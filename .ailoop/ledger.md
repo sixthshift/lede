@@ -285,3 +285,20 @@ Append-only journal. Newest at bottom.
     poll /api/health, assert DATA_DIR .sqlite created) — the real-boot gate the pure-vitest
     baseline lacked. Strengthens the check so a non-bootable runner can't pass again.
   chunk: 2/6 tickets closed this run.
+
+[v2-018] T017, E1-C — ACCEPTED (batch fan-out, workflow Gate + coordinator both green)
+  gate (merged tree, master @ dfa0484): bun run check exit 0; bun run build exit 0; bun run
+    test keyless -> 13 files / 113 tests PASS. Workflow's own Gate agent passed (oracle.passed
+    true) AND coordinator re-confirmed. Verify passed both independently; merge clean; worktrees pruned.
+  T017: server runner now Node/tsx (package.json start=`tsx src/server/index.ts`, dev:api=`tsx
+    watch ...`, tsx@^4.19.2 devDep); test/boot.smoke.test.ts spawns the REAL entrypoint under
+    tsx, polls /api/health -> {ok:true}, asserts DATA_DIR/lede.sqlite created. The boot gap is
+    now closed with an executable gate (escaped-bug rule satisfied). check/build/test scripts
+    still run under Bun (vitest/node) — unchanged.
+  E1-C: entryInput derived via drizzle-zod createInsertSchema(entries); ALL §17 bounds +
+    superRefine + entryMetaZ discriminated union + entryImport(max200) preserved; TailorDecisionZ
+    stays hand-written; +profileInput/settingsInput (§4.2/§9/§16). schema.test 24 tests green,
+    zero regression. CONTRAST held: client vite bundle contains 0 refs to better-sqlite3 — the
+    src/shared -> src/server/db/schema.ts import stays driver-free (that file imports only
+    drizzle-orm/sqlite-core).
+  chunk: 4/6 tickets closed this run. Next ready: E1-D (routes; deps B,C done).

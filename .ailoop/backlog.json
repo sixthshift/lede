@@ -395,7 +395,7 @@
     {
       "id": "T017",
       "title": "Server runs under Node (tsx), not Bun — better-sqlite3 native ABI; add real-boot smoke gate",
-      "status": "todo",
+      "status": "done",
       "depends_on": [
         "E1-B"
       ],
@@ -407,12 +407,12 @@
       "context": "Baseline (oracle.md): bun run check + bun run build + bun run test pass, keyless. Touch ONLY declared files (+ package.json manifest). Add tests for new behavior.\n\nESCAPED ISSUE (verified by coordinator 2026-07-02): running `bun src/server/index.ts` dies with ERR_DLOPEN_FAILED — better-sqlite3 ships a Node-ABI prebuilt (NODE_MODULE_VERSION 127) that Bun 1.3.14's embedded V8 (137) cannot load; better-sqlite3 uses direct V8/NAN bindings, not N-API, so this is NOT rebuild-away (oven-sh/bun#4290). Under Node v22 via tsx the server boots, runs migrations, and GET /api/health returns {ok:true} (coordinator confirmed).\nRESOLUTION (mechanical, ledger [v2-017]): the server PROCESS runs under Node — reverting the runner to spec §3.1's own 'Node >= 20'. Bun stays the package-manager + script runner (bun install / bun run check|build|test unchanged; they already use vitest/node).\nCHANGES: in package.json scripts, change `start` from `bun src/server/index.ts` to `tsx src/server/index.ts`; change `dev:api` from `bun --watch src/server/index.ts` to `tsx watch src/server/index.ts`. Add `tsx` to devDependencies. Do NOT touch check/build/test scripts. Do NOT introduce bun:sqlite (it breaks vitest).\n\nSTRENGTHENED CHECK (escaped-bug rule): add test/boot.smoke.test.ts that spawns the REAL entrypoint under the actual runner (node via tsx — e.g. child_process spawn of `tsx src/server/index.ts`, or `node --import tsx`) against a fresh tmp DATA_DIR on a free port; poll GET /api/health until {ok:true} (fail on ~15s timeout); assert the .sqlite file was created under DATA_DIR; tear the child down. This is the boot gate the baseline lacked — it catches a runner that can't load the native driver.",
       "acceptance": "- baseline passes (check+build+test, keyless)\n- CONTRAST (real boot, gameable-resistant): test/boot.smoke.test.ts spawns the entrypoint under the real runner, GET /api/health -> {ok:true}, and the DATA_DIR .sqlite file exists after boot; the test FAILS if the server can't boot (proves the runner loads better-sqlite3)\n- package.json `start` and `dev:api` no longer invoke `bun` on src/server/index.ts (grep: no `bun` invoking src/server/index.ts in scripts); `tsx` present in devDependencies\n- new test in test/boot.smoke.test.ts",
       "attempts": [],
-      "evidence": null
+      "evidence": "COORDINATOR merged-tree re-verify (2026-07-02, master @ dfa0484): bun run check exit 0; bun run build exit 0; bun run test keyless (all provider keys unset) -> 13 files / 113 tests PASS (incl. new boot.smoke.test.ts). Workflow Gate agent also passed independently; Verify passed both (scope clean, no gaming); merge clean. T017: package.json start/dev:api now `tsx ...` (no bun on entrypoint), tsx@^4.19.2 devDep; boot.smoke.test.ts spawns real entrypoint under tsx -> /api/health {ok:true} + DATA_DIR/lede.sqlite created (fails if runner cannot dlopen better-sqlite3)."
     },
     {
       "id": "E1-C",
       "title": "drizzle-zod entry validators + profile/settings validators (replace Phase-0 hand-rolled entryInput)",
-      "status": "todo",
+      "status": "done",
       "depends_on": [
         "E1-B"
       ],
@@ -424,7 +424,7 @@
       "context": "Baseline (oracle.md, every ticket): `bun run check` + `bun run build` + `bun run test` all pass, keyless (no provider key set). Locked stack (oracle.md, cite; never re-litigate): Bun runtime + Fastify server, Vite + React SPA, drizzle-orm over better-sqlite3 (single-file SQLite, WAL), zod validation, TanStack Query + react-router client, shadcn/ui primitives + Tailwind, self-hosted IBM Plex via @fontsource. Path alias `@shared/*`→`src/shared/*` only (no @server/@client). Tests live in /test, run under vitest (node); server runs under bun — better-sqlite3 works under BOTH (do not use bun:sqlite, it breaks vitest). Touch ONLY your declared `files` (+ package.json/lockfile for deps). Add tests for new behavior.\n\nReplace the Phase-0 hand-rolled `entryInput` in src/shared/schema.ts with `createInsertSchema(entries, {...})` from drizzle-zod (§4.4), importing the `entries` table from src/server/db/schema.ts (safe — that file is driver-free per E1-B). PRESERVE exactly: the discriminatedUnion `entryMetaZ` (hand-written, unchanged), the §17 bounds that drizzle-zod can't infer (facts ≤12 × 1–300; label sections exactly 1 fact; cert/reference allow 0; tags ≤8 × 1–40; framings ≤6 × 1–200; meta string fields 1–120; id 1–80 optional; jobDescription bound stays where it is), `.omit({createdAt, updatedAt})`, and the superRefine (meta.section === section; per-section facts arity). Keep `entryImport = z.array(entryInput).max(200)`. Keep `TailorDecisionZ` HAND-WRITTEN (never derived). ADD `profileInput` and `settingsInput` (provider/model/baseUrl/layout) zod objects per §4.2/§9. All existing schema tests must stay green (regression).",
       "acceptance": "- baseline passes; ALL existing test/schema.test.ts cases still green (per-section meta, arity rules, foreign-field rejection)\n- entryInput is derived via createInsertSchema AND still enforces the §17 bounds: rejects facts.length>12, a tag >40 chars, a meta string >120, a foreign meta field\n- CONTRAST (boundary intact): `bun run build` (vite client build) succeeds and the dist bundle does NOT contain 'better-sqlite3' or 'node:' native driver refs — the shared→db import stays driver-free\n- profileInput / settingsInput accept a valid payload and reject a malformed one\n- tests updated in test/schema.test.ts",
       "attempts": [],
-      "evidence": null
+      "evidence": "COORDINATOR merged-tree re-verify (2026-07-02, master @ dfa0484): bun run check exit 0; bun run build exit 0; bun run test keyless (all provider keys unset) -> 13 files / 113 tests PASS (incl. new boot.smoke.test.ts). Workflow Gate agent also passed independently; Verify passed both (scope clean, no gaming); merge clean. E1-C: entryInput derived via createInsertSchema(entries) (drizzle-zod ^0.8.3); §17 bounds + superRefine + entryMetaz + entryImport preserved; TailorDecisionZ still hand-written; +profileInput/settingsInput; schema.test 24 tests green; client bundle grep better-sqlite3 -> 0 (boundary intact)."
     },
     {
       "id": "E1-D",
