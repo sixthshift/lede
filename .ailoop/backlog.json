@@ -540,7 +540,7 @@
     {
       "id": "E2",
       "title": "Phase 2 — auth gate + BYOK (encrypted key storage, validate-on-save, Settings)",
-      "status": "todo",
+      "status": "decomposed",
       "depends_on": [
         "E1-E",
         "E1-F2",
@@ -551,6 +551,106 @@
       "context": "COARSE EPIC — decompose after E1 into: (a) src/server/crypto.ts (AES-256-GCM encrypt/decrypt using LEDE_MASTER_KEY; scrypt hash/verify) + config.ts fail-fast REQUIRING LEDE_MASTER_KEY + LEDE_SESSION_SECRET at boot; (b) secrets-table access; (c) auth.ts + /api/auth/{setup,login,logout} (@fastify/secure-session) + session guard on ALL /api/* except /api/auth/* and /api/health; first-run set-password; LEDE_AUTH_DISABLED escape hatch (default false); (d) BYOK: PUT /api/settings/key (validate via one cheap live generateText BEFORE storing, then store ciphertext), DELETE, GET /api/settings returns {keySet,provider,model,baseUrl,layout} NEVER the key; (e) /api/tailor switches to ProviderEngine with the DECRYPTED BYOK key (in-memory only), no_api_key→400; (f) client: LoginGate, SettingsView + ApiKeyForm (write-only) + ProviderPicker + ModelPicker. RED-TEAM — child tickets MUST include: (1) SENTINEL scan — store key sk-SENTINEL-<uuid>, hit EVERY endpoint incl. tailor error paths, grep every response body + all stdout/stderr/log files + the .sqlite/-wal/-shm + entire DATA_DIR; sentinel appears nowhere plaintext, only in secrets.apiKeyEnc ciphertext; (2) master key load-bearing — decryption THROWS/garbles when LEDE_MASTER_KEY changed; two encryptions of same plaintext have DIFFERENT iv (catches base64/ECB fakes); (3) PROCESS-LEVEL boot refusal — spawn real server with LEDE_MASTER_KEY unset AND with a malformed key → non-zero exit, no listening port, does NOT auto-generate a master key; (4) master-key material never in DATA_DIR (the backup unit, §23); (5) validate-BEFORE-store — bad key → 4xx AND secrets.apiKeyEnc unchanged; (6) guard total with auth ENABLED — every route except auth/health returns 401 sans session (esp. /api/tailor).",
       "acceptance": "See oracle.md Phase 2 (merged-tree): boot refuses without LEDE_MASTER_KEY (process-level); encrypt/decrypt round-trip w/ distinct IVs; login→session, guarded routes 401; key stored as ciphertext, sentinel scan clean across responses/logs/DATA_DIR; validate-on-save; /api/tailor no-key→400 no_api_key.",
       "attempts": [],
+      "evidence": "Decomposed into E2-A..E2-E (5 child tickets). See ledger [v2-023]."
+    },
+    {
+      "id": "E2-A",
+      "title": "crypto.ts (AES-256-GCM + scrypt) + config fail-fast (LEDE_MASTER_KEY/SESSION_SECRET) + test-env setup + process-level boot refusal",
+      "status": "todo",
+      "depends_on": [],
+      "files": [
+        "src/server/crypto.ts",
+        "src/server/config.ts",
+        "test/setup.ts",
+        "vite.config.ts",
+        "test/boot.smoke.test.ts",
+        "test/crypto.test.ts",
+        "test/config.test.ts"
+      ],
+      "origin": "decomposed from E2 (spec §8, §17, §19, §23)",
+      "context": "Baseline (oracle.md, every ticket): `bun run check` + `bun run build` + `bun run test` all pass, KEYLESS (no provider key). Locked stack: Fastify + Vite/React SPA, drizzle-orm over better-sqlite3, zod+drizzle-zod, TanStack Query + react-router, shadcn/ui + Tailwind, node crypto (AES-256-GCM + scrypt) + @fastify/secure-session. Path alias `@shared/*` only. Tests in /test under vitest(node); client tests use @testing-library/react + jsdom docblock. RUNTIME (v2-017): server runs under Node/tsx; Bun runs check/build/test. Secrets are OPERATOR secrets (LEDE_MASTER_KEY 32-byte base64 + LEDE_SESSION_SECRET) required to BOOT — distinct from a provider BYOK key (encrypted in the secrets table). Touch ONLY declared files (+ package.json/lockfile). Add tests for new behavior. Cross-cutting invariants stay green: NO tag-scoring, NO LLM-checks-LLM.\n\nFOUNDATION for Phase 2 (everything else depends on this).\n(1) src/server/crypto.ts (node:crypto only): `encrypt(plaintext, masterKey)` -> {iv, tag, ciphertext} using AES-256-GCM with a FRESH random iv each call; `decrypt({iv,tag,ciphertext}, masterKey)` -> plaintext (throws on tampered tag/wrong key); `hashPassword(pw)` -> {hash, salt} using scrypt (random salt); `verifyPassword(pw, {hash,salt})` -> bool (timing-safe compare). masterKey is the decoded 32 bytes.\n(2) src/server/config.ts: EXTEND loadConfig() to parse+VALIDATE `masterKey` (from LEDE_MASTER_KEY, base64 decoding to EXACTLY 32 bytes — else throw), `sessionSecret` (from LEDE_SESSION_SECRET, non-empty — @fastify/secure-session needs >=32 chars, validate), `authDisabled` (LEDE_AUTH_DISABLED === 'true', default false). loadConfig() FAIL-FAST throws a clear error if master key or session secret is missing/malformed. Do NOT auto-generate a master key. Keep existing port/tailorEngine/dataDir.\n(3) test/setup.ts (NEW vitest global setup) + wire it in vite.config.ts `test.setupFiles`: set process.env.LEDE_MASTER_KEY (a valid 32-byte base64), LEDE_SESSION_SECRET (a >=32-char test value), and LEDE_AUTH_DISABLED='true' BEFORE tests run, so the whole existing keyless suite (buildApp etc.) still boots. (The auth guard is proven ENABLED separately in E2-B.)\n(4) test/boot.smoke.test.ts (EXTEND, owned-contract now changes): the spawned real entrypoint must now receive LEDE_MASTER_KEY + LEDE_SESSION_SECRET in its env (add them to the existing happy-path spawn). ADD the process-level boot-refusal cases: spawn the real entrypoint with LEDE_MASTER_KEY UNSET, and separately with a MALFORMED master key (not 32 bytes) -> the process exits NON-ZERO, never starts listening, and does NOT write/auto-generate a master key anywhere.\nRED-TEAM acceptance encodes: master-key load-bearing (distinct IVs; wrong-key decrypt throws) + process boot refusal.",
+      "acceptance": "- baseline passes; ALL existing suites stay green (test/setup.ts provides operator secrets + LEDE_AUTH_DISABLED=true)\n- CONTRAST (crypto load-bearing, gameable-resistant): encrypt(x) then decrypt -> x; TWO encrypts of the SAME plaintext yield DIFFERENT iv AND different ciphertext (catches ECB/base64 fakes); decrypt with a DIFFERENT masterKey THROWS (not silent garbage); scrypt verifyPassword true for right pw, false for wrong\n- CONTRAST (config fail-fast): loadConfig() THROWS when LEDE_MASTER_KEY is unset, and when it is malformed (base64 not decoding to 32 bytes); throws when LEDE_SESSION_SECRET missing\n- CONTRAST (process-level boot refusal): spawning the real entrypoint with master key unset / malformed -> non-zero exit, no listening port, no auto-generated key file in DATA_DIR\n- new tests in test/crypto.test.ts + test/config.test.ts; boot.smoke extended",
+      "attempts": [],
+      "evidence": null
+    },
+    {
+      "id": "E2-B",
+      "title": "Auth: scrypt password gate + @fastify/secure-session + session guard on all /api/* except auth/health + /api/auth/{setup,login,logout}",
+      "status": "todo",
+      "depends_on": [
+        "E2-A"
+      ],
+      "files": [
+        "src/server/auth.ts",
+        "src/server/routes/auth.ts",
+        "src/server/index.ts",
+        "test/api.auth.test.ts"
+      ],
+      "origin": "decomposed from E2 (spec §7, §9)",
+      "context": "Baseline (oracle.md, every ticket): `bun run check` + `bun run build` + `bun run test` all pass, KEYLESS (no provider key). Locked stack: Fastify + Vite/React SPA, drizzle-orm over better-sqlite3, zod+drizzle-zod, TanStack Query + react-router, shadcn/ui + Tailwind, node crypto (AES-256-GCM + scrypt) + @fastify/secure-session. Path alias `@shared/*` only. Tests in /test under vitest(node); client tests use @testing-library/react + jsdom docblock. RUNTIME (v2-017): server runs under Node/tsx; Bun runs check/build/test. Secrets are OPERATOR secrets (LEDE_MASTER_KEY 32-byte base64 + LEDE_SESSION_SECRET) required to BOOT — distinct from a provider BYOK key (encrypted in the secrets table). Touch ONLY declared files (+ package.json/lockfile). Add tests for new behavior. Cross-cutting invariants stay green: NO tag-scoring, NO LLM-checks-LLM.\n\nSingle-user password gate (§7) — NOT accounts. Uses crypto.ts (E2-A: hashPassword/verifyPassword) + config (E2-A: sessionSecret, authDisabled).\n(1) Register @fastify/secure-session in buildApp() with the sessionSecret (add dep). (2) src/server/routes/auth.ts: POST /api/auth/setup (FIRST-RUN only: if secrets.auth is null, store scrypt hash+salt; if already set -> 409/403), POST /api/auth/login (verifyPassword against secrets.auth -> set session), POST /api/auth/logout (clear session). Bodies zod-validated {password}. (3) src/server/auth.ts: the guard preHandler — every /api/* EXCEPT /api/auth/* and /api/health requires a valid session; no session -> 401. When config.authDisabled is true, the guard is a no-op (escape hatch).\n(4) src/server/index.ts (buildApp): EXTEND signature to buildApp(db?, configOverride?) so a test can force auth ENABLED (configOverride.authDisabled=false) even though the global test env sets it true; register secure-session + auth routes + the guard hook. Keep existing route registration (entries/profile/settings/tailor) and the injected-db path intact. The guard must cover /api/tailor, /api/entries, /api/profile, /api/settings, /api/settings/key.\nRED-TEAM acceptance: guard TOTAL with auth ENABLED — every guarded route 401 without a session; first-run setup then login issues a working session.",
+      "acceptance": "- baseline passes (existing suites stay green — they run with LEDE_AUTH_DISABLED=true from test/setup.ts)\n- CONTRAST (guard total, auth ENABLED, gameable-resistant): build an app with auth ENABLED (configOverride authDisabled=false); WITHOUT a session, GET/POST to /api/entries, /api/profile, /api/settings, /api/settings/key, and POST /api/tailor ALL return 401; /api/health and /api/auth/* are reachable without a session\n- first-run setup: POST /api/auth/setup sets the password (scrypt hash stored in secrets.auth); a second setup attempt is rejected (already configured)\n- login: POST /api/auth/login with the right password issues a session that then passes the guard; wrong password -> 401; logout clears it\n- new tests in test/api.auth.test.ts",
+      "attempts": [],
+      "evidence": null
+    },
+    {
+      "id": "E2-C",
+      "title": "BYOK key storage: PUT/DELETE /api/settings/key, validate-before-store, ciphertext-only, sentinel leak scan",
+      "status": "todo",
+      "depends_on": [
+        "E2-A"
+      ],
+      "files": [
+        "src/server/routes/settings.ts",
+        "src/server/keyvalidation.ts",
+        "test/api.byok.test.ts"
+      ],
+      "origin": "decomposed from E2 (spec §8, §9, §23)",
+      "context": "Baseline (oracle.md, every ticket): `bun run check` + `bun run build` + `bun run test` all pass, KEYLESS (no provider key). Locked stack: Fastify + Vite/React SPA, drizzle-orm over better-sqlite3, zod+drizzle-zod, TanStack Query + react-router, shadcn/ui + Tailwind, node crypto (AES-256-GCM + scrypt) + @fastify/secure-session. Path alias `@shared/*` only. Tests in /test under vitest(node); client tests use @testing-library/react + jsdom docblock. RUNTIME (v2-017): server runs under Node/tsx; Bun runs check/build/test. Secrets are OPERATOR secrets (LEDE_MASTER_KEY 32-byte base64 + LEDE_SESSION_SECRET) required to BOOT — distinct from a provider BYOK key (encrypted in the secrets table). Touch ONLY declared files (+ package.json/lockfile). Add tests for new behavior. Cross-cutting invariants stay green: NO tag-scoring, NO LLM-checks-LLM.\n\nBYOK key handling (§8). Uses crypto.ts (E2-A encrypt/decrypt + the master key from config). EXTEND src/server/routes/settings.ts (E1-D created it; keep GET/PUT /api/settings intact — GET already returns {keySet,provider,model,baseUrl,layout}, key NEVER returned).\n(1) src/server/keyvalidation.ts: `validateProviderKey({provider,model,apiKey,baseUrl})` -> does ONE cheap live `generateText` (Vercel AI SDK) and returns ok / throws on failure. INJECTABLE: settingsRoutes must accept an optional validator so tests pass a fake (keyless) — default is the real one. This is the seam that keeps validate-before-store keyless-testable.\n(2) PUT /api/settings/key {apiKey}: VALIDATE via validateProviderKey FIRST (using current settings.provider/model/baseUrl); on failure -> 4xx and secrets.apiKeyEnc UNCHANGED; on success -> encrypt(apiKey, masterKey) and store {iv,tag,ciphertext} in secrets.apiKeyEnc, set apiKeyValidatedAt, return {keySet:true}. (3) DELETE /api/settings/key -> purge (secrets.apiKeyEnc=null), return {keySet:false}. (4) NEVER log the key; NEVER return it.\nRED-TEAM acceptance (the security core): SENTINEL scan + validate-before-store + ciphertext-only + master-key-not-in-DATA_DIR.",
+      "acceptance": "- baseline passes\n- CONTRAST (validate-before-store): with an injected validator that REJECTS, PUT /api/settings/key -> 4xx AND secrets.apiKeyEnc is unchanged (still null / still the prior value); with a validator that ACCEPTS, the key is stored as {iv,tag,ciphertext} (NOT plaintext) and keySet becomes true\n- CONTRAST (SENTINEL leak scan, gameable-resistant): store apiKey `sk-SENTINEL-<uuid>` (validator accepts); then hit every endpoint incl. GET /api/settings and the tailor error paths; assert the sentinel string appears in NONE of: any response body, the server logs (capture stdout/stderr), and NO plaintext occurrence anywhere under DATA_DIR (the .sqlite + -wal + -shm). It may appear ONLY inside secrets.apiKeyEnc as ciphertext (i.e. the raw sentinel substring is absent from the DB file bytes)\n- CONTRAST (master key not in DATA_DIR): the LEDE_MASTER_KEY value never appears in any file under DATA_DIR (§23 — DB leak without the master key keeps the key safe)\n- DELETE purges: after DELETE /api/settings/key, GET /api/settings keySet=false\n- new tests in test/api.byok.test.ts",
+      "attempts": [],
+      "evidence": null
+    },
+    {
+      "id": "E2-D",
+      "title": "/api/tailor uses the decrypted BYOK key via ProviderEngine (in-memory only); no stored key -> 400 no_api_key",
+      "status": "todo",
+      "depends_on": [
+        "E2-B",
+        "E2-C"
+      ],
+      "files": [
+        "src/server/index.ts",
+        "test/api.tailor-byok.test.ts"
+      ],
+      "origin": "decomposed from E2 (spec §8, §9, §6.1)",
+      "context": "Baseline (oracle.md, every ticket): `bun run check` + `bun run build` + `bun run test` all pass, KEYLESS (no provider key). Locked stack: Fastify + Vite/React SPA, drizzle-orm over better-sqlite3, zod+drizzle-zod, TanStack Query + react-router, shadcn/ui + Tailwind, node crypto (AES-256-GCM + scrypt) + @fastify/secure-session. Path alias `@shared/*` only. Tests in /test under vitest(node); client tests use @testing-library/react + jsdom docblock. RUNTIME (v2-017): server runs under Node/tsx; Bun runs check/build/test. Secrets are OPERATOR secrets (LEDE_MASTER_KEY 32-byte base64 + LEDE_SESSION_SECRET) required to BOOT — distinct from a provider BYOK key (encrypted in the secrets table). Touch ONLY declared files (+ package.json/lockfile). Add tests for new behavior. Cross-cutting invariants stay green: NO tag-scoring, NO LLM-checks-LLM.\n\nWire /api/tailor (buildApp() in src/server/index.ts) to the user's BYOK key in LIVE mode, keeping the keyless FixtureEngine path for tests/demo. Uses crypto.decrypt (E2-A) + the stored secrets.apiKeyEnc (E2-C). Depends on E2-B (index.ts guard/session — avoid conflicts) and E2-C (key storage).\nLOGIC: keep the engine-mode split. In FIXTURE mode (LEDE_TAILOR_ENGINE=fixture, i.e. tests/CI/demo) -> FixtureEngine, no key needed (current behavior, MUST stay keyless-green). In LIVE mode -> read secrets.apiKeyEnc; if NULL -> respond 400 {error:'no_api_key'} BEFORE any provider call; else decrypt the key in memory (do NOT persist/log the plaintext, discard after the call) and build a per-request ProviderEngine({provider,model,baseUrl,apiKey}) from settings.provider/model/baseUrl + the decrypted key, then run tailor(). Keep the existing mapTailorError distinct statuses (§9). Do NOT change assemble/validate/prompt. Do NOT touch routes/* or auth.\nNOTE: the no_api_key path is keyless-testable — set LEDE_TAILOR_ENGINE=live for that one test with NO stored key -> expect 400 no_api_key (it short-circuits before any live call). Fixture-mode tailor tests remain keyless and green.",
+      "acceptance": "- baseline passes; all existing keyless tailor tests (fixture mode) stay green\n- CONTRAST (no_api_key, gameable-resistant): with engine mode LIVE and NO stored key, POST /api/tailor -> 400 {error:'no_api_key'} (short-circuits, no provider call); this differs from fixture-mode 422 no_fixture\n- decrypt-in-memory: with a stored (test-encrypted) key and an injected/stubbed provider path, the tailor route decrypts and builds ProviderEngine with settings.provider/model + the decrypted key; the plaintext key is never logged (assert absence in captured logs) nor persisted beyond secrets.apiKeyEnc\n- new tests in test/api.tailor-byok.test.ts",
+      "attempts": [],
+      "evidence": null
+    },
+    {
+      "id": "E2-E",
+      "title": "Client: LoginGate + SettingsView + ApiKeyForm (write-only) + ProviderPicker + ModelPicker",
+      "status": "todo",
+      "depends_on": [
+        "E2-B",
+        "E2-C"
+      ],
+      "files": [
+        "src/client/components/LoginGate.tsx",
+        "src/client/components/SettingsView.tsx",
+        "src/client/components/ApiKeyForm.tsx",
+        "src/client/components/ProviderPicker.tsx",
+        "src/client/components/ModelPicker.tsx",
+        "src/client/api.ts",
+        "src/client/App.tsx",
+        "src/client/hooks/queries.ts",
+        "test/settings-auth.test.tsx"
+      ],
+      "origin": "decomposed from E2 (spec §7, §8, §13)",
+      "context": "Baseline (oracle.md, every ticket): `bun run check` + `bun run build` + `bun run test` all pass, KEYLESS (no provider key). Locked stack: Fastify + Vite/React SPA, drizzle-orm over better-sqlite3, zod+drizzle-zod, TanStack Query + react-router, shadcn/ui + Tailwind, node crypto (AES-256-GCM + scrypt) + @fastify/secure-session. Path alias `@shared/*` only. Tests in /test under vitest(node); client tests use @testing-library/react + jsdom docblock. RUNTIME (v2-017): server runs under Node/tsx; Bun runs check/build/test. Secrets are OPERATOR secrets (LEDE_MASTER_KEY 32-byte base64 + LEDE_SESSION_SECRET) required to BOOT — distinct from a provider BYOK key (encrypted in the secrets table). Touch ONLY declared files (+ package.json/lockfile). Add tests for new behavior. Cross-cutting invariants stay green: NO tag-scoring, NO LLM-checks-LLM.\n\nClient auth + settings UI (§13). EXTEND src/client/api.ts (auth: setup/login/logout; key: PUT/DELETE /api/settings/key) throwing ApiError{status,code}. EXTEND src/client/hooks/queries.ts WITHOUT clobbering existing hooks (useEntries/useDeleteEntry/useCreateEntry/useUpdateEntry/useProfile/useSettings/useUpdateProfile/useUpdateSettings) — add auth + key mutations.\n(1) LoginGate: wraps the app; if a query returns 401 (ApiError.status===401) show the login/setup form (first-run = setup password, else login); on success re-render the app. (2) SettingsView (replace the /settings stub route added in E1-F1 — wire it in App.tsx): ApiKeyForm (WRITE-ONLY — shows keySet status from GET /api/settings, an input to set a NEW key, a Delete button; NEVER renders the stored key because the API never returns it), ProviderPicker (from @shared/providers ProviderId list) + ModelPicker (provider+model saved via PUT /api/settings). Use E1-A primitives (select/input/button/dialog). Depends on E2-B (auth endpoints) + E2-C (key endpoints).\nRED-TEAM acceptance: write-only key (the form never displays a key value) + 401 routes to LoginGate.",
+      "acceptance": "- baseline passes; all existing client suites (library, entry-editor, profile-layout) stay green\n- CONTRAST (write-only key, gameable-resistant): render ApiKeyForm with a mocked GET /api/settings returning {keySet:true, ...} (and NO key field, because the API never sends one) -> the form shows a 'key is set' status and an input to REPLACE it, but renders NO actual key value anywhere (there is none to render); saving fires PUT /api/settings/key; Delete fires DELETE /api/settings/key\n- CONTRAST (401 -> LoginGate): with a mocked query returning 401, LoginGate shows the login form instead of the app; after a mocked successful login the app content renders\n- ProviderPicker/ModelPicker: changing provider+model fires PUT /api/settings with the new values\n- new tests in test/settings-auth.test.tsx",
+      "attempts": [],
       "evidence": null
     },
     {
@@ -558,7 +658,8 @@
       "title": "Phase 3 — reasoning UI (timebox) + remaining sections",
       "status": "todo",
       "depends_on": [
-        "E2"
+        "E2-D",
+        "E2-E"
       ],
       "files": [],
       "origin": "spec §24 Phase 3 (§10, §11, §23)",

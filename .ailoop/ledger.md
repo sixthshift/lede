@@ -385,3 +385,27 @@ Append-only journal. Newest at bottom.
   chunk: 3/6 closed this run (E1-E, E1-F2, E1-F3) + Phase 1 closed. STOPPING at the phase boundary
     (natural human checkpoint before Phase 2 = auth/BYOK/crypto, the security-critical phase).
   next: E2 (Phase 2 epic) is now ready — needs decomposition at next intake (like E1 was).
+
+[v2-023] ===== PHASE 2 OPENED — E2 epic decomposed (5 child tickets) =====
+  E2 -> E2-A..E2-E; E2 status=decomposed; E3.depends_on rewired to leaves [E2-D, E2-E].
+  children (dependency spine):
+    E2-A crypto.ts (AES-256-GCM+scrypt) + config fail-fast + test-env setup + boot refusal  deps []
+    E2-B auth: scrypt gate + secure-session + guard + /api/auth/{setup,login,logout}         deps [A]
+    E2-C BYOK: PUT/DELETE /api/settings/key, validate-before-store, sentinel scan            deps [A]
+    E2-D /api/tailor uses decrypted BYOK key (ProviderEngine); no key -> 400 no_api_key       deps [B,C]
+    E2-E client: LoginGate + SettingsView + ApiKeyForm(write-only) + Provider/ModelPicker     deps [B,C]
+  KEY DESIGN DECISIONS (coordinator, to make Phase 2 keyless-testable without breaking the 140
+    existing tests):
+    - test/setup.ts (new vitest setupFiles) provides operator secrets (LEDE_MASTER_KEY 32-byte
+      base64 + LEDE_SESSION_SECRET) AND LEDE_AUTH_DISABLED=true, so the whole existing suite still
+      boots + isn't 401'd. E2-B proves the guard by building an app with auth EXPLICITLY enabled.
+    - buildApp(db?, configOverride?) so auth-enabled is testable in isolation.
+    - validateProviderKey is an INJECTABLE seam (E2-C) -> validate-before-store is keyless-testable.
+    - no_api_key 400 (E2-D) is keyless-testable: LIVE mode + no stored key short-circuits before
+      any provider call.
+  RED-TEAM baked into acceptance (all from E2 context, gameable-resistant): A=distinct-IV +
+    wrong-key-throws + process boot refusal; B=guard-total-with-auth-ENABLED; C=SENTINEL scan
+    (key absent from every response/log/DATA_DIR byte, only ciphertext in secrets.apiKeyEnc) +
+    validate-before-store + master-key-not-in-DATA_DIR; D=no_api_key short-circuit + no plaintext
+    key in logs; E=write-only key form + 401->LoginGate.
+  fan-out plan: [E2-A] -> [E2-B, E2-C] (disjoint) -> [E2-D, E2-E] (disjoint). 5 tickets.
