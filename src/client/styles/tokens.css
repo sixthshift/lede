@@ -1,0 +1,50 @@
+/*
+ * Design tokens (§12) — the single source of color/radius truth.
+ * Verbatim §12 palette first, then shadcn's CSS variable names mapped onto
+ * it ("--accent is primary"). Components (ours and shadcn's) should read the
+ * shadcn-named variables below, never re-declare a color.
+ */
+
+:root {
+  /* §12 palette — verbatim */
+  --ink: #1a1a1a;
+  --ink-soft: #52525b;
+  --ink-faint: #a1a1aa;
+  --bg: #fff;
+  --bg-subtle: #fafafa;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --accent: #2f5fdd;
+  --accent-weak: #eef2fe;
+  --success: #15803d;
+  --warn: #b45309;
+  --danger: #b91c1c;
+
+  /* §12 radius: 4px base, 6px cards/dialogs (tailwind.config.ts derives
+     lg/md/sm from this single value) */
+  --radius: 4px;
+
+  /* §12 type: IBM Plex, self-hosted (imported in app.css) */
+  --font-sans: "IBM Plex Sans", ui-sans-serif, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-serif: "IBM Plex Serif", ui-serif, serif;
+
+  /* shadcn theme mapping — re-themed to the palette above, not shadcn's
+     defaults. --accent is primary. */
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card: var(--bg);
+  --card-foreground: var(--ink);
+  --popover: var(--bg);
+  --popover-foreground: var(--ink);
+  --primary: var(--accent);
+  --primary-foreground: var(--bg);
+  --secondary: var(--bg-subtle);
+  --secondary-foreground: var(--ink);
+  --muted: var(--bg-subtle);
+  --muted-foreground: var(--ink-soft);
+  --accent-bg: var(--accent-weak);
+  --accent-foreground: var(--ink);
+  --destructive: var(--danger);
+  --destructive-foreground: var(--bg);
+}
