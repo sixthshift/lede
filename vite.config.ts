@@ -18,5 +18,6 @@ export default defineConfig({
   // Exclude ailoop fan-out worktrees so their test copies never pollute the suite.
   test: {
     exclude: [...configDefaults.exclude, "**/.claude/**"],
+    setupFiles: ["./test/setup.ts"],
   },
 });
