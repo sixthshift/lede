@@ -3,8 +3,17 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Section } from "@shared/types";
-import { fetchEntries, deleteEntry, createEntry, updateEntry, fetchProfile, fetchSettings } from "../api";
-import type { EntryInput } from "../api";
+import {
+  fetchEntries,
+  deleteEntry,
+  createEntry,
+  updateEntry,
+  fetchProfile,
+  updateProfile,
+  fetchSettings,
+  updateSettings,
+} from "../api";
+import type { EntryInput, ProfileInput, SettingsInput } from "../api";
 
 export function useEntries(section?: Section) {
   return useQuery({
@@ -43,11 +52,30 @@ export function useUpdateEntry() {
   });
 }
 
-// Stubs — E1-F3 (settings) extends these with mutations.
 export function useProfile() {
   return useQuery({ queryKey: ["profile"] as const, queryFn: fetchProfile });
 }
 
+export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ProfileInput) => updateProfile(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
+  });
+}
+
 export function useSettings() {
   return useQuery({ queryKey: ["settings"] as const, queryFn: fetchSettings });
+}
+
+export function useUpdateSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SettingsInput) => updateSettings(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["settings"] });
+    },
+  });
 }

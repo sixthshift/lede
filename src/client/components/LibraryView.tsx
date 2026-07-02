@@ -8,6 +8,8 @@ import { useEntries, useDeleteEntry } from "../hooks/queries";
 import { LibraryToolbar } from "./LibraryToolbar";
 import { SectionAccordion } from "./SectionAccordion";
 import { EntryEditor } from "./EntryEditor";
+import { ProfileEditor } from "./ProfileEditor";
+import { LayoutEditor } from "./LayoutEditor";
 import { Button } from "./ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
@@ -30,6 +32,8 @@ export function LibraryView() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | undefined>(undefined);
   const [editTargetId, setEditTargetId] = useState<string>("");
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [layoutOpen, setLayoutOpen] = useState(false);
 
   function openCreate() {
     setEditingEntry(undefined);
@@ -44,6 +48,16 @@ export function LibraryView() {
   return (
     <div>
       <LibraryToolbar />
+
+      {/* Profile identity + resume layout entry points — E1-F3. */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="outline" onClick={() => setProfileOpen(true)}>
+          Edit profile
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => setLayoutOpen(true)}>
+          Edit layout
+        </Button>
+      </div>
 
       {/* Add/edit entry points — E1-F2. EntryCard's own "Edit" affordance is a
           disabled stub (EntryCard.tsx is not a file this ticket may touch);
@@ -97,6 +111,8 @@ export function LibraryView() {
       </div>
 
       <EntryEditor open={editorOpen} onOpenChange={setEditorOpen} entry={editingEntry} />
+      <ProfileEditor open={profileOpen} onOpenChange={setProfileOpen} />
+      <LayoutEditor open={layoutOpen} onOpenChange={setLayoutOpen} />
     </div>
   );
 }
