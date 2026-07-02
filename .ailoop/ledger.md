@@ -144,3 +144,29 @@ Append-only journal. Newest at bottom.
        '**/.claude/**' so future fan-out worktrees can never pollute the suite. Real
        count now 25. NOTE for future batches: prune worktrees after each fan-out.
   evidence: see backlog T003/T004/T006/T009.evidence
+
+[v2-009] RESUME NOTES (read this on any fresh-session resume)
+  - Fan-out: use the LOCAL guarded copy .ailoop/build-phase.workflow.js, NOT the raw
+    templates/build-phase.workflow.js — the template crashes on args delivered as a
+    STRING (destructures `args` directly); the local copy JSON.parses a string first.
+  - Ticket authoring: any ticket whose acceptance needs tests MUST list its test file
+    in `files` (else the scope check fails the added test as an undeclared touch).
+    Fixed per-wave so far (T004/T005/T007). Config/data tickets are test-exempt.
+  - After every fan-out: `git worktree remove --force` the .claude/worktrees/* and
+    delete the merged worktree-* branches. vite.config.ts already excludes
+    '**/.claude/**' from vitest so a stray worktree can't double the test count.
+  - Toolchain = BUN (bun run check/build/test); Phase-0 eval model = gemini-2.5-flash
+    (pro is 429/quota). Chunk cap default 6 — user authorized driving ALL of Phase 0
+    this session ([v2-007]); a fresh session reverts to the 6-cap unless told otherwise.
+
+[v2-010] batch {T005,T007,T008} — DONE (fan-out workflow wb4vkx7wt)
+  decision: accept all 3 after independent Verify + merged-tree Gate + coordinator re-check
+  why: 8 agents; all done, 0 verifyFailed, 0 suspectedGaming, merged clean, gate passed.
+       Coordinator re-verify on merged master (after pruning 3 worktrees): check 0,
+       build 0, 54 tests pass (schema 13 + prompt 9 + assemble 7 + providers 14 +
+       validate 11), scope = exactly the 6 declared files, tag-scoring grep clean.
+       T005 TailorDecisionZ hand-written + strict meta + facts arity; T007 SYSTEM_PROMPT
+       frozen + rephrase policy DERIVED from SECTIONS (flip test) + deterministic
+       renderLibrary; T008 assemble server-owns-structure (max-member order, coercion
+       override, layout order). Real flip proof still pending the live eval (T014).
+  evidence: see backlog T005/T007/T008.evidence

@@ -95,7 +95,7 @@
     {
       "id": "T005",
       "title": "zod schemas: TailorDecisionZ + entry/meta validation",
-      "status": "in-progress",
+      "status": "done",
       "depends_on": [
         "T002",
         "T003"
@@ -108,7 +108,7 @@
       "context": "Author src/shared/schema.ts. Critical: TailorDecisionZ \u2014 hand-written zod for the model's flat TailorDecision (\u00a75), passed straight to generateObject. Also entryMetaZ (STRICT discriminatedUnion on 'section', one object per \u00a74.1 \u2014 reject foreign fields) and entryInput (plain zod for Phase 0: id?, section enum, meta=entryMetaZ, facts 1-300 x\u226412, tags \u22648 x1-40, framings? \u22646 x1-200, sortKey int; superRefine meta.section===section + per-section facts arity per \u00a717). drizzle-zod derivation deferred to Phase 1 (no Drizzle yet). Locked: TailorDecisionZ hand-written, never table-derived.",
       "acceptance": "- `bun run check` + `bun run test` pass\n- Rejection table (each a distinct assert): TailorDecisionZ REJECTS empty entryId, non-numeric rank, missing signals.hardRequirements, a cut entry missing reason; ACCEPTS one fully-populated valid decision\n- Strict meta: canonical experience meta PASSES; same object + foreign field (school) REJECTED; missing role REJECTED\n- Facts arity: skill with 2 facts REJECTED (label sections exactly 1); experience with 0 facts REJECTED (narrative \u22651); certification with [] facts PASSES; meta.section !== section REJECTED",
       "attempts": [],
-      "evidence": null
+      "evidence": "INDEPENDENT re-verify (workflow Verify+Gate, re-confirmed on merged tree): check/build green; test/schema.test.ts 13/13. TailorDecisionZ rejects empty entryId / non-numeric rank / missing signals.hardRequirements / cut missing reason, accepts a valid decision; entryMetaZ strict (foreign 'school' field rejected, missing role rejected); facts arity (skill!=2, experience>=1, cert [] ok, meta.section mismatch rejected). zod dep added. Hand-written, not table-derived."
     },
     {
       "id": "T006",
@@ -129,7 +129,7 @@
     {
       "id": "T007",
       "title": "System prompt + renderLibrary (the product IP)",
-      "status": "in-progress",
+      "status": "done",
       "depends_on": [
         "T002",
         "T003"
@@ -142,12 +142,12 @@
       "context": "Author src/server/tailor/prompt.ts \u2014 THE product IP (\u00a76.2). SYSTEM_PROMPT (frozen; never interpolate JD/timestamp) encodes: judge from FACTS not tags; the fact-lock (never invent, never strengthen \u2014 'contributed to' \u2260 'led'); the rephrase policy full/light/none GENERATED from SECTIONS (so prompt/code never drift); rank-within-group = the lede; a leadRationale on each group's leading item tied to a NAMED JD signal; return ONLY the flat TailorDecision with every number grounded in facts. renderLibrary(entries) serializes deterministically (by section, then sortKey desc, then id; stable key order) and FOREGROUNDS facts (tags not presented as a scorable field). This prompt is what makes the \u00a722 lede flip \u2014 if the eval (T014) doesn't flip sharply, THIS file is the bug, not the code.",
       "acceptance": "- `bun run check` + `bun run test` pass\n- Derivation not literal: the policy block is produced by a pure fn(SECTIONS); a test passing a SECTIONS copy with one section's rephrase FLIPPED asserts the rendered block reflects the flipped value (a hardcoded string fails this)\n- Order-independence: SCRAMBLED input entries \u2192 output equals the canonical section\u2192sortKey-desc\u2192id ordering, and two different input orderings yield BYTE-IDENTICAL output\n- Facts foregrounded: renderLibrary(e) output contains every string in e.facts; tags are not framed as 'match these'\n- SYSTEM_PROMPT contains no JD/timestamp interpolation",
       "attempts": [],
-      "evidence": null
+      "evidence": "INDEPENDENT re-verify (workflow Verify+coordinator): check/build green; test/prompt.test.ts 9/9. SYSTEM_PROMPT frozen (no JD/timestamp interpolation), encodes facts-not-tags + fact-lock ('contributed to'\u2260'led') + rank=lede + leadRationale-names-signal. Rephrase policy DERIVED from SECTIONS via pure fn (flip test: changing a section's rephrase in a SECTIONS copy changes the rendered block \u2014 not a hardcoded literal). renderLibrary deterministic (section\u2192sortKey desc\u2192id, byte-identical across input orderings), facts foregrounded, tags labeled 'never a relevance signal'. NOTE: real proof of the flip is the live eval T014."
     },
     {
       "id": "T008",
       "title": "assemble() \u2014 deterministic structure from the flat decision",
-      "status": "in-progress",
+      "status": "done",
       "depends_on": [
         "T002",
         "T003"
@@ -160,7 +160,7 @@
       "context": "Author src/server/tailor/assemble.ts: assemble(decision, entries, layout, sections): TailoredResume. Server owns ALL structure (\u00a75): group by registry groupBy; group/flat order by registry `order` (recency = MAX member sortKey desc, server-computed; relevance = ascending min member rank; manual = sortKey); items-WITHIN-group ALWAYS by rank (lowest = lede); coerce text for rephrase:'none' to facts verbatim (empty-facts \u2192 text:''); filter to sections enabled in layout. The model NEVER controls structure. Keyless-testable \u2014 the regression net's core.",
       "acceptance": "- `bun run check` + `bun run test` pass\n- Max-member contrast: group A sortKeys [202101,202503] supplied in that order, group B [202501] \u2192 A ordered before B (A's key = max = 202503, distinguishing max from min/first)\n- Coercion is an OVERRIDE not pass-through: a rephrase:'none' entry fed decision text:\"FABRICATED\" \u2192 output text is the verbatim fact, not \"FABRICATED\"; empty-facts entry \u2192 text:\"\"\n- Section order follows LAYOUT: layout orders B before A while entries inserted A before B \u2192 output sections [B,A]; an enabled:false section present in entries is absent\n- items within a group order by rank (lowest first); flipping rank flips the leading item",
       "attempts": [],
-      "evidence": null
+      "evidence": "INDEPENDENT re-verify (workflow Verify+coordinator): check/build green; test/assemble.test.ts 7/7. Server owns structure: recency groups by MAX member sortKey desc (contrast test distinguishes max from min/first); rephrase:'none' text COERCED to facts verbatim (decision text 'FABRICATED' overridden; empty-facts\u2192''); section order follows LAYOUT (permuted) + disabled sections dropped; items within group by rank (flip test). Deterministic core of the keyless regression net."
     },
     {
       "id": "T009",
@@ -182,7 +182,7 @@
     {
       "id": "T016",
       "title": "Shared eval-core: hash(jd,entries), flip-predicate, canonical JDs, tag-shuffle",
-      "status": "todo",
+      "status": "in-progress",
       "depends_on": [
         "T002",
         "T003",
