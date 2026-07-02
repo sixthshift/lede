@@ -1,0 +1,35 @@
+{
+  "name": "Lede Dev",
+  "dockerComposeFile": "docker-compose.dev.yml",
+  "service": "dev",
+  "workspaceFolder": "/workspace",
+
+  "containerEnv": {
+    "ENABLE_LSP_TOOLS": "1",
+    "CLAUDE_CONFIG_DIR": "/root/.claude",
+    "IS_SANDBOX": "1"
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["oven.bun-vscode", "ms-azuretools.vscode-docker", "mhutchie.git-graph"],
+      "settings": {
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "typescript.enablePromptUseWorkspaceTsdk": true,
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+
+  "forwardPorts": [3737],
+  "portsAttributes": {
+    "3737": {
+      "label": "HTTP Server",
+      "onAutoForward": "notify"
+    }
+  },
+
+  "postCreateCommand": "bun install",
+
+  "remoteUser": "root"
+}

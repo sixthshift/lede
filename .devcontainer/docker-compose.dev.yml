@@ -1,0 +1,33 @@
+services:
+  dev:
+    container_name: lede-dev
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ..:/workspace:cached
+      # Keep node_modules in a container-private volume so the macOS host and this
+      # Debian container don't fight over one bind-mounted dir: Bun materializes
+      # platform-specific native binaries, and the host's differ from the
+      # container's. postCreateCommand (bun install) repopulates it.
+      - lede-node-modules:/workspace/node_modules
+      - claude-config:/root/.claude
+      - ~/.ssh:/root/.ssh:ro
+      - ~/.gitconfig:/root/.gitconfig:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+    ports:
+      - '3737:3000'
+    command: sleep infinity
+    working_dir: /workspace
+
+volumes:
+  lede-node-modules:
+    driver: local
+  claude-config:
+    driver: local

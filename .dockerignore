@@ -1,0 +1,28 @@
+# Dependencies (reinstalled in container)
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# Dev container (not needed for production) — but the dev image COPYs these,
+# so keep them in the build context.
+.devcontainer/
+!.devcontainer/shell-config.sh
+!.devcontainer/Dockerfile
+
+# IDE
+.vscode/
+*.swp
+*.swo
+
+# Claude / AI
+.claude/
+
+# Environment (user creates their own)
+.env
+.env.local
+
+# Misc
+*.md
+LICENSE
