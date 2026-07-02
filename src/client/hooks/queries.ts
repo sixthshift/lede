@@ -3,7 +3,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Section } from "@shared/types";
-import { fetchEntries, deleteEntry, fetchProfile, fetchSettings } from "../api";
+import { fetchEntries, deleteEntry, createEntry, updateEntry, fetchProfile, fetchSettings } from "../api";
+import type { EntryInput } from "../api";
 
 export function useEntries(section?: Section) {
   return useQuery({
@@ -22,7 +23,27 @@ export function useDeleteEntry() {
   });
 }
 
-// Stubs — E1-F2 (profile editor) / E1-F3 (settings) extend these with mutations.
+export function useCreateEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: EntryInput) => createEntry(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["entries"] });
+    },
+  });
+}
+
+export function useUpdateEntry() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: EntryInput }) => updateEntry(id, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["entries"] });
+    },
+  });
+}
+
+// Stubs — E1-F3 (settings) extends these with mutations.
 export function useProfile() {
   return useQuery({ queryKey: ["profile"] as const, queryFn: fetchProfile });
 }
