@@ -200,7 +200,7 @@
     {
       "id": "T010",
       "title": "TailorEngine (Fixture + Provider) + tailor() orchestration",
-      "status": "in-progress",
+      "status": "done",
       "depends_on": [
         "T002",
         "T004",
@@ -218,12 +218,12 @@
       "context": "Author src/server/tailor/engine.ts per \u00a76.1: interface TailorEngine { decide(jd, entries): Promise<TailorDecision> }. ProviderEngine (real): resolveModel(cfg) then generateObject({ model, schema: TailorDecisionZ, system: SYSTEM_PROMPT + renderLibrary(entries), prompt: 'Tailor for this job description:\\n\\n'+jd, providerOptions: providerOptionsFor(provider) }); retry EXACTLY once on failure then throw. FixtureEngine (keyless): loadFixtureDecision by hashKey(jd, entries) FROM T016 (shared) out of test/fixtures/decisions; a MISS throws a no_fixture-tagged error (\u2192422), NEVER a silent fallback / first-file. tailor(engine, jd, entries, layout, baseSummary?): decision = engine.decide \u2192 assemble \u2192 validateNoFabrication \u2192 return (engine-agnostic). Engine factory by env LEDE_TAILOR_ENGINE (live|fixture; fixture default under NODE_ENV=test). The engine split is what makes everything except the live call keyless.",
       "acceptance": "- `bun run check` + `bun run test` pass\n- Validate-wired contrast: tailor() with a stub engine returning a decision containing a FABRICATED number THROWS FabricationError; same stub with a clean decision returns a resume (proves validate runs, not just assemble)\n- Hash keying with \u22652 fixtures: decide(jdA)\u2192fixtureA, decide(jdB)\u2192fixtureB (distinct); decide(jdC unrecorded) THROWS no_fixture WHILE fixtures exist (closes first-file/silent-fallback)\n- Retry count: a mock model throwing once then succeeding \u2192 decide resolves after EXACTLY 2 calls; throwing twice \u2192 rejects after 2\n- Engine factory returns FixtureEngine under NODE_ENV=test and ProviderEngine under live (assert by type); ProviderEngine calls generateObject with schema===TailorDecisionZ and a system string containing renderLibrary(entries) output",
       "attempts": [],
-      "evidence": null
+      "evidence": "INDEPENDENT re-verify (coordinator): check/build green; test/engine.test.ts 10 (78 total). tailor() = decide\u2192assemble\u2192validateNoFabrication (validate WIRED, contrast test: fabricated '9999%' throws FabricationError, clean returns resume). ProviderEngine retry EXACTLY once (try/catch/retry, generateObject \u22642 calls, asserted). FixtureEngine keys by evalcore.hashKey; MISS throws NoFixtureError code 'no_fixture' listing scenarios (no silent fallback / first-file). makeEngine: fixture under NODE_ENV=test/LEDE_TAILOR_ENGINE=fixture, ProviderEngine (google/gemini-2.5-flash) under live. Wiring test asserts generateObject called with schema===TailorDecisionZ + system containing renderLibrary output. Scope: only engine.ts+test."
     },
     {
       "id": "T011",
       "title": "Fastify /api/tailor + /api/health + config (Phase 0, no DB/auth)",
-      "status": "todo",
+      "status": "in-progress",
       "depends_on": [
         "T005",
         "T006",
@@ -231,7 +231,8 @@
       ],
       "files": [
         "src/server/index.ts",
-        "src/server/config.ts"
+        "src/server/config.ts",
+        "test/server.test.ts"
       ],
       "origin": "spec \u00a79, \u00a724 Phase 0",
       "context": "Extend src/server/index.ts (from T001) + add src/server/config.ts. config.ts: fail-fast env loader (\u00a717) \u2014 PORT (8787), LEDE_TAILOR_ENGINE (live|fixture). Phase 0 does NOT require LEDE_MASTER_KEY/SESSION_SECRET yet (arrive with auth/BYOK in Phase 2). Route POST /api/tailor: zod-validate { jobDescription } (1-20000, \u00a717); build engine per config (live=ProviderEngine using the Google bootstrap key from env; fixture=FixtureEngine); call tailor(engine, jd, SEED_ENTRIES, defaultLayout) \u2014 the route MUST go through tailor() (assemble+validate), never return a raw decision or canned resume. Error mapping (\u00a79): provider auth\u2192'key invalid', rate-limit\u2192429, other provider fail\u2192502, zod-fail on LLM output\u2192502, fixture miss\u2192422 no_fixture. GET /api/health \u2192 {ok:true}.",
