@@ -6,6 +6,7 @@ export type TailorEngineMode = "live" | "fixture";
 export type Config = {
   port: number;
   tailorEngine: TailorEngineMode;
+  dataDir: string;
 };
 
 function parsePort(raw: string | undefined): number {
@@ -27,5 +28,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     port: parsePort(env.PORT),
     tailorEngine: parseTailorEngine(env.LEDE_TAILOR_ENGINE, env.NODE_ENV),
+    dataDir: env.DATA_DIR ?? "./data",
   };
 }
