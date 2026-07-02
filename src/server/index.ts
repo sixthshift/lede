@@ -1,16 +1,19 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import secureSession from "@fastify/secure-session";
 import { APICallError, NoObjectGeneratedError } from "ai";
 import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Entry, Section } from "@shared/types";
-import { loadConfig } from "./config";
+import { loadConfig, type Config } from "./config";
 import { initDb, type Db } from "./db";
 import { entries, settings } from "./db/schema";
 import { seedIfEmpty } from "./seed";
 import { makeEngine, tailor, NoFixtureError, type TailorEngine } from "./tailor/engine";
 import { FabricationError } from "./tailor/validate";
+import { registerAuthGuard } from "./auth";
+import { authRoutes } from "./routes/auth";
 import { entriesRoutes } from "./routes/entries";
 import { profileRoutes } from "./routes/profile";
 import { settingsRoutes } from "./routes/settings";
@@ -57,18 +60,33 @@ function mapTailorError(err: unknown): { status: number; body: { error: string }
 // migrates one from config.dataDir and seeds it on first boot (empty entries
 // table) so buildApp() stays a one-call boot. An injected db is assumed
 // already initialized/seeded by its caller (see seedIfEmpty in ./seed).
-export function buildApp(db?: Db): FastifyInstance {
+// configOverride merges onto loadConfig() (e.g. tests forcing authDisabled:
+// false even though the global test env sets LEDE_AUTH_DISABLED=true).
+export function buildApp(db?: Db, configOverride?: Partial<Config>): FastifyInstance {
   const app = Fastify({ logger: true });
+  const config: Config = { ...loadConfig(), ...configOverride };
   const engine: TailorEngine = makeEngine();
   let resolvedDb: Db;
   if (db) {
     resolvedDb = db;
   } else {
-    resolvedDb = initDb(loadConfig().dataDir).db;
+    resolvedDb = initDb(config.dataDir).db;
     seedIfEmpty(resolvedDb);
   }
 
+  // salt is the library's own published default (see @fastify/secure-session's
+  // source) — passing it explicitly satisfies the plugin's type (which
+  // requires salt alongside secret) while reproducing its no-salt behavior;
+  // security comes from config.sessionSecret, not this constant.
+  app.register(secureSession, {
+    secret: config.sessionSecret,
+    salt: Buffer.from("mq9hDxBVDbspDR6nLfFT1g==", "base64"),
+  });
+
   app.get("/api/health", async () => ({ ok: true }));
+
+  authRoutes(app, resolvedDb);
+  registerAuthGuard(app, config.authDisabled);
 
   entriesRoutes(app, resolvedDb);
   profileRoutes(app, resolvedDb);
