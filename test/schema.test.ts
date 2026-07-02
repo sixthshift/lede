@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { TailorDecisionZ, entryMetaZ, entryInput } from "@shared/schema";
+import { TailorDecisionZ, entryMetaZ, entryInput, profileInput, settingsInput } from "@shared/schema";
 
 // ── TailorDecisionZ ──
 
@@ -122,5 +122,113 @@ describe("entryInput facts arity + section/meta agreement", () => {
       sortKey: 202001,
     };
     expect(entryInput.safeParse(bad).success).toBe(false);
+  });
+});
+
+// ── entryInput: §17 bounds (drizzle-zod can't infer these; must survive derivation) ──
+
+describe("entryInput §17 bounds", () => {
+  it("rejects facts.length > 12", () => {
+    const bad = {
+      section: "experience",
+      meta: experienceMeta(),
+      facts: Array.from({ length: 13 }, (_, i) => `fact ${i}`),
+      tags: [],
+      sortKey: 202001,
+    };
+    expect(entryInput.safeParse(bad).success).toBe(false);
+  });
+
+  it("rejects a tag longer than 40 chars", () => {
+    const bad = {
+      section: "experience",
+      meta: experienceMeta(),
+      facts: ["led team"],
+      tags: ["x".repeat(41)],
+      sortKey: 202001,
+    };
+    expect(entryInput.safeParse(bad).success).toBe(false);
+  });
+
+  it("rejects a meta string longer than 120 chars", () => {
+    const bad = {
+      section: "experience",
+      meta: { ...experienceMeta(), company: "x".repeat(121) },
+      facts: ["led team"],
+      tags: [],
+      sortKey: 202001,
+    };
+    expect(entryInput.safeParse(bad).success).toBe(false);
+  });
+
+  it("rejects a foreign meta field", () => {
+    const bad = {
+      section: "experience",
+      meta: { ...experienceMeta(), notAField: "nope" },
+      facts: ["led team"],
+      tags: [],
+      sortKey: 202001,
+    };
+    expect(entryInput.safeParse(bad).success).toBe(false);
+  });
+
+  it("accepts a fully valid entry at the bounds", () => {
+    const ok = {
+      section: "experience",
+      meta: experienceMeta(),
+      facts: ["led team"],
+      tags: ["backend"],
+      sortKey: 202001,
+    };
+    expect(entryInput.safeParse(ok).success).toBe(true);
+  });
+});
+
+// ── profileInput ──
+
+describe("profileInput", () => {
+  function validProfile() {
+    return {
+      name: "Jane Doe",
+      email: "jane@example.com",
+      links: [{ type: "github" as const, label: "GitHub", url: "https://github.com/jane" }],
+    };
+  }
+
+  it("accepts a valid profile payload", () => {
+    expect(profileInput.safeParse(validProfile()).success).toBe(true);
+  });
+
+  it("rejects a profile missing required 'name'", () => {
+    const { name, ...bad } = validProfile();
+    expect(profileInput.safeParse(bad).success).toBe(false);
+  });
+
+  it("rejects a link with an invalid 'type'", () => {
+    const bad = validProfile();
+    (bad.links[0] as unknown as { type: string }).type = "twitter";
+    expect(profileInput.safeParse(bad).success).toBe(false);
+  });
+});
+
+// ── settingsInput ──
+
+describe("settingsInput", () => {
+  it("accepts a valid settings payload", () => {
+    const ok = {
+      provider: "anthropic",
+      model: "claude-opus-4-8",
+      layout: [{ section: "summary" as const, enabled: true }],
+    };
+    expect(settingsInput.safeParse(ok).success).toBe(true);
+  });
+
+  it("accepts an empty (all-optional) settings payload", () => {
+    expect(settingsInput.safeParse({}).success).toBe(true);
+  });
+
+  it("rejects a layout entry with an invalid section", () => {
+    const bad = { layout: [{ section: "not-a-section", enabled: true }] };
+    expect(settingsInput.safeParse(bad).success).toBe(false);
   });
 });
