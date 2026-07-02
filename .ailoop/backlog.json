@@ -520,7 +520,7 @@
     {
       "id": "E1-F3",
       "title": "ProfileEditor + LayoutEditor (reorder/toggle resume sections)",
-      "status": "todo",
+      "status": "done",
       "depends_on": [
         "E1-F1"
       ],
@@ -535,7 +535,7 @@
       "context": "Baseline (oracle.md, every ticket): `bun run check` + `bun run build` + `bun run test` all pass, keyless (no provider key set). Locked stack (oracle.md, cite; never re-litigate): Bun runtime + Fastify server, Vite + React SPA, drizzle-orm over better-sqlite3 (single-file SQLite, WAL), zod validation, TanStack Query + react-router client, shadcn/ui primitives + Tailwind, self-hosted IBM Plex via @fontsource. Path alias `@shared/*`→`src/shared/*` only (no @server/@client). Tests live in /test, run under vitest (node); server runs under bun — better-sqlite3 works under BOTH (do not use bun:sqlite, it breaks vitest). Touch ONLY your declared `files` (+ package.json/lockfile for deps). Add tests for new behavior.\n\nProfileEditor (Dialog, §16): edit name/headline/email/phone/location/links[]/baseSummary; GET /api/profile populates, PUT /api/profile saves (round-trip); add useProfile/useUpdateProfile to hooks/queries.ts (invalidate ['profile']). LayoutEditor (§13): reorder + enable/disable the resume sections in settings.layout; GET /api/settings populates, PUT /api/settings persists; add useSettings/useUpdateSettings (invalidate ['settings']). Wire ProfileEditor open from LibraryView (or AppShell) and LayoutEditor into the Library/Settings area. Use E1-A primitives. Depends on E1-F1 — EXTEND LibraryView + queries.ts, do not clobber F1/F2 exports. (The render-order EFFECT of layout is verified server-side in E1-E; here the acceptance is the editor persisting the layout correctly.)",
       "acceptance": "- baseline passes\n- CONTRAST (profile round-trip): ProfileEditor mounts with GET /api/profile data populated; edit name + add a link + set baseSummary, save → PUT /api/profile fired with the new values; reopening shows them\n- CONTRAST (layout persist): LayoutEditor reorders two sections + disables one, save → PUT /api/settings fired with the reordered layout in which the disabled section has enabled:false\n- new tests in test/profile-layout.test.tsx",
       "attempts": [],
-      "evidence": null
+      "evidence": "COORDINATOR merged-tree gate (master @ 6a2a79c; keyless): check 0 / build 0 / test 19 files / 140 PASS incl. new test/profile-layout.test.tsx. Workflow Gate + Verify both green; merge landed on master; worktree pruned. CONTRAST profile round-trip (PUT /api/profile with edited name+link+baseSummary, reopen shows) + layout persist (reorder + disable → PUT /api/settings with enabled:false) pass. queries.ts extended (useUpdateProfile/useUpdateSettings) without clobbering F1/F2 exports."
     },
     {
       "id": "E2",

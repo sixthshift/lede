@@ -359,3 +359,29 @@ Append-only journal. Newest at bottom.
     driver-free; server-side E1-D zod remains authoritative.
   chunk: 2/6 closed this run. Phase 1: 7 of 8 children done — only E1-F3 (ProfileEditor +
     LayoutEditor) remains before the full Phase-1 behavioral oracle can run at phase close.
+
+[v2-022] E1-F3 — ACCEPTED; ===== PHASE 1 CLOSED (8/8 children) =====
+  E1-F3: ProfileEditor + LayoutEditor. gate (master @ 6a2a79c, keyless): check 0/build 0/test
+    19 files/140 PASS. Verify clean; merged (fast-forward); worktree pruned. Profile round-trip +
+    layout-persist contrasts pass; queries.ts extended without clobbering F1/F2.
+  ===== FULL PHASE-1 BEHAVIORAL ORACLE (oracle.md §Phase 1) — run on merged tree @ 6a2a79c =====
+    [x] bun run check + bun run test pass -> check exit 0; 140 tests PASS keyless (provider key unset)
+    [x] migrations run on boot; /api/entries CRUD round-trips AND persists across a server RESTART
+        -> test/boot.smoke.test.ts (real Node/tsx boot, migrations ran, /api/health ok) +
+           test/db.test.ts (fresh-migrate table set + CHECK) + test/api.entries.test.ts (CRUD +
+           rebuild-app-on-same-DATA_DIR restart persistence, real .sqlite)
+    [x] POST /api/entries/import + export round-trip Entry[] -> test/api.entries.test.ts (import
+        {imported:2} + GET returns them; export = GET /api/entries, entries-only leak contrast)
+    [x] LibraryView create/edit/delete e2e via the section-aware EntryEditor -> test/library.test.tsx
+        (delete e2e w/ post-invalidation refetch) + test/entry-editor.test.tsx (ONE registry-driven
+        editor: section-switch changes meta fields; create POST + edit PUT e2e)
+    [x] /api/profile GET/PUT round-trip; settings.layout ordering RESPECTED BY RENDER ->
+        test/api.profile-settings.test.ts (profile + settings round-trip) + test/profile-layout.test.tsx
+        (editor persists layout) + test/api.tailor-db.test.ts (NON-default layout reorder+disable ->
+        assembled TailoredResume.sections order reflects reorder AND omits disabled section)
+  All Phase-1 oracle checks GREEN on the merged tree. Test suite grew 93 (Phase-0 close) -> 140,
+    all keyless. Cross-cutting invariants intact: no tag-scoring (evalcore/providers green), no
+    LLM-checks-LLM, boot invariant (T017) green, secret-leak contrasts (E1-D) green.
+  chunk: 3/6 closed this run (E1-E, E1-F2, E1-F3) + Phase 1 closed. STOPPING at the phase boundary
+    (natural human checkpoint before Phase 2 = auth/BYOK/crypto, the security-critical phase).
+  next: E2 (Phase 2 epic) is now ready — needs decomposition at next intake (like E1 was).
