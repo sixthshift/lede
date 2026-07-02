@@ -243,7 +243,7 @@
     {
       "id": "T012",
       "title": "Client Phase 0: JD paste \u2192 tailor \u2192 deterministic resume render",
-      "status": "in-progress",
+      "status": "done",
       "depends_on": [
         "T002",
         "T011"
@@ -262,7 +262,7 @@
       "context": "Minimal Phase 0 client (no shadcn/Tailwind yet \u2014 lands in E1; plain CSS here). api.ts: typed fetch to /api/tailor throwing ApiError{status,code,message}. TailorView: JDInput (textarea) + tailor button \u2192 /api/tailor \u2192 ResumePage. ResumePage: SINGLE-COLUMN deterministic render of TailoredResume (\u00a710) \u2014 ProfileHeader stub, summary, then each TailoredSection (registry label + groups) in LAYOUT order (data-driven, not hardcoded). print.css (@media print): US-Letter, #000 on #fff, real text, no images/tables/multi-column. leadRationale/cut[] MUST NOT render on the resume page (\u00a710) \u2014 reasoning UI is Phase 3. Wire into App.tsx.",
       "acceptance": "- `bun run check` + `bun run build` pass\n- Leak check: feed a TailoredResume fixture whose leadRationale and every cut[].reason contain UNIQUE SENTINEL strings; assert those exact strings are ABSENT from the rendered resume DOM textContent\n- Data-driven order: use a NON-DEFAULT (permuted) layout; assert rendered section order equals layout order (not hardcoded); items within a group follow given order\n- print.css @media print: no column-count/columns>1, no display:table/table layout, #000 on #fff (grep-checkable)",
       "attempts": [],
-      "evidence": null
+      "evidence": "INDEPENDENT re-verify (coordinator): check/build green; 88 tests (4 new resumepage). \u00a710 LEAK invariant: ResumePage renders NO leadRationale/cut (grep shows only a forbidding comment; sentinel test: renderToStaticMarkup HTML .not.toContain the 4 sentinels). Data-driven order: sections render in resume order ([project,experience] non-alpha) via SECTIONS labels, items in array order (not hardcoded). print.css @media print single-column, no column-count/columns2+/display:table. api.ts throws typed ApiError; JDInput disabled while pending. Scope: exactly the 8 declared files."
     },
     {
       "id": "T013",
@@ -308,7 +308,7 @@
     {
       "id": "T015",
       "title": "Keyless pipeline e2e tests (FixtureEngine replay)",
-      "status": "todo",
+      "status": "in-progress",
       "depends_on": [
         "T011",
         "T013",

@@ -1,1 +1,58 @@
-/* print/ATS-safe styles — populated in a later phase (§10) */
+/* print/ATS-safe styles — spec.md §10.
+   Single-column, real text, #000 on #fff. No images/tables/multi-column. */
+
+@media print {
+  @page {
+    size: letter;
+    margin: 0.6in;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 11pt;
+    line-height: 1.4;
+  }
+
+  /* Only the resume page prints — app chrome (input, buttons, pending/error) is hidden. */
+  .jd-input,
+  .tailor-view__pending,
+  .tailor-view__error {
+    display: none !important;
+  }
+
+  .resume-page {
+    display: block;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    color: #000;
+    background: #fff;
+  }
+
+  .resume-header,
+  .resume-summary,
+  .resume-section,
+  .resume-group {
+    display: block;
+    width: 100%;
+    break-inside: avoid;
+  }
+
+  .resume-group__items {
+    list-style: disc;
+    padding-left: 1.2em;
+    margin: 0.2em 0 0.6em;
+  }
+
+  .resume-item {
+    display: list-item;
+  }
+
+  a {
+    color: #000;
+    text-decoration: none;
+  }
+}
