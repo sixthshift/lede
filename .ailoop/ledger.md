@@ -409,3 +409,23 @@ Append-only journal. Newest at bottom.
     validate-before-store + master-key-not-in-DATA_DIR; D=no_api_key short-circuit + no plaintext
     key in logs; E=write-only key form + 401->LoginGate.
   fan-out plan: [E2-A] -> [E2-B, E2-C] (disjoint) -> [E2-D, E2-E] (disjoint). 5 tickets.
+
+[v2-024] E2-A — ACCEPTED (code verified + 4/4 green); flaky-suite defect found -> repair T018
+  E2-A gate (master @ 121655a, keyless): check 0 / build 0 / test 21 files / 157 PASS on 4/4
+    repeated coordinator runs. crypto (AES-256-GCM distinct-IV + wrong-key-throws + tamper-throws;
+    scrypt), config fail-fast (throws on unset/malformed master + missing/short session; no
+    auto-gen), boot.smoke extended (real boot w/ secrets + 2 process-level boot-refusal cases).
+    Verify passed; merged onto master; worktree pruned. crypto adds NO deps (node:crypto).
+  FLAKY DEFECT (workflow Gate caught it; trust-the-oracle): server.test.ts (Phase0) and
+    api.tailor-db.test.ts (E1-E) both write temp fixtures into the SHARED test/fixtures/decisions/
+    dir from parallel vitest workers; FixtureEngine.loadFixtures parses ALL .json with no per-file
+    guard -> a mid-write/mid-delete file throws -> /api/tailor 502 (builder saw 1 fail/157 in run 1,
+    green in run 2; coordinator saw 4/4 green — intermittent, ~1 in 2-5). NOT E2-A's code; E2-A only
+    shifted timing. Accepted E2-A (its contrasts deterministic + suite green for me) rather than
+    hold it hostage to a pre-existing latent race.
+  ESCAPED-BUG RULE -> T018 (deps none; touches engine.ts + engine.test.ts only, disjoint from all
+    other Phase-2 tickets): harden loadFixtures with a per-file try/catch (skip+warn on partial/
+    ENOENT), + a test proving a valid key still resolves alongside a malformed fixture file. Will
+    land T018 BEFORE the security-critical [E2-B, E2-C] so their gates are deterministic (a flaky
+    502 could otherwise spuriously fail a Verify and mis-attribute a security ticket).
+  chunk: 1/6 closed this run (E2-A). Next: dispatch T018, then [E2-B, E2-C], then [E2-D, E2-E].
