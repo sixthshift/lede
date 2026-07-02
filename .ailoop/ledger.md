@@ -318,3 +318,23 @@ Append-only journal. Newest at bottom.
     app on the same real .sqlite. §17 slug generator unit-tested in slug.ts.
   chunk: 5/6 tickets closed this run. Dispatching E1-F1 as the 6th (maximises next-chunk
     unblock: frees E1-F2 + E1-F3).
+
+[v2-020] E1-F1 — ACCEPTED after coordinator mechanical-integration recovery; +workflow-template fix
+  workflow Gate came back RED, but NOT a code defect — two mechanical infra gaps:
+    (1) the Build worker wrote all files in its worktree but never `git commit`ed them, so its
+        branch == master (nothing to merge); the Integrate agent's "merged" claim was empty.
+    (2) after merging E1-F1's package.json (adds @tanstack/react-query, react-router-dom,
+        @testing-library/react, jsdom), the main tree's node_modules lacked them -> check/test red.
+  Trust-the-oracle held: the Gate (real merged tree) caught it though Build+Verify were green on
+    the worktree's working dir. Recovery (coordinator, mechanical — not a code patch): staged ONLY
+    the scope-clean declared files+manifest on the branch and committed (c108633), merged --no-ff
+    into master (46ffdce), ran `bun install`, re-gated GREEN: check 0 / build 0 / test 16 files
+    129 keyless. Gaming read: delete-e2e test is rigorous (stateful fetch mock, asserts DELETE URL
+    + post-invalidation refetch + only target card removed) — not gamed. No client tag-scoring.
+  PREVENTION (build-phase.workflow.js patched, local guarded copy): Build prompt now requires the
+    worker to `git commit` its branch (clean status) before reporting done; Integrate prompt now
+    runs `bun install` after merging manifest changes and verifies merged files are really on the
+    branch. Also .gitignore now ignores data/ (the runtime DATA_DIR artifact).
+  ===== CHUNK CAP REACHED — 6/6 tickets closed this run =====
+    closed: E1-A, E1-B, T017, E1-C, E1-D, E1-F1. Phase 1 progress: 6 of 8 children done
+    (remaining E1-E, E1-F2, E1-F3). Full Phase-1 behavioral oracle NOT yet run (phase not closed).
