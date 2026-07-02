@@ -338,3 +338,24 @@ Append-only journal. Newest at bottom.
   ===== CHUNK CAP REACHED — 6/6 tickets closed this run =====
     closed: E1-A, E1-B, T017, E1-C, E1-D, E1-F1. Phase 1 progress: 6 of 8 children done
     (remaining E1-E, E1-F2, E1-F3). Full Phase-1 behavioral oracle NOT yet run (phase not closed).
+
+[v2-021] E1-E, E1-F2 — ACCEPTED (batch fan-out; workflow Gate + coordinator both green)
+  gate (master @ d079e3f, keyless): check 0 / build 0 / test 18 files / 138 PASS. Integrator
+    correctly merged onto master AND installed deps this time (the v2-020 template patch worked);
+    coordinator re-confirmed after bun install. Verify passed both (scope clean, no gaming);
+    worktrees pruned (incl. a stray verify worktree in scratchpad).
+  E1-E: /api/tailor reads entries + settings.layout from the db (was hardcoded SEED_ENTRIES +
+    defaultLayout consts). rowToEntry() preserves the SEED literal key order so hashKey-based
+    fixture matching is unaffected (builder self-caught an earlier key-reorder that would have
+    silently broken every fixture). CONTRAST reads-db-not-const (200 w/ custom id vs 422) +
+    layout reorder/disable both pass. seedIfEmpty(db) = idempotent first-boot seed; injected
+    test dbs untouched so existing route tests' row counts hold.
+  E1-F2: ONE section-aware EntryEditor for ALL sections (registry-driven CONTRAST passes:
+    section switch changes the meta fields). create/edit e2e pass. DRIFT (minor, noted for later
+    polish): EntryCard/LibraryToolbar weren't in F2's declared files, so F2 added its own Add
+    trigger + edit-picker in LibraryView instead of wiring F1's disabled stub buttons — correct
+    + scope-honest, but the UX has two entry points; unify in a Phase-3/4 polish ticket. Client
+    §17 validation is a local validate() (not @shared zod import) to keep the Vite bundle
+    driver-free; server-side E1-D zod remains authoritative.
+  chunk: 2/6 closed this run. Phase 1: 7 of 8 children done — only E1-F3 (ProfileEditor +
+    LayoutEditor) remains before the full Phase-1 behavioral oracle can run at phase close.

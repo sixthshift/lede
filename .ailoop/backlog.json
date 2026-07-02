@@ -452,7 +452,7 @@
     {
       "id": "E1-E",
       "title": "/api/tailor reads entries + settings.layout from DB; first-boot seeds SEED_ENTRIES",
-      "status": "todo",
+      "status": "done",
       "depends_on": [
         "E1-B",
         "E1-D"
@@ -466,7 +466,7 @@
       "context": "Baseline (oracle.md, every ticket): `bun run check` + `bun run build` + `bun run test` all pass, keyless (no provider key set). Locked stack (oracle.md, cite; never re-litigate): Bun runtime + Fastify server, Vite + React SPA, drizzle-orm over better-sqlite3 (single-file SQLite, WAL), zod validation, TanStack Query + react-router client, shadcn/ui primitives + Tailwind, self-hosted IBM Plex via @fontsource. Path alias `@shared/*`→`src/shared/*` only (no @server/@client). Tests live in /test, run under vitest (node); server runs under bun — better-sqlite3 works under BOTH (do not use bun:sqlite, it breaks vitest). Touch ONLY your declared `files` (+ package.json/lockfile for deps). Add tests for new behavior.\n\nPhase 0's /api/tailor uses the hardcoded `SEED_ENTRIES` const + a `defaultLayout` const. Rewire it to read ALL entries and `settings.layout` from the DB (E1-B). Keep the FixtureEngine keyless path intact (engine selection unchanged). On FIRST boot (entries table empty), seed SEED_ENTRIES into the db (§22 'loaded if entries empty on first run') — refactor seed.ts to keep the SEED_ENTRIES export (tests/eval depend on it) AND add a seedIfEmpty(db) used at boot. tailor() already accepts (entries, layout) params — pass the DB-sourced values. Do NOT change assemble()/engine/prompt. Do NOT touch the routes files (E1-D owns them).",
       "acceptance": "- baseline passes; full suite green with provider key UNSET (keyless guarantee holds)\n- CONTRAST (reads DB, not the const): seed the db with a DIFFERENT entry set than SEED_ENTRIES (e.g. a single distinct entry), POST /api/tailor (fixture engine) → the assembled resume reflects the DB entries, NOT the 3 hardcoded SEED_ENTRIES\n- CONTRAST (layout respected by render): with a NON-DEFAULT settings.layout (two sections reordered + one section disabled), the assembled TailoredResume.sections order reflects the reorder AND omits the disabled section; with the default layout, the standard §4.2 order\n- first-boot seeding: empty entries table → after boot, SEED_ENTRIES are present (GET /api/entries returns them)\n- new tests in test/api.tailor-db.test.ts",
       "attempts": [],
-      "evidence": null
+      "evidence": "COORDINATOR merged-tree gate (master @ d079e3f; bun install; keyless): check 0, build 0, test 18 files / 138 PASS. Workflow Gate also green; Verify passed both (scope clean, no gaming); merge landed on master (template patch worked). E1-E: /api/tailor now reads all entries + settings.layout from the db (rowToEntry mapper preserves SEED key order so hashKey fixtures still match — builder self-caught). CONTRAST reads-db-not-const: custom-seeded entry → 200 with its id, SEED ids absent (would be 422 no_fixture if still const). CONTRAST layout: reorder+disable → sections [certification,skill], award omitted. seedIfEmpty(db) idempotent first-boot seed; injected test dbs left untouched."
     },
     {
       "id": "E1-F1",
@@ -498,7 +498,7 @@
     {
       "id": "E1-F2",
       "title": "Section-aware EntryEditor + create/edit (SectionMetaFields, RepeatableList, TagInput)",
-      "status": "todo",
+      "status": "done",
       "depends_on": [
         "E1-F1"
       ],
@@ -515,7 +515,7 @@
       "context": "Baseline (oracle.md, every ticket): `bun run check` + `bun run build` + `bun run test` all pass, keyless (no provider key set). Locked stack (oracle.md, cite; never re-litigate): Bun runtime + Fastify server, Vite + React SPA, drizzle-orm over better-sqlite3 (single-file SQLite, WAL), zod validation, TanStack Query + react-router client, shadcn/ui primitives + Tailwind, self-hosted IBM Plex via @fontsource. Path alias `@shared/*`→`src/shared/*` only (no @server/@client). Tests live in /test, run under vitest (node); server runs under bun — better-sqlite3 works under BOTH (do not use bun:sqlite, it breaks vitest). Touch ONLY your declared `files` (+ package.json/lockfile for deps). Add tests for new behavior.\n\nBuild ONE section-aware EntryEditor (Dialog) for ALL sections, driven by the section registry (@shared/sections) — NOT one editor per section (§13 rule). SectionMetaFields renders the correct meta inputs per section from the §4.1 meta shapes (experience→company/role/period/location; project→name/role/period/url; education→school/degree/field/period/location; skill→category/level; etc.). Label sections (skill/interest/language) show a compact single-fact form. RepeatableList handles facts + framings (add/remove/reorder rows); TagInput handles tags (chip add/remove, ≤8). Wire create (POST /api/entries) and edit (PUT /api/entries/:id) via TanStack mutations that invalidate ['entries'] (add useCreateEntry/useUpdateEntry to hooks/queries.ts). Validate §17 bounds client-side before submit. Wire the editor open from LibraryView's Add button and EntryCard's edit button. Use E1-A primitives (dialog/input/label/button/form). Depends on E1-F1 (LibraryView + queries.ts already exist — EXTEND them, don't clobber F1's exports).",
       "acceptance": "- baseline passes\n- CONTRAST (ONE registry-driven editor, gameable-resistant): render EntryEditor with section=experience → company/role/period fields present; switch section to skill → the meta fields CHANGE to the skill compact single-fact form and the experience fields are GONE (proves registry-driven, not a fixed/duplicated form)\n- CONTRAST (create e2e): open editor, fill an experience entry, save → POST /api/entries fired with the entered meta/facts/tags; on success the new EntryCard appears in LibraryView\n- edit: open an existing entry → fields populated → change a fact → PUT /api/entries/:id fired\n- new tests in test/entry-editor.test.tsx",
       "attempts": [],
-      "evidence": null
+      "evidence": "COORDINATOR merged-tree gate (master @ d079e3f; bun install; keyless): check 0, build 0, test 18 files / 138 PASS. Workflow Gate also green; Verify passed both (scope clean, no gaming); merge landed on master (template patch worked). E1-F2: ONE registry-driven EntryEditor (Dialog) — CONTRAST: section=experience shows company/role/period; switch to skill → those gone, compact skill form shown. create e2e (POST fired, card appears) + edit (PUT fired) pass. SectionMetaFields/RepeatableList/TagInput built. DRIFT (minor): EntryCard/LibraryToolbar were not in F2 declared files, so F2 added its own Add trigger + edit-picker in LibraryView rather than wiring F1s disabled stub buttons — functionally correct + scope-honest; unify in a later polish ticket. Client §17 validation is a local validate() (not importing @shared zod) to keep the client bundle driver-free; server remains authoritative (E1-D zod)."
     },
     {
       "id": "E1-F3",
