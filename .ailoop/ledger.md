@@ -436,3 +436,25 @@ Append-only journal. Newest at bottom.
     abort. New engine.test case proves a valid fixture resolves next to truncated+empty files.
     No decide()/hashKey change. The security-critical [E2-B, E2-C] will gate on this clean baseline.
   chunk: 2/6 closed this run (E2-A, T018). Dispatching [E2-B auth, E2-C BYOK] next.
+
+[v2-026] T019 (harness), E2-B (auth), E2-C (BYOK) — ACCEPTED; baseline deterministic
+  gate (master @ 1f281b1, keyless): check 0 / build 0 / test 23 files / 172 PASS DETERMINISTIC
+    across 5 runs (~30s each, zero timeouts). All three merged; worktrees pruned; secure-session
+    dep installed in main tree.
+  T019 (repair, escaped-bug rule): 2nd harness-determinism defect this chunk (distinct from T018's
+    fixture-dir race) — default parallel workers + ~10 full-Fastify-boot suites + boot.smoke tsx
+    spawns starved the 5000ms deadline on the contended box; coordinator reproduced (run1=3 fail,
+    run2=5 fail, disjoint, all bare timeouts). Fix: vite.config.ts testTimeout/hookTimeout=30000 +
+    pool:forks singleFork:true (serial file exec). No product/test-logic touched. Now the loop
+    gates on a stable suite.
+  E2-B (auth): secure-session + scrypt gate; guard total with auth ENABLED (401 on every
+    protected route incl. /api/tailor; /api/health + /api/auth/* public; no-op when
+    LEDE_AUTH_DISABLED). setup->409-on-repeat; login->session; logout clears. Coordinator read the
+    guard + confirmed exemptions.
+  E2-C (BYOK): validate-before-store (reject->400 + ciphertext UNCHANGED; accept->encrypt+store),
+    SENTINEL leak scan clean (key only as ciphertext in secrets.apiKeyEnc; absent from every
+    response/log/DATA_DIR byte), master-key-not-in-DATA_DIR, DELETE purges. GET never returns key.
+  ===== CHUNK CAP — 5 tickets closed this run (E2-A, T018, T019, E2-B, E2-C) =====
+    Phase 2: 3 of 5 children done (auth + BYOK storage + crypto/config). Remaining: E2-D (tailor
+    uses decrypted BYOK key; no-key->400) + E2-E (client LoginGate/SettingsView/ApiKeyForm). The
+    FULL Phase-2 oracle runs at phase close after those. STOPPING at this security checkpoint.
