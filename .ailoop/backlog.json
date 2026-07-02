@@ -29,14 +29,14 @@
     {
       "id": "T002",
       "title": "Shared domain types (Entry, EntryMeta, TailorDecision, TailoredResume)",
-      "status": "todo",
+      "status": "done",
       "depends_on": ["T001"],
       "files": ["src/shared/types.ts"],
       "origin": "spec §4.1, §5",
       "context": "Author src/shared/types.ts EXACTLY per §4.1 and §5: Section (10-member union), EntryMeta (discriminated union on `section`), Entry (id, section, meta, facts=FACT-LOCK, tags, framings?, sortKey), Profile (§4.2 shape), ProviderId ('anthropic'|'openai'|'google'|'openai-compatible'), JDSignals, TailorDecision (the MODEL's flat output — signals, summary, items[{entryId,text,rank,leadRationale?}], cut[]), TailoredItem/Group/Section/Resume (SERVER-assembled), Layout = { section: Section|'summary'; enabled: boolean }[]. Imported by both server and client via @shared. Locked (oracle): model returns judgment only; facts are the fact-lock; tags never for scoring.",
       "acceptance": "- `bun run check` passes\n- types match §4.1/§5 field-for-field (EntryMeta discriminated on section; TailorDecision flat with per-item rank; TailoredResume is the assembled shape)\n- types-only ticket: no runtime tests required (stated)",
       "attempts": [],
-      "evidence": null
+      "evidence": "INDEPENDENT re-verify (coordinator, 2026-07-02): `bun run check`→exit 0; `bun run test`→exit 0 (green-on-empty, no test file added). Scope: only src/shared/types.ts touched. Correctness read: file matches spec §4.1/§5 field-for-field — EntryMeta is a discriminated union on `section` (10 variants), TailorDecision is FLAT (signals/summary/items[]{entryId,text,rank,leadRationale?}/cut[]), TailoredResume is the nested assembled shape (sections→groups→items); Profile/Layout/ProviderId/JDSignals all exported. No runtime code, no gaming."
     },
     {
       "id": "T003",
