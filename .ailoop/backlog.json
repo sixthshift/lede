@@ -576,7 +576,7 @@
     {
       "id": "T018",
       "title": "Fix flaky test: FixtureEngine.loadFixtures must tolerate concurrent/partial fixture files (shared decisions dir race)",
-      "status": "todo",
+      "status": "done",
       "depends_on": [],
       "files": [
         "src/server/tailor/engine.ts",
@@ -586,12 +586,12 @@
       "context": "Baseline (oracle.md): bun run check + build + test pass KEYLESS. Touch ONLY declared files. Add a test for the new behavior. RUNTIME v2-017: server under Node/tsx.\n\nFLAKY-TEST DEFECT (measured, stack-traced): test/server.test.ts and test/api.tailor-db.test.ts each writeFileSync/rmSync temp .json fixtures into the SHARED dir test/fixtures/decisions/ from SEPARATE parallel vitest workers. FixtureEngine.loadFixtures (src/server/tailor/engine.ts ~lines 82-90) does readdirSync(dir).filter(.json).map(f => JSON.parse(readFileSync(...))) — it reads+parses EVERY .json with NO per-file guard, so when a worker catches another worker's file mid-write (partial/empty) or mid-delete (ENOENT), JSON.parse/readFileSync throws, the whole map() throws, decide() throws, and /api/tailor returns 502 instead of 200. Intermittent (~1 in 2-5 runs) -> it will randomly red-gate future tickets.\n\nFIX (product-robustness, minimal): in loadFixtures, wrap EACH file's readFileSync+JSON.parse in its own try/catch; on failure SKIP that file (do not abort the whole scan) and emit a console.warn naming the file (so a genuinely corrupt RECORDED fixture is still visible in logs, not silently swallowed). Return the successfully-parsed fixtures. A mid-write/mid-delete concurrent file becomes a no-op for other workers, while a test's own fully-written fixture is still found by key. Do NOT change decide()/hashKey/matching semantics; do NOT touch the tests that write fixtures (the fix is in the engine). Keep DEFAULT_FIXTURES_DIR behavior.\n\nSTRENGTHENED CHECK (escaped-bug rule): add a test in test/engine.test.ts that points a FixtureEngine at a temp dir containing (a) one VALID fixture .json and (b) one MALFORMED/partial .json (truncated, and/or an empty file), then asserts decide() for the valid fixture's key STILL RESOLVES (the malformed file is skipped, not fatal) and loadFixtures does not throw — the guard that would have caught the race.",
       "acceptance": "- baseline passes; the full suite is GREEN across repeated runs (a concurrent partial/deleted fixture file no longer aborts a scan)\n- CONTRAST (tolerate bad fixture files, gameable-resistant): a FixtureEngine over a temp dir holding one valid + one MALFORMED/empty .json still resolves the valid key via decide() (the bad file is skipped); loadFixtures does not throw\n- unchanged: a valid recorded fixture still matches by hashKey; no change to decide()/matching semantics\n- new/updated test in test/engine.test.ts",
       "attempts": [],
-      "evidence": null
+      "evidence": "COORDINATOR merged-tree gate (master @ 2e1777d, keyless): check 0, build 0, test 21 files / 158 PASS — DETERMINISTIC across 5 total runs (workflow 3 + coordinator 2). Fix: loadFixtures per-file try/catch (skip+console.warn on partial/ENOENT), no map()-abort. New test/engine.test.ts case: valid fixture resolves alongside a truncated + empty .json (bad files skipped). No change to decide()/hashKey/matching. Verify passed; merged; worktree pruned."
     },
     {
       "id": "E2-B",
       "title": "Auth: scrypt password gate + @fastify/secure-session + session guard on all /api/* except auth/health + /api/auth/{setup,login,logout}",
-      "status": "todo",
+      "status": "in-progress",
       "depends_on": [
         "E2-A"
       ],
@@ -610,7 +610,7 @@
     {
       "id": "E2-C",
       "title": "BYOK key storage: PUT/DELETE /api/settings/key, validate-before-store, ciphertext-only, sentinel leak scan",
-      "status": "todo",
+      "status": "in-progress",
       "depends_on": [
         "E2-A"
       ],

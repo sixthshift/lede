@@ -429,3 +429,10 @@ Append-only journal. Newest at bottom.
     land T018 BEFORE the security-critical [E2-B, E2-C] so their gates are deterministic (a flaky
     502 could otherwise spuriously fail a Verify and mis-attribute a security ticket).
   chunk: 1/6 closed this run (E2-A). Next: dispatch T018, then [E2-B, E2-C], then [E2-D, E2-E].
+
+[v2-025] T018 — ACCEPTED (flaky race fixed); baseline now DETERMINISTIC
+  gate (master @ 2e1777d, keyless): check 0/build 0/test 21 files/158 PASS, GREEN across 5 runs
+    (workflow 3 + coordinator 2). loadFixtures now per-file try/catch (skip+warn), no whole-scan
+    abort. New engine.test case proves a valid fixture resolves next to truncated+empty files.
+    No decide()/hashKey change. The security-critical [E2-B, E2-C] will gate on this clean baseline.
+  chunk: 2/6 closed this run (E2-A, T018). Dispatching [E2-B auth, E2-C BYOK] next.
