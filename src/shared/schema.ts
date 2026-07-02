@@ -3,7 +3,9 @@
 // to the AI SDK's `generateObject` as the LLM output contract.
 
 import { z } from "zod";
+import { createInsertSchema } from "drizzle-zod";
 import { SECTION_VALUES } from "@shared/sections";
+import { entries } from "../server/db/schema";
 
 // ── §4.1 EntryMeta, one object per section, strict (reject foreign fields) ──
 const experienceMetaZ = z.object({
@@ -98,17 +100,17 @@ export const entryMetaZ = z.discriminatedUnion("section", [
 const LABEL_SECTIONS = new Set(["skill", "interest", "language"]);
 const NO_FACTS_REQUIRED = new Set(["certification", "reference"]);
 
-// ── §4.4/§17 entry input (Phase 0: plain zod; drizzle-zod derivation deferred) ──
-export const entryInput = z
-  .object({
-    id: z.string().min(1).max(80).optional(),
-    section: z.enum(SECTION_VALUES),
-    meta: entryMetaZ,
-    facts: z.array(z.string().min(1).max(300)).max(12),
-    tags: z.array(z.string().min(1).max(40)).max(8),
-    framings: z.array(z.string().min(1).max(200)).max(6).nullish(),
-    sortKey: z.number().int(),
-  })
+// ── §4.4/§17 entry input, derived from the `entries` table (drizzle-zod) ──
+export const entryInput = createInsertSchema(entries, {
+  id: z.string().min(1).max(80).optional(),
+  section: z.enum(SECTION_VALUES),
+  meta: entryMetaZ,
+  facts: z.array(z.string().min(1).max(300)).max(12),
+  tags: z.array(z.string().min(1).max(40)).max(8),
+  framings: z.array(z.string().min(1).max(200)).max(6).nullish(),
+  sortKey: z.number().int(),
+})
+  .omit({ createdAt: true, updatedAt: true })
   .superRefine((entry, ctx) => {
     if (entry.meta.section !== entry.section) {
       ctx.addIssue({
@@ -134,6 +136,36 @@ export const entryInput = z
   });
 
 export const entryImport = z.array(entryInput).max(200);
+
+// ── §4.2/§16 profile input (identity for the header) ──
+const profileLinkZ = z.object({
+  type: z.enum(["github", "linkedin", "site", "other"]),
+  label: z.string().min(1).max(120),
+  url: z.string().min(1).max(120),
+});
+
+export const profileInput = z.object({
+  name: z.string().min(1).max(120),
+  headline: z.string().min(1).max(120).nullish(),
+  email: z.string().min(1).max(120),
+  phone: z.string().min(1).max(120).nullish(),
+  location: z.string().min(1).max(120).nullish(),
+  links: z.array(profileLinkZ).max(8),
+  baseSummary: z.string().min(1).max(2000).nullish(),
+});
+
+// ── §4.2/§9 settings input (provider/model/baseUrl/layout) ──
+const layoutEntryZ = z.object({
+  section: z.enum([...SECTION_VALUES, "summary"]),
+  enabled: z.boolean(),
+});
+
+export const settingsInput = z.object({
+  provider: z.string().min(1).max(120).optional(),
+  model: z.string().min(1).max(120).optional(),
+  baseUrl: z.string().min(1).max(200).nullish(),
+  layout: z.array(layoutEntryZ).optional(),
+});
 
 // ── §5 the model's flat output contract — hand-written, passed straight to generateObject ──
 const jdSignalsZ = z.object({
