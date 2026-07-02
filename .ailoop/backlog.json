@@ -17,14 +17,14 @@
     {
       "id": "T001",
       "title": "Replace Bun scaffold with Fastify + Vite/React skeleton (bun toolchain)",
-      "status": "todo",
+      "status": "done",
       "depends_on": [],
       "files": ["tsconfig.json", "tsconfig.server.json", "vite.config.ts", "index.html", ".env.example", "src/server/index.ts", "src/client/main.tsx", "src/client/App.tsx", "src/client/styles/app.css", "src/client/styles/print.css", "src/main.ts", "src/routes/health.ts"],
       "origin": "spec §3, §21, §24 Phase 0",
       "context": "Establish the §21 layout on the LOCKED stack (§3.1) but with the BUN toolchain (oracle.md 'Toolchain'): Fastify 4 API + Vite/React 18 SPA, one process. DELETE the existing Bun.serve scaffold (src/main.ts, src/routes/health.ts) — replaced, do not keep Bun.serve. Set up: tsconfig (client, ESM, react-jsx, path alias @shared/* → src/shared/*, include src/**), tsconfig.server.json, vite.config.ts (react plugin, @shared alias, dev proxy /api → http://localhost:8787), index.html mounting src/client/main.tsx (bare App shell), src/client/styles/{app.css,print.css} stubs. src/server/index.ts: minimal Fastify server booting on PORT (default 8787, §17) serving GET /api/health → {ok:true} (in prod also serves dist/ static — TODO stub fine). package.json scripts (bun): dev (concurrently dev:api+dev:web), dev:api (bun --watch src/server/index.ts), dev:web (vite), build (vite build), check (tsc --noEmit both configs), start (bun src/server/index.ts), test (vitest run). Deps per §20 (fastify, react, react-dom, vite, @vitejs/plugin-react, vitest, concurrently, typescript). Locked: PORT 8787, Fastify not Bun.serve, ESM, @shared.",
       "acceptance": "- `bun install` succeeds; `bun run check` passes; `bun run build` emits dist/index.html\n- server boots (`bun run start`); `curl localhost:8787/api/health` served by the running Fastify instance → `{\"ok\":true}`\n- src/main.ts & src/routes/health.ts DO NOT exist; `grep -r 'Bun.serve' src` → no hits; src/server/index.ts imports fastify\n- meta-check: tsconfig include covers src/**, so a deliberate type error in src FAILS `bun run check`\n- an `@shared/*` import resolves under BOTH check and build; vite proxies /api → :8787\n- pure scaffold: no behavior tests required (stated)",
       "attempts": [],
-      "evidence": null
+      "evidence": "INDEPENDENT re-verify (coordinator, 2026-07-02): `bun run check`→exit 0; `bun run build`→dist/index.html + assets, exit 0; `bun run test`→'No test files found, exiting with code 0' (passWithNoTests, no dummy test); server boot `curl localhost:8787/api/health`→{\"ok\":true}. Scope: 14 touched paths all ⊆ declared ∪ {package.json,bun.lock}; no drift. Gaming read: test script = 'vitest run --passWithNoTests' (real green-on-empty), tsconfig include=['src/**/*'] (meta-check holds), src/server/index.ts imports fastify, no Bun.serve. Needed one re-dispatch to make the test runner green-on-empty."
     },
     {
       "id": "T002",

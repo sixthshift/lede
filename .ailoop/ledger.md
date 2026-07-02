@@ -107,3 +107,15 @@ Append-only journal. Newest at bottom.
        Flash is the working Phase-0 eval model; if the §22 flip isn't sharp on flash,
        that's a model-quality result → escalate (enable pro billing / swap provider),
        per spec §22/§25 ("the eval is how you vet a model").
+
+[v2-006] T001 (scaffold) — DONE (drive chunk 1, ticket 1/6)
+  decision: accept after independent re-verify + one targeted re-dispatch
+  why: builder (sonnet) replaced the Bun.serve scaffold with Fastify+Vite/React on the
+       bun toolchain. First submission: check/build/health/scope all green BUT `bun run
+       test` exited 1 on 'No test files found' — would break the baseline test gate for
+       every later no-test ticket (T002/T003/T006). Resumed the builder (SendMessage) for
+       a one-line fix (test script → `vitest run --passWithNoTests`, no dummy test).
+       Re-verify green: check 0, build→dist/index.html, test exit 0 on empty, health
+       {ok:true}. Scope clean (14 paths ⊆ declared∪manifest). Gaming read clean.
+  attempt: 1/3 (with one in-session fix, not a failed attempt)
+  evidence: see backlog T001.evidence
