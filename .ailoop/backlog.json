@@ -266,7 +266,7 @@
     {
       "id": "T013",
       "title": "record-fixtures script + recorded decision fixtures (KEY-GATED)",
-      "status": "in-progress",
+      "status": "done",
       "depends_on": [
         "T006",
         "T010",
@@ -283,12 +283,12 @@
       "context": "Author scripts/record-fixtures.ts: runs the LIVE ProviderEngine (Google bootstrap key, GOOGLE_GENERATIVE_AI_API_KEY) over T016's CONTRAST_JDS against SEED_ENTRIES and writes each TailorDecision to test/fixtures/decisions/<name>.json keyed by T016 hashKey(jd, SEED_ENTRIES). Fails LOUD (non-zero, no key). BEFORE writing each fixture it runs the decision through tailor()\u2192assemble\u2192validateNoFabrication AND T016 flipPredicate \u2014 a non-flipping or fabricating decision CANNOT be written. Writes manifest.json (model id, prompt hash, timestamp, token usage) \u2014 provenance. These committed fixtures are what makes the keyless suite (T015) replay the REAL scenarios; a hand-authored fixture would not survive the live-reproduces-fixtures phase gate (oracle Phase 0).",
       "acceptance": "- `bun run scripts/record-fixtures.ts` (with GOOGLE key) writes 3 fixtures + manifest.json; each recorded decision is TailorDecisionZ-valid, passes validateNoFabrication, and passes T016 flipPredicate for its target\n- fixture key = T016 hashKey(jd, SEED_ENTRIES); a subsequent FixtureEngine.decide(jd, SEED_ENTRIES) returns exactly that fixture (shared-hash proof)\n- across the 3 fixtures the rank-1 (leading) entry does NOT track sortKey order (proves a real rank flip, not recency)\n- each fixture embeds/matches the canonical JD text and the SEED_ENTRIES hash (guards library/JD swap)",
       "attempts": [],
-      "evidence": null
+      "evidence": "INDEPENDENT re-verify (coordinator): baseline green (84 tests). Live recorder wrote 3 fixtures + manifest.json (model gemini-2.5-flash). Fixtures are REAL TailorDecisions (2-3 items, cut lists, 342-485-char summaries, ranks 1..N \u2014 not stubs). KEYLESS replay CONFIRMED (GOOGLE key blanked): FixtureEngine+tailor() over the 3 CONTRAST_JDS reproduces all flips PASS (platform-sdk/rules-engine/frontend-rewrite lead, rationale names signal). Keys === hashKey(jd,SEED_ENTRIES). rules-engine leads despite OLDEST sortKey (rank\u2260recency). Provenance gate satisfied \u2014 matches my live ground truth [v2-013]. Scope: scripts/record-fixtures.ts + 3 fixtures + manifest only."
     },
     {
       "id": "T014",
       "title": "Phase 0 acceptance oracle \u2014 scripts/eval.ts (KEY-GATED, THE gate)",
-      "status": "todo",
+      "status": "in-progress",
       "depends_on": [
         "T006",
         "T007",

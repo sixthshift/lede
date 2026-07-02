@@ -1,0 +1,38 @@
+{
+  "key": "c2ca42df2cefb552692a52be41c07dac273ad6880fe01640c99d33f1dbf3f3e8",
+  "name": "rules-engine",
+  "decision": {
+    "signals": {
+      "roleLevel": "senior engineer",
+      "weights": [
+        "impose structure on organically grown, complex systems",
+        "improve system navigability and maintainability",
+        "establish clear conventions and ownership boundaries",
+        "implement guardrails for new team member orientation",
+        "reduce onboarding ramp-up time for engineers",
+        "decrease surprise regressions in production"
+      ],
+      "hardRequirements": []
+    },
+    "summary": "Senior Software Engineer with a proven track record of imposing structure on complex, organically grown systems, reducing developer onboarding time, and enhancing system stability. Expert in architecting frameworks and building foundational components to improve navigability, establish clear conventions, and minimize production regressions.",
+    "items": [
+      {
+        "entryId": "cloudcase-rules-engine",
+        "text": "Architected a lifecycle framework with schemas, lifecycle management, and consistent patterns for a 30k-line rules engine, which reduced onboarding time from days to 1 day and decreased bug incidence.",
+        "rank": 1,
+        "leadRationale": "Leads with direct experience in structuring a complex, unstructured system, significantly improving onboarding and reducing regressions, aligning with the JD's primary focus."
+      },
+      {
+        "entryId": "cloudcase-platform-sdk",
+        "text": "Developed a platform SDK, exposing the platform programmatically for the first time, establishing it as the standard integration path for all internal project teams and new external clients.",
+        "rank": 2
+      },
+      {
+        "entryId": "cloudcase-frontend-rewrite",
+        "text": "Replaced a legacy jQuery frontend with a modern three-layer React/TypeScript architecture, incorporating a component library and platform SDK, enabling the team to ship all feature work on the new system.",
+        "rank": 3
+      }
+    ],
+    "cut": []
+  }
+}

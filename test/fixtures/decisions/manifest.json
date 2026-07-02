@@ -1,0 +1,22 @@
+{
+  "model": "gemini-2.5-flash",
+  "provider": "google",
+  "recordedAt": "2026-07-02T04:35:24.825Z",
+  "fixtures": [
+    {
+      "name": "platform-sdk",
+      "key": "428e546ea2761f54c3c1abd9ca73716f01158bd70eda577d49964de7c952582d",
+      "leadingEntryId": "cloudcase-platform-sdk"
+    },
+    {
+      "name": "rules-engine",
+      "key": "c2ca42df2cefb552692a52be41c07dac273ad6880fe01640c99d33f1dbf3f3e8",
+      "leadingEntryId": "cloudcase-rules-engine"
+    },
+    {
+      "name": "frontend-rewrite",
+      "key": "70724608fc7b8ddbc31ce6e4a50310d72b1307fb9ac95c80b493d403cc9d00d2",
+      "leadingEntryId": "cloudcase-frontend-rewrite"
+    }
+  ]
+}

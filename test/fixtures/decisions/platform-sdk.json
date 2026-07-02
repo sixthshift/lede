@@ -1,0 +1,37 @@
+{
+  "key": "428e546ea2761f54c3c1abd9ca73716f01158bd70eda577d49964de7c952582d",
+  "name": "platform-sdk",
+  "decision": {
+    "signals": {
+      "roleLevel": "Senior Engineer",
+      "weights": [
+        "Designing and shipping a public-facing developer surface",
+        "Creating stable contracts, versioning, and documentation",
+        "Building a client library for external partners",
+        "Collaborating with solutions engineering for early adopter onboarding",
+        "Partnering with product on capability exposure"
+      ],
+      "hardRequirements": []
+    },
+    "summary": "Experienced Principal Software Engineer with a proven track record of designing and delivering foundational platform services and SDKs that expose core functionality programmatically to internal and external developers. Skilled in establishing integration paths for new clients and modernizing core architectural components to support scalable feature development.",
+    "items": [
+      {
+        "entryId": "cloudcase-platform-sdk",
+        "text": "Built a platform SDK that programmatically exposed the platform for the first time, becoming the integration path offered to new external clients and adopted across all internal project teams.",
+        "rank": 1,
+        "leadRationale": "leads with direct experience designing and shipping a public-facing SDK for external clients, a core requirement of the role."
+      },
+      {
+        "entryId": "cloudcase-frontend-rewrite",
+        "text": "Replaced legacy jQuery with a new three-layer React/TypeScript architecture, incorporating a component library and platform SDK, on which the team now ships all feature work.",
+        "rank": 2
+      }
+    ],
+    "cut": [
+      {
+        "entryId": "cloudcase-rules-engine",
+        "reason": "This entry focuses on internal rules engine lifecycle management and internal developer experience, which is not directly relevant to building an external-facing developer platform for partners."
+      }
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "key": "70724608fc7b8ddbc31ce6e4a50310d72b1307fb9ac95c80b493d403cc9d00d2",
+  "name": "frontend-rewrite",
+  "decision": {
+    "signals": {
+      "roleLevel": "Staff/Lead Frontend Engineer",
+      "weights": [
+        "Technical direction and ownership of web application",
+        "Define and build shared design system and component foundation in React and TypeScript",
+        "Enable other product teams to build on shared foundation",
+        "Set conventions for state management and testing",
+        "Incremental migration of legacy applications",
+        "Hands-on coding, technical review, and mentorship",
+        "Modernizing UI from legacy practices"
+      ],
+      "hardRequirements": [
+        "React",
+        "TypeScript",
+        "Building shared frontend platforms/design systems"
+      ]
+    },
+    "summary": "Experienced Staff-level engineer with a proven track record of owning the technical direction of web applications, specializing in building and migrating modern frontend platforms using React and TypeScript. Led the replacement of legacy UI with a three-layer React/TypeScript architecture, including a component library and platform SDK, enabling feature teams to build upon it. Skilled in defining foundational architectures and fostering adoption across internal and external teams.",
+    "items": [
+      {
+        "entryId": "cloudcase-frontend-rewrite",
+        "text": "Led the replacement of a legacy jQuery frontend with a modern three-layer architecture utilizing React and TypeScript, establishing a new foundation for all feature work through a component library and platform SDK.",
+        "rank": 1,
+        "leadRationale": "This directly addresses the primary requirement of replacing a legacy UI and building a modern React/TypeScript component foundation for other teams."
+      },
+      {
+        "entryId": "cloudcase-platform-sdk",
+        "text": "Built a platform SDK that exposed the platform programmatically, which was adopted by all internal project teams and became the standard integration path for new external clients.",
+        "rank": 2
+      }
+    ],
+    "cut": [
+      {
+        "entryId": "cloudcase-rules-engine",
+        "reason": "While demonstrating platform thinking and developer experience improvements, this entry focuses on a backend rules engine and does not directly align with the job's strong emphasis on frontend architecture, UI modernization, and React/TypeScript expertise."
+      }
+    ]
+  }
+}
