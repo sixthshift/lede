@@ -50,12 +50,28 @@ Stack (§3.1, §20 — frozen):
   (§8, §17, §19). Provider key is BYOK (encrypted in DB), not an env var — except
   the Phase 0 dev bootstrap (§24). `PORT` default **8787** (§17).
 
-**Toolchain (coordinator decision 2026-07-02, ledger [v2-002]):** **Bun as
-package-manager + runner** (`bun install`, `bun run`, `bunx`) — matches the
-existing container (bun.lock, Bun devcontainer). This is a *mechanical* deviation
-from spec §20's `tsx`-in-dev-deps; every **architectural** lock above (Fastify not
-Bun.serve, provider-agnostic AI SDK, Drizzle, better-sqlite3, etc.) is unchanged.
-Production Docker uses a Bun runtime image (deviation from §19 "node slim"; noted).
+**Toolchain (coordinator decision 2026-07-02, ledger [v2-002], amended
+[v2-017]):** **Bun as package-manager + script runner** (`bun install`,
+`bun run check|build|test`, `bunx`) — matches the existing container (bun.lock).
+This is a *mechanical* deviation from spec §20's `tsx`-in-dev-deps; every
+**architectural** lock above (Fastify, provider-agnostic AI SDK, Drizzle,
+better-sqlite3, etc.) is unchanged.
+
+**AMENDMENT [v2-017] (mechanical) — the server PROCESS runs under Node, not Bun.**
+`bun src/server/index.ts` dies `ERR_DLOPEN_FAILED`: better-sqlite3 ships a
+Node-ABI prebuilt (NODE_MODULE_VERSION 127) that Bun 1.3.14's V8 (137) can't
+load, and it uses direct V8/NAN bindings (not N-API), so it's not rebuild-away
+(bun#4290). Verified: under Node v22 (tsx) the server boots, migrates, and
+`/api/health` → `{ok:true}`. So the `start`/`dev:api` scripts run under **Node
+via `tsx`** — which is just reverting the *runner* to spec §3.1's own
+"Node ≥ 20". Bun remains the package-manager + runs check/build/test (vitest is
+node already). Implemented by repair ticket **T017**, which also adds the
+real-boot smoke gate below. Production Docker likewise uses a **Node** runtime
+image (aligns with §19 "node slim"; earlier Bun-image plan dropped).
+
+**Boot invariant (added [v2-017], checked via `test/boot.smoke.test.ts`):** the
+server must boot under the real runner (Node/tsx) against a real DATA_DIR and
+answer `GET /api/health` → `{ok:true}` — the gap the pure-vitest baseline missed.
 
 ## Scope tripwire (halt if crossed) — §2, §20
 

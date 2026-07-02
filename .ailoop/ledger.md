@@ -239,3 +239,49 @@ Append-only journal. Newest at bottom.
     infra: pruned fan-out worktrees each batch + vite.config excludes .claude/** so stray
     worktrees can't pollute the suite. Workflow template had an args string/object bug →
     fixed in the local guarded copy.
+
+[v2-016] ===== PHASE 1 OPENED — E1 epic decomposed (8 child tickets) =====
+  decision: E1 → E1-A..E1-F3; E1 status=decomposed; E2.depends_on rewired to leaves
+            [E1-E, E1-F2, E1-F3] (scheduler counts only status==='done' as satisfying
+            a dep, so a 'decomposed' parent would never unblock E2).
+  children (dependency spine):
+    E1-A UI foundation (Tailwind + 15 shadcn primitives + §12 tokens + self-hosted Plex)  deps []
+    E1-B Drizzle schema + db + migrations-on-boot + singleton seeding                     deps []
+    E1-C drizzle-zod validators (replace hand-rolled entryInput) + profile/settings zod   deps [B]
+    E1-D routes /api/entries CRUD+import, /api/profile, /api/settings                      deps [B,C]
+    E1-E /api/tailor reads entries+layout from DB; first-boot seeds SEED_ENTRIES          deps [B,D]
+    E1-F1 client infra (Query+router+AppShell/NavTabs) + LibraryView browse/delete        deps [A,D]
+    E1-F2 section-aware EntryEditor + create/edit (SectionMetaFields/RepeatableList/TagInput) deps [F1]
+    E1-F3 ProfileEditor + LayoutEditor                                                    deps [F1]
+  red-team baked into acceptance (gameable-resistant contrasts, not existence checks):
+    A=no-CDN-font grep on dist; B=fresh-migrate tables+CHECK + real-file restart persist;
+    C=client build must NOT bundle better-sqlite3 (shared→db boundary stays driver-free);
+    D=secrets-never-leak (settings/entries payload scan) + restart persistence;
+    E=tailor reads DB-not-const + non-default layout reorder/disable contrast;
+    F1=delete-e2e; F2=one-registry-editor section-switch contrast; F3=profile+layout persist round-trip.
+  scheduler after: ready=[E1-A,E1-B]; batches=[[E1-A,E1-B]] (file-disjoint: client-config vs server-db).
+  NOTE: partial-batch gate = baseline on merged tree; the FULL Phase-1 behavioral oracle
+        (oracle.md §Phase 1) runs at phase close after all 8 children integrate.
+
+[v2-017] E1-A, E1-B — ACCEPTED (batch fan-out, coordinator-gated); + oracle amendment + T016
+  decision: accept both after COORDINATOR merged-tree re-verify (the workflow's Gate agent
+    errored on a session-limit reset, not a code failure — oracle:null — so I ran the gate).
+  gate (merged tree, master @ c927c70): bun run check exit 0; bun run build exit 0
+    (dist ships self-hosted IBM Plex woff/woff2, grep dist fonts.googleapis/gstatic -> none);
+    bun run test with ALL provider keys unset -> 12 files / 101 tests PASS (93 -> 101: +4
+    db.test, +4 ui-foundation.test). Workflow Verify passed both independently (scope clean,
+    no gaming); merge clean, no conflicts. Worktrees + branches pruned.
+  MECHANICAL AMENDMENT (server runner Bun -> Node/tsx): E1-B's builder flagged, and I
+    VERIFIED directly, that `bun src/server/index.ts` fails ERR_DLOPEN_FAILED — better-sqlite3
+    is a Node-ABI native addon Bun 1.3.14 can't dlopen (bun#4290), not rebuild-away. Under
+    Node v22 (tsx): boots, migrates, /api/health {ok:true}. This is a collision between my
+    v2-002 Bun-as-runner deviation and the locked better-sqlite3 dep; the SPEC's own §3.1 says
+    "Node >= 20", so reverting the runner to Node is a mechanical correction, NOT a semantic
+    change (behavior/stack/architecture unchanged; only the server process runner). Bun stays
+    the package-manager + check/build/test runner. oracle.md toolchain note amended + boot
+    invariant added.
+  ESCAPED-BUG RULE -> repair ticket T017 (depends E1-B): change package.json start/dev:api to
+    run under tsx, add tsx devDep, and add test/boot.smoke.test.ts (spawn the REAL entrypoint,
+    poll /api/health, assert DATA_DIR .sqlite created) — the real-boot gate the pure-vitest
+    baseline lacked. Strengthens the check so a non-bootable runner can't pass again.
+  chunk: 2/6 tickets closed this run.
