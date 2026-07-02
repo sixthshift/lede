@@ -308,7 +308,7 @@
     {
       "id": "T015",
       "title": "Keyless pipeline e2e tests (FixtureEngine replay)",
-      "status": "in-progress",
+      "status": "done",
       "depends_on": [
         "T011",
         "T013",
@@ -321,7 +321,7 @@
       "context": "Author test/tailor.e2e.test.ts: drive tailor() AND POST /api/tailor with FixtureEngine over the recorded fixtures (T013) for the 3 CONTRAST_JDS \u2014 NO API KEY. Asserts the assembled resume's structure/order/coercion/validation AND that the correct target leads each JD (replaying the flip keylessly via T016 flipPredicate). The standing regression net (\u00a725 keyless guarantee). Honest limit (record in ledger): this replays FROZEN decisions, so it proves the MACHINERY, not that the live model still flips \u2014 that rests on T014 being genuinely run. It also cannot catch a fabricated fixture; the anti-recency check below is the one recency-vs-rank cheat it CAN kill alone.",
       "acceptance": "- `bun run test` (GOOGLE_GENERATIVE_AI_API_KEY UNSET) passes; assert the engine used is FixtureEngine\n- for each of the 3 JDs the SPECIFIC expected target is its group's UNIQUE leading item, and the three leads are MUTUALLY DISTINCT\n- Anti-recency: rules-engine JD \u2192 cloudcase-rules-engine leads (it has the OLDEST sortKey 202101, impossible under recency), and \u22652 of 3 leads are NOT the max-sortKey entry\n- a specifically-UNRECORDED jd yields the tagged no_fixture error via tailor() and 422 {error:'no_fixture'} via HTTP\n- structure-ignores-tags: replay with tagShuffle(SEED_ENTRIES) \u2192 identical assembled order/selection (proves assemble/render never let tags influence structure)",
       "attempts": [],
-      "evidence": null
+      "evidence": "INDEPENDENT re-verify (coordinator): KEYLESS full suite passes with GOOGLE key UNSET \u2014 10 files/93 tests. e2e replays the 3 \u00a722 flips via FixtureEngine (each target is its group's items[0]; leads mutually distinct = the 3 seed ids); ANTI-RECENCY (rules-engine leads despite OLDEST sortKey 202101, verified via Math.min; \u22652 leads not max-sortKey); HTTP via buildApp().inject() recorded\u2192200/unrecorded\u2192422 no_fixture; structure-ignores-tags (assemble over SEED_ENTRIES vs tagShuffle deep-equal). Honest-limit comment present. No ProviderEngine (keyless). Scope: only test/tailor.e2e.test.ts."
     },
     {
       "id": "E1",

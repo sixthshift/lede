@@ -203,3 +203,39 @@ Append-only journal. Newest at bottom.
        the flip judges FACTS not tags (the anti-Teal proof). This is spec §25 Tier-0 met.
        I now hold ground truth: T013's recorded fixtures + T014's eval must reproduce
        exactly {platform-sdk, rules-engine, frontend-rewrite} or they are gamed/broken.
+
+[v2-014] T013, T014, T012, T015 — DONE (single dispatches)
+  decision: accept all after coordinator re-verify
+  why: T013 recorder wrote 3 real fixtures + manifest (live), keys=hashKey, replay
+       keyless PASS×3 (provenance gate met). T014 eval.ts — coordinator RAN IT LIVE:
+       exit 0, base+tag-shuffle all flip, no-key→exit1 (no fallback). T012 client —
+       §10 leak invariant (ResumePage renders no leadRationale/cut; sentinel test),
+       data-driven order, ATS print.css. T015 keyless e2e — 93 tests pass with key
+       UNSET, anti-recency + 422 no_fixture + structure-ignores-tags.
+  evidence: see backlog T012/T013/T014/T015.evidence
+
+[v2-015] ===== PHASE 0 CLOSED (16/16 tickets) =====
+  decision: Phase 0 COMPLETE — behavioral oracle satisfied; proceed to Phase 1 (E1)
+  merged-tree gate:
+    - baseline: bun run check PASS, bun run build PASS.
+    - keyless regression net: bun run test → 93 tests PASS with GOOGLE key UNSET
+      (the §25 keyless guarantee — CI proves the machinery without a key).
+    - behavioral oracle (§22/§25 Tier-0 lede-flip + tag-shuffle): PASSED LIVE today on
+      THIS exact tailoring pipeline. Evidence: ground-truth probe [v2-013] + T013
+      recorder + T014 eval run (coordinator-run, exit 0). git-confirmed: the only files
+      changed after the last live pass (commit a1770d3) are src/client/* + tests — the
+      tailoring pipeline (src/server/tailor/*, seed.ts, src/shared/*, scripts/eval.ts)
+      is BYTE-IDENTICAL, so the live pass holds for the current tree.
+    - fixture provenance: fixtures are real live-model output, keyed by hashKey, replay
+      keylessly (T013/T015).
+  HONEST CAVEAT: a fresh `bun run scripts/eval.ts` at close returned 429
+    RESOURCE_EXHAUSTED — Google FREE-TIER DAILY QUOTA is now spent (many live calls
+    today). This is a TRANSIENT environment limit, NOT a code/flip regression: the same
+    unchanged pipeline passed live earlier today and the keyless net is green. Re-running
+    eval.ts after the quota resets (or with Pyro/Pro billing) will re-confirm. Do NOT
+    treat the 429 as a Phase-0 failure.
+  NOTE (drift): 6 tickets needed a test-file added to their `files` contract mid-flight
+    (T004/T005/T007/T010/T011/T012) — the intake under-declared test files. Coordinator
+    infra: pruned fan-out worktrees each batch + vite.config excludes .claude/** so stray
+    worktrees can't pollute the suite. Workflow template had an args string/object bug →
+    fixed in the local guarded copy.
