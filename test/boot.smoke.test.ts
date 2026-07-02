@@ -5,13 +5,16 @@
 // native addon Bun's embedded V8 cannot dlopen.
 import { describe, it, expect, afterEach } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtempSync, existsSync, rmSync } from "node:fs";
+import { mkdtempSync, existsSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createServer } from "node:net";
+import { randomBytes } from "node:crypto";
 import path from "node:path";
 
 const TSX_BIN = path.join(process.cwd(), "node_modules/.bin/tsx");
 const ENTRYPOINT = path.join(process.cwd(), "src/server/index.ts");
+const VALID_MASTER_KEY = randomBytes(32).toString("base64");
+const VALID_SESSION_SECRET = "boot-smoke-session-secret-at-least-32-chars";
 
 let child: ChildProcess | undefined;
 let dataDir: string | undefined;
@@ -65,6 +68,8 @@ describe("boot smoke: real entrypoint under the real runner (tsx/Node)", () => {
         DATA_DIR: dataDir,
         PORT: String(port),
         NODE_ENV: "test",
+        LEDE_MASTER_KEY: VALID_MASTER_KEY,
+        LEDE_SESSION_SECRET: VALID_SESSION_SECRET,
       },
       stdio: "pipe",
     });
@@ -85,5 +90,67 @@ describe("boot smoke: real entrypoint under the real runner (tsx/Node)", () => {
 
     expect(body).toEqual({ ok: true });
     expect(existsSync(path.join(dataDir, "lede.sqlite"))).toBe(true);
+  }, 20_000);
+});
+
+// Process-level boot refusal (spec.md §8/§19/§23): the operator secrets are
+// REQUIRED to boot and are NEVER auto-generated. A missing or malformed
+// LEDE_MASTER_KEY must fail the process before it ever listens.
+function spawnWithEnv(env: Record<string, string | undefined>): {
+  waitForExit: () => Promise<number | null>;
+} {
+  const merged: Record<string, string> = { ...process.env } as Record<string, string>;
+  for (const [key, value] of Object.entries(env)) {
+    if (value === undefined) delete merged[key];
+    else merged[key] = value;
+  }
+  child = spawn(TSX_BIN, [ENTRYPOINT], {
+    env: merged,
+    stdio: "pipe",
+  });
+  const proc = child;
+  return {
+    waitForExit: () =>
+      new Promise((resolve) => {
+        proc.on("exit", (code) => resolve(code));
+      }),
+  };
+}
+
+describe("boot refusal: missing/malformed operator secrets never boot, never write a key", () => {
+  it("exits non-zero and never listens when LEDE_MASTER_KEY is unset", async () => {
+    dataDir = mkdtempSync(path.join(tmpdir(), "lede-boot-refusal-"));
+    const port = await freePort();
+    const { waitForExit } = spawnWithEnv({
+      DATA_DIR: dataDir,
+      PORT: String(port),
+      NODE_ENV: "test",
+      LEDE_MASTER_KEY: undefined,
+      LEDE_SESSION_SECRET: VALID_SESSION_SECRET,
+    });
+
+    const code = await waitForExit();
+    expect(code).not.toBe(0);
+    await expect(pollHealth(port, Date.now() + 1_500)).rejects.toThrow();
+    expect(existsSync(dataDir)).toBe(true);
+    expect(readdirSync(dataDir)).toEqual([]);
+  }, 20_000);
+
+  it("exits non-zero and never listens when LEDE_MASTER_KEY is malformed (not 32 bytes)", async () => {
+    dataDir = mkdtempSync(path.join(tmpdir(), "lede-boot-refusal-"));
+    const port = await freePort();
+    const { waitForExit } = spawnWithEnv({
+      DATA_DIR: dataDir,
+      PORT: String(port),
+      NODE_ENV: "test",
+      LEDE_MASTER_KEY: Buffer.from("too short").toString("base64"),
+      LEDE_SESSION_SECRET: VALID_SESSION_SECRET,
+    });
+
+    const code = await waitForExit();
+    expect(code).not.toBe(0);
+    await expect(pollHealth(port, Date.now() + 1_500)).rejects.toThrow();
+    expect(existsSync(dataDir)).toBe(true);
+    expect(readdirSync(dataDir)).toEqual([]);
   }, 20_000);
 });
