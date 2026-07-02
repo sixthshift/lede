@@ -243,7 +243,7 @@
     {
       "id": "T012",
       "title": "Client Phase 0: JD paste \u2192 tailor \u2192 deterministic resume render",
-      "status": "todo",
+      "status": "in-progress",
       "depends_on": [
         "T002",
         "T011"
@@ -255,7 +255,8 @@
         "src/client/components/JDInput.tsx",
         "src/client/components/ResumePage.tsx",
         "src/client/styles/print.css",
-        "src/client/styles/app.css"
+        "src/client/styles/app.css",
+        "test/resumepage.test.tsx"
       ],
       "origin": "spec \u00a710, \u00a713 (minimal)",
       "context": "Minimal Phase 0 client (no shadcn/Tailwind yet \u2014 lands in E1; plain CSS here). api.ts: typed fetch to /api/tailor throwing ApiError{status,code,message}. TailorView: JDInput (textarea) + tailor button \u2192 /api/tailor \u2192 ResumePage. ResumePage: SINGLE-COLUMN deterministic render of TailoredResume (\u00a710) \u2014 ProfileHeader stub, summary, then each TailoredSection (registry label + groups) in LAYOUT order (data-driven, not hardcoded). print.css (@media print): US-Letter, #000 on #fff, real text, no images/tables/multi-column. leadRationale/cut[] MUST NOT render on the resume page (\u00a710) \u2014 reasoning UI is Phase 3. Wire into App.tsx.",
@@ -288,7 +289,7 @@
     {
       "id": "T014",
       "title": "Phase 0 acceptance oracle \u2014 scripts/eval.ts (KEY-GATED, THE gate)",
-      "status": "in-progress",
+      "status": "done",
       "depends_on": [
         "T006",
         "T007",
@@ -302,7 +303,7 @@
       "context": "Author scripts/eval.ts \u2014 THE Phase 0 behavioral oracle (\u00a722, \u00a725). Constructs ProviderEngine EXPLICITLY (Google bootstrap key, model gemini-2.5-flash per ledger [v2-005] \u2014 pro is quota-blocked) and EXITS NON-ZERO if no key (never skip-as-pass, never fall back to FixtureEngine). Runs the live model over T016 CONTRAST_JDS against EXACTLY SEED_ENTRIES via tailor(), using T016 flipPredicate. Exit 0 iff all 3 flip correctly, non-zero (naming the miss) otherwise. Locked: if it doesn't flip sharply, the PROMPT (\u00a76.2, T007) is wrong \u2014 not the code.",
       "acceptance": "- `bun run scripts/eval.ts` (with GOOGLE_GENERATIVE_AI_API_KEY) exits 0; asserts engine instanceof ProviderEngine and \u22651 live response with token usage\n- over exactly SEED_ENTRIES (length===3, ids match): for each JD the expected target is present in items (NOT cut) and is the STRICT UNIQUE minimum rank\n- the three leading entryIds are MUTUALLY DISTINCT and equal the SET {cloudcase-platform-sdk, cloudcase-rules-engine, cloudcase-frontend-rewrite} (set assertion, not 3 isolated checks)\n- each target's leadRationale contains a token from that JD's decision.signals; the three rationales are pairwise different\n- TAG-SHUFFLE CONTROL (Finding B): re-run over tagShuffle(SEED_ENTRIES); the flip is UNCHANGED (if shuffling tags changes the lede \u2192 tag-scoring \u2192 FAIL)\n- exits non-zero naming the failing JD when a lede does not flip",
       "attempts": [],
-      "evidence": null
+      "evidence": "INDEPENDENT re-verify (coordinator RAN THE GATE LIVE): `bun run scripts/eval.ts` \u2192 exit 0. BASE: all 3 JDs flip to correct target (platform-sdk/rules-engine/frontend-rewrite), leads+rationaleNamesSignal, mutually-distinct set. TAG-SHUFFLE: same 3 flips hold + same target per JD (fact-driven, not tag-driven). No-key run \u2192 exit 1 (refuses, no FixtureEngine fallback). Gaming read: uses ProviderEngine explicitly, EXPECTED_TARGETS as a Set, no fallback. THIS IS THE PHASE-0 \u00a722/\u00a725-Tier0 ORACLE PASSING. Scope: only scripts/eval.ts."
     },
     {
       "id": "T015",
