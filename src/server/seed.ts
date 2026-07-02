@@ -1,5 +1,7 @@
 // Phase 0 seed data — spec.md §22 (verbatim). Loaded if `entries` empty on first run.
 import type { Entry } from '@shared/types';
+import type { Db } from './db';
+import { entries } from './db/schema';
 
 export const SEED_ENTRIES: Entry[] = [
   { id: 'cloudcase-rules-engine', section: 'experience', sortKey: 202101,
@@ -29,3 +31,19 @@ export const SEED_ENTRIES: Entry[] = [
     ],
     tags: ['platform-arch', 'sdk'] },
 ];
+
+// First-boot seeding (§22): if `entries` is empty, load SEED_ENTRIES. Idempotent —
+// safe to call on every boot; only acts once (until entries are added/removed down to 0).
+export function seedIfEmpty(db: Db): void {
+  const count = db.select().from(entries).all().length;
+  if (count > 0) return;
+
+  const now = Date.now();
+  db.transaction((tx) => {
+    for (const entry of SEED_ENTRIES) {
+      tx.insert(entries)
+        .values({ ...entry, framings: entry.framings ?? null, createdAt: now, updatedAt: now })
+        .run();
+    }
+  });
+}

@@ -1,28 +1,41 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { APICallError, NoObjectGeneratedError } from "ai";
 import { fileURLToPath } from "node:url";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import type { Layout } from "@shared/types";
-import { SECTION_VALUES } from "@shared/sections";
+import type { Entry, Section } from "@shared/types";
 import { loadConfig } from "./config";
 import { initDb, type Db } from "./db";
-import { SEED_ENTRIES } from "./seed";
+import { entries, settings } from "./db/schema";
+import { seedIfEmpty } from "./seed";
 import { makeEngine, tailor, NoFixtureError, type TailorEngine } from "./tailor/engine";
 import { FabricationError } from "./tailor/validate";
 import { entriesRoutes } from "./routes/entries";
 import { profileRoutes } from "./routes/profile";
 import { settingsRoutes } from "./routes/settings";
 
-// Phase 0: every §4.2 section enabled, standard order — no layout persistence yet.
-const defaultLayout: Layout = [
-  { section: "summary", enabled: true },
-  ...SECTION_VALUES.map((section) => ({ section, enabled: true })),
-];
-
 const tailorBodyZ = z.object({
   jobDescription: z.string().min(1).max(20000),
 });
+
+// Row -> domain Entry: drops the storage-only createdAt/updatedAt and omits
+// `framings` entirely when unset (rather than `null`). Key order matches the
+// SEED_ENTRIES literals exactly (id, section, sortKey, meta, facts, tags,
+// framings?) so JSON.stringify-based hashKey() matching (engine.ts,
+// evalcore.ts) against recorded fixtures is unaffected by the db round-trip.
+function rowToEntry(row: typeof entries.$inferSelect): Entry {
+  const entry: Entry = {
+    id: row.id,
+    section: row.section as Section,
+    sortKey: row.sortKey,
+    meta: row.meta,
+    facts: row.facts,
+    tags: row.tags,
+  };
+  if (row.framings) entry.framings = row.framings;
+  return entry;
+}
 
 // Maps a tailor() failure to its distinct HTTP status (spec.md §9).
 function mapTailorError(err: unknown): { status: number; body: { error: string } } {
@@ -41,11 +54,19 @@ function mapTailorError(err: unknown): { status: number; body: { error: string }
 }
 
 // Accepts an injected db (tests, or the entrypoint below); otherwise opens/
-// migrates/seeds one from config.dataDir so buildApp() stays a one-call boot.
+// migrates one from config.dataDir and seeds it on first boot (empty entries
+// table) so buildApp() stays a one-call boot. An injected db is assumed
+// already initialized/seeded by its caller (see seedIfEmpty in ./seed).
 export function buildApp(db?: Db): FastifyInstance {
   const app = Fastify({ logger: true });
   const engine: TailorEngine = makeEngine();
-  const resolvedDb = db ?? initDb(loadConfig().dataDir).db;
+  let resolvedDb: Db;
+  if (db) {
+    resolvedDb = db;
+  } else {
+    resolvedDb = initDb(loadConfig().dataDir).db;
+    seedIfEmpty(resolvedDb);
+  }
 
   app.get("/api/health", async () => ({ ok: true }));
 
@@ -60,7 +81,9 @@ export function buildApp(db?: Db): FastifyInstance {
     }
 
     try {
-      const resume = await tailor(engine, parsed.data.jobDescription, SEED_ENTRIES, defaultLayout);
+      const jdEntries = resolvedDb.select().from(entries).all().map(rowToEntry);
+      const layout = resolvedDb.select().from(settings).where(eq(settings.id, 1)).get()!.layout;
+      const resume = await tailor(engine, parsed.data.jobDescription, jdEntries, layout);
       return reply.code(200).send(resume);
     } catch (err) {
       const { status, body } = mapTailorError(err);
@@ -79,6 +102,7 @@ const isEntrypoint = process.argv[1] !== undefined && fileURLToPath(import.meta.
 if (isEntrypoint) {
   const config = loadConfig();
   const { db } = initDb(config.dataDir);
+  seedIfEmpty(db);
   const app = buildApp(db);
   app.listen({ port: config.port, host: "0.0.0.0" }).catch((err) => {
     app.log.error(err);
