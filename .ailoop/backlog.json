@@ -101,7 +101,8 @@
         "T003"
       ],
       "files": [
-        "src/shared/schema.ts"
+        "src/shared/schema.ts",
+        "test/schema.test.ts"
       ],
       "origin": "spec \u00a74.4, \u00a75, \u00a717",
       "context": "Author src/shared/schema.ts. Critical: TailorDecisionZ \u2014 hand-written zod for the model's flat TailorDecision (\u00a75), passed straight to generateObject. Also entryMetaZ (STRICT discriminatedUnion on 'section', one object per \u00a74.1 \u2014 reject foreign fields) and entryInput (plain zod for Phase 0: id?, section enum, meta=entryMetaZ, facts 1-300 x\u226412, tags \u22648 x1-40, framings? \u22646 x1-200, sortKey int; superRefine meta.section===section + per-section facts arity per \u00a717). drizzle-zod derivation deferred to Phase 1 (no Drizzle yet). Locked: TailorDecisionZ hand-written, never table-derived.",
@@ -134,7 +135,8 @@
         "T003"
       ],
       "files": [
-        "src/server/tailor/prompt.ts"
+        "src/server/tailor/prompt.ts",
+        "test/prompt.test.ts"
       ],
       "origin": "spec \u00a76.1, \u00a76.2",
       "context": "Author src/server/tailor/prompt.ts \u2014 THE product IP (\u00a76.2). SYSTEM_PROMPT (frozen; never interpolate JD/timestamp) encodes: judge from FACTS not tags; the fact-lock (never invent, never strengthen \u2014 'contributed to' \u2260 'led'); the rephrase policy full/light/none GENERATED from SECTIONS (so prompt/code never drift); rank-within-group = the lede; a leadRationale on each group's leading item tied to a NAMED JD signal; return ONLY the flat TailorDecision with every number grounded in facts. renderLibrary(entries) serializes deterministically (by section, then sortKey desc, then id; stable key order) and FOREGROUNDS facts (tags not presented as a scorable field). This prompt is what makes the \u00a722 lede flip \u2014 if the eval (T014) doesn't flip sharply, THIS file is the bug, not the code.",
