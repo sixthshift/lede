@@ -170,3 +170,11 @@ Append-only journal. Newest at bottom.
        renderLibrary; T008 assemble server-owns-structure (max-member order, coercion
        override, layout order). Real flip proof still pending the live eval (T014).
   evidence: see backlog T005/T007/T008.evidence
+
+[v2-011] T016 (eval-core) — DONE (single dispatch)
+  decision: accept after coordinator re-verify
+  why: check/build green, 68 tests (14 new). Closes red-team Findings A+B spine: one
+       shared hashKey (order-insensitive), CONTRAST_JDS proven leak-free vs SEED_ENTRIES
+       facts (realistic employer JDs, not keyword lists), flipPredicate (leads=group
+       items[0] & not cut; rationaleNamesSignal), tagShuffle. No new deps. Scope clean.
+  evidence: see backlog T016.evidence

@@ -182,7 +182,7 @@
     {
       "id": "T016",
       "title": "Shared eval-core: hash(jd,entries), flip-predicate, canonical JDs, tag-shuffle",
-      "status": "in-progress",
+      "status": "done",
       "depends_on": [
         "T002",
         "T003",
@@ -195,12 +195,12 @@
       "context": "SINGLE SOURCE that closes the two structural holes. Author src/server/tailor/evalcore.ts exporting: (1) hashKey(jd, entries) \u2014 the ONE fixture key used by BOTH FixtureEngine (T010) and record-fixtures (T013), so a fixture can't be keyed one way and looked up another; (2) CONTRAST_JDS \u2014 the 3 \u00a722 JDs, authored so NONE contains any entry id or a fact substring \u2265 ~12 chars from its target (no keyword leakage), each mapped to its expected target (platform-sdk/rules-engine/frontend-rewrite); (3) flipPredicate(resume: TailoredResume, targetId) \u2192 { leads, rationaleNamesSignal } \u2014 target is its group's UNIQUE lowest-rank leading item AND its group.leadRationale contains a token from resume.signals; used identically by eval, record-fixtures, and the keyless suite; (4) tagShuffle(entries) \u2014 returns entries with tags permuted/stripped across entries (for the invariance control). This module is imported by T010, T013, T014, T015 \u2014 the provenance chain's spine.",
       "acceptance": "- `bun run check` + `bun run test` pass\n- hashKey is deterministic and order-insensitive over entries; hashKey(CONTRAST_JDS[i], SEED_ENTRIES) is stable\n- unit test: none of CONTRAST_JDS contains an entry id or a \u226512-char fact substring from its target (guards keyword leakage)\n- flipPredicate returns leads=true only when target is the UNIQUE minimum-rank leading item of its group; false on a rank tie or when target is in cut\n- tagShuffle preserves entry ids/facts/sortKeys and only permutes tags",
       "attempts": [],
-      "evidence": null
+      "evidence": "INDEPENDENT re-verify (coordinator): check/build green; test/evalcore.test.ts adds 14 (68 total). hashKey deterministic + order-insensitive (sha256 over jd+entries-sorted-by-id); ANTI-LEAKAGE verified \u2014 each CONTRAST_JDS jd contains neither its target id nor any \u226512-char substring of that target's facts (builder's drafts leaked 'integration path'/'the codebase'/'consistent patterns' and were reworded until clean). JDs read as realistic employer descriptions of the NEED, not keyword lists. flipPredicate: leads = target is its group's items[0] (leading) & not in cut; rationaleNamesSignal = leadRationale references a resume.signals token (true/false/filler/empty cases tested). tagShuffle permutes tags across entries, preserves id/facts/sortKey, no mutation. No new deps. Scope: only evalcore.ts + test."
     },
     {
       "id": "T010",
       "title": "TailorEngine (Fixture + Provider) + tailor() orchestration",
-      "status": "todo",
+      "status": "in-progress",
       "depends_on": [
         "T002",
         "T004",
