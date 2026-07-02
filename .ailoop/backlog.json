@@ -211,7 +211,8 @@
         "T016"
       ],
       "files": [
-        "src/server/tailor/engine.ts"
+        "src/server/tailor/engine.ts",
+        "test/engine.test.ts"
       ],
       "origin": "spec \u00a76.1",
       "context": "Author src/server/tailor/engine.ts per \u00a76.1: interface TailorEngine { decide(jd, entries): Promise<TailorDecision> }. ProviderEngine (real): resolveModel(cfg) then generateObject({ model, schema: TailorDecisionZ, system: SYSTEM_PROMPT + renderLibrary(entries), prompt: 'Tailor for this job description:\\n\\n'+jd, providerOptions: providerOptionsFor(provider) }); retry EXACTLY once on failure then throw. FixtureEngine (keyless): loadFixtureDecision by hashKey(jd, entries) FROM T016 (shared) out of test/fixtures/decisions; a MISS throws a no_fixture-tagged error (\u2192422), NEVER a silent fallback / first-file. tailor(engine, jd, entries, layout, baseSummary?): decision = engine.decide \u2192 assemble \u2192 validateNoFabrication \u2192 return (engine-agnostic). Engine factory by env LEDE_TAILOR_ENGINE (live|fixture; fixture default under NODE_ENV=test). The engine split is what makes everything except the live call keyless.",
