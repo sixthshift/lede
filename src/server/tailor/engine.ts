@@ -86,7 +86,19 @@ export class FixtureEngine implements TailorEngine {
     } catch {
       return [];
     }
-    return files.map((f) => JSON.parse(readFileSync(path.join(this.dir, f), "utf-8")) as FixtureFile);
+    const fixtures: FixtureFile[] = [];
+    for (const f of files) {
+      try {
+        fixtures.push(JSON.parse(readFileSync(path.join(this.dir, f), "utf-8")) as FixtureFile);
+      } catch (err) {
+        // A concurrent writer/deleter in the shared fixtures dir can leave this file
+        // partial, empty, or gone between readdirSync and readFileSync — skip it rather
+        // than aborting the whole scan. A genuinely corrupt recorded fixture still
+        // surfaces here, in logs, instead of being silently dropped.
+        console.warn(`FixtureEngine: skipping unreadable fixture ${path.join(this.dir, f)}: ${(err as Error).message}`);
+      }
+    }
+    return fixtures;
   }
 }
 

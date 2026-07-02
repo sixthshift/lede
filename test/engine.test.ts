@@ -104,6 +104,28 @@ describe("FixtureEngine — hash keying, not filename/first-file fallback", () =
   });
 });
 
+// ── CONCURRENT/PARTIAL FIXTURE FILES (T018) ──
+
+describe("FixtureEngine — tolerates malformed/partial fixture files (shared-dir race)", () => {
+  it("still resolves the valid key when a truncated and an empty .json sit alongside it", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "lede-fixtures-race-"));
+    const jd = "job description — race scenario";
+    const decision = makeDecision({ summary: "Race scenario summary." });
+
+    writeFileSync(
+      path.join(dir, "valid.json"),
+      JSON.stringify({ key: hashKey(jd, SEED_ENTRIES), name: "race-valid", decision }),
+    );
+    // Simulates another worker caught mid-write (truncated JSON).
+    writeFileSync(path.join(dir, "truncated.json"), '{"key": "abc", "decision": {');
+    // Simulates another worker caught mid-delete/mid-create.
+    writeFileSync(path.join(dir, "empty.json"), "");
+
+    const engine = new FixtureEngine(dir);
+    await expect(engine.decide(jd, SEED_ENTRIES)).resolves.toEqual(decision);
+  });
+});
+
 // ── RETRY COUNT ──
 
 describe("ProviderEngine — retry policy", () => {
