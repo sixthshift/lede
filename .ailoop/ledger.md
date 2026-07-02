@@ -119,3 +119,28 @@ Append-only journal. Newest at bottom.
        {ok:true}. Scope clean (14 paths ⊆ declared∪manifest). Gaming read clean.
   attempt: 1/3 (with one in-session fix, not a failed attempt)
   evidence: see backlog T001.evidence
+
+[v2-007] chunk-cap override (user instruction)
+  decision: drive ALL of Phase 0 to done/escalation this run, not stopping at chunk=6
+  why: user explicitly said "continue with the rest of phase 0". The chunk cap is a
+       human-checkpoint convenience, not a safety guard — the real guards (attempts,
+       thrash, scope/gaming re-verify, oracle gate) stay in force. Batch {T003,T004,
+       T006,T009} dispatched via the fan-out workflow (first attempt crashed on an args
+       string-vs-object bug in the template; fixed via a local guarded copy at
+       .ailoop/build-phase.workflow.js, re-launched).
+
+[v2-008] batch {T003,T004,T006,T009} — DONE (fan-out workflow ww3xmvhzb)
+  decision: accept all 4 after independent Verify + merged-tree Gate + coordinator re-check
+  why: 10 agents (4 build in worktrees + 4 verify + integrate + gate); all done, 0
+       verifyFailed, 0 suspectedGaming, merged clean (no conflicts), gate passed.
+       Coordinator re-verify on merged master: check 0, build 0, 25 tests pass (14
+       providers + 11 validate), tag-scoring grep clean. T003 sections=§4.3 verbatim;
+       T004 resolveModel dispatch correct all 4 providers + apiKey forwarding + google
+       env; T006 SEED_ENTRIES=§22 literal; T009 whole-token fabrication + per-entry
+       scoping + deep-scan.
+  infra fix (coordinator): the workflow left 4 git worktrees under .claude/worktrees/;
+       vitest was discovering their test copies (50 count = 25 real ×2). Removed the
+       worktrees + merged branches, and hardened vite.config.ts test.exclude with
+       '**/.claude/**' so future fan-out worktrees can never pollute the suite. Real
+       count now 25. NOTE for future batches: prune worktrees after each fan-out.
+  evidence: see backlog T003/T004/T006/T009.evidence

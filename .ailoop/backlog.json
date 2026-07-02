@@ -62,7 +62,7 @@
     {
       "id": "T003",
       "title": "Section registry (SECTIONS)",
-      "status": "in-progress",
+      "status": "done",
       "depends_on": [
         "T002"
       ],
@@ -73,12 +73,12 @@
       "context": "Author src/shared/sections.ts: the SECTIONS: Record<Section, {label; rephrase:'full'|'light'|'none'; order:'recency'|'relevance'|'manual'; groupBy?}> registry VERBATIM per \u00a74.3 (experience/project full+recency+groupBy; education light+recency+groupBy; award/cert/publication recency; reference manual; skill none+relevance+groupBy category; interest relevance; language manual). Export SECTION_VALUES (the 10 keys). SINGLE SOURCE (\u00a717) for rephrase/order/group \u2014 consumed by prompt, assemble, render \u2014 must be exact.",
       "acceptance": "- `bun run check` passes; `bun run test` green (config-only, test-exempt per baseline \u2014 nothing behavioral to test; consumed by T008 assemble tests later)\n- correctness (coordinator diff-read vs \u00a74.3): SECTIONS has ALL 10 sections, each with the exact rephrase/order/groupBy triple, and SECTION_VALUES exports the 10 keys\n- do NOT add a test file (not in declared files)",
       "attempts": [],
-      "evidence": null
+      "evidence": "INDEPENDENT re-verify (fan-out workflow Verify+Gate, re-confirmed by coordinator on merged tree): check/build/test green. src/shared/sections.ts has all 10 sections with exact \u00a74.3 rephrase/order/groupBy triples; SECTION_VALUES exports 10 keys. Diff-read confirms verbatim \u00a74.3. Config-only, test-exempt."
     },
     {
       "id": "T004",
       "title": "Providers registry (PROVIDERS, resolveModel, providerOptionsFor)",
-      "status": "in-progress",
+      "status": "done",
       "depends_on": [
         "T002"
       ],
@@ -90,12 +90,12 @@
       "context": "Author src/shared/providers.ts per \u00a76.1: PROVIDERS registry mapping each ProviderId \u2192 { label, models[], default }. resolveModel({provider,model,apiKey,baseURL}) builds an AI SDK LanguageModel via createAnthropic/createOpenAI/createGoogleGenerativeAI (openai-compatible = createOpenAI+baseURL). providerOptionsFor(provider) returns provider-specific extras (Anthropic: thinking/effort + prompt-cache control; sane defaults elsewhere). Deps: ai, @ai-sdk/anthropic, @ai-sdk/openai, @ai-sdk/google. Default Anthropic claude-opus-4-8; include a Google model. PHASE-0 EVAL MODEL = gemini-2.5-flash (ledger [v2-005]: key tested live \u2014 flash works incl. structured output; gemini-2.5-pro is 429 quota-blocked/no-billing). The Google factory ALSO reads GOOGLE_GENERATIVE_AI_API_KEY from env \u2014 Phase 0 relies on that.",
       "acceptance": "- `bun run check` + `bun run test` pass\n- parametrized over ALL 4 ProviderIds: each returned model's provider/modelId matches the REQUESTED provider (dispatch correctness \u2014 not just non-throw)\n- the passed apiKey is forwarded to the factory (not dropped); google resolves via GOOGLE_GENERATIVE_AI_API_KEY env alone\n- providerOptionsFor('anthropic') includes cache-control/thinking keys; other providers return defined sane defaults",
       "attempts": [],
-      "evidence": null
+      "evidence": "INDEPENDENT re-verify (workflow Verify+coordinator): check/build green; test/providers.test.ts 14/14. resolveModel dispatch correct for all 4 providers (modelId exact; provider strings distinct incl. openai vs openai-compatible); apiKey forwarded (verified via AI SDK header closure, no network); google resolves via GOOGLE_GENERATIVE_AI_API_KEY env; providerOptionsFor('anthropic') has cacheControl+thinking. Deps ai@7/@ai-sdk/* added. No tag-scoring."
     },
     {
       "id": "T005",
       "title": "zod schemas: TailorDecisionZ + entry/meta validation",
-      "status": "todo",
+      "status": "in-progress",
       "depends_on": [
         "T002",
         "T003"
@@ -112,7 +112,7 @@
     {
       "id": "T006",
       "title": "Phase 0 seed entries (SEED_ENTRIES)",
-      "status": "in-progress",
+      "status": "done",
       "depends_on": [
         "T002"
       ],
@@ -123,12 +123,12 @@
       "context": "Author src/server/seed.ts exporting SEED_ENTRIES: Entry[] VERBATIM from \u00a722 \u2014 the three Cloudcase experience entries (cloudcase-rules-engine sortKey 202101, cloudcase-frontend-rewrite 202501, cloudcase-platform-sdk 202503). All tagged platform-arch ON PURPOSE (forces discrimination on FACTS not tags) and all ONE job (same company/role/period \u2192 one group, so every flip is the group's leading item). Copy facts/tags/framings/sortKey EXACTLY \u2014 do NOT edit facts to inject target keywords (that would make the flip trivial keyword-lookup and void the Tier-0 premise). NOTE the secondary-tag hole (sdk/frontend/delivery map 1:1 to targets) is neutralized downstream by the tag-shuffle control (T014/T015), not by the seed.",
       "acceptance": "- `bun run check` passes; `bun run test` green (data-only, test-exempt per baseline \u2014 verified by diff-read; consumed by T013/T014 later)\n- correctness (coordinator diff-read vs \u00a722): SEED_ENTRIES deep-equals the \u00a722 literal \u2014 the 3 ids (cloudcase-rules-engine/-frontend-rewrite/-platform-sdk), meta, facts element-for-element, tags, framings, sortKey\n- all three share company/role/period (one group); every entry's tags include platform-arch; sortKeys exactly 202101/202501/202503 (the OLDEST, rules-engine, can still lead \u2014 proving rank not recency); facts NOT edited to inject target keywords\n- do NOT add a test file (not in declared files)",
       "attempts": [],
-      "evidence": null
+      "evidence": "INDEPENDENT re-verify (workflow Verify+coordinator diff-read): check/build/test green. src/server/seed.ts SEED_ENTRIES = \u00a722 literal element-for-element (3 ids, sortKeys 202101/202501/202503, all one Cloudcase group, all tags incl platform-arch, facts NOT keyword-injected, framings only on rules-engine). Data-only, test-exempt."
     },
     {
       "id": "T007",
       "title": "System prompt + renderLibrary (the product IP)",
-      "status": "todo",
+      "status": "in-progress",
       "depends_on": [
         "T002",
         "T003"
@@ -145,7 +145,7 @@
     {
       "id": "T008",
       "title": "assemble() \u2014 deterministic structure from the flat decision",
-      "status": "todo",
+      "status": "in-progress",
       "depends_on": [
         "T002",
         "T003"
@@ -163,7 +163,7 @@
     {
       "id": "T009",
       "title": "validateNoFabrication + extractNumbers/hasNumberToken",
-      "status": "in-progress",
+      "status": "done",
       "depends_on": [
         "T002"
       ],
@@ -175,7 +175,7 @@
       "context": "Author src/server/tailor/validate.ts per \u00a76.3: validateNoFabrication(resume, entries, baseSummary?) throws FabricationError on (a) an item entryId not a real entry, (b) a number in item.text not present in THAT item's OWN entry facts (per-entry scoped, not pooled), (c) a summary number not traceable to a kept entry's facts OR baseSummary. extractNumbers/hasNumberToken compare WHOLE number tokens INCLUDING attached %/k/x/units (so 30k\u226030, 50%\u226050), separators normalized (1,000==1000), NOT substrings ('1' \u2260 inside '2021'). Mechanical only (\u00a723) \u2014 NO LLM-checks-LLM pass, ever.",
       "acceptance": "- `bun run check` + `bun run test` pass\n- Token semantics (one assert per pair): text \"30k\" PASSES only if facts contain \"30k\", THROWS if facts contain only \"30\"; \"50%\" does NOT match a fact of \"50\"; \"1,000\" matches a fact of \"1000\"\n- Per-entry scoping: an item whose number is present in a DIFFERENT entry's facts but absent from its OWN entry THROWS\n- Detection completeness: a fake number injected into a DEEP location (summary, or a buried non-leading item in a late group) still THROWS and names the invented token (proves all items scanned)\n- clean output PASSES; unknown entryId THROWS; summary number grounded in baseSummary PASSES",
       "attempts": [],
-      "evidence": null
+      "evidence": "INDEPENDENT re-verify (workflow Verify+coordinator): check/build green; test/validate.test.ts 11/11. Whole-token semantics ('30k'\u2260'30','50%'\u2260'50','1,000'=='1000','1' not in '2021'); per-entry scoping enforced; deep-buried fake number throws naming the token; unknown entryId throws; baseSummary-grounded summary passes. Mechanical only, no LLM call."
     },
     {
       "id": "T016",
