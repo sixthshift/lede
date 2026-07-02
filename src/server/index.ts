@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { Layout } from "@shared/types";
 import { SECTION_VALUES } from "@shared/sections";
 import { loadConfig } from "./config";
+import { initDb } from "./db";
 import { SEED_ENTRIES } from "./seed";
 import { makeEngine, tailor, NoFixtureError, type TailorEngine } from "./tailor/engine";
 import { FabricationError } from "./tailor/validate";
@@ -67,6 +68,7 @@ const isEntrypoint = process.argv[1] !== undefined && fileURLToPath(import.meta.
 
 if (isEntrypoint) {
   const config = loadConfig();
+  initDb(config.dataDir);
   const app = buildApp();
   app.listen({ port: config.port, host: "0.0.0.0" }).catch((err) => {
     app.log.error(err);
