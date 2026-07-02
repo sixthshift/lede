@@ -302,3 +302,19 @@ Append-only journal. Newest at bottom.
     src/shared -> src/server/db/schema.ts import stays driver-free (that file imports only
     drizzle-orm/sqlite-core).
   chunk: 4/6 tickets closed this run. Next ready: E1-D (routes; deps B,C done).
+
+[v2-019] E1-D — ACCEPTED (single-ticket workflow batch; workflow Gate + coordinator green)
+  gate (merged tree): bun run check exit 0; build exit 0; test keyless -> 15 files / 126 tests
+    PASS (+8 test/api.entries.test.ts, +5 test/api.profile-settings.test.ts). Verify passed
+    (scope clean, no gaming); merge clean; worktree pruned.
+  routes: /api/entries GET(+?section)/POST(slug §17 if no id)/PUT/DELETE + /import (cap 200);
+    /api/profile GET/PUT; /api/settings GET(keySet,provider,model,baseUrl,layout)/PUT — all over
+    the E1-B drizzle db, bodies validated with E1-C zod. buildApp() refactored to obtain a db
+    (injected for tests) WITHOUT breaking existing server.test.ts.
+  LEAK CONTRAST (security-critical, coordinator re-read routes/settings.ts): keySet =
+    secrets.apiKeyEnc!=null; the key is never read in this route nor returned. GET /api/entries
+    exposes Entry fields only (secrets are a separate table). Both invariant tests green.
+  restart persistence: entry written via one app over a tmp DATA_DIR reads back from a fresh
+    app on the same real .sqlite. §17 slug generator unit-tested in slug.ts.
+  chunk: 5/6 tickets closed this run. Dispatching E1-F1 as the 6th (maximises next-chunk
+    unblock: frees E1-F2 + E1-F3).

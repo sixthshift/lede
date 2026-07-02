@@ -6,10 +6,13 @@ import { z } from "zod";
 import type { Layout } from "@shared/types";
 import { SECTION_VALUES } from "@shared/sections";
 import { loadConfig } from "./config";
-import { initDb } from "./db";
+import { initDb, type Db } from "./db";
 import { SEED_ENTRIES } from "./seed";
 import { makeEngine, tailor, NoFixtureError, type TailorEngine } from "./tailor/engine";
 import { FabricationError } from "./tailor/validate";
+import { entriesRoutes } from "./routes/entries";
+import { profileRoutes } from "./routes/profile";
+import { settingsRoutes } from "./routes/settings";
 
 // Phase 0: every §4.2 section enabled, standard order — no layout persistence yet.
 const defaultLayout: Layout = [
@@ -37,11 +40,18 @@ function mapTailorError(err: unknown): { status: number; body: { error: string }
   return { status: 502, body: { error: "provider_error" } };
 }
 
-export function buildApp(): FastifyInstance {
+// Accepts an injected db (tests, or the entrypoint below); otherwise opens/
+// migrates/seeds one from config.dataDir so buildApp() stays a one-call boot.
+export function buildApp(db?: Db): FastifyInstance {
   const app = Fastify({ logger: true });
   const engine: TailorEngine = makeEngine();
+  const resolvedDb = db ?? initDb(loadConfig().dataDir).db;
 
   app.get("/api/health", async () => ({ ok: true }));
+
+  entriesRoutes(app, resolvedDb);
+  profileRoutes(app, resolvedDb);
+  settingsRoutes(app, resolvedDb);
 
   app.post("/api/tailor", async (request, reply) => {
     const parsed = tailorBodyZ.safeParse(request.body);
@@ -68,8 +78,8 @@ const isEntrypoint = process.argv[1] !== undefined && fileURLToPath(import.meta.
 
 if (isEntrypoint) {
   const config = loadConfig();
-  initDb(config.dataDir);
-  const app = buildApp();
+  const { db } = initDb(config.dataDir);
+  const app = buildApp(db);
   app.listen({ port: config.port, host: "0.0.0.0" }).catch((err) => {
     app.log.error(err);
     process.exit(1);
