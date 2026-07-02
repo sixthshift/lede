@@ -178,3 +178,28 @@ Append-only journal. Newest at bottom.
        facts (realistic employer JDs, not keyword lists), flipPredicate (leads=group
        items[0] & not cut; rationaleNamesSignal), tagShuffle. No new deps. Scope clean.
   evidence: see backlog T016.evidence
+
+[v2-012] T010, T011 — DONE (single dispatches)
+  decision: accept both after coordinator re-verify
+  why: T010 engine — check/build green, 78 tests; tailor()=decide→assemble→validate
+       (validate wired, contrast test), retry-exactly-once, FixtureEngine miss throws
+       NoFixtureError (no fallback), makeEngine factory, generateObject wiring asserted.
+       T011 server — 84 tests; real HTTP boot health {ok:true}; POST /api/tailor goes
+       through tailor() with distinct 400/422/502 mapping; buildApp() testable. Scope
+       clean both.
+  evidence: see backlog T010/T011.evidence
+
+[v2-013] *** THE RISK RETIRED — live lede-flip PROVEN on gemini-2.5-flash ***
+  decision: proceed to T013/T014/T015; flash is sufficient, NO Pro-billing needed
+  why: coordinator ran the ORACLE directly (temp probe over the REAL pipeline —
+       ProviderEngine google/gemini-2.5-flash → tailor() → assemble → flipPredicate,
+       deleted after) rather than trust a builder's fixtures (guards red-team Finding A
+       provenance-gaming). Result over SEED_ENTRIES:
+         platform-sdk JD → leads cloudcase-platform-sdk (PASS, rationale names signal)
+         rules-engine JD → leads cloudcase-rules-engine (PASS)
+         frontend-rewrite JD → leads cloudcase-frontend-rewrite (PASS)
+         three leads mutually distinct.
+       TAG-SHUFFLE CONTROL (Finding B): leads UNCHANGED under tagShuffle(SEED_ENTRIES) —
+       the flip judges FACTS not tags (the anti-Teal proof). This is spec §25 Tier-0 met.
+       I now hold ground truth: T013's recorded fixtures + T014's eval must reproduce
+       exactly {platform-sdk, rules-engine, frontend-rewrite} or they are gamed/broken.

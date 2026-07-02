@@ -266,7 +266,7 @@
     {
       "id": "T013",
       "title": "record-fixtures script + recorded decision fixtures (KEY-GATED)",
-      "status": "todo",
+      "status": "in-progress",
       "depends_on": [
         "T006",
         "T010",
