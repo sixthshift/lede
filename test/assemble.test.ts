@@ -62,13 +62,13 @@ describe("assemble — text coercion for rephrase:'none' sections", () => {
     expect(resume.sections[0]!.groups[0]!.items[0]!.text).toBe("AWS Certified Solutions Architect");
   });
 
-  it("renders an empty-facts entry as text:''", () => {
+  it("renders an empty-facts entry from meta instead of going blank (E3-B)", () => {
     const e = entry("cert2", "certification", { section: "certification", name: "Some Cert" }, [], 202401);
     const d = decision([{ entryId: "cert2", text: "FABRICATED", rank: 1 }]);
     const layout = layoutFor([{ section: "certification", enabled: true }]);
 
     const resume = assemble(d, [e], layout);
-    expect(resume.sections[0]!.groups[0]!.items[0]!.text).toBe("");
+    expect(resume.sections[0]!.groups[0]!.items[0]!.text).toBe("Some Cert");
   });
 });
 
