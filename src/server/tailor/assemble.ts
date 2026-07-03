@@ -110,9 +110,12 @@ function toGroup(heading: string | undefined, ordered: Resolved[], rule: Section
 }
 
 // rephrase:'none' sections never carry model-composed text — the server
-// overrides it with the entry's own facts, verbatim (joined; empty facts
-// render as '' and are rendered from `meta` alone downstream).
+// overrides it with the entry's own facts, verbatim (joined). Sections like
+// certification/publication/reference may have no facts at all; for those,
+// fall back to the registry's meta->text formatter (§4.3) so the item still
+// renders something human-readable instead of going blank.
 function coerceText(r: Resolved, rule: SectionRule): string {
   if (rule.rephrase !== "none") return r.item.text;
-  return r.entry.facts.join(" ");
+  if (r.entry.facts.length > 0) return r.entry.facts.join(" ");
+  return rule.metaText?.(r.entry.meta) ?? "";
 }
