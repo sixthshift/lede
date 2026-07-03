@@ -5,13 +5,14 @@ import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import type { Entry, Section } from "@shared/types";
+import type { Entry, ProviderId, Section } from "@shared/types";
 import { loadConfig, type Config } from "./config";
 import { initDb, type Db } from "./db";
-import { entries, settings } from "./db/schema";
+import { entries, secrets, settings } from "./db/schema";
 import { seedIfEmpty } from "./seed";
-import { makeEngine, tailor, NoFixtureError, type TailorEngine } from "./tailor/engine";
+import { FixtureEngine, ProviderEngine, tailor, NoFixtureError, type TailorEngine } from "./tailor/engine";
 import { FabricationError } from "./tailor/validate";
+import { decrypt } from "./crypto";
 import { registerAuthGuard } from "./auth";
 import { authRoutes } from "./routes/auth";
 import { entriesRoutes } from "./routes/entries";
@@ -65,7 +66,10 @@ function mapTailorError(err: unknown): { status: number; body: { error: string }
 export function buildApp(db?: Db, configOverride?: Partial<Config>): FastifyInstance {
   const app = Fastify({ logger: true });
   const config: Config = { ...loadConfig(), ...configOverride };
-  const engine: TailorEngine = makeEngine();
+  // FIXTURE mode (tests/CI/demo) resolves once at boot, keyless. LIVE mode
+  // has no fixed engine: each request builds a ProviderEngine from the
+  // decrypted BYOK key (never a boot-time constant — see the route below).
+  const fixtureEngine: TailorEngine | undefined = config.tailorEngine === "fixture" ? new FixtureEngine() : undefined;
   let resolvedDb: Db;
   if (db) {
     resolvedDb = db;
@@ -98,10 +102,29 @@ export function buildApp(db?: Db, configOverride?: Partial<Config>): FastifyInst
       return reply.code(400).send({ error: "invalid_body", issues: parsed.error.issues });
     }
 
+    let requestEngine: TailorEngine;
+    if (fixtureEngine) {
+      requestEngine = fixtureEngine;
+    } else {
+      const secretsRow = resolvedDb.select().from(secrets).where(eq(secrets.id, 1)).get();
+      if (!secretsRow?.apiKeyEnc) {
+        return reply.code(400).send({ error: "no_api_key" });
+      }
+      const settingsRow = resolvedDb.select().from(settings).where(eq(settings.id, 1)).get()!;
+      // Decrypted in memory for this request only — never persisted, logged, or returned.
+      const apiKey = decrypt(secretsRow.apiKeyEnc, config.masterKey);
+      requestEngine = new ProviderEngine({
+        provider: settingsRow.provider as ProviderId,
+        model: settingsRow.model,
+        apiKey,
+        baseURL: settingsRow.baseUrl ?? undefined,
+      });
+    }
+
     try {
       const jdEntries = resolvedDb.select().from(entries).all().map(rowToEntry);
       const layout = resolvedDb.select().from(settings).where(eq(settings.id, 1)).get()!.layout;
-      const resume = await tailor(engine, parsed.data.jobDescription, jdEntries, layout);
+      const resume = await tailor(requestEngine, parsed.data.jobDescription, jdEntries, layout);
       return reply.code(200).send(resume);
     } catch (err) {
       const { status, body } = mapTailorError(err);
