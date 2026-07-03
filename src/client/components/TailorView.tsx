@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { TailoredResume } from "@shared/types";
 import { tailor, ApiError } from "../api";
 import { JDInput } from "./JDInput";
-import { ResumePage } from "./ResumePage";
+import { ResultView } from "./ResultView";
 
 export function TailorView() {
   const [jobDescription, setJobDescription] = useState("");
@@ -32,7 +32,7 @@ export function TailorView() {
       {pending ? <p className="tailor-view__pending">Tailoring your resume…</p> : null}
       {error ? <p className="tailor-view__error">{error}</p> : null}
 
-      {resume ? <ResumePage resume={resume} /> : null}
+      {resume ? <ResultView resume={resume} /> : null}
     </div>
   );
 }
