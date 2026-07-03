@@ -92,3 +92,26 @@ export async function fetchSettings(): Promise<SettingsResponse> {
 export async function updateSettings(input: SettingsInput): Promise<SettingsResponse> {
   return request<SettingsResponse>("/api/settings", jsonInit("PUT", input));
 }
+
+// ── auth (spec.md §7/§8) — single-user password gate, never accounts ──
+export async function authSetup(password: string): Promise<void> {
+  await request<{ ok: true }>("/api/auth/setup", jsonInit("POST", { password }));
+}
+
+export async function authLogin(password: string): Promise<void> {
+  await request<{ ok: true }>("/api/auth/login", jsonInit("POST", { password }));
+}
+
+export async function authLogout(): Promise<void> {
+  await request<{ ok: true }>("/api/auth/logout", { method: "POST" });
+}
+
+// ── BYOK provider key (spec.md §8) — write-only: the server never returns
+// the key value, only `keySet`. There is nothing here to fetch or display.
+export async function setApiKey(apiKey: string): Promise<{ keySet: true }> {
+  return request<{ keySet: true }>("/api/settings/key", jsonInit("PUT", { apiKey }));
+}
+
+export async function deleteApiKey(): Promise<{ keySet: false }> {
+  return request<{ keySet: false }>("/api/settings/key", { method: "DELETE" });
+}
