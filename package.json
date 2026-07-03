@@ -11,8 +11,9 @@
     "lint:fix": "biome check --write",
     "format": "biome format --write",
     "start": "tsx --env-file=.env src/server/index.ts",
-    "test": "vitest run --passWithNoTests && playwright test",
+    "test": "vitest run --passWithNoTests && playwright test && LEDE_E2E_DOCKER=1 playwright test --project=docker",
     "test:e2e": "playwright test",
+    "test:docker": "LEDE_E2E_DOCKER=1 playwright test --project=docker",
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
