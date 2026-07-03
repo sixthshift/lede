@@ -1,6 +1,9 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import secureSession from "@fastify/secure-session";
+import fastifyStatic from "@fastify/static";
 import { APICallError, NoObjectGeneratedError } from "ai";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -22,6 +25,11 @@ import { settingsRoutes } from "./routes/settings";
 const tailorBodyZ = z.object({
   jobDescription: z.string().min(1).max(20000),
 });
+
+// Vite's build output (§19) — resolved relative to this file so it's correct
+// regardless of process.cwd(). No config field for this: it's a fixed build
+// artifact location, not an operator-tunable setting.
+const DEFAULT_DIST_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../dist");
 
 // Row -> domain Entry: drops the storage-only createdAt/updatedAt and omits
 // `framings` entirely when unset (rather than `null`). Key order matches the
@@ -63,7 +71,10 @@ function mapTailorError(err: unknown): { status: number; body: { error: string }
 // already initialized/seeded by its caller (see seedIfEmpty in ./seed).
 // configOverride merges onto loadConfig() (e.g. tests forcing authDisabled:
 // false even though the global test env sets LEDE_AUTH_DISABLED=true).
-export function buildApp(db?: Db, configOverride?: Partial<Config>): FastifyInstance {
+// distDir overrides where the built SPA is served from (default: the real
+// build output next to this file) — tests use it to point at a throwaway
+// fixture directory instead of colliding on the repo's own dist/.
+export function buildApp(db?: Db, configOverride?: Partial<Config>, distDir: string = DEFAULT_DIST_DIR): FastifyInstance {
   const app = Fastify({ logger: true });
   const config: Config = { ...loadConfig(), ...configOverride };
   // FIXTURE mode (tests/CI/demo) resolves once at boot, keyless. LIVE mode
@@ -133,10 +144,24 @@ export function buildApp(db?: Db, configOverride?: Partial<Config>): FastifyInst
     }
   });
 
+  // Serve the built SPA (§19) — skipped entirely when dist/ hasn't been built
+  // (keyless test/CI/demo boot never runs `vite build`), so absence is a
+  // no-op rather than a boot failure. /api/* is registered above as exact
+  // routes, which find-my-way matches before this wildcard static handler,
+  // so it's never shadowed; the notFoundHandler below re-splits the same way
+  // for paths (like unknown /api/* routes) that fall through as 404s.
+  if (existsSync(distDir)) {
+    app.register(fastifyStatic, { root: distDir });
+    app.setNotFoundHandler((request, reply) => {
+      if (request.raw.url?.startsWith("/api/")) {
+        return reply.code(404).send({ error: "not_found" });
+      }
+      return reply.sendFile("index.html");
+    });
+  }
+
   return app;
 }
-
-// TODO(later ticket): in production, serve the built SPA from dist/ as static files.
 
 const isEntrypoint = process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];
 
