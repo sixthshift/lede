@@ -109,6 +109,7 @@ export function buildApp(
   app.register(secureSession, {
     secret: config.sessionSecret,
     salt: Buffer.from("mq9hDxBVDbspDR6nLfFT1g==", "base64"),
+    cookie: { path: "/" },
   });
 
   app.get("/api/health", async () => ({ ok: true }));
