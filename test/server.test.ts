@@ -17,7 +17,8 @@ const FIXTURES_DIR = path.join(process.cwd(), "test/fixtures/decisions");
 const RECORDED_JD =
   "We need a senior engineer to design a public-facing platform SDK so outside partners can build on our product.";
 const UNRECORDED_JD = "Completely unrecorded job description about pastry arts and bread science.";
-const FABRICATION_JD = "Job description whose fixture decision fabricates a number absent from every fact.";
+const FABRICATION_JD =
+  "Job description whose fixture decision fabricates a number absent from every fact.";
 
 function decisionFor(text: string): TailorDecision {
   return {
@@ -58,7 +59,11 @@ beforeAll(() => {
     decisionFor("built a platform SDK exposing the platform programmatically for the first time"),
   );
   // "9999%" is not in any SEED_ENTRIES fact — must trip FabricationError -> 502
-  writeFixture("route-test-fabrication", FABRICATION_JD, decisionFor("grew external adoption by 9999%"));
+  writeFixture(
+    "route-test-fabrication",
+    FABRICATION_JD,
+    decisionFor("grew external adoption by 9999%"),
+  );
 
   process.env.NODE_ENV = "test";
   delete process.env.LEDE_TAILOR_ENGINE;

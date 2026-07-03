@@ -2,7 +2,13 @@ import { describe, it, expect } from "vitest";
 import { assemble } from "../src/server/tailor/assemble";
 import type { Entry, EntryMeta, Layout, TailorDecision } from "@shared/types";
 
-function entry(id: string, section: Entry["section"], meta: EntryMeta, facts: string[], sortKey: number): Entry {
+function entry(
+  id: string,
+  section: Entry["section"],
+  meta: EntryMeta,
+  facts: string[],
+  sortKey: number,
+): Entry {
   return { id, section, meta, facts, tags: [], sortKey };
 }
 
@@ -24,7 +30,12 @@ describe("assemble — group ordering", () => {
     // Group A: two members, sortKeys supplied out of order [202101, 202503] -> max 202503.
     // Group B: one member, sortKey 202501. Naive min/first-supplied would rank B before A.
     // groupBy keys off company/role/period, so give A and B distinct periods to land in separate groups.
-    const meta = (period: string): EntryMeta => ({ section: "experience", company: "Acme", role: "Eng", period });
+    const meta = (period: string): EntryMeta => ({
+      section: "experience",
+      company: "Acme",
+      role: "Eng",
+      period,
+    });
     const entries = [
       entry("a1", "experience", meta("A"), ["did thing one"], 202101),
       entry("a2", "experience", meta("A"), ["did thing two"], 202503),
@@ -63,7 +74,13 @@ describe("assemble — text coercion for rephrase:'none' sections", () => {
   });
 
   it("renders an empty-facts entry from meta instead of going blank (E3-B)", () => {
-    const e = entry("cert2", "certification", { section: "certification", name: "Some Cert" }, [], 202401);
+    const e = entry(
+      "cert2",
+      "certification",
+      { section: "certification", name: "Some Cert" },
+      [],
+      202401,
+    );
     const d = decision([{ entryId: "cert2", text: "FABRICATED", rank: 1 }]);
     const layout = layoutFor([{ section: "certification", enabled: true }]);
 
@@ -73,9 +90,21 @@ describe("assemble — text coercion for rephrase:'none' sections", () => {
 });
 
 describe("assemble — section order & filtering follow layout", () => {
-  const cert = entry("cert1", "certification", { section: "certification", name: "Cert" }, ["fact"], 202401);
+  const cert = entry(
+    "cert1",
+    "certification",
+    { section: "certification", name: "Cert" },
+    ["fact"],
+    202401,
+  );
   const award = entry("award1", "award", { section: "award", title: "Award" }, ["fact"], 202301);
-  const pub = entry("pub1", "publication", { section: "publication", title: "Pub" }, ["fact"], 202201);
+  const pub = entry(
+    "pub1",
+    "publication",
+    { section: "publication", title: "Pub" },
+    ["fact"],
+    202201,
+  );
 
   it("orders sections by layout order, independent of entries/items insertion order", () => {
     // entries/items inserted award (A) then cert (B); layout lists cert before award.
@@ -112,7 +141,12 @@ describe("assemble — section order & filtering follow layout", () => {
 });
 
 describe("assemble — items within a group order by rank", () => {
-  const meta: EntryMeta = { section: "experience", company: "Acme", role: "Eng", period: "2020-2023" };
+  const meta: EntryMeta = {
+    section: "experience",
+    company: "Acme",
+    role: "Eng",
+    period: "2020-2023",
+  };
   const e1 = entry("e1", "experience", meta, ["fact one"], 202001);
   const e2 = entry("e2", "experience", meta, ["fact two"], 202001);
   const layout = layoutFor([{ section: "experience", enabled: true }]);

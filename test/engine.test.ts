@@ -13,7 +13,14 @@ import { FabricationError } from "../src/server/tailor/validate";
 const { generateObjectMock } = vi.hoisted(() => ({ generateObjectMock: vi.fn() }));
 vi.mock("ai", () => ({ generateObject: generateObjectMock }));
 
-import { ProviderEngine, FixtureEngine, NoFixtureError, tailor, makeEngine, type TailorEngine } from "../src/server/tailor/engine";
+import {
+  ProviderEngine,
+  FixtureEngine,
+  NoFixtureError,
+  tailor,
+  makeEngine,
+  type TailorEngine,
+} from "../src/server/tailor/engine";
 
 const LAYOUT: Layout = [{ section: "experience", enabled: true }];
 
@@ -99,7 +106,9 @@ describe("FixtureEngine — hash keying, not filename/first-file fallback", () =
     } catch (err) {
       expect(err).toBeInstanceOf(NoFixtureError);
       expect((err as NoFixtureError).code).toBe("no_fixture");
-      expect((err as NoFixtureError).scenarios).toEqual(expect.arrayContaining(["scenario-a", "scenario-b"]));
+      expect((err as NoFixtureError).scenarios).toEqual(
+        expect.arrayContaining(["scenario-a", "scenario-b"]),
+      );
     }
   });
 });
@@ -137,9 +146,15 @@ describe("ProviderEngine — retry policy", () => {
 
   it("resolves after exactly 2 calls when the first attempt throws", async () => {
     const decision = makeDecision();
-    generateObjectMock.mockRejectedValueOnce(new Error("transient")).mockResolvedValueOnce({ object: decision });
+    generateObjectMock
+      .mockRejectedValueOnce(new Error("transient"))
+      .mockResolvedValueOnce({ object: decision });
 
-    const engine = new ProviderEngine({ provider: "google", model: "gemini-2.5-flash", apiKey: "k" });
+    const engine = new ProviderEngine({
+      provider: "google",
+      model: "gemini-2.5-flash",
+      apiKey: "k",
+    });
     await expect(engine.decide(jd, SEED_ENTRIES)).resolves.toEqual(decision);
     expect(generateObjectMock).toHaveBeenCalledTimes(2);
   });
@@ -147,7 +162,11 @@ describe("ProviderEngine — retry policy", () => {
   it("rejects after exactly 2 calls when both attempts throw", async () => {
     generateObjectMock.mockRejectedValue(new Error("permanent"));
 
-    const engine = new ProviderEngine({ provider: "google", model: "gemini-2.5-flash", apiKey: "k" });
+    const engine = new ProviderEngine({
+      provider: "google",
+      model: "gemini-2.5-flash",
+      apiKey: "k",
+    });
     await expect(engine.decide(jd, SEED_ENTRIES)).rejects.toThrow("permanent");
     expect(generateObjectMock).toHaveBeenCalledTimes(2);
   });
@@ -189,7 +208,11 @@ describe("ProviderEngine.decide — wiring to generateObject", () => {
   it("passes TailorDecisionZ as schema and a system string containing renderLibrary(entries)", async () => {
     generateObjectMock.mockResolvedValueOnce({ object: makeDecision() });
 
-    const engine = new ProviderEngine({ provider: "google", model: "gemini-2.5-flash", apiKey: "k" });
+    const engine = new ProviderEngine({
+      provider: "google",
+      model: "gemini-2.5-flash",
+      apiKey: "k",
+    });
     await engine.decide(jd, SEED_ENTRIES);
 
     expect(generateObjectMock).toHaveBeenCalledTimes(1);

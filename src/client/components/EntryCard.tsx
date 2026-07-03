@@ -12,6 +12,7 @@ export function EntryCard({ entry, onDelete }: { entry: Entry; onDelete: () => v
       <CardContent className="flex flex-col gap-2 p-0">
         <ul className="list-inside list-disc text-sm">
           {entry.facts.map((fact, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: facts are raw strings (may repeat) in fixed manual order — no stable id in the data model
             <li key={i}>{fact}</li>
           ))}
         </ul>

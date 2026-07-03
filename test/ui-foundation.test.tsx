@@ -40,10 +40,7 @@ describe("ui-foundation: tokens.css (§12)", () => {
 
 describe("ui-foundation: self-hosted fonts (§12, no Google Fonts CDN)", () => {
   it("app.css imports @fontsource IBM Plex, not a remote font URL", () => {
-    const css = fs.readFileSync(
-      path.resolve(__dirname, "../src/client/styles/app.css"),
-      "utf-8",
-    );
+    const css = fs.readFileSync(path.resolve(__dirname, "../src/client/styles/app.css"), "utf-8");
 
     expect(css).toMatch(/@fontsource\/ibm-plex-sans/);
     expect(css).toMatch(/@fontsource\/ibm-plex-mono/);

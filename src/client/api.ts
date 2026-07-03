@@ -10,7 +10,13 @@ import type { entryInput, profileInput, settingsInput } from "@shared/schema";
 export type EntryInput = z.infer<typeof entryInput>;
 export type ProfileInput = z.infer<typeof profileInput>;
 export type SettingsInput = z.infer<typeof settingsInput>;
-export type SettingsResponse = { keySet: boolean; provider: string; model: string; baseUrl: string | null; layout: Layout };
+export type SettingsResponse = {
+  keySet: boolean;
+  provider: string;
+  model: string;
+  baseUrl: string | null;
+  layout: Layout;
+};
 
 export class ApiError extends Error {
   status: number;

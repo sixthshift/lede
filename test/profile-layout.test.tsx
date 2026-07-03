@@ -44,22 +44,37 @@ function mockFetch({ profile, settings }: { profile: Profile; settings: typeof s
     const method = init?.method ?? "GET";
 
     if (method === "GET" && url.startsWith("/api/entries")) {
-      return new Response(JSON.stringify([]), { status: 200, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
     if (method === "GET" && url === "/api/profile") {
-      return new Response(JSON.stringify(profileState), { status: 200, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify(profileState), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
     if (method === "PUT" && url === "/api/profile") {
       profileState = JSON.parse(String(init?.body));
-      return new Response(JSON.stringify(profileState), { status: 200, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify(profileState), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
     if (method === "GET" && url === "/api/settings") {
-      return new Response(JSON.stringify(settingsState), { status: 200, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify(settingsState), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
     if (method === "PUT" && url === "/api/settings") {
       const body = JSON.parse(String(init?.body));
       settingsState = { ...settingsState, ...body };
-      return new Response(JSON.stringify(settingsState), { status: 200, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify(settingsState), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
     throw new Error(`unexpected fetch: ${method} ${url}`);
   });
@@ -92,22 +107,29 @@ describe("ProfileEditor — round-trip", () => {
     expect(screen.getByLabelText("Base summary")).toHaveValue("Ships platform SDKs.");
 
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Jane R. Doe" } });
-    fireEvent.change(screen.getByLabelText("Base summary"), { target: { value: "Builds resume tailoring tools." } });
+    fireEvent.change(screen.getByLabelText("Base summary"), {
+      target: { value: "Builds resume tailoring tools." },
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Add link" }));
     fireEvent.change(screen.getByLabelText("Link 2 label"), { target: { value: "Site" } });
-    fireEvent.change(screen.getByLabelText("Link 2 url"), { target: { value: "https://jane.dev" } });
+    fireEvent.change(screen.getByLabelText("Link 2 url"), {
+      target: { value: "https://jane.dev" },
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Save profile" }));
 
     await waitFor(() => {
-      expect(fetchMock.mock.calls.some(([url, init]) => url === "/api/profile" && (init as RequestInit)?.method === "PUT")).toBe(
-        true,
-      );
+      expect(
+        fetchMock.mock.calls.some(
+          ([url, init]) => url === "/api/profile" && (init as RequestInit)?.method === "PUT",
+        ),
+      ).toBe(true);
     });
 
     const putCall = fetchMock.mock.calls.find(
-      ([url, init]) => url === "/api/profile" && (init as RequestInit | undefined)?.method === "PUT",
+      ([url, init]) =>
+        url === "/api/profile" && (init as RequestInit | undefined)?.method === "PUT",
     )!;
     const body = JSON.parse(String((putCall[1] as RequestInit).body));
     expect(body.name).toBe("Jane R. Doe");
@@ -142,12 +164,15 @@ describe("LayoutEditor — persist", () => {
 
     await waitFor(() => {
       expect(
-        fetchMock.mock.calls.some(([url, init]) => url === "/api/settings" && (init as RequestInit)?.method === "PUT"),
+        fetchMock.mock.calls.some(
+          ([url, init]) => url === "/api/settings" && (init as RequestInit)?.method === "PUT",
+        ),
       ).toBe(true);
     });
 
     const putCall = fetchMock.mock.calls.find(
-      ([url, init]) => url === "/api/settings" && (init as RequestInit | undefined)?.method === "PUT",
+      ([url, init]) =>
+        url === "/api/settings" && (init as RequestInit | undefined)?.method === "PUT",
     )!;
     const body = JSON.parse(String((putCall[1] as RequestInit).body));
     expect(body.layout).toEqual([

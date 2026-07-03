@@ -29,14 +29,18 @@ describe("fresh migrate against an empty tmp DATA_DIR", () => {
     migrateDb(db);
 
     const tables = sqlite
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '__drizzle%'")
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '__drizzle%'",
+      )
       .all()
-      .map((row: any) => row.name)
+      .map((row) => (row as { name: string }).name)
       .sort();
     expect(tables).toEqual(["entries", "profile", "secrets", "settings"]);
 
     expect(() => db.run(sql`INSERT INTO profile (id, updated_at) VALUES (2, 0)`)).toThrow();
-    expect(() => db.run(sql`INSERT INTO settings (id, layout, updated_at) VALUES (2, '[]', 0)`)).toThrow();
+    expect(() =>
+      db.run(sql`INSERT INTO settings (id, layout, updated_at) VALUES (2, '[]', 0)`),
+    ).toThrow();
     expect(() => db.run(sql`INSERT INTO secrets (id, updated_at) VALUES (2, 0)`)).toThrow();
 
     sqlite.close();
@@ -49,17 +53,20 @@ describe("restart persistence", () => {
 
     const first = openDb(dataDir);
     migrateDb(first.db);
-    first.db.insert(entries).values({
-      id: "acme-widget",
-      section: "project",
-      meta: { section: "project", name: "Widget" },
-      facts: ["Built a widget."],
-      tags: ["backend"],
-      framings: null,
-      sortKey: 202401,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    }).run();
+    first.db
+      .insert(entries)
+      .values({
+        id: "acme-widget",
+        section: "project",
+        meta: { section: "project", name: "Widget" },
+        facts: ["Built a widget."],
+        tags: ["backend"],
+        framings: null,
+        sortKey: 202401,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+      .run();
     first.sqlite.close();
 
     const second = openDb(dataDir);
@@ -89,8 +96,17 @@ describe("singleton seeding", () => {
     expect(settingsRow[0].layout).toEqual(DEFAULT_LAYOUT);
     expect(settingsRow[0].layout.every((l) => l.enabled)).toBe(true);
     expect(settingsRow[0].layout.map((l) => l.section)).toEqual([
-      "summary", "experience", "project", "skill", "education",
-      "award", "certification", "publication", "language", "interest", "reference",
+      "summary",
+      "experience",
+      "project",
+      "skill",
+      "education",
+      "award",
+      "certification",
+      "publication",
+      "language",
+      "interest",
+      "reference",
     ]);
 
     sqlite.close();

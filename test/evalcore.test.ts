@@ -17,7 +17,9 @@ describe("hashKey", () => {
   });
 
   it("changes when entry content changes", () => {
-    const mutated = SEED_ENTRIES.map((e, i) => (i === 0 ? { ...e, facts: [...e.facts, "new fact"] } : e));
+    const mutated = SEED_ENTRIES.map((e, i) =>
+      i === 0 ? { ...e, facts: [...e.facts, "new fact"] } : e,
+    );
     expect(hashKey("jd", SEED_ENTRIES)).not.toBe(hashKey("jd", mutated));
   });
 });
@@ -62,7 +64,11 @@ describe("CONTRAST_JDS — anti-leakage", () => {
 
 function resumeWithGroups(
   groups: TailoredResume["sections"][number]["groups"],
-  signals: TailoredResume["signals"] = { roleLevel: "senior", weights: ["developer velocity"], hardRequirements: [] },
+  signals: TailoredResume["signals"] = {
+    roleLevel: "senior",
+    weights: ["developer velocity"],
+    hardRequirements: [],
+  },
   cut: TailoredResume["cut"] = [],
 ): TailoredResume {
   return {
@@ -78,7 +84,8 @@ describe("flipPredicate", () => {
     const resume = resumeWithGroups([
       {
         heading: "Acme",
-        leadRationale: "Leads with this because it directly demonstrates developer velocity improvements.",
+        leadRationale:
+          "Leads with this because it directly demonstrates developer velocity improvements.",
         items: [
           { entryId: "target", text: "..." },
           { entryId: "other", text: "..." },
@@ -93,7 +100,8 @@ describe("flipPredicate", () => {
     const resume = resumeWithGroups([
       {
         heading: "Acme",
-        leadRationale: "Leads with this because it directly demonstrates developer velocity improvements.",
+        leadRationale:
+          "Leads with this because it directly demonstrates developer velocity improvements.",
         items: [
           { entryId: "other", text: "..." },
           { entryId: "target", text: "..." },
@@ -109,7 +117,8 @@ describe("flipPredicate", () => {
       [
         {
           heading: "Acme",
-          leadRationale: "Leads with this because it directly demonstrates developer velocity improvements.",
+          leadRationale:
+            "Leads with this because it directly demonstrates developer velocity improvements.",
           items: [{ entryId: "target", text: "..." }],
         },
       ],
@@ -155,7 +164,9 @@ describe("tagShuffle", () => {
 
     // distinct deep copy
     expect(shuffled).not.toBe(SEED_ENTRIES);
-    shuffled.forEach((e, i) => expect(e).not.toBe(SEED_ENTRIES[i]));
+    shuffled.forEach((e, i) => {
+      expect(e).not.toBe(SEED_ENTRIES[i]);
+    });
 
     // identity fields preserved
     shuffled.forEach((e, i) => {

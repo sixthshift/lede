@@ -22,7 +22,13 @@ export function entriesRoutes(app: FastifyInstance, db: Db): void {
     }
 
     const input = parsed.data;
-    const existingIds = new Set(db.select({ id: entries.id }).from(entries).all().map((row) => row.id));
+    const existingIds = new Set(
+      db
+        .select({ id: entries.id })
+        .from(entries)
+        .all()
+        .map((row) => row.id),
+    );
     const id = input.id ?? generateSlug(input, existingIds);
     const now = Date.now();
 
@@ -65,7 +71,13 @@ export function entriesRoutes(app: FastifyInstance, db: Db): void {
       return reply.code(400).send({ error: "invalid_body", issues: parsed.error.issues });
     }
 
-    const existingIds = new Set(db.select({ id: entries.id }).from(entries).all().map((row) => row.id));
+    const existingIds = new Set(
+      db
+        .select({ id: entries.id })
+        .from(entries)
+        .all()
+        .map((row) => row.id),
+    );
     const now = Date.now();
 
     const rows = parsed.data.map((input) => {
@@ -76,10 +88,7 @@ export function entriesRoutes(app: FastifyInstance, db: Db): void {
 
     db.transaction((tx) => {
       for (const row of rows) {
-        tx.insert(entries)
-          .values(row)
-          .onConflictDoUpdate({ target: entries.id, set: row })
-          .run();
+        tx.insert(entries).values(row).onConflictDoUpdate({ target: entries.id, set: row }).run();
       }
     });
 

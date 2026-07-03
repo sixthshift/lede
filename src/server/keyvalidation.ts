@@ -16,7 +16,12 @@ export type ValidateProviderKeyInput = {
 
 export type ProviderKeyValidator = (input: ValidateProviderKeyInput) => Promise<void>;
 
-export const validateProviderKey: ProviderKeyValidator = async ({ provider, model, apiKey, baseUrl }) => {
+export const validateProviderKey: ProviderKeyValidator = async ({
+  provider,
+  model,
+  apiKey,
+  baseUrl,
+}) => {
   const resolved = resolveModel({ provider, model, apiKey, baseURL: baseUrl ?? undefined });
   await generateText({ model: resolved, prompt: "ping", maxOutputTokens: 1 });
 };

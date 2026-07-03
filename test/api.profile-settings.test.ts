@@ -52,7 +52,11 @@ describe("GET/PUT /api/profile", () => {
 
   it("PUT with a bad body -> 400", async () => {
     const app = appOn(freshDataDir());
-    const res = await app.inject({ method: "PUT", url: "/api/profile", payload: { email: "jane@example.com" } });
+    const res = await app.inject({
+      method: "PUT",
+      url: "/api/profile",
+      payload: { email: "jane@example.com" },
+    });
     expect(res.statusCode).toBe(400);
   });
 });
@@ -64,7 +68,11 @@ describe("GET/PUT /api/settings", () => {
     const getRes = await app.inject({ method: "GET", url: "/api/settings" });
     expect(getRes.statusCode).toBe(200);
     const initial = getRes.json();
-    expect(initial).toMatchObject({ keySet: false, provider: "anthropic", model: "claude-opus-4-8" });
+    expect(initial).toMatchObject({
+      keySet: false,
+      provider: "anthropic",
+      model: "claude-opus-4-8",
+    });
     expect(Array.isArray(initial.layout)).toBe(true);
 
     const putRes = await app.inject({

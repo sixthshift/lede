@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import type { Entry } from "@shared/types";
@@ -32,7 +32,10 @@ function mockFetch(seed: Entry[]) {
     const method = init?.method ?? "GET";
 
     if (method === "GET" && url.startsWith("/api/entries")) {
-      return new Response(JSON.stringify(state), { status: 200, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify(state), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
     if (method === "POST" && url === "/api/entries") {
       const body = JSON.parse(String(init?.body));
@@ -89,7 +92,9 @@ describe("EntryEditor — create e2e via LibraryView", () => {
     fireEvent.change(screen.getByLabelText(/^Company/), { target: { value: "Cloudcase" } });
     fireEvent.change(screen.getByLabelText(/^Role/), { target: { value: "Staff Engineer" } });
     fireEvent.change(screen.getByLabelText(/^Period/), { target: { value: "2024–Present" } });
-    fireEvent.change(screen.getByLabelText("Facts 1"), { target: { value: "Shipped the tailoring pipeline" } });
+    fireEvent.change(screen.getByLabelText("Facts 1"), {
+      target: { value: "Shipped the tailoring pipeline" },
+    });
 
     fireEvent.change(screen.getByLabelText("New tag"), { target: { value: "backend" } });
     fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
@@ -97,14 +102,25 @@ describe("EntryEditor — create e2e via LibraryView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create entry" }));
 
     await waitFor(() => {
-      expect(fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "POST")).toBe(true);
+      expect(
+        fetchMock.mock.calls.some(
+          ([, init]) => (init as RequestInit | undefined)?.method === "POST",
+        ),
+      ).toBe(true);
     });
 
-    const postCall = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "POST")!;
+    const postCall = fetchMock.mock.calls.find(
+      ([, init]) => (init as RequestInit | undefined)?.method === "POST",
+    )!;
     expect(String(postCall[0])).toBe("/api/entries");
     const body = JSON.parse(String((postCall[1] as RequestInit).body));
     expect(body.section).toBe("experience");
-    expect(body.meta).toMatchObject({ section: "experience", company: "Cloudcase", role: "Staff Engineer", period: "2024–Present" });
+    expect(body.meta).toMatchObject({
+      section: "experience",
+      company: "Cloudcase",
+      role: "Staff Engineer",
+      period: "2024–Present",
+    });
     expect(body.facts).toEqual(["Shipped the tailoring pipeline"]);
     expect(body.tags).toEqual(["backend"]);
 
@@ -116,7 +132,12 @@ describe("EntryEditor — edit", () => {
   const existing: Entry = {
     id: "cloudcase-staff-engineer",
     section: "experience",
-    meta: { section: "experience", company: "Cloudcase", role: "Staff Engineer", period: "2023–2024" },
+    meta: {
+      section: "experience",
+      company: "Cloudcase",
+      role: "Staff Engineer",
+      period: "2023–2024",
+    },
     facts: ["Built the rules engine"],
     tags: ["backend"],
     sortKey: 202301,
@@ -130,14 +151,22 @@ describe("EntryEditor — edit", () => {
     expect(screen.getByLabelText(/^Role/)).toHaveValue("Staff Engineer");
     expect(screen.getByLabelText("Facts 1")).toHaveValue("Built the rules engine");
 
-    fireEvent.change(screen.getByLabelText("Facts 1"), { target: { value: "Rebuilt the rules engine from scratch" } });
+    fireEvent.change(screen.getByLabelText("Facts 1"), {
+      target: { value: "Rebuilt the rules engine from scratch" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => {
-      expect(fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === "PUT")).toBe(true);
+      expect(
+        fetchMock.mock.calls.some(
+          ([, init]) => (init as RequestInit | undefined)?.method === "PUT",
+        ),
+      ).toBe(true);
     });
 
-    const putCall = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "PUT")!;
+    const putCall = fetchMock.mock.calls.find(
+      ([, init]) => (init as RequestInit | undefined)?.method === "PUT",
+    )!;
     expect(String(putCall[0])).toBe(`/api/entries/${existing.id}`);
     const body = JSON.parse(String((putCall[1] as RequestInit).body));
     expect(body.facts).toEqual(["Rebuilt the rules engine from scratch"]);

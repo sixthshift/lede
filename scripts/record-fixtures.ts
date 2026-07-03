@@ -26,7 +26,9 @@ const defaultLayout: Layout = [
 async function main() {
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!apiKey) {
-    console.error("record-fixtures: GOOGLE_GENERATIVE_AI_API_KEY is not set — aborting (no silent skip).");
+    console.error(
+      "record-fixtures: GOOGLE_GENERATIVE_AI_API_KEY is not set — aborting (no silent skip).",
+    );
     process.exit(1);
   }
 
@@ -66,9 +68,11 @@ async function main() {
 
       const key = hashKey(jd, SEED_ENTRIES);
       const fixturePath = path.join(FIXTURES_DIR, `${name}.json`);
-      writeFileSync(fixturePath, JSON.stringify({ key, name, decision }, null, 2) + "\n");
+      writeFileSync(fixturePath, `${JSON.stringify({ key, name, decision }, null, 2)}\n`);
       manifestFixtures.push({ name, key, leadingEntryId: target });
-      console.log(`[${name}] PASS: "${target}" leads, rationale names a signal. Wrote ${fixturePath}`);
+      console.log(
+        `[${name}] PASS: "${target}" leads, rationale names a signal. Wrote ${fixturePath}`,
+      );
     } catch (err) {
       if (err instanceof FabricationError) {
         failures.push(`${name}: fabrication check failed — ${err.message}`);
@@ -85,10 +89,12 @@ async function main() {
     recordedAt: new Date().toISOString(),
     fixtures: manifestFixtures,
   };
-  writeFileSync(path.join(FIXTURES_DIR, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
+  writeFileSync(path.join(FIXTURES_DIR, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 
   if (failures.length > 0) {
-    console.error(`\nrecord-fixtures: ${failures.length} of ${CONTRAST_JDS.length} JD(s) failed to flip:`);
+    console.error(
+      `\nrecord-fixtures: ${failures.length} of ${CONTRAST_JDS.length} JD(s) failed to flip:`,
+    );
     for (const f of failures) console.error(`  - ${f}`);
     process.exit(1);
   }

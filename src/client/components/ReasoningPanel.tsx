@@ -20,7 +20,10 @@ export function ReasoningPanel({ resume }: { resume: TailoredResume }) {
         section.groups
           .filter((group) => group.leadRationale)
           .map((group, i) => (
-            <div key={group.heading ?? `${section.section}-${i}`} className="reasoning-panel__rationale">
+            <div
+              key={group.heading ?? `${section.section}-${i}`}
+              className="reasoning-panel__rationale"
+            >
               <span className="reasoning-panel__rationale-source">
                 {SECTIONS[section.section].label}
                 {group.heading ? ` · ${group.heading}` : ""}

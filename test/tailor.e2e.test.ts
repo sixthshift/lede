@@ -97,7 +97,11 @@ describe("keyless e2e — POST /api/tailor via buildApp().inject(), FixtureEngin
 
   it("200s for each recorded CONTRAST_JDS jd with the correct target leading", async () => {
     for (const { jd, target } of CONTRAST_JDS) {
-      const res = await app.inject({ method: "POST", url: "/api/tailor", payload: { jobDescription: jd } });
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/tailor",
+        payload: { jobDescription: jd },
+      });
       expect(res.statusCode).toBe(200);
 
       const body = res.json() as TailoredResume;

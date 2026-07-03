@@ -38,7 +38,11 @@ describe("GET/POST /api/entries", () => {
     const dataDir = freshDataDir();
     const app = appOn(dataDir);
 
-    const postRes = await app.inject({ method: "POST", url: "/api/entries", payload: validProject });
+    const postRes = await app.inject({
+      method: "POST",
+      url: "/api/entries",
+      payload: validProject,
+    });
     expect(postRes.statusCode).toBe(200);
     const created = postRes.json();
     expect(created.id).toBeTruthy();
@@ -59,7 +63,13 @@ describe("GET/POST /api/entries", () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/entries",
-      payload: { section: "project", meta: { section: "project", name: "X" }, facts: [], tags: [], sortKey: "nope" },
+      payload: {
+        section: "project",
+        meta: { section: "project", name: "X" },
+        facts: [],
+        tags: [],
+        sortKey: "nope",
+      },
     });
     expect(res.statusCode).toBe(400);
   });
@@ -67,7 +77,9 @@ describe("GET/POST /api/entries", () => {
   it("PUT with a bad body -> 400", async () => {
     const dataDir = freshDataDir();
     const app = appOn(dataDir);
-    const created = (await app.inject({ method: "POST", url: "/api/entries", payload: validProject })).json();
+    const created = (
+      await app.inject({ method: "POST", url: "/api/entries", payload: validProject })
+    ).json();
 
     const res = await app.inject({
       method: "PUT",
@@ -102,7 +114,9 @@ describe("GET/POST /api/entries", () => {
   it("PUT updates an existing entry and DELETE removes it", async () => {
     const dataDir = freshDataDir();
     const app = appOn(dataDir);
-    const created = (await app.inject({ method: "POST", url: "/api/entries", payload: validProject })).json();
+    const created = (
+      await app.inject({ method: "POST", url: "/api/entries", payload: validProject })
+    ).json();
 
     const putRes = await app.inject({
       method: "PUT",
@@ -173,7 +187,17 @@ describe("CONTRAST: export payload contains only Entry fields", () => {
     expect(raw).not.toMatch(/keySet/i);
 
     const rows = res.json();
-    const allowed = new Set(["id", "section", "meta", "facts", "tags", "framings", "sortKey", "createdAt", "updatedAt"]);
+    const allowed = new Set([
+      "id",
+      "section",
+      "meta",
+      "facts",
+      "tags",
+      "framings",
+      "sortKey",
+      "createdAt",
+      "updatedAt",
+    ]);
     for (const row of rows) {
       for (const key of Object.keys(row)) {
         expect(allowed.has(key)).toBe(true);

@@ -81,7 +81,8 @@ export function flipPredicate(
   if (!leads || !leadingGroup) return { leads, rationaleNamesSignal: false };
 
   const rationale = leadingGroup.leadRationale ?? "";
-  const rationaleNamesSignal = rationale.trim().length > 0 && rationaleReferencesSignal(rationale, resume.signals);
+  const rationaleNamesSignal =
+    rationale.trim().length > 0 && rationaleReferencesSignal(rationale, resume.signals);
 
   return { leads, rationaleNamesSignal };
 }

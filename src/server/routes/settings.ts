@@ -28,7 +28,11 @@ function currentSettings(db: Db) {
   };
 }
 
-export function settingsRoutes(app: FastifyInstance, db: Db, validate: ProviderKeyValidator = validateProviderKey): void {
+export function settingsRoutes(
+  app: FastifyInstance,
+  db: Db,
+  validate: ProviderKeyValidator = validateProviderKey,
+): void {
   app.get("/api/settings", async () => currentSettings(db));
 
   app.put("/api/settings", async (request, reply) => {
@@ -51,16 +55,29 @@ export function settingsRoutes(app: FastifyInstance, db: Db, validate: ProviderK
       return reply.code(400).send({ error: "invalid_body", issues: parsed.error.issues });
     }
 
-    const { provider, model, baseUrl } = db.select().from(settings).where(eq(settings.id, 1)).get()!;
+    const { provider, model, baseUrl } = db
+      .select()
+      .from(settings)
+      .where(eq(settings.id, 1))
+      .get()!;
     try {
-      await validate({ provider: provider as ProviderId, model, apiKey: parsed.data.apiKey, baseUrl });
+      await validate({
+        provider: provider as ProviderId,
+        model,
+        apiKey: parsed.data.apiKey,
+        baseUrl,
+      });
     } catch {
       return reply.code(400).send({ error: "key_invalid" });
     }
 
     const masterKey = loadConfig().masterKey;
     db.update(secrets)
-      .set({ apiKeyEnc: encrypt(parsed.data.apiKey, masterKey), apiKeyValidatedAt: Date.now(), updatedAt: Date.now() })
+      .set({
+        apiKeyEnc: encrypt(parsed.data.apiKey, masterKey),
+        apiKeyValidatedAt: Date.now(),
+        updatedAt: Date.now(),
+      })
       .where(eq(secrets.id, 1))
       .run();
 

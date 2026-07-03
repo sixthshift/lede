@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { TailorDecisionZ, entryMetaZ, entryInput, profileInput, settingsInput } from "@shared/schema";
+import {
+  TailorDecisionZ,
+  entryMetaZ,
+  entryInput,
+  profileInput,
+  settingsInput,
+} from "@shared/schema";
 
 // ── TailorDecisionZ ──
 
@@ -8,7 +14,12 @@ function validDecision() {
     signals: { roleLevel: "senior", weights: ["backend"], hardRequirements: ["5+ years"] },
     summary: "Backend engineer with a track record of shipping.",
     items: [
-      { entryId: "e1", text: "Led a team of 5.", rank: 1, leadRationale: "Strongest leadership signal." },
+      {
+        entryId: "e1",
+        text: "Led a team of 5.",
+        rank: 1,
+        leadRationale: "Strongest leadership signal.",
+      },
     ],
     cut: [{ entryId: "e2", reason: "Not relevant to backend role." }],
   };

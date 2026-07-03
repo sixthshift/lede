@@ -43,7 +43,11 @@ function freshDb(): Db {
 function storeKey(db: Db, apiKey: string): void {
   const masterKey = loadConfig().masterKey;
   db.update(secrets)
-    .set({ apiKeyEnc: encrypt(apiKey, masterKey), apiKeyValidatedAt: Date.now(), updatedAt: Date.now() })
+    .set({
+      apiKeyEnc: encrypt(apiKey, masterKey),
+      apiKeyValidatedAt: Date.now(),
+      updatedAt: Date.now(),
+    })
     .where(eq(secrets.id, 1))
     .run();
 }
@@ -95,12 +99,20 @@ describe("CONTRAST: LIVE mode with NO stored key -> 400 no_api_key (short-circui
     const fixtureApp = buildApp(db, { tailorEngine: "fixture" });
     const jd = "A jd never recorded in any fixture, about beekeeping logistics.";
 
-    const liveRes = await liveApp.inject({ method: "POST", url: "/api/tailor", payload: { jobDescription: jd } });
+    const liveRes = await liveApp.inject({
+      method: "POST",
+      url: "/api/tailor",
+      payload: { jobDescription: jd },
+    });
     expect(liveRes.statusCode).toBe(400);
     expect(liveRes.json()).toEqual({ error: "no_api_key" });
     expect(generateObjectMock).not.toHaveBeenCalled();
 
-    const fixtureRes = await fixtureApp.inject({ method: "POST", url: "/api/tailor", payload: { jobDescription: jd } });
+    const fixtureRes = await fixtureApp.inject({
+      method: "POST",
+      url: "/api/tailor",
+      payload: { jobDescription: jd },
+    });
     expect(fixtureRes.statusCode).toBe(422);
     expect(fixtureRes.json().error).toBe("no_fixture");
   });
@@ -153,7 +165,9 @@ describe("LIVE mode with a stored key decrypts in-memory and builds a ProviderEn
     const db = freshDb();
     const sentinel = `sk-SENTINEL-${randomUUID()}`;
     storeKey(db, sentinel);
-    generateObjectMock.mockRejectedValueOnce(new Error("transient")).mockResolvedValueOnce({ object: decision });
+    generateObjectMock
+      .mockRejectedValueOnce(new Error("transient"))
+      .mockResolvedValueOnce({ object: decision });
 
     const app = buildApp(db, { tailorEngine: "live" });
 

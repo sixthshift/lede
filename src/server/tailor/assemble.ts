@@ -2,7 +2,16 @@
 // The model returns judgment only; every structural choice (grouping, group
 // order, section order) is decided here, never by the model.
 
-import type { Entry, EntryMeta, Layout, Section, TailorDecision, TailoredGroup, TailoredItem, TailoredResume } from "@shared/types";
+import type {
+  Entry,
+  EntryMeta,
+  Layout,
+  Section,
+  TailorDecision,
+  TailoredGroup,
+  TailoredItem,
+  TailoredResume,
+} from "@shared/types";
 import { SECTIONS } from "@shared/sections";
 
 type DecisionItem = TailorDecision["items"][number];
@@ -54,10 +63,13 @@ function buildGroups(resolved: Resolved[], rule: SectionRule): TailoredGroup[] {
     return [toGroup(undefined, ordered, rule)];
   }
 
-  const groupBy = rule.groupBy;
+  // rule holds a general Section, so its groupBy is a union over every
+  // section's narrowed meta; the runtime invariant (meta matches section)
+  // lets us call it with the entry's own meta.
+  const groupBy = rule.groupBy as (m: EntryMeta) => string;
   const buckets = new Map<string, Resolved[]>();
   for (const r of resolved) {
-    const key = groupBy(r.entry.meta as EntryMeta);
+    const key = groupBy(r.entry.meta);
     const bucket = buckets.get(key) ?? [];
     bucket.push(r);
     buckets.set(key, bucket);
@@ -103,8 +115,15 @@ function groupKey(members: Resolved[], order: SectionRule["order"]): number {
   }
 }
 
-function toGroup(heading: string | undefined, ordered: Resolved[], rule: SectionRule): TailoredGroup {
-  const items: TailoredItem[] = ordered.map((r) => ({ entryId: r.entry.id, text: coerceText(r, rule) }));
+function toGroup(
+  heading: string | undefined,
+  ordered: Resolved[],
+  rule: SectionRule,
+): TailoredGroup {
+  const items: TailoredItem[] = ordered.map((r) => ({
+    entryId: r.entry.id,
+    text: coerceText(r, rule),
+  }));
   const leadRationale = ordered[0]?.item.leadRationale;
   return { heading, leadRationale, items };
 }
@@ -117,5 +136,6 @@ function toGroup(heading: string | undefined, ordered: Resolved[], rule: Section
 function coerceText(r: Resolved, rule: SectionRule): string {
   if (rule.rephrase !== "none") return r.item.text;
   if (r.entry.facts.length > 0) return r.entry.facts.join(" ");
-  return rule.metaText?.(r.entry.meta) ?? "";
+  const metaText = rule.metaText as ((m: EntryMeta) => string) | undefined;
+  return metaText?.(r.entry.meta) ?? "";
 }

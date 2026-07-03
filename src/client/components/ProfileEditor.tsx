@@ -40,7 +40,13 @@ function toFormState(profile: Profile | undefined): FormState {
   };
 }
 
-export function ProfileEditor({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function ProfileEditor({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const { data: profile } = useProfile();
   const updateProfile = useUpdateProfile();
 
@@ -57,7 +63,10 @@ export function ProfileEditor({ open, onOpenChange }: { open: boolean; onOpenCha
 
   function addLink() {
     if (state.links.length >= MAX_LINKS) return;
-    setState((prev) => ({ ...prev, links: [...prev.links, { type: "other", label: "", url: "" }] }));
+    setState((prev) => ({
+      ...prev,
+      links: [...prev.links, { type: "other", label: "", url: "" }],
+    }));
   }
 
   function updateLink(i: number, patch: Partial<LinkRow>) {
@@ -85,7 +94,11 @@ export function ProfileEditor({ open, onOpenChange }: { open: boolean; onOpenCha
       email: state.email.trim(),
       phone: state.phone.trim() || undefined,
       location: state.location.trim() || undefined,
-      links: state.links.map((link) => ({ type: link.type, label: link.label.trim(), url: link.url.trim() })),
+      links: state.links.map((link) => ({
+        type: link.type,
+        label: link.label.trim(),
+        url: link.url.trim(),
+      })),
       baseSummary: state.baseSummary.trim() || undefined,
     };
 
@@ -107,7 +120,11 @@ export function ProfileEditor({ open, onOpenChange }: { open: boolean; onOpenCha
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <Label htmlFor="profile-name">Name</Label>
-            <Input id="profile-name" value={state.name} onChange={(e) => setState((prev) => ({ ...prev, name: e.target.value }))} />
+            <Input
+              id="profile-name"
+              value={state.name}
+              onChange={(e) => setState((prev) => ({ ...prev, name: e.target.value }))}
+            />
           </div>
 
           <div className="flex flex-col gap-1">
@@ -121,12 +138,20 @@ export function ProfileEditor({ open, onOpenChange }: { open: boolean; onOpenCha
 
           <div className="flex flex-col gap-1">
             <Label htmlFor="profile-email">Email</Label>
-            <Input id="profile-email" value={state.email} onChange={(e) => setState((prev) => ({ ...prev, email: e.target.value }))} />
+            <Input
+              id="profile-email"
+              value={state.email}
+              onChange={(e) => setState((prev) => ({ ...prev, email: e.target.value }))}
+            />
           </div>
 
           <div className="flex flex-col gap-1">
             <Label htmlFor="profile-phone">Phone</Label>
-            <Input id="profile-phone" value={state.phone} onChange={(e) => setState((prev) => ({ ...prev, phone: e.target.value }))} />
+            <Input
+              id="profile-phone"
+              value={state.phone}
+              onChange={(e) => setState((prev) => ({ ...prev, phone: e.target.value }))}
+            />
           </div>
 
           <div className="flex flex-col gap-1">
@@ -141,15 +166,25 @@ export function ProfileEditor({ open, onOpenChange }: { open: boolean; onOpenCha
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <Label>Links</Label>
-              <Button type="button" variant="outline" size="sm" disabled={state.links.length >= MAX_LINKS} onClick={addLink}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={state.links.length >= MAX_LINKS}
+                onClick={addLink}
+              >
                 Add link
               </Button>
             </div>
 
             <div className="flex flex-col gap-2">
               {state.links.map((link, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: link rows are controlled by index (updateLink(i, …)); no stable id in the profile data model
                 <div key={i} className="flex items-center gap-2">
-                  <Select value={link.type} onValueChange={(value) => updateLink(i, { type: value as LinkRow["type"] })}>
+                  <Select
+                    value={link.type}
+                    onValueChange={(value) => updateLink(i, { type: value as LinkRow["type"] })}
+                  >
                     <SelectTrigger aria-label={`Link ${i + 1} type`} className="w-32">
                       <SelectValue />
                     </SelectTrigger>
@@ -195,7 +230,11 @@ export function ProfileEditor({ open, onOpenChange }: { open: boolean; onOpenCha
             />
           </div>
 
-          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
 
           <DialogFooter>
             <Button type="submit" disabled={updateProfile.isPending}>

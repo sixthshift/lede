@@ -27,7 +27,12 @@ export function TailorView() {
 
   return (
     <div className="tailor-view">
-      <JDInput value={jobDescription} onChange={setJobDescription} onSubmit={handleSubmit} pending={pending} />
+      <JDInput
+        value={jobDescription}
+        onChange={setJobDescription}
+        onSubmit={handleSubmit}
+        pending={pending}
+      />
 
       {pending ? <p className="tailor-view__pending">Tailoring your resume…</p> : null}
       {error ? <p className="tailor-view__error">{error}</p> : null}

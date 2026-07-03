@@ -58,9 +58,17 @@ docker compose -f .devcontainer/docker-compose.dev.yml down
 
 | Command         | Description                          |
 | --------------- | ------------------------------------ |
-| `bun run dev`   | Start the server with `--watch`      |
-| `bun run start` | Start the server once                |
-| `bun run check` | Type-check with `tsc --noEmit`       |
+| `bun run dev`      | Start the server with `--watch`      |
+| `bun run start`    | Start the server once                |
+| `bun run check`    | Type-check with `tsc --noEmit`       |
+| `bun run lint`     | Lint + format check ([Biome](https://biomejs.dev)) |
+| `bun run lint:fix` | Apply safe lint fixes + format       |
+| `bun run format`   | Format only                          |
+
+Biome is enforced at commit time: `bun install` runs `prepare`, which points
+`core.hooksPath` at `.githooks/`, and the `pre-commit` hook blocks any commit
+whose staged files have lint or format issues. Run `bun run lint:fix` to clear
+them.
 
 ## Configuration
 

@@ -12,7 +12,8 @@ type SectionRegistry = typeof SECTIONS;
 
 const REPHRASE_INSTRUCTION: Record<"full" | "light" | "none", string> = {
   full: "freely re-represent the facts in your own words (reorder, combine, recast sentence structure) — every resulting claim must still trace to a fact",
-  light: "lightly smooth phrasing only — do not restructure facts into new claims or combine facts across entries",
+  light:
+    "lightly smooth phrasing only — do not restructure facts into new claims or combine facts across entries",
   none: "copy the facts verbatim as `text` — this section may not be rephrased at all (the server will overwrite anything you write here anyway)",
 };
 
@@ -143,7 +144,9 @@ function renderEntry(entry: Entry): string {
     lines.push("pre-written framings (fact-locked; you may use, adapt, or ignore):");
     lines.push(...entry.framings.map((f) => `  - ${f}`));
   }
-  lines.push(`tags (grouping/filtering metadata only — never a relevance signal): ${JSON.stringify(entry.tags)}`);
+  lines.push(
+    `tags (grouping/filtering metadata only — never a relevance signal): ${JSON.stringify(entry.tags)}`,
+  );
   lines.push(`sortKey: ${entry.sortKey}`);
   return lines.join("\n");
 }

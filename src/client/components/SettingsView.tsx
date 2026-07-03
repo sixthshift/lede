@@ -38,7 +38,11 @@ export function SettingsView() {
         <h2 className="text-sm font-semibold">Provider &amp; model</h2>
         <div className="flex flex-wrap gap-3">
           <ProviderPicker value={provider as ProviderId} onChange={handleProviderChange} />
-          <ModelPicker provider={provider as ProviderId} value={model} onChange={handleModelChange} />
+          <ModelPicker
+            provider={provider as ProviderId}
+            value={model}
+            onChange={handleModelChange}
+          />
         </div>
       </section>
 

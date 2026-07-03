@@ -84,14 +84,14 @@ describe("SPA static serving (dist/ present)", () => {
 
 describe("SPA static serving (dist/ absent — keyless build/test/demo)", () => {
   it("boots fine and GET / is a plain 404, not a crash", async () => {
-    const missingDist = path.join(tmpdir(), "lede-spa-dist-does-not-exist-" + Date.now());
+    const missingDist = path.join(tmpdir(), `lede-spa-dist-does-not-exist-${Date.now()}`);
     const app = appWithDist(missingDist);
     const res = await app.inject({ method: "GET", url: "/" });
     expect(res.statusCode).toBe(404);
   });
 
   it("/api/health is unaffected", async () => {
-    const missingDist = path.join(tmpdir(), "lede-spa-dist-does-not-exist-" + Date.now());
+    const missingDist = path.join(tmpdir(), `lede-spa-dist-does-not-exist-${Date.now()}`);
     const app = appWithDist(missingDist);
     const res = await app.inject({ method: "GET", url: "/api/health" });
     expect(res.statusCode).toBe(200);

@@ -15,7 +15,12 @@ import { hashKey } from "../src/server/tailor/evalcore";
 const FIXTURES_DIR = path.join(process.cwd(), "test/fixtures/decisions");
 const TMP_FIXTURES: string[] = [];
 
-function writeFixture(name: string, jd: string, entriesForHash: Entry[], decision: TailorDecision): void {
+function writeFixture(
+  name: string,
+  jd: string,
+  entriesForHash: Entry[],
+  decision: TailorDecision,
+): void {
   const file = path.join(FIXTURES_DIR, `${name}.json`);
   writeFileSync(file, JSON.stringify({ key: hashKey(jd, entriesForHash), name, decision }));
   TMP_FIXTURES.push(file);
@@ -111,7 +116,14 @@ describe("CONTRAST: TailoredResume.sections order/visibility follows settings.la
   const jd = "Hiring a well-rounded engineer with strong fundamentals and a few notable accolades.";
 
   const layoutEntries = [
-    { id: "layout-skill", section: "skill" as const, meta: { section: "skill" as const }, facts: ["TypeScript"], tags: [], sortKey: 1 },
+    {
+      id: "layout-skill",
+      section: "skill" as const,
+      meta: { section: "skill" as const },
+      facts: ["TypeScript"],
+      tags: [],
+      sortKey: 1,
+    },
     {
       id: "layout-award",
       section: "award" as const,
@@ -144,7 +156,11 @@ describe("CONTRAST: TailoredResume.sections order/visibility follows settings.la
     summary: "Well-rounded engineer.",
     items: [
       { entryId: "layout-skill", text: "TypeScript", rank: 1 },
-      { entryId: "layout-award", text: "Recognized company-wide for engineering excellence", rank: 1 },
+      {
+        entryId: "layout-award",
+        text: "Recognized company-wide for engineering excellence",
+        rank: 1,
+      },
       { entryId: "layout-cert", text: "", rank: 1 },
     ],
     cut: [],
@@ -198,7 +214,10 @@ describe("CONTRAST: TailoredResume.sections order/visibility follows settings.la
     expect(res.statusCode).toBe(200);
     const body = res.json();
 
-    expect(body.sections.map((s: { section: string }) => s.section)).toEqual(["certification", "skill"]);
+    expect(body.sections.map((s: { section: string }) => s.section)).toEqual([
+      "certification",
+      "skill",
+    ]);
   });
 });
 
@@ -217,7 +236,9 @@ describe("first-boot seeding (§22): empty entries table -> seedIfEmpty loads SE
     expect(after.statusCode).toBe(200);
     const rows = after.json();
     expect(rows).toHaveLength(SEED_ENTRIES.length);
-    expect(new Set(rows.map((r: { id: string }) => r.id))).toEqual(new Set(SEED_ENTRIES.map((e) => e.id)));
+    expect(new Set(rows.map((r: { id: string }) => r.id))).toEqual(
+      new Set(SEED_ENTRIES.map((e) => e.id)),
+    );
 
     // idempotent: a non-empty table is left untouched
     seedIfEmpty(db);

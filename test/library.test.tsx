@@ -41,7 +41,10 @@ function mockFetch(seed: Entry[]) {
     const method = init?.method ?? "GET";
 
     if (method === "GET" && url.startsWith("/api/entries")) {
-      return new Response(JSON.stringify(state), { status: 200, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify(state), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
     if (method === "DELETE" && url.startsWith("/api/entries/")) {
       const id = url.split("/").pop()!;
@@ -92,7 +95,9 @@ describe("LibraryView", () => {
     await waitFor(() => expect(screen.queryByText("TypeScript")).not.toBeInTheDocument());
     expect(screen.getByText("AWS Certified Solutions Architect")).toBeInTheDocument();
 
-    const deleteCall = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "DELETE");
+    const deleteCall = fetchMock.mock.calls.find(
+      ([, init]) => (init as RequestInit | undefined)?.method === "DELETE",
+    );
     expect(String(deleteCall?.[0])).toBe(`/api/entries/${entryA.id}`);
 
     // the refetch triggered by invalidation re-GETs the list (proves invalidation, not just local removal)
@@ -112,10 +117,19 @@ describe("NavTabs + routing", () => {
       "fetch",
       vi.fn(
         async () =>
-          new Response(JSON.stringify({ keySet: false, provider: "anthropic", model: "claude-opus-4-8", baseUrl: null, layout: [] }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }),
+          new Response(
+            JSON.stringify({
+              keySet: false,
+              provider: "anthropic",
+              model: "claude-opus-4-8",
+              baseUrl: null,
+              layout: [],
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
       ),
     );
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

@@ -62,11 +62,20 @@ function mockFetch(initial: Partial<ServerState> = {}) {
   };
 
   function json(body: unknown, status = 200) {
-    return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   function settingsPayload() {
-    return { keySet: state.keySet, provider: state.provider, model: state.model, baseUrl: null, layout: [] };
+    return {
+      keySet: state.keySet,
+      provider: state.provider,
+      model: state.model,
+      baseUrl: null,
+      layout: [],
+    };
   }
 
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -85,7 +94,8 @@ function mockFetch(initial: Partial<ServerState> = {}) {
     }
     if (method === "POST" && url === "/api/auth/login") {
       const body = JSON.parse(String(init?.body));
-      if (!state.configured || body.password === "wrong") return json({ error: "invalid_credentials" }, 401);
+      if (!state.configured || body.password === "wrong")
+        return json({ error: "invalid_credentials" }, 401);
       state.authed = true;
       return json({ ok: true });
     }
@@ -119,7 +129,9 @@ function withClient(children: React.ReactNode) {
 }
 
 function putCallsTo(fetchMock: ReturnType<typeof vi.fn>, url: string, method: string) {
-  return fetchMock.mock.calls.filter(([u, init]) => u === url && ((init as RequestInit | undefined)?.method ?? "GET") === method);
+  return fetchMock.mock.calls.filter(
+    ([u, init]) => u === url && ((init as RequestInit | undefined)?.method ?? "GET") === method,
+  );
 }
 
 describe("LoginGate — 401 routes to the login/setup form", () => {
@@ -184,14 +196,18 @@ describe("ApiKeyForm — write-only (RED-TEAM)", () => {
 
     await waitFor(() => expect(putCallsTo(fetchMock, "/api/settings/key", "PUT")).toHaveLength(1));
     const [, putInit] = putCallsTo(fetchMock, "/api/settings/key", "PUT")[0];
-    expect(JSON.parse(String((putInit as RequestInit).body))).toEqual({ apiKey: "sk-new-key-value" });
+    expect(JSON.parse(String((putInit as RequestInit).body))).toEqual({
+      apiKey: "sk-new-key-value",
+    });
 
     // the typed key is never re-rendered anywhere after save — there's nothing to display.
     expect(screen.queryByText("sk-new-key-value")).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue("sk-new-key-value")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
-    await waitFor(() => expect(putCallsTo(fetchMock, "/api/settings/key", "DELETE")).toHaveLength(1));
+    await waitFor(() =>
+      expect(putCallsTo(fetchMock, "/api/settings/key", "DELETE")).toHaveLength(1),
+    );
   });
 
   it("keySet:false shows 'no key' status and no Delete button", () => {
@@ -214,16 +230,22 @@ describe("ProviderPicker / ModelPicker — persisted via PUT /api/settings", () 
     fireEvent.click(await screen.findByRole("option", { name: "OpenAI" }));
 
     await waitFor(() => expect(putCallsTo(fetchMock, "/api/settings", "PUT")).toHaveLength(1));
-    const firstPut = JSON.parse(String((putCallsTo(fetchMock, "/api/settings", "PUT")[0][1] as RequestInit).body));
+    const firstPut = JSON.parse(
+      String((putCallsTo(fetchMock, "/api/settings", "PUT")[0][1] as RequestInit).body),
+    );
     expect(firstPut).toMatchObject({ provider: "openai", model: "gpt-5" });
 
-    await waitFor(() => expect(screen.getByRole("combobox", { name: "Model" })).toHaveTextContent("gpt-5"));
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Model" })).toHaveTextContent("gpt-5"),
+    );
 
     fireEvent.click(screen.getByRole("combobox", { name: "Model" }));
     fireEvent.click(await screen.findByRole("option", { name: "gpt-5-mini" }));
 
     await waitFor(() => expect(putCallsTo(fetchMock, "/api/settings", "PUT")).toHaveLength(2));
-    const secondPut = JSON.parse(String((putCallsTo(fetchMock, "/api/settings", "PUT")[1][1] as RequestInit).body));
+    const secondPut = JSON.parse(
+      String((putCallsTo(fetchMock, "/api/settings", "PUT")[1][1] as RequestInit).body),
+    );
     expect(secondPut).toMatchObject({ model: "gpt-5-mini" });
   });
 });

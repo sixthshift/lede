@@ -12,7 +12,10 @@ const TABS = [
 
 export function NavTabs() {
   return (
-    <nav className="inline-flex h-9 items-center gap-1 rounded-md bg-muted p-1 text-muted-foreground" aria-label="Primary">
+    <nav
+      className="inline-flex h-9 items-center gap-1 rounded-md bg-muted p-1 text-muted-foreground"
+      aria-label="Primary"
+    >
       {TABS.map((tab) => (
         <NavLink
           key={tab.to}

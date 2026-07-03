@@ -1,0 +1,4 @@
+#!/bin/sh
+# Biome gate: block commits whose staged files have lint/format issues.
+# Run `bun run lint:fix` to auto-fix, then re-stage.
+exec bunx biome check --staged --no-errors-on-unmatched

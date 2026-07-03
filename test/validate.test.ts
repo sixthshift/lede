@@ -18,7 +18,10 @@ function entry(id: string, facts: string[]): Entry {
   };
 }
 
-function resumeWithItems(items: { entryId: string; text: string }[], summary = "Summary."): TailoredResume {
+function resumeWithItems(
+  items: { entryId: string; text: string }[],
+  summary = "Summary.",
+): TailoredResume {
   return {
     signals: { roleLevel: "", weights: [], hardRequirements: [] },
     summary,
@@ -81,7 +84,10 @@ describe("validateNoFabrication", () => {
       signals: { roleLevel: "", weights: [], hardRequirements: [] },
       summary: "Experienced engineer.",
       sections: [
-        { section: "experience", groups: [{ items: [{ entryId: "e1", text: "Led a team of 5." }] }] },
+        {
+          section: "experience",
+          groups: [{ items: [{ entryId: "e1", text: "Led a team of 5." }] }],
+        },
         {
           section: "project",
           groups: [
@@ -105,7 +111,9 @@ describe("validateNoFabrication", () => {
       [{ entryId: "e1", text: "Led a team of 5." }],
       "Brings 12 years of experience.",
     );
-    expect(() => validateNoFabrication(resume, [e1, e2], "Brings 12 years of experience.")).not.toThrow();
+    expect(() =>
+      validateNoFabrication(resume, [e1, e2], "Brings 12 years of experience."),
+    ).not.toThrow();
   });
 
   it("throws when a summary number is not traceable to kept facts or baseSummary", () => {

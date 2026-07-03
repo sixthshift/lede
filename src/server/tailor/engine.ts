@@ -20,7 +20,12 @@ export interface TailorEngine {
 }
 
 // ── real — provider-agnostic via the Vercel AI SDK; production (user's decrypted key) ──
-export type ProviderEngineConfig = { provider: ProviderId; model: string; apiKey: string; baseURL?: string };
+export type ProviderEngineConfig = {
+  provider: ProviderId;
+  model: string;
+  apiKey: string;
+  baseURL?: string;
+};
 
 export class ProviderEngine implements TailorEngine {
   constructor(private cfg: ProviderEngineConfig) {}
@@ -41,7 +46,9 @@ export class ProviderEngine implements TailorEngine {
       schema: TailorDecisionZ,
       system: `${SYSTEM_PROMPT}\n\n${renderLibrary(entries)}`,
       prompt: `Tailor for this job description:\n\n${jd}`,
-      providerOptions: providerOptionsFor(this.cfg.provider) as Parameters<typeof generateObject>[0]["providerOptions"],
+      providerOptions: providerOptionsFor(this.cfg.provider) as Parameters<
+        typeof generateObject
+      >[0]["providerOptions"],
     });
     return object;
   }
@@ -53,7 +60,9 @@ export class NoFixtureError extends Error {
   scenarios: string[];
 
   constructor(key: string, scenarios: string[]) {
-    super(`no recorded fixture for key ${key}; recorded scenarios: ${scenarios.join(", ") || "(none)"}`);
+    super(
+      `no recorded fixture for key ${key}; recorded scenarios: ${scenarios.join(", ") || "(none)"}`,
+    );
     this.name = "NoFixtureError";
     this.scenarios = scenarios;
   }
@@ -95,7 +104,9 @@ export class FixtureEngine implements TailorEngine {
         // partial, empty, or gone between readdirSync and readFileSync — skip it rather
         // than aborting the whole scan. A genuinely corrupt recorded fixture still
         // surfaces here, in logs, instead of being silently dropped.
-        console.warn(`FixtureEngine: skipping unreadable fixture ${path.join(this.dir, f)}: ${(err as Error).message}`);
+        console.warn(
+          `FixtureEngine: skipping unreadable fixture ${path.join(this.dir, f)}: ${(err as Error).message}`,
+        );
       }
     }
     return fixtures;

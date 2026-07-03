@@ -37,7 +37,11 @@ export function TagInput({
           {tags.map((tag) => (
             <Badge key={tag} variant="secondary" className="gap-1">
               {tag}
-              <button type="button" aria-label={`Remove tag ${tag}`} onClick={() => onChange(tags.filter((t) => t !== tag))}>
+              <button
+                type="button"
+                aria-label={`Remove tag ${tag}`}
+                onClick={() => onChange(tags.filter((t) => t !== tag))}
+              >
                 <X className="h-3 w-3" />
               </button>
             </Badge>
@@ -59,7 +63,13 @@ export function TagInput({
             }
           }}
         />
-        <Button type="button" variant="outline" size="sm" disabled={atMax || !draft.trim()} onClick={commit}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={atMax || !draft.trim()}
+          onClick={commit}
+        >
           Add tag
         </Button>
       </div>

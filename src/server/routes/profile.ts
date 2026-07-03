@@ -8,7 +8,11 @@ import { profile } from "../db/schema";
 
 export function profileRoutes(app: FastifyInstance, db: Db): void {
   app.get("/api/profile", async () => {
-    const { id: _id, updatedAt: _updatedAt, ...rest } = db.select().from(profile).where(eq(profile.id, 1)).get()!;
+    const {
+      id: _id,
+      updatedAt: _updatedAt,
+      ...rest
+    } = db.select().from(profile).where(eq(profile.id, 1)).get()!;
     return rest;
   });
 
@@ -24,7 +28,11 @@ export function profileRoutes(app: FastifyInstance, db: Db): void {
       .where(eq(profile.id, 1))
       .run();
 
-    const { id: _id, updatedAt: _updatedAt, ...rest } = db.select().from(profile).where(eq(profile.id, 1)).get()!;
+    const {
+      id: _id,
+      updatedAt: _updatedAt,
+      ...rest
+    } = db.select().from(profile).where(eq(profile.id, 1)).get()!;
     return reply.code(200).send(rest);
   });
 }

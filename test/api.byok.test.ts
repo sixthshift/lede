@@ -86,7 +86,11 @@ describe("CONTRAST: validate-before-store", () => {
 
     expect(secretsRow(db).apiKeyEnc).toBeNull();
 
-    const res = await app.inject({ method: "PUT", url: "/api/settings/key", payload: { apiKey: "sk-bad" } });
+    const res = await app.inject({
+      method: "PUT",
+      url: "/api/settings/key",
+      payload: { apiKey: "sk-bad" },
+    });
     expect(res.statusCode).toBeGreaterThanOrEqual(400);
     expect(res.statusCode).toBeLessThan(500);
     expect(secretsRow(db).apiKeyEnc).toBeNull();
@@ -95,12 +99,20 @@ describe("CONTRAST: validate-before-store", () => {
   it("rejecting validator leaves a PRIOR key untouched", async () => {
     const db = initDb(freshDataDir()).db;
     const acceptApp = keyAppOn(db, acceptValidator);
-    await acceptApp.inject({ method: "PUT", url: "/api/settings/key", payload: { apiKey: "sk-original" } });
+    await acceptApp.inject({
+      method: "PUT",
+      url: "/api/settings/key",
+      payload: { apiKey: "sk-original" },
+    });
     const before = secretsRow(db).apiKeyEnc;
     expect(before).not.toBeNull();
 
     const rejectApp = keyAppOn(db, rejectValidator);
-    const res = await rejectApp.inject({ method: "PUT", url: "/api/settings/key", payload: { apiKey: "sk-new" } });
+    const res = await rejectApp.inject({
+      method: "PUT",
+      url: "/api/settings/key",
+      payload: { apiKey: "sk-new" },
+    });
     expect(res.statusCode).toBeGreaterThanOrEqual(400);
     expect(res.statusCode).toBeLessThan(500);
     expect(secretsRow(db).apiKeyEnc).toEqual(before);
@@ -110,7 +122,11 @@ describe("CONTRAST: validate-before-store", () => {
     const db = initDb(freshDataDir()).db;
     const app = keyAppOn(db, acceptValidator);
 
-    const res = await app.inject({ method: "PUT", url: "/api/settings/key", payload: { apiKey: "sk-good-key" } });
+    const res = await app.inject({
+      method: "PUT",
+      url: "/api/settings/key",
+      payload: { apiKey: "sk-good-key" },
+    });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ keySet: true });
 
@@ -136,14 +152,22 @@ describe("DELETE /api/settings/key purges the stored key", () => {
     const mainApp = buildApp(db);
     const keyApp = keyAppOn(db, acceptValidator);
 
-    await keyApp.inject({ method: "PUT", url: "/api/settings/key", payload: { apiKey: "sk-to-be-deleted" } });
-    expect((await mainApp.inject({ method: "GET", url: "/api/settings" })).json().keySet).toBe(true);
+    await keyApp.inject({
+      method: "PUT",
+      url: "/api/settings/key",
+      payload: { apiKey: "sk-to-be-deleted" },
+    });
+    expect((await mainApp.inject({ method: "GET", url: "/api/settings" })).json().keySet).toBe(
+      true,
+    );
 
     const delRes = await keyApp.inject({ method: "DELETE", url: "/api/settings/key" });
     expect(delRes.statusCode).toBe(200);
     expect(delRes.json()).toEqual({ keySet: false });
 
-    expect((await mainApp.inject({ method: "GET", url: "/api/settings" })).json().keySet).toBe(false);
+    expect((await mainApp.inject({ method: "GET", url: "/api/settings" })).json().keySet).toBe(
+      false,
+    );
     expect(secretsRow(db).apiKeyEnc).toBeNull();
   });
 });
@@ -158,7 +182,11 @@ describe("CONTRAST: SENTINEL leak scan (gameable-resistant)", () => {
     const responseBodies: string[] = [];
 
     const logs = await captureIO(async () => {
-      const putRes = await keyApp.inject({ method: "PUT", url: "/api/settings/key", payload: { apiKey: sentinel } });
+      const putRes = await keyApp.inject({
+        method: "PUT",
+        url: "/api/settings/key",
+        payload: { apiKey: sentinel },
+      });
       responseBodies.push(putRes.payload);
       expect(putRes.statusCode).toBe(200);
 
@@ -170,7 +198,9 @@ describe("CONTRAST: SENTINEL leak scan (gameable-resistant)", () => {
       const tailorErr = await mainApp.inject({
         method: "POST",
         url: "/api/tailor",
-        payload: { jobDescription: "A completely unrecorded jd about beekeeping, never in any fixture." },
+        payload: {
+          jobDescription: "A completely unrecorded jd about beekeeping, never in any fixture.",
+        },
       });
       responseBodies.push(tailorErr.payload);
 
@@ -179,7 +209,11 @@ describe("CONTRAST: SENTINEL leak scan (gameable-resistant)", () => {
       responseBodies.push(badPut.payload);
 
       const rejectApp = keyAppOn(db, rejectValidator);
-      const rejectedPut = await rejectApp.inject({ method: "PUT", url: "/api/settings/key", payload: { apiKey: "sk-other" } });
+      const rejectedPut = await rejectApp.inject({
+        method: "PUT",
+        url: "/api/settings/key",
+        payload: { apiKey: "sk-other" },
+      });
       responseBodies.push(rejectedPut.payload);
     });
 
@@ -200,7 +234,11 @@ describe("CONTRAST: SENTINEL leak scan (gameable-resistant)", () => {
     const dataDir = freshDataDir();
     const db = initDb(dataDir).db;
     const keyApp = keyAppOn(db, acceptValidator);
-    await keyApp.inject({ method: "PUT", url: "/api/settings/key", payload: { apiKey: `sk-${randomUUID()}` } });
+    await keyApp.inject({
+      method: "PUT",
+      url: "/api/settings/key",
+      payload: { apiKey: `sk-${randomUUID()}` },
+    });
 
     const masterKeyB64 = loadConfig().masterKey.toString("base64");
     const dbBytes = dataDirBytes(dataDir);

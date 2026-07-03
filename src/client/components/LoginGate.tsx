@@ -63,7 +63,10 @@ function LoginForm({ onSignedIn }: { onSignedIn: () => void }) {
 
   return (
     <div className="mx-auto mt-24 max-w-sm">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-lg border border-border p-6">
+      <form
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-4 rounded-lg border border-border p-6"
+      >
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="login-gate-password">Password</Label>
           <Input

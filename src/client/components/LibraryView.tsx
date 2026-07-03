@@ -97,17 +97,23 @@ export function LibraryView() {
       </div>
 
       {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
-      {isError ? <p role="alert" className="text-sm text-destructive">Couldn't load entries.</p> : null}
+      {isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          Couldn't load entries.
+        </p>
+      ) : null}
 
       <div className="flex flex-col gap-4">
-        {SECTION_VALUES.filter((section) => (bySection.get(section)?.length ?? 0) > 0).map((section) => (
-          <SectionAccordion
-            key={section}
-            section={section}
-            entries={bySection.get(section) ?? []}
-            onDelete={(id) => deleteEntry.mutate(id)}
-          />
-        ))}
+        {SECTION_VALUES.filter((section) => (bySection.get(section)?.length ?? 0) > 0).map(
+          (section) => (
+            <SectionAccordion
+              key={section}
+              section={section}
+              entries={bySection.get(section) ?? []}
+              onDelete={(id) => deleteEntry.mutate(id)}
+            />
+          ),
+        )}
       </div>
 
       <EntryEditor open={editorOpen} onOpenChange={setEditorOpen} entry={editingEntry} />

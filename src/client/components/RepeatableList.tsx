@@ -58,6 +58,7 @@ export function RepeatableList({
 
       <div className="flex flex-col gap-2">
         {values.map((value, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: rows are controlled by index (value={value}); order IS the data, and strings carry no stable id
           <div key={i} className="flex items-center gap-2">
             <Input
               aria-label={`${label} ${i + 1}`}

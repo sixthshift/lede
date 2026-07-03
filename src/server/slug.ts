@@ -54,7 +54,9 @@ export function generateSlug(entry: SlugInput, existingIds: ReadonlySet<string>)
       .filter(Boolean)
       .join("-")
       .slice(0, MAX_LEN)
-      .replace(/-+$/, "") || kebab(entry.section) || "entry";
+      .replace(/-+$/, "") ||
+    kebab(entry.section) ||
+    "entry";
 
   if (!existingIds.has(base)) return base;
 

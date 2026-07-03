@@ -13,7 +13,13 @@ import { loadConfig, type Config } from "./config";
 import { initDb, type Db } from "./db";
 import { entries, secrets, settings } from "./db/schema";
 import { seedIfEmpty } from "./seed";
-import { FixtureEngine, ProviderEngine, tailor, NoFixtureError, type TailorEngine } from "./tailor/engine";
+import {
+  FixtureEngine,
+  ProviderEngine,
+  tailor,
+  NoFixtureError,
+  type TailorEngine,
+} from "./tailor/engine";
 import { FabricationError } from "./tailor/validate";
 import { decrypt } from "./crypto";
 import { registerAuthGuard } from "./auth";
@@ -55,12 +61,14 @@ function mapTailorError(err: unknown): { status: number; body: { error: string }
   if (err instanceof FabricationError) return { status: 502, body: { error: "fabrication" } };
 
   if (APICallError.isInstance(err)) {
-    if (err.statusCode === 401 || err.statusCode === 403) return { status: 401, body: { error: "key_invalid" } };
+    if (err.statusCode === 401 || err.statusCode === 403)
+      return { status: 401, body: { error: "key_invalid" } };
     if (err.statusCode === 429) return { status: 429, body: { error: "rate_limited" } };
     return { status: 502, body: { error: "provider_error" } };
   }
 
-  if (NoObjectGeneratedError.isInstance(err)) return { status: 502, body: { error: "model_off_contract" } };
+  if (NoObjectGeneratedError.isInstance(err))
+    return { status: 502, body: { error: "model_off_contract" } };
 
   return { status: 502, body: { error: "provider_error" } };
 }
@@ -74,13 +82,18 @@ function mapTailorError(err: unknown): { status: number; body: { error: string }
 // distDir overrides where the built SPA is served from (default: the real
 // build output next to this file) — tests use it to point at a throwaway
 // fixture directory instead of colliding on the repo's own dist/.
-export function buildApp(db?: Db, configOverride?: Partial<Config>, distDir: string = DEFAULT_DIST_DIR): FastifyInstance {
+export function buildApp(
+  db?: Db,
+  configOverride?: Partial<Config>,
+  distDir: string = DEFAULT_DIST_DIR,
+): FastifyInstance {
   const app = Fastify({ logger: true });
   const config: Config = { ...loadConfig(), ...configOverride };
   // FIXTURE mode (tests/CI/demo) resolves once at boot, keyless. LIVE mode
   // has no fixed engine: each request builds a ProviderEngine from the
   // decrypted BYOK key (never a boot-time constant — see the route below).
-  const fixtureEngine: TailorEngine | undefined = config.tailorEngine === "fixture" ? new FixtureEngine() : undefined;
+  const fixtureEngine: TailorEngine | undefined =
+    config.tailorEngine === "fixture" ? new FixtureEngine() : undefined;
   let resolvedDb: Db;
   if (db) {
     resolvedDb = db;
@@ -163,7 +176,8 @@ export function buildApp(db?: Db, configOverride?: Partial<Config>, distDir: str
   return app;
 }
 
-const isEntrypoint = process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];
+const isEntrypoint =
+  process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];
 
 if (isEntrypoint) {
   const config = loadConfig();

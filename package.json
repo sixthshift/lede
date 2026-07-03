@@ -3,13 +3,16 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n api,web \"bun run dev:api\" \"bun run dev:web\"",
-    "dev:api": "tsx watch src/server/index.ts",
+    "dev:api": "tsx watch --env-file=.env src/server/index.ts",
     "dev:web": "vite",
     "build": "vite build",
     "check": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
-    "start": "tsx src/server/index.ts",
-    "test": "vitest run --passWithNoTests"
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
+    "format": "biome format --write",
+    "start": "tsx --env-file=.env src/server/index.ts",
+    "test": "vitest run --passWithNoTests",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.5",
@@ -45,6 +48,7 @@
     "zod": "^4.1.8"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.2",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.1",
     "@types/better-sqlite3": "^7.6.13",

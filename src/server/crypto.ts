@@ -1,6 +1,12 @@
 // AES-256-GCM (reversible, for the BYOK provider key) + scrypt (one-way, for
 // the password) — spec.md §8/§17/§19. node:crypto only.
-import { randomBytes, createCipheriv, createDecipheriv, scryptSync, timingSafeEqual } from "node:crypto";
+import {
+  randomBytes,
+  createCipheriv,
+  createDecipheriv,
+  scryptSync,
+  timingSafeEqual,
+} from "node:crypto";
 
 export type EncryptedPayload = {
   iv: string; // base64

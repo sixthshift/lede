@@ -135,11 +135,21 @@ async function main() {
   if (!ok) {
     console.error("\neval: FAIL");
     for (const r of [...baseResults, ...shuffleResults]) {
-      if (!r.pass) console.error(`  - [${r.name}] did not flip to ${r.target} (leading: ${r.leadingId ?? "(none)"})`);
+      if (!r.pass)
+        console.error(
+          `  - [${r.name}] did not flip to ${r.target} (leading: ${r.leadingId ?? "(none)"})`,
+        );
     }
-    if (!baseSetOk) console.error("  - base: leading ids are not the expected mutually-distinct target set");
-    if (!shuffleSetOk) console.error("  - tag-shuffle: leading ids are not the expected mutually-distinct target set");
-    if (!unchanged) console.error("  - tag-shuffle: a lede changed vs. the base run — this indicates tag-scoring");
+    if (!baseSetOk)
+      console.error("  - base: leading ids are not the expected mutually-distinct target set");
+    if (!shuffleSetOk)
+      console.error(
+        "  - tag-shuffle: leading ids are not the expected mutually-distinct target set",
+      );
+    if (!unchanged)
+      console.error(
+        "  - tag-shuffle: a lede changed vs. the base run — this indicates tag-scoring",
+      );
     process.exit(1);
   }
 

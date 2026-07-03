@@ -102,7 +102,8 @@ function validate(state: FormState): string[] {
   for (const field of META_FIELDS[state.section]) {
     const value = (state.meta[field.key] ?? "").trim();
     if (field.required && !value) errors.push(`${field.label} is required.`);
-    if (value.length > META_MAX_LEN) errors.push(`${field.label} must be ${META_MAX_LEN} characters or fewer.`);
+    if (value.length > META_MAX_LEN)
+      errors.push(`${field.label} must be ${META_MAX_LEN} characters or fewer.`);
   }
 
   if (!Number.isInteger(Number(state.sortKey))) errors.push("Sort key must be a whole number.");
@@ -141,7 +142,11 @@ export function EntryEditor({
       ...prev,
       section: next,
       meta: {},
-      facts: LABEL_SECTIONS.has(next) ? [prev.facts[0] ?? ""] : prev.facts.length > 0 ? prev.facts : [""],
+      facts: LABEL_SECTIONS.has(next)
+        ? [prev.facts[0] ?? ""]
+        : prev.facts.length > 0
+          ? prev.facts
+          : [""],
     }));
   }
 
@@ -184,7 +189,10 @@ export function EntryEditor({
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <Label htmlFor="entry-section">Section</Label>
-            <Select value={state.section} onValueChange={(value) => handleSectionChange(value as Section)}>
+            <Select
+              value={state.section}
+              onValueChange={(value) => handleSectionChange(value as Section)}
+            >
               <SelectTrigger id="entry-section">
                 <SelectValue />
               </SelectTrigger>
@@ -232,7 +240,11 @@ export function EntryEditor({
             </>
           )}
 
-          <TagInput tags={state.tags} onChange={(tags) => setState((prev) => ({ ...prev, tags }))} max={MAX_TAGS} />
+          <TagInput
+            tags={state.tags}
+            onChange={(tags) => setState((prev) => ({ ...prev, tags }))}
+            max={MAX_TAGS}
+          />
 
           <div className="flex flex-col gap-1">
             <Label htmlFor="entry-sortkey">Sort key (YYYYMM or YYYYMMDD)</Label>

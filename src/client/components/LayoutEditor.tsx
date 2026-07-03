@@ -14,7 +14,13 @@ function labelFor(section: Layout[number]["section"]): string {
   return section === "summary" ? "Summary" : SECTIONS[section].label;
 }
 
-export function LayoutEditor({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function LayoutEditor({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const { data: settings } = useSettings();
   const updateSettings = useUpdateSettings();
 
@@ -38,7 +44,9 @@ export function LayoutEditor({ open, onOpenChange }: { open: boolean; onOpenChan
   }
 
   function toggle(i: number) {
-    setLayout((prev) => prev.map((row, idx) => (idx === i ? { ...row, enabled: !row.enabled } : row)));
+    setLayout((prev) =>
+      prev.map((row, idx) => (idx === i ? { ...row, enabled: !row.enabled } : row)),
+    );
   }
 
   async function handleSave() {
@@ -59,7 +67,11 @@ export function LayoutEditor({ open, onOpenChange }: { open: boolean; onOpenChan
 
         <div className="flex flex-col gap-2">
           {layout.map((row, i) => (
-            <div key={row.section} data-layout-row={row.section} className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
+            <div
+              key={row.section}
+              data-layout-row={row.section}
+              className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
+            >
               <label className="flex flex-1 items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -93,7 +105,11 @@ export function LayoutEditor({ open, onOpenChange }: { open: boolean; onOpenChan
           ))}
         </div>
 
-        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
 
         <DialogFooter>
           <Button type="button" onClick={handleSave} disabled={updateSettings.isPending}>

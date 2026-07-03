@@ -7,7 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 
 const PROVIDER_IDS = Object.keys(PROVIDERS) as ProviderId[];
 
-export function ProviderPicker({ value, onChange }: { value: ProviderId; onChange: (provider: ProviderId) => void }) {
+export function ProviderPicker({
+  value,
+  onChange,
+}: {
+  value: ProviderId;
+  onChange: (provider: ProviderId) => void;
+}) {
   return (
     <Select value={value} onValueChange={(next) => onChange(next as ProviderId)}>
       <SelectTrigger aria-label="Provider" className="w-48">
