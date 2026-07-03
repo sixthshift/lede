@@ -17,12 +17,24 @@
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
+import { DOCKER_BASE_URL } from "./test/e2e/helpers/docker";
 
 const PORT = process.env.PORT ?? "8787";
 const BASE_URL = `http://localhost:${PORT}`;
 
 const AUTH_PORT = String(Number(PORT) + 1);
 const AUTH_BASE_URL = `http://localhost:${AUTH_PORT}`;
+
+// E5-C's docker project runs a real container (helpers/docker.ts globalSetup)
+// instead of a webServer, and is driven by its own `playwright test
+// --project=docker` invocation (package.json test:docker / the composite
+// `test` script's last step) with LEDE_E2E_DOCKER=1 set. The project is only
+// *defined* when that flag is present, so a bare `playwright test` (the
+// default run, and what `bun run test`'s middle step invokes) has no
+// "docker" project to pick up at all — belt-and-braces with globalSetup's
+// own flag check below, since globalSetup runs unconditionally for every
+// invocation regardless of which projects are selected.
+const dockerProject = process.env.LEDE_E2E_DOCKER === "1";
 
 export default defineConfig({
   testDir: "test/e2e",
@@ -31,6 +43,7 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
   },
+  globalSetup: "./test/e2e/helpers/docker.ts",
   projects: [
     {
       name: "chromium",
@@ -42,6 +55,15 @@ export default defineConfig({
       testMatch: /auth\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: AUTH_BASE_URL },
     },
+    ...(dockerProject
+      ? [
+          {
+            name: "docker",
+            testMatch: /docker-spa\.spec\.ts/,
+            use: { ...devices["Desktop Chrome"], baseURL: DOCKER_BASE_URL },
+          },
+        ]
+      : []),
   ],
   webServer: [
     {
