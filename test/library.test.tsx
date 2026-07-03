@@ -105,6 +105,20 @@ describe("LibraryView", () => {
 
 describe("NavTabs + routing", () => {
   it("renders links to /tailor /library /settings and mounts the matching route", () => {
+    // App now wraps everything in LoginGate (E2-E), which pings /api/settings
+    // via useQuery — needs a QueryClientProvider + a fetch stub so that ping
+    // resolves instead of crashing the render tree.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ keySet: false, provider: "anthropic", model: "claude-opus-4-8", baseUrl: null, layout: [] }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+      ),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const router = createMemoryRouter(
       [
         {
@@ -120,7 +134,11 @@ describe("NavTabs + routing", () => {
       { initialEntries: ["/library"] },
     );
 
-    render(<RouterProvider router={router} />);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
 
     expect(screen.getByRole("link", { name: "Tailor" })).toHaveAttribute("href", "/tailor");
     expect(screen.getByRole("link", { name: "Library" })).toHaveAttribute("href", "/library");
