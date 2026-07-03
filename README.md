@@ -67,11 +67,39 @@ docker compose -f .devcontainer/docker-compose.dev.yml down
 Copy `.env.example` to `.env` and adjust as needed. `.env` is git-ignored and
 optionally loaded by the dev container.
 
-## Production
+## Production / self-hosting
 
-The root `Dockerfile` builds a minimal single-stage image:
+The root `Dockerfile` is a multi-stage build: a Bun stage builds the SPA
+(`bun run build` → `dist/`), and a slim **Node** stage runs the server via
+`tsx` (the server always runs under Node, never Bun — `better-sqlite3`'s
+native binary is Node-ABI only). Data (the SQLite DB) lives in `DATA_DIR`
+(default `/app/data`), backed by a named volume so it survives rebuilds.
 
-```bash
-docker build -t lede .
-docker run -p 3000:3000 lede
-```
+### First run
+
+1. Generate the two required secrets — the server refuses to boot without them:
+
+   ```bash
+   export LEDE_MASTER_KEY=$(openssl rand -base64 32)
+   export LEDE_SESSION_SECRET=$(openssl rand -base64 48)
+   ```
+
+2. Build and start:
+
+   ```bash
+   docker compose up --build
+   ```
+
+3. Open **http://localhost:8787**, set your login password on first visit,
+   then go to **Settings** and add your provider API key (BYOK — stored
+   encrypted at rest under `LEDE_MASTER_KEY`).
+
+4. Tailor away.
+
+To persist the secrets across shells, put them in a `.env` file next to
+`docker-compose.yml` (compose loads it automatically) instead of `export`ing
+them each time. Optional env vars: `PORT` (host port, default `8787`) and
+`LEDE_AUTH_DISABLED=true` (skips the login gate — local/dev use only).
+
+Stop the stack with `docker compose down`; add `-v` to also drop the data
+volume.
