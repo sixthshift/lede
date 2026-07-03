@@ -1,0 +1,17 @@
+services:
+  lede:
+    build: .
+    ports:
+      - '${PORT:-8787}:8787'
+    environment:
+      - 'LEDE_MASTER_KEY=${LEDE_MASTER_KEY:?required — generate with "openssl rand -base64 32"}'
+      - 'LEDE_SESSION_SECRET=${LEDE_SESSION_SECRET:?required — generate with "openssl rand -base64 48"}'
+      - PORT=8787
+      - DATA_DIR=/app/data
+      - LEDE_AUTH_DISABLED=${LEDE_AUTH_DISABLED:-false}
+    volumes:
+      - lede-data:/app/data
+
+volumes:
+  lede-data:
+    driver: local
