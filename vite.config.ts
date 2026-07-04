@@ -20,16 +20,20 @@ export default defineConfig({
     exclude: [...configDefaults.exclude, "**/.claude/**"],
     setupFiles: ["./test/setup.ts"],
     // Integration suites boot a full Fastify server (and boot.smoke spawns
-    // real tsx subprocesses); on a contended multi-core box the default
-    // 5000ms timeout starves workers and causes non-deterministic per-test
-    // timeouts. Give headroom and cap worker parallelism so full-suite runs
-    // are deterministically green.
+    // real tsx subprocesses). Funnelling all files through one long-lived fork
+    // (singleFork) let per-file resources — open better-sqlite3 handles, Fastify
+    // instances — accumulate until the heavy real-server tests starved and hit
+    // their per-test timeout; a hung test then wedged the shared fork and
+    // starved the rest of the run. Isolated forks (fresh state per file) bound
+    // that accumulation; a small pool caps contention well below the core count.
     testTimeout: 30000,
     hookTimeout: 30000,
     pool: "forks",
     poolOptions: {
       forks: {
-        singleFork: true,
+        isolate: true,
+        maxForks: 3,
+        minForks: 1,
       },
     },
   },
