@@ -5,7 +5,7 @@
 import { sqliteTable, text, integer, check } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
-import type { EntryMeta, Section } from "@shared/types";
+import type { EntryMeta, ProviderId, Section, TailoredResume } from "@shared/types";
 
 // ── all resume content ────────────────────────────────────
 export const entries = sqliteTable("entries", {
@@ -56,6 +56,25 @@ export const settings = sqliteTable(
   },
   (t) => ({ singleton: check("settings_singleton", sql`${t.id} = 1`) }),
 );
+
+// ── a tailoring record for one job, NOT a hiring tracker (§27) ──
+export const applications = sqliteTable("applications", {
+  id: text("id").primaryKey(),
+  company: text("company"),
+  role: text("role"),
+  jobDescription: text("job_description").notNull(),
+  context: text("context"), // guides emphasis only — never a fact source
+  current: text("current", { mode: "json" }).$type<TailoredResume | null>(),
+  locked: text("locked", { mode: "json" }).$type<TailoredResume | null>(),
+  genState: text("gen_state").notNull().default("untailored"), // 'untailored'|'tailoring'|'tailored'|'failed'
+  currentMeta: text("current_meta", { mode: "json" }).$type<{
+    at: number;
+    provider: ProviderId;
+    model: string;
+  } | null>(),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
 
 // ── sensitive material, ISOLATED (singleton) ──────────────
 export const secrets = sqliteTable(
