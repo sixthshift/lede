@@ -12,6 +12,12 @@ import { ProfileEditor } from "./ProfileEditor";
 import { LayoutEditor } from "./LayoutEditor";
 import { Button } from "./ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import {
+  LibraryFilter,
+  DEFAULT_LIBRARY_FILTER,
+  filterEntries,
+  type LibraryFilterState,
+} from "./LibraryFilter";
 
 function groupBySection(entries: Entry[]): Map<Section, Entry[]> {
   const groups = new Map<Section, Entry[]>();
@@ -27,7 +33,9 @@ export function LibraryView() {
   const { data: entries, isLoading, isError } = useEntries();
   const deleteEntry = useDeleteEntry();
 
-  const bySection = useMemo(() => groupBySection(entries ?? []), [entries]);
+  const [filter, setFilter] = useState<LibraryFilterState>(DEFAULT_LIBRARY_FILTER);
+  const filteredEntries = useMemo(() => filterEntries(entries ?? [], filter), [entries, filter]);
+  const bySection = useMemo(() => groupBySection(filteredEntries), [filteredEntries]);
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | undefined>(undefined);
@@ -101,6 +109,15 @@ export function LibraryView() {
         <p role="alert" className="text-sm text-destructive">
           Couldn't load entries.
         </p>
+      ) : null}
+
+      {entries && entries.length > 0 ? (
+        <LibraryFilter
+          entries={entries}
+          filter={filter}
+          onFilterChange={setFilter}
+          resultCount={filteredEntries.length}
+        />
       ) : null}
 
       <div className="flex flex-col gap-4">
