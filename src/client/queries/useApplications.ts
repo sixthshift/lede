@@ -9,6 +9,8 @@ import {
   updateApplication,
   deleteApplication,
   tailorApplication,
+  lockApplication,
+  unlockApplication,
 } from "../api";
 import type { ApplicationCreateInput, ApplicationUpdateInput } from "../api";
 
@@ -60,6 +62,26 @@ export function useTailorApplication() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => tailorApplication(id),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["applications", updated.id] });
+    },
+  });
+}
+
+export function useLockApplication() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => lockApplication(id),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["applications", updated.id] });
+    },
+  });
+}
+
+export function useUnlockApplication() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => unlockApplication(id),
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ["applications", updated.id] });
     },
