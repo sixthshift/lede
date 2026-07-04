@@ -24,6 +24,7 @@ import { FabricationError } from "./tailor/validate";
 import { decrypt } from "./crypto";
 import { registerAuthGuard } from "./auth";
 import { authRoutes } from "./routes/auth";
+import { applicationsRoutes } from "./routes/applications";
 import { entriesRoutes } from "./routes/entries";
 import { profileRoutes } from "./routes/profile";
 import { settingsRoutes } from "./routes/settings";
@@ -120,6 +121,7 @@ export function buildApp(
   entriesRoutes(app, resolvedDb);
   profileRoutes(app, resolvedDb);
   settingsRoutes(app, resolvedDb);
+  applicationsRoutes(app, resolvedDb);
 
   app.post("/api/tailor", async (request, reply) => {
     const parsed = tailorBodyZ.safeParse(request.body);
