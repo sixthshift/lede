@@ -3,7 +3,7 @@
 // the server's `error` string verbatim (e.g. "key_invalid", "no_api_key") so
 // later tickets can switch on it (401→LoginGate, 400 no_api_key→Settings).
 
-import type { TailoredResume, Entry, Profile, Layout, Section, Application } from "@shared/types";
+import type { Entry, Profile, Layout, Section, Application } from "@shared/types";
 import type { z } from "zod";
 import type {
   entryInput,
@@ -63,10 +63,6 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 function jsonInit(method: string, body: unknown): RequestInit {
   return { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
-}
-
-export async function tailor(jobDescription: string): Promise<TailoredResume> {
-  return request<TailoredResume>("/api/tailor", jsonInit("POST", { jobDescription }));
 }
 
 // ── entries (spec.md §9) ──
