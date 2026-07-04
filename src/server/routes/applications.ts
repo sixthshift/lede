@@ -3,10 +3,91 @@
 import type { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
+import { APICallError, NoObjectGeneratedError } from "ai";
 
 import { applicationCreate, applicationUpdate } from "@shared/schema";
+import type { Entry, ProviderId, Section } from "@shared/types";
 import type { Db } from "../db";
-import { applications } from "../db/schema";
+import { applications, entries, profile, settings, secrets } from "../db/schema";
+import { loadConfig, type Config } from "../config";
+import { decrypt } from "../crypto";
+import {
+  FixtureEngine,
+  ProviderEngine,
+  NoFixtureError,
+  tailor,
+  type TailorEngine,
+} from "../tailor/engine";
+import { FabricationError } from "../tailor/validate";
+
+// Row -> domain Entry — same shape/key-order as index.ts's rowToEntry, kept
+// in lockstep so hashKey() (FixtureEngine's replay key) matches identically
+// regardless of which route read the entries from the db.
+function rowToEntry(row: typeof entries.$inferSelect): Entry {
+  const entry: Entry = {
+    id: row.id,
+    section: row.section as Section,
+    sortKey: row.sortKey,
+    meta: row.meta,
+    facts: row.facts,
+    tags: row.tags,
+  };
+  if (row.framings) entry.framings = row.framings;
+  return entry;
+}
+
+// Maps a tailor() failure to its distinct HTTP status — identical to
+// index.ts's mapTailorError for the stateless route (spec.md §9).
+function mapTailorError(err: unknown): { status: number; body: { error: string } } {
+  if (err instanceof NoFixtureError) return { status: 422, body: { error: "no_fixture" } };
+  if (err instanceof FabricationError) return { status: 502, body: { error: "fabrication" } };
+
+  if (APICallError.isInstance(err)) {
+    if (err.statusCode === 401 || err.statusCode === 403)
+      return { status: 401, body: { error: "key_invalid" } };
+    if (err.statusCode === 429) return { status: 429, body: { error: "rate_limited" } };
+    return { status: 502, body: { error: "provider_error" } };
+  }
+
+  if (NoObjectGeneratedError.isInstance(err))
+    return { status: 502, body: { error: "model_off_contract" } };
+
+  return { status: 502, body: { error: "provider_error" } };
+}
+
+export type ApplicationsRoutesDeps = {
+  // Test-only seam (mirrors settingsRoutes' injected validator): a fixed
+  // engine bypasses mode selection/decryption entirely, e.g. a spy proving
+  // context reaches decide(). Production callers never pass this.
+  engine?: TailorEngine;
+  config?: Partial<Config>;
+};
+
+// Selects the engine for one tailor request exactly like the stateless
+// /api/tailor route does: fixture mode is keyless; live mode decrypts the
+// stored BYOK key per request (never a boot-time constant) or short-circuits
+// to 'no_api_key' before any provider call.
+function resolveEngine(
+  db: Db,
+  config: Config,
+  deps?: ApplicationsRoutesDeps,
+): TailorEngine | { error: "no_api_key" } {
+  if (deps?.engine) return deps.engine;
+  if (config.tailorEngine === "fixture") return new FixtureEngine();
+
+  const secretsRow = db.select().from(secrets).where(eq(secrets.id, 1)).get();
+  if (!secretsRow?.apiKeyEnc) return { error: "no_api_key" };
+
+  const settingsRow = db.select().from(settings).where(eq(settings.id, 1)).get()!;
+  // Decrypted in memory for this request only — never persisted, logged, or returned.
+  const apiKey = decrypt(secretsRow.apiKeyEnc, config.masterKey);
+  return new ProviderEngine({
+    provider: settingsRow.provider as ProviderId,
+    model: settingsRow.model,
+    apiKey,
+    baseURL: settingsRow.baseUrl ?? undefined,
+  });
+}
 
 // The LIST payload omits the heavy current/locked TailoredResume snapshots
 // (§9 "no heavy snapshots") — only metadata + genState + currentMeta.
@@ -22,7 +103,11 @@ const LIST_COLUMNS = {
   updatedAt: applications.updatedAt,
 } as const;
 
-export function applicationsRoutes(app: FastifyInstance, db: Db): void {
+export function applicationsRoutes(
+  app: FastifyInstance,
+  db: Db,
+  deps?: ApplicationsRoutesDeps,
+): void {
   app.get("/api/applications", async () => {
     return db.select(LIST_COLUMNS).from(applications).all();
   });
@@ -91,5 +176,63 @@ export function applicationsRoutes(app: FastifyInstance, db: Db): void {
   app.delete<{ Params: { id: string } }>("/api/applications/:id", async (request, reply) => {
     db.delete(applications).where(eq(applications.id, request.params.id)).run();
     return reply.code(200).send({ ok: true });
+  });
+
+  // ── application-scoped tailor (§27) — purely additive alongside the
+  // stateless /api/tailor; persists the result on the application record
+  // instead of returning it bare ──
+  app.post<{ Params: { id: string } }>("/api/applications/:id/tailor", async (request, reply) => {
+    const existing = db
+      .select()
+      .from(applications)
+      .where(eq(applications.id, request.params.id))
+      .get();
+    if (!existing) {
+      return reply.code(404).send({ error: "not_found" });
+    }
+
+    const config: Config = { ...loadConfig(), ...deps?.config };
+    const engine = resolveEngine(db, config, deps);
+    if ("error" in engine) {
+      return reply.code(400).send({ error: engine.error });
+    }
+
+    try {
+      const jdEntries = db.select().from(entries).all().map(rowToEntry);
+      const settingsRow = db.select().from(settings).where(eq(settings.id, 1)).get()!;
+      const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get();
+
+      const resume = await tailor(
+        engine,
+        existing.jobDescription,
+        jdEntries,
+        settingsRow.layout,
+        profileRow?.baseSummary,
+        existing.context,
+      );
+
+      const row = {
+        ...existing,
+        current: resume,
+        genState: "tailored" as const,
+        currentMeta: {
+          at: Date.now(),
+          provider: settingsRow.provider as ProviderId,
+          model: settingsRow.model,
+        },
+        updatedAt: Date.now(),
+      };
+      db.update(applications).set(row).where(eq(applications.id, existing.id)).run();
+      return reply.code(200).send(row);
+    } catch (err) {
+      db.update(applications)
+        .set({ genState: "failed", updatedAt: Date.now() })
+        .where(eq(applications.id, existing.id))
+        .run();
+
+      const { status, body } = mapTailorError(err);
+      if (status >= 500) app.log.error(err);
+      return reply.code(status).send(body);
+    }
   });
 }

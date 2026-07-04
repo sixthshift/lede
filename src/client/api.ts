@@ -138,6 +138,13 @@ export async function deleteApplication(id: string): Promise<void> {
   });
 }
 
+export async function tailorApplication(id: string): Promise<Application> {
+  return request<Application>(
+    `/api/applications/${encodeURIComponent(id)}/tailor`,
+    jsonInit("POST", {}),
+  );
+}
+
 // ── auth (spec.md §7/§8) — single-user password gate, never accounts ──
 export async function authSetup(password: string): Promise<void> {
   await request<{ ok: true }>("/api/auth/setup", jsonInit("POST", { password }));

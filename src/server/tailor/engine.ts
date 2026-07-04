@@ -16,7 +16,17 @@ import { validateNoFabrication } from "./validate";
 import { hashKey } from "./evalcore";
 
 export interface TailorEngine {
-  decide(jd: string, entries: Entry[]): Promise<TailorDecision>;
+  decide(jd: string, entries: Entry[], context?: string | null): Promise<TailorDecision>;
+}
+
+// The exact user message ProviderEngine sends. With no context, byte-identical
+// to the pre-context baseline (T014 fixtures/replays depend on this). With
+// context, appends a clearly-labelled block — context guides emphasis, never
+// a fact source (§27), so it's kept visibly separate from the JD itself.
+export function buildUserPrompt(jd: string, context?: string | null): string {
+  const base = `Tailor for this job description:\n\n${jd}`;
+  if (!context) return base;
+  return `${base}\n\nTailoring context (guides emphasis; not a source of facts):\n${context}`;
 }
 
 // ── real — provider-agnostic via the Vercel AI SDK; production (user's decrypted key) ──
@@ -30,22 +40,26 @@ export type ProviderEngineConfig = {
 export class ProviderEngine implements TailorEngine {
   constructor(private cfg: ProviderEngineConfig) {}
 
-  async decide(jd: string, entries: Entry[]): Promise<TailorDecision> {
+  async decide(jd: string, entries: Entry[], context?: string | null): Promise<TailorDecision> {
     try {
-      return await this.attempt(jd, entries);
+      return await this.attempt(jd, entries, context);
     } catch {
       // retry exactly once; a second failure propagates (route maps it to 502)
-      return await this.attempt(jd, entries);
+      return await this.attempt(jd, entries, context);
     }
   }
 
-  private async attempt(jd: string, entries: Entry[]): Promise<TailorDecision> {
+  private async attempt(
+    jd: string,
+    entries: Entry[],
+    context?: string | null,
+  ): Promise<TailorDecision> {
     const model = resolveModel(this.cfg);
     const { object } = await generateObject({
       model,
       schema: TailorDecisionZ,
       system: `${SYSTEM_PROMPT}\n\n${renderLibrary(entries)}`,
-      prompt: `Tailor for this job description:\n\n${jd}`,
+      prompt: buildUserPrompt(jd, context),
       providerOptions: providerOptionsFor(this.cfg.provider) as Parameters<
         typeof generateObject
       >[0]["providerOptions"],
@@ -75,7 +89,9 @@ const DEFAULT_FIXTURES_DIR = path.join(process.cwd(), "test/fixtures/decisions")
 export class FixtureEngine implements TailorEngine {
   constructor(private dir: string = DEFAULT_FIXTURES_DIR) {}
 
-  async decide(jd: string, entries: Entry[]): Promise<TailorDecision> {
+  async decide(jd: string, entries: Entry[], _context?: string | null): Promise<TailorDecision> {
+    // Recorded fixtures key on (jd, entries) only — context never affects
+    // replay matching, matching validateNoFabrication's entries-only contract.
     const key = hashKey(jd, entries);
     const fixtures = this.loadFixtures();
     const match = fixtures.find((f) => f.key === key);
@@ -120,9 +136,12 @@ export async function tailor(
   entries: Entry[],
   layout: Layout,
   baseSummary?: string | null,
+  context?: string | null,
 ): Promise<TailoredResume> {
-  const decision = await engine.decide(jd, entries);
+  const decision = await engine.decide(jd, entries, context);
   const resume = assemble(decision, entries, layout, SECTIONS);
+  // validateNoFabrication takes entries only — context guides emphasis, never
+  // a fact source (§27), so it must never be checked against as if it were one.
   validateNoFabrication(resume, entries, baseSummary);
   return resume;
 }
