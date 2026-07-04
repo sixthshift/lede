@@ -5,7 +5,7 @@ import { NavLink } from "react-router-dom";
 import { cn } from "../lib/utils";
 
 const TABS = [
-  { to: "/tailor", label: "Tailor" },
+  { to: "/applications", label: "Applications" },
   { to: "/library", label: "Library" },
   { to: "/settings", label: "Settings" },
 ];

@@ -3,10 +3,9 @@ import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, within, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter, RouterProvider, createMemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router-dom";
 import type { Entry } from "@shared/types";
 
-import { App } from "../src/client/App";
 import { LibraryView } from "../src/client/components/LibraryView";
 
 afterEach(() => {
@@ -108,57 +107,5 @@ describe("LibraryView", () => {
   });
 });
 
-describe("NavTabs + routing", () => {
-  it("renders links to /tailor /library /settings and mounts the matching route", () => {
-    // App now wraps everything in LoginGate (E2-E), which pings /api/settings
-    // via useQuery — needs a QueryClientProvider + a fetch stub so that ping
-    // resolves instead of crashing the render tree.
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({
-              keySet: false,
-              provider: "anthropic",
-              model: "claude-opus-4-8",
-              baseUrl: null,
-              layout: [],
-            }),
-            {
-              status: 200,
-              headers: { "Content-Type": "application/json" },
-            },
-          ),
-      ),
-    );
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const router = createMemoryRouter(
-      [
-        {
-          path: "/",
-          element: <App />,
-          children: [
-            { path: "tailor", element: <div>TAILOR_VIEW_MARKER</div> },
-            { path: "library", element: <div>LIBRARY_VIEW_MARKER</div> },
-            { path: "settings", element: <div>SETTINGS_VIEW_MARKER</div> },
-          ],
-        },
-      ],
-      { initialEntries: ["/library"] },
-    );
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>,
-    );
-
-    expect(screen.getByRole("link", { name: "Tailor" })).toHaveAttribute("href", "/tailor");
-    expect(screen.getByRole("link", { name: "Library" })).toHaveAttribute("href", "/library");
-    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
-
-    expect(screen.getByText("LIBRARY_VIEW_MARKER")).toBeInTheDocument();
-    expect(screen.queryByText("TAILOR_VIEW_MARKER")).not.toBeInTheDocument();
-  });
-});
+// NavTabs' labels/order/active-state and full-App routing now live in
+// test/ia.test.tsx (spec.md §26) — this file stays scoped to LibraryView.
