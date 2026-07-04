@@ -3,13 +3,23 @@
 // the server's `error` string verbatim (e.g. "key_invalid", "no_api_key") so
 // later tickets can switch on it (401→LoginGate, 400 no_api_key→Settings).
 
-import type { TailoredResume, Entry, Profile, Layout, Section } from "@shared/types";
+import type { TailoredResume, Entry, Profile, Layout, Section, Application } from "@shared/types";
 import type { z } from "zod";
-import type { entryInput, profileInput, settingsInput } from "@shared/schema";
+import type {
+  entryInput,
+  profileInput,
+  settingsInput,
+  applicationCreate,
+  applicationUpdate,
+} from "@shared/schema";
 
 export type EntryInput = z.infer<typeof entryInput>;
 export type ProfileInput = z.infer<typeof profileInput>;
 export type SettingsInput = z.infer<typeof settingsInput>;
+export type ApplicationCreateInput = z.infer<typeof applicationCreate>;
+export type ApplicationUpdateInput = z.infer<typeof applicationUpdate>;
+// The list endpoint omits the heavy current/locked TailoredResume snapshots (§9).
+export type ApplicationListItem = Omit<Application, "current" | "locked">;
 export type SettingsResponse = {
   keySet: boolean;
   provider: string;
@@ -97,6 +107,35 @@ export async function fetchSettings(): Promise<SettingsResponse> {
 
 export async function updateSettings(input: SettingsInput): Promise<SettingsResponse> {
   return request<SettingsResponse>("/api/settings", jsonInit("PUT", input));
+}
+
+// ── applications (spec.md §27) — tailoring records, not a hiring tracker ──
+export async function listApplications(): Promise<ApplicationListItem[]> {
+  return request<ApplicationListItem[]>("/api/applications");
+}
+
+export async function createApplication(input: ApplicationCreateInput): Promise<Application> {
+  return request<Application>("/api/applications", jsonInit("POST", input));
+}
+
+export async function getApplication(id: string): Promise<Application> {
+  return request<Application>(`/api/applications/${encodeURIComponent(id)}`);
+}
+
+export async function updateApplication(
+  id: string,
+  input: ApplicationUpdateInput,
+): Promise<Application> {
+  return request<Application>(
+    `/api/applications/${encodeURIComponent(id)}`,
+    jsonInit("PUT", input),
+  );
+}
+
+export async function deleteApplication(id: string): Promise<void> {
+  await request<{ ok: true }>(`/api/applications/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 }
 
 // ── auth (spec.md §7/§8) — single-user password gate, never accounts ──
