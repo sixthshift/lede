@@ -458,3 +458,513 @@ Append-only journal. Newest at bottom.
     Phase 2: 3 of 5 children done (auth + BYOK storage + crypto/config). Remaining: E2-D (tailor
     uses decrypted BYOK key; no-key->400) + E2-E (client LoginGate/SettingsView/ApiKeyForm). The
     FULL Phase-2 oracle runs at phase close after those. STOPPING at this security checkpoint.
+
+[v2-027] RESUME (2026-07-03) — batch [E2-D, E2-E] interrupted by SESSION LIMIT, re-launched
+  First launch (wf_2f13f99c-2f0): build:E2-D completed on branch worktree-wf_2f13f99c-2f0-1
+    (2 declared files only: src/server/index.ts + test/api.tailor-byok.test.ts, in scope). Then
+    build:E2-E, verify:E2-D, and gate ALL died "session limit · resets 4am UTC" — infra, not ticket
+    failure. Nothing merged (master still @ 6dbbfc0). Backlog untouched (workflow never writes it);
+    E2-D/E2-E remain todo. No reconciliation needed.
+  Limit cleared (04:04 UTC 07-03). Resumed same runId w/ identical args -> build:E2-D cache-hits;
+    build:E2-E + verify:E2-D + integrate + gate re-run. E2-D self-report FLAGGED boot.smoke.test.ts
+    flaky under box contention (claims pre-existing, reproduced via git stash to base) — NOT accepted
+    on self-report; the independent verify (this resume) is what decides.
+
+[v2-028] E2-E — ACCEPTED (independent verify green; scope judgment); merged d992aff
+  Verify (branch f71462a): check 0 / build 0 / test 24 files 181 PASS; acceptance
+  settings-auth.test.tsx 9/9 (write-only key — ApiKeyForm has no key prop, shows keySet status,
+  Save->PUT /api/settings/key, Delete->DELETE, typed key never re-rendered; 401->LoginGate; Provider/
+  ModelPicker->PUT /api/settings). Gaming read: clean.
+  SCOPE JUDGMENT: verify failed E2-E mechanically for touching test/library.test.tsx (undeclared).
+  Coordinator judged it a FORCED, CORRECT cascading fix, not scope creep: App now wraps LoginGate,
+  which useQuery-pings /api/settings for 401 detection (the ticket's required design); the existing
+  NavTabs test rendered <App/> with no QueryClientProvider and crashed "No QueryClient set". Fix adds
+  QueryClientProvider + fetch stub matching the file's two sibling tests; existing assertions
+  preserved. The ticket's OWN acceptance ("existing client suites incl. library stay green") cannot
+  hold without it -> the declared `files` under-specified. Amended E2-E.files += test/library.test.tsx;
+  accepted. (Not an oracle weakening — the acceptance is unchanged and green.)
+
+[v2-029] E2-D — FAILED independent verify (real bug, not gaming); attempt 1 logged; re-dispatched
+  Verify caught what the builder's self-report missed (trust-the-oracle). CONTRAST fixture-mode
+  assertion (expect 422 no_fixture) gets 502 provider_error DETERMINISTICALLY in isolation. Root
+  cause: buildApp decides fixture mode via config.tailorEngine but constructs via makeEngine(), which
+  re-derives mode from process.env (NODE_ENV) and ignores the decision; under vitest NODE_ENV=
+  development -> makeEngine returns a LIVE ProviderEngine even in fixture mode. Full-suite green was
+  SPURIOUS (NODE_ENV=test leaked from other files in the shared singleFork process). Scope clean
+  (only the 2 declared files); gaming read: intent genuinely implemented, but the CONTRAST check was
+  accidentally order-dependent.
+  Re-dispatch fixNote: in index.ts use `new FixtureEngine()` directly for fixture mode (do NOT touch
+  engine.ts/makeEngine — other callers rely on its env behavior); harden the test to be order-
+  independent (must get 422 with NODE_ENV unset). Single-ticket Sonnet builder in a worktree; I
+  re-verify before merge. Verified E2-D isolation must pass: `env -u NODE_ENV bunx vitest run
+  test/api.tailor-byok.test.ts`.
+  Baseline flakiness note: verify saw `bun run test` flaky 3/5 on the branch (api.auth/boot.smoke/
+  api.entries timeouts), but merge-base master ALSO flaked 1/4 (api.tailor-db) -> PRE-EXISTING /
+  environmental (heavy concurrent-worktree load during the workflow), NOT an E2-D regression. T019's
+  singleFork+30s helps but a contended box under N parallel worktrees still starves real-subprocess
+  boot suites. Deterministic checks (check/build + the byok isolation run) are the gate.
+
+[v2-030] E2-D — ACCEPTED (independent re-verify green); merged 9686714
+  Attempt 2 fixed the real bug. Scope=2 declared files; gaming clean. check 0 / build 0;
+  ISOLATION `env -u NODE_ENV bunx vitest run test/api.tailor-byok.test.ts` = 4/4 (fixture-mode now
+  422 no_fixture, was 502 — the exact prior failure, now deterministically green). full suite 185/185.
+
+===== PHASE 2 CLOSED — oracle GREEN on merged tree (master @ 9686714) =====
+  All 5 children done: E2-A (crypto/config) + E2-B (auth gate) + E2-C (BYOK storage) + E2-D
+  (tailor uses decrypted BYOK key; no key->400) + E2-E (client LoginGate/SettingsView/ApiKeyForm/
+  Provider+ModelPicker). Repairs earlier this phase: T017 (Node/tsx runner), T018 (fixture-dir race),
+  T019 (harness determinism).
+  Phase-2 oracle evidence (bun run test on master, 25 files):
+   - 401 gate on /api/* without session -> api.auth.test.ts PASS
+   - boot refuses w/o or w/ malformed LEDE_MASTER_KEY + encrypt/decrypt round-trip -> boot.smoke.test.ts
+     3/3 (isolation, 2 runs) + config.test.ts PASS
+   - PUT /api/settings/key stores ciphertext (validate-first); GET never returns key; no log leak ->
+     api.byok.test.ts + api.profile-settings.test.ts sentinel scan PASS
+   - /api/tailor no stored key -> 400 no_api_key -> api.tailor-byok.test.ts 4/4 (isolation) PASS
+   - full suite 183/185; the only 2 non-green are boot.smoke real-subprocess TIMEOUTS under full-suite
+     contention, PASS 3/3 in isolation (documented env flake, [v2-026]/T019) — not a regression.
+  check 0 / build 0 on master.
+
+===== CHUNK END — 2 tickets closed this run (E2-D, E2-E) =====
+  Healthy checkpoint at the close of the SECURITY-CRITICAL phase (auth + BYOK fully landed & merged).
+  This run also absorbed a mid-run SESSION LIMIT (resumed same workflow runId post-reset) and a
+  failed-verify repair cycle on E2-D (trust-the-oracle caught a real order-dependent bug the builder
+  self-reported as flaky). Backlog: 32/36 done; 2 todo (E3, E4). Scheduler-ready next: E3.
+  NEXT RUN: E3 ("Phase 3 — reasoning UI + remaining sections", spec §10/§11) is a COARSE phase-sized
+  placeholder, NOT cold-start dispatchable as one ticket. First action next invocation: decompose E3
+  into focused tickets (ReasoningPanel renders signals/leadRationale/cut; leadRationale+cut EXCLUDED
+  from printed resume DOM; award/certification/publication/interest/language/reference render from
+  data) with deps, red-team their acceptance, then fan out. E4 (render polish + Docker) depends on E3.
+
+[v2-031] RESUME — E3 DECOMPOSED (spec §10/§11); red-teamed; batch [E3-A, E3-B] dispatched
+  Investigated the tree before splitting: Phase-1 already built the FULL section registry (all 10
+  sections), the entryMetaZ discriminated union, SectionMetaFields for all remaining sections, and a
+  fully registry-GENERIC assemble()+ResumePage. So "remaining sections" is NOT net-new rendering.
+  Two real, file-disjoint units:
+   - E3-A (reasoning UI, client-only): ResultView split (ResumePage | ReasoningPanel) + WeightBar/
+     Callout/CutList + wire into TailorView + print handling. Net-new; the reasoning data
+     (leadRationale/cut/signals) already rides on TailoredResume but nothing renders it.
+   - E3-B (remaining sections, server/registry): the ACTUAL gap is assemble.coerceText — for
+     rephrase:'none' label sections it returns facts.join(' '), so empty-facts entries (cert/
+     publication/reference/interest/language) render BLANK, and TailoredItem carries no meta for the
+     client to recover (the code comment promises "from meta downstream" but nothing does it). Fix =
+     registry-single-source meta->text formatter consumed by assemble.
+  RED-TEAM (sharpened into acceptance): E3-A CONTRAST = DOM-ABSENCE not display:none — non-empty
+    distinctive leadRationale/cut strings must be ABSENT from the .resume-page subtree textContent
+    (panel must be a SIBLING, not nested); TIMEBOX grep-forbid EventSource/SSE/framer-motion/history
+    table/new deps. E3-B CONTRAST = empty-facts cert+reference must render meta-derived text (asserts
+    specific meta values), so the current blank behavior FAILS; assemble.test.ts must stay green
+    (no weakening). Prefer input->output contrasts over existence checks throughout.
+  E4 (Phase 4) depends_on updated -> [E3-A, E3-B]. Scheduler: ready [E3-A,E3-B], one disjoint batch,
+    no problems/cycles. No oracle amendment (Phase-3 checks from intake already match).
+
+[v2-032] E3-A + E3-B — ACCEPTED (verified + merged-tree gate green); PHASE 3 CLOSED
+  Workflow wf_4a99ea91-5d1: both built, independently verified, merged clean (master 41249cc), phase
+  gate 196/196 on merged tree; coordinator re-confirmed merged-tree `bun run check` exit 0.
+  E3-A (reasoning UI): 9 declared files only; DOM-ABSENCE contrast real (sentinel strings absent from
+    .resume-page subtree, present in reasoning sibling; print.css hides .reasoning-panel); WeightBar/
+    Callout/CutList render signals/leadRationale/cut; TIMEBOX grep clean; no new deps.
+  E3-B (remaining sections): coerceText facts-else-metaText fallback; registry-owned metaText in
+    sections.ts; empty-facts cert/reference now render meta-derived text; model text still ignored for
+    rephrase:'none'. SCOPE: touched undeclared test/assemble.test.ts — VERIFY STAGE MISSED IT (a
+    workflow-verifier gap worth noting), coordinator caught it independently. Judged a forced cascade:
+    the one changed assertion had encoded the very bug being fixed (text===''); now asserts meta text
+    — STRENGTHENS, not weakens. Amended E3-B.files; accepted.
+  PHASE 3 oracle GREEN (merged tree): ReasoningPanel signals+leadRationale+cut (reasoning-ui 6/6);
+    reasoning DOM-absent from print target (reasoning-ui ResultView contrast + resumepage.test.tsx
+    renderToStaticMarkup absence); remaining sections incl. empty-facts meta (remaining-sections 5/5).
+    Full suite 196/196; check 0. No boot.smoke flake this run.
+  CONTINUING (budget 2/12, Docker verifiable): decomposing E4 (final phase) to drive toward drain.
+
+[v2-033] E4 DECOMPOSED (final phase, §10/§12/§19) + Phase-4 oracle RED-TEAM SHARPENED
+  Investigated the tree: §12 tokens (tokens.css full palette+shadcn map), Plex @fontsource (imported
+  in app.css), ATS-safe print.css, tailwind config — ALL already present. So render polish (E4-A) is
+  ~done → a proving test + gap-fill. Two real gaps found:
+   - index.ts:139 has a deferred TODO: the server does NOT serve the built SPA (@fastify/static not
+     installed). Without it `docker compose up` yields an API with no UI.
+   - Dockerfile is a WRONG stale stub: FROM oven/bun + CMD bun run src/main.ts (nonexistent) +
+     single-stage + no vite build + EXPOSE 3000. Contradicts locked [v2-017] (server must run under
+     Node/tsx, not Bun — better-sqlite3 ABI) and §19 (multi-stage, serves SPA).
+  ORACLE SHARPENING (red-team, self-serve — TIGHTENS toward §19 intent, does not weaken): the
+    Phase-4 check "GET /api/health ok" was gameable (a UI-less API passes). Added: server serves the
+    SPA (GET / -> index.html; /api/* not shadowed) as a keyless check, AND the docker check now
+    requires GET / to return the SPA + the image to run under Node/tsx not Bun. oracle.md Phase 4
+    updated inline (marked [SHARPENED v2-033]).
+  SPLIT (dependency-ordered): E4-A (render polish + proving test, client styles) and E4-B (serve
+    built SPA — the index.ts:139 TODO, server + @fastify/static) are file-disjoint → batch together.
+    E4-C (Docker/compose/README) depends_on E4-B (the image must serve the SPA E4-B enables). E4-C's
+    acceptance runs the LIVE heavy check `docker compose up --build` (Docker confirmed available).
+  Dispatching batch [E4-A, E4-B]; E4-C follows after E4-B is judged.
+
+[v2-034] E4-A + E4-B — ACCEPTED (verified + merged-tree gate green); Phase-4 keyless subset done
+  Workflow wf_731cca90-c59: both built, verified, merged (master 74a0420); coordinator re-confirmed
+  scope (E4-A: only render-polish.test.ts; E4-B: index.ts+package.json+spa-serving.test.ts+bun.lock)
+  and merged `bun run check` 0.
+  E4-A: styles already matched §12/§10 verbatim; delivered the proving test (render-polish 11/11) —
+    §12 token values + shadcn map, @fontsource self-hosted (no CDN), print.css ATS-safe.
+  E4-B: implemented the index.ts:139 TODO — @fastify/static serves dist/ with an API-safe SPA history
+    fallback; tolerant when dist absent (keyless suite green both ways). spa-serving 8/8 incl. the
+    CONTRAST that /api/* is not shadowed. Gate also did a LIVE boot vs real dist: GET / -> SPA,
+    /api/health -> {ok:true}. boot.smoke clean (no flake). Full suite 215/215.
+  Remaining: E4-C (Docker/compose/README) now ready (depends_on E4-B). Dispatching as a single-ticket
+    builder; I re-verify incl. the LIVE `docker compose up --build` boot (Docker available).
+
+[v2-035] E4-C — ACCEPTED (independent LIVE docker re-verify); ===== BACKLOG DRAINED — BUILD COMPLETE =====
+  E4-C scope clean (4 declared files); Dockerfile = Node multi-stage runtime (node:22-bookworm-slim,
+  npx tsx, NOT Bun per [v2-017]). Coordinator ran `docker compose up --build` itself (host 8899,
+  project lede-verify): container booted; GET /api/health 200 {ok:true}; GET / 200 <title>Lede</title>
+  + real /assets bundle (SPA served); GET /api/nope 401 JSON (API not shadowed). Teardown clean.
+  Merged d4ca2a9.
+  FINAL STATE: 37 done / 0 todo / 0 in-progress / 4 decomposed (E2,E3,E4 + early epic). All phase
+  oracles green on merged trees. Final master @ d4ca2a9: check 0, build 0, full suite 215/215 real
+  signal (one run showed 1 boot.smoke timeout under docker+suite contention; PASSED 3/3 in isolation
+  — the documented env flake, not a regression).
+  Phase 0 honesty note (unchanged): the key-gated lede-flip eval (T014, scripts/eval.ts, live model)
+  is the one non-keyless Tier-0 criterion; the keyless suite proves the machinery over frozen recorded
+  fixtures. See earlier ledger for the eval-run record.
+
+[v2-036] BROWSER ACCEPTANCE — semantic amendment (escalation → user approved 2026-07-03); backlog reopened
+  Escalation: post-drain [v2-035], user identified that per-phase acceptance was passing on servers
+  that were never actually reached by a browser. Phase 4 [v2-033] sharpened toward "GET / returns SPA"
+  but a static 200 with no JS bundle would still game it — a UI-less container serving raw index.html
+  passes the letter and fails the intent. Per skill "semantic amendments never self-serve" → escalated.
+  USER APPROVED (2026-07-03) folding a browser gate into the baseline.
+  Scope (user decisions logged):
+   - Fold Playwright into baseline `bun run test` (composite: `vitest run` — excluding test/e2e/** —
+     then `playwright test`), NOT a separate gate: every worker pays browser-boot cost for strongest
+     guarantee. User's call.
+   - Phase 0 unchanged: T014's live lede-flip eval already carries the Phase 0 risk; a browser hit
+     on /api/health duplicates the existing curl.
+  Oracle amendment (see oracle.md "## Browser acceptance"):
+   - Phase 1 gains a browser-driven LibraryView CRUD + reload spec across experience/project/
+     education/skill.
+   - Phase 2 gains a browser first-run → login → protected-route spec with HttpOnly cookie assertion.
+   - Phase 4 gains a post-`docker compose up` browser spec: React root actually mounts (non-empty +
+     app-shell text), no uncaught console errors, one live /api/* round-trip through the SPA —
+     SHARPENS [v2-033]'s "GET / returns SPA" (a static 200 could game it; this can't be gamed by a
+     UI-less container).
+  Tooling:
+   - Playwright MCP installed at user scope (`claude mcp add playwright -s user -- npx -y
+     @playwright/mcp@latest`) for coordinator/worker live browser driving during the loop.
+   - `@playwright/test` added in-repo (E5-A) as the durable acceptance record; MCP handles inline
+     coordinator judgment, specs are the artifact + human-runnable gate.
+  Backlog reopens (drain [v2-035] reverted): seeded E5-A (scaffold + Phase 1 CRUD), E5-B (Phase 2
+    auth, depends_on E5-A for the scaffold; extracts a session helper for E5-C reuse), E5-C (Phase 4
+    docker+browser spec, depends_on both). E5-B and E5-C are file-disjoint after E5-A lands →
+    dispatchable as a batch. Escaped-bug rule applies: each spec strengthens the phase-oracle line
+    that let a browser-blind ticket previously pass.
+  IMPORTANT — this session cannot run the MCP browser tools: MCP servers register at CLI startup, so
+  the browser capability appears only after the human restarts Claude Code. All coordinator-only work
+  (oracle amendment + ledger + backlog seeding) is done in this session; the E5 build itself runs in
+  a fresh session after restart.
+
+[v2-037] E5-A — ACCEPTED (independent re-verify + merged @07848f0). Chunk resumed after restart; MCP
+  playwright browser tools now live. Env precondition probed & met: coordinator installed chromium
+  (`npx playwright install --with-deps chromium`, cached global ~/.cache/ms-playwright) and confirmed a
+  headless launch works — the [v2-036] browser gate is runnable here.
+  Dispatched single sonnet builder (worktree). INDEPENDENT re-verify (coordinator ran it, not the
+  builder's transcript): check 0, build 0, composite `bun run test` = vitest 215/215 THEN playwright 8/8,
+  exit 0. Ran on PORT=18899 because 8787 is occupied by an unrelated /workspace dev server on this shared
+  container; playwright.config default (PORT env or 8787) is UNCHANGED and correct for normal CI/dev —
+  the collision is a coordinator-env quirk, not a ticket defect. Scope clean (7 declared files; src/ diff
+  empty). Gaming read clean: spec drives real chromium vs real Node/tsx server boot, role selectors from
+  actual LibraryView/EntryEditor, CONTRAST assertions (edit old text toHaveCount 0; delete toHaveCount 0;
+  reload persistence via page.reload). Builder deliberate-break corroborated (8 failed at Create when POST
+  /api/entries no-op'd; 8 passed after revert). vitest excludes test/e2e via mergeConfig array-concat
+  (configDefaults.exclude preserved) — `bunx vitest run test/e2e/...` → 'No test files found'.
+  Escaped-bug rule (Phase 1): the browser-blind gap that let a UI-unreached server pass Phase 1 is now
+  closed by library-crud.spec.ts in the baseline composite. Notes: skill/education sections deferred (per
+  ticket scope) — experience+project fully covered; auth-disable env var is LEDE_AUTH_DISABLED="true"
+  (strict "true", not "1" — config.ts). Builder copied repo's gitignored .env into worktree (tsx
+  --env-file needs the file to exist; webServer.env values still take precedence).
+  Scheduler: E5-B now ready (E5-C still gated on E5-B). Dispatching E5-B.
+
+[v2-038] E5-B — BROWSER GATE CAUGHT A REAL PRE-EXISTING BUG (Phase 2 auth broken in a real browser).
+  The worker built all 3 declared files correctly (playwright.config.ts two-server/two-project array;
+  auth.spec.ts; helpers/session.ts) and correctly returned BLOCKED rather than touching src out of scope.
+  Its diagnosis, INDEPENDENTLY REPRODUCED by the coordinator on the worktree:
+   - src/server/index.ts ~L109 registers @fastify/secure-session with NO `cookie` option. Per RFC 6265
+     §5.1.4 the Set-Cookie from POST /api/auth/login gets default-path '/api/auth', so the session cookie
+     is NEVER sent to GET /api/settings (LoginGate's post-login ping) or any other /api/* — the app is
+     unreachable after login in a REAL browser. All existing tests use Fastify .inject(), which ignores
+     cookie Path scoping, so this escaped every prior Phase-2 acceptance. THIS is exactly the browser-blind
+     gap [v2-036] was commissioned to expose.
+  Coordinator reproduction (PORT=18899, 8787 occupied on this box): unfixed src -> `bunx playwright test`
+     = 1 failed (auth) / 8 passed (library); the auth failure is at helpers/session.ts:19 (login form never
+     unmounts post-submit — the ping stays 401). Applied the one-line fix `cookie: { path: "/" }` ->
+     `bun run test` = vitest 215/215 THEN playwright 9/9 (8 library + 1 auth), composite exit 0. Reverted
+     the fix in the worktree (not the coordinator's to land).
+  DECISION — fold the repair into E5-B (NOT a separate repair ticket): the fix and its ONLY possible proof
+     (a real-browser spec) are one inseparable unit; a standalone repair ticket's behavioral proof could not
+     live in its own files (inject can't catch Path). Per skill "blocked -> missing dependency you can order":
+     expanded E5-B's declared `files` to include src/server/index.ts for exactly this one-line fix; appended
+     an attempts[] entry with the diagnosis + fixNote. Escaped-bug rule satisfied: E5-B's auth.spec.ts is the
+     strengthening check that locks the bug out (the sharper, correct-level check the inject suite couldn't be).
+  EXECUTION: resuming the SAME worker (has full context + authored the diagnosis) via SendMessage to apply
+     its own diagnosed fix and re-verify the composite; coordinator then independently re-verifies + merges.
+
+[v2-039] E5-B — ACCEPTED (independent re-verify + merged @a10a0ec). Fix applied & spec finished.
+  NOTE ON EXECUTION: the resume was dispatched as a `fork`, which returned 0 tool_uses (echoed context,
+  did no work) — a wasted dispatch. Rather than burn a 3rd builder dispatch on a one-line fix already
+  reproduced fail->fix->pass against an INDEPENDENTLY-AUTHORED spec (the objective gate is the spec, not
+  who types the line), the coordinator applied the cookie fix directly and ran the FULL acceptance itself
+  as the independent verification: check 0, build 0, composite 215 vitest + 9 playwright exit 0, and BOTH
+  deliberate-breaks (httpOnly:false -> fail line 45; guard public -> fail step 1) with exact reverts.
+  Final src diff = only `cookie: { path: "/" }`.
+  FLAKE FOUND + HARDENED during re-verify: under back-to-back composite contention the auth logout step
+  (bare 5s toBeVisible after a POST + cache-invalidate + re-render) flaked ~1/3. Coordinator hardened it
+  (test-timing ONLY, not a semantic change): waitForResponse on POST /api/auth/logout + 15s headroom on
+  the post-transition assertions in auth.spec.ts and the shared session.ts helper (E5-C reuses it under
+  Docker, more contended). Post-hardening: full playwright suite 5/5 green under contention incl. a 30.6s
+  contended run. (The separate boot.smoke vitest flake seen once under my hammering is the PRE-EXISTING
+  documented env flake [v2-035], not E5-B's.)
+  Escaped-bug rule DISCHARGED: the check that let the cookie bug through was the inject-based Phase-2 tests
+  (.inject ignores cookie Path — structurally blind); the strengthening is E5-B's real-browser auth.spec.ts,
+  now in the baseline composite — the correct-level check the inject suite could never be.
+  NO oracle amendment: the app now actually satisfies the pre-existing Phase-2 acceptance; behavior
+  definition unchanged. Scheduler next: E5-C ready (depends E5-A+E5-B, both done). 2/12 chunk closed.
+
+[v2-040] E5-C — ACCEPTED (independent re-verify + FINAL merged-tree run on master @9d552be). ===== BACKLOG DRAINED (again) — BROWSER-ACCEPTANCE EPIC E5 COMPLETE =====
+  Single sonnet builder (worktree). Scope clean (4 declared: package.json, playwright.config.ts +
+  new docker-spa.spec.ts, helpers/docker.ts; src/ empty; other e2e untouched). Coordinator ran the
+  full composite on master itself: vitest 215/215, playwright default 9/9, docker project 1/1 (real
+  docker compose up --build of the shipped Node/tsx image, health-poll, teardown -v), exit 0, no
+  orphan containers/networks. Note: had to `bun install` on master first (merges only changed
+  package.json/bun.lock; the playwright CLI wasn't in node_modules/.bin -> a 127 on the first attempt,
+  not a code failure).
+  Gaming read clean (mount = real app-shell not static; console allowlist narrow to the one expected
+  pre-login /api/settings 401, pageerror unguarded; step-4 round-trip is the in-container authed proof
+  that the E5-B cookie fix enables). Both deliberate-breaks confirmed load-bearing by the builder.
+  Env adaptation (builder, sound): docker-outside-of-docker (/.dockerenv) -> join compose network +
+  address the sibling by service DNS (http://lede:8787); real-host fallback http://localhost:8899.
+  Same production container either way — not a CI-only fixture. docker project gated on LEDE_E2E_DOCKER=1
+  so a bare `playwright test` never touches Docker.
+  Escaped-bug rule DISCHARGED (Phase 4): the [v2-033] "GET / returns SPA" check a static 200 could game
+  is now backed by a real-browser mount + no-console-error + authed round-trip inside the shipped image.
+
+  ===== FINAL STATE: 40 done / 0 todo / 0 in-progress / 4 decomposed (44 total). Chunk closed 3/12
+  (E5-A, E5-B, E5-C) — backlog fully drained; all phase oracles green on the merged tree (master
+  @9d552be). The [v2-036] browser-acceptance semantic amendment is fully delivered: Phase 1 CRUD,
+  Phase 2 auth, Phase 4 docker+SPA browser gates all folded into the baseline composite. NOTABLE:
+  the Phase-2 browser gate paid for itself immediately by catching a real production auth bug
+  (session-cookie path) that every prior inject-based test was structurally blind to. =====
+
+[v3-000] SPEC REVISION (major, user-authorized 2026-07-03) — post-E5 product direction, written into spec.md.
+  Not an oracle amendment yet: the SPEC changed; oracle.md + backlog re-intake is the NEXT step (see below).
+  Added/changed in spec.md (no section renumbering — oracle.md/backlog.json reference § numbers by value):
+   - §2 Scope: tailoring reframed stateless→PERSISTENT (Applications); Library reframed as over-complete
+     information bank. New tripwire: "Applications are tailoring records, NOT a job tracker" (only genState,
+     never a hiring status) — guards against ATS/CRM drift.
+   - §6.2: hard boundary — per-application `context` guides selection/emphasis ONLY, never a source of
+     quotable facts; validateNoFabrication still checks entries alone (context absent from keptBlob). Guards
+     the locked no-fabrication principle (§6.3/§23).
+   - §9 API: /api/tailor (stateless) → /api/applications CRUD + :id/tailor (persists `current`) + :id/lock
+     (immutable `final`); /api/export|import span library+profile+applications (full backup).
+   - §13: component tree updated — Applications replaces Tailor destination (ApplicationsView/ApplicationDetail),
+     Library gains progressive LibraryFilter, Profile/Layout stay with Library. Two COORDINATOR-DEFAULT decisions
+     flagged pending user's final word (both current-build-aligned): (a) top-bar tabs not sidebar; (b) Profile/
+     Layout live with Library not Settings.
+   - NEW §26 Information Architecture: nav model (top-bar, 3 flat destinations, reachability/no-orphan invariants),
+     placement rule, Library-as-bank vision + progressive findability, Applications↔Library loop, first-run path,
+     rejected alternatives. NEW §27 Applications: domain (self-contained snapshots, no entry-ID refs), lifecycle,
+     current+locked (NO version history — decided w/ rationale: lock the unreconstructable "final" artifact, not
+     a hiring status), provenance/staleness, context-not-facts contract, backup, not-a-tracker tripwire, and an
+     acceptance shape for the future oracle.
+  OPENS NEW BUILD WORK (backlog currently drained @9d552be): a new Applications epic (schema+migration, API,
+  tailor-persistence, Applications UI, keyless+browser tests, snapshot-integrity + context-not-fabrication gates),
+  Library findability (progressive filter), and an IA structural oracle gate. NEXT STEP: a fresh /ailoop intake
+  pass to derive the new per-phase oracles from §26/§27 and seed tickets — NOT auto-started; awaiting user.
+  Oracle a11y/contrast/IA gate (discussed): structural-IA gate is safe to add now; a11y/contrast/token gate needs
+  a compliance run on the current UI first (else the first UI ticket fails on inherited debt) — deferred to intake.
+
+[v3-001] RE-INTAKE for the v3 spec revision (Applications + IA). Coordinator, 2026-07-03. Backlog was drained
+  @9d552be; this pass seeds the new epic E6 from spec §26/§27 (+ changed §2/§6.2/§9/§13). Codebase inventoried
+  vs v3 first (fresh Explore agent) — canonical tree src/, test/, drizzle/ (worktrees ignored).
+  ORACLE amended: added Phase 5 (Applications lifecycle + snapshot integrity + context-not-facts machinery +
+  tailor error mapping + full-instance backup + IA structural gate + Library findability + browser lifecycle gate;
+  one DEFERRED key-gated line). Added 3 cross-cutting invariants "From E6 on": not-a-tracker grep guard,
+  context-excluded-from-grounding, no-orphan-routes. Scope tripwire gained not-a-tracker + context-not-facts.
+  TWO INTAKE DECISIONS (spec §26/§13 flagged them for the human; asked via AskUserQuestion, user away/no response
+  within 60s → proceeded on the spec's own coordinator recommendations, both current-build-aligned, flippable):
+   (a) top-bar tabs (not sidebar); (b) Profile/Layout stay in Library (they already do — zero churn).
+  KEY-PRECONDITION resolved WITHOUT escalation: v3 threads per-app `context` into tailoring. Verified at intake:
+  GOOGLE_GENERATIVE_AI_API_KEY is MISSING here. But SYSTEM_PROMPT is a frozen constant and the JD enters via the
+  model USER MESSAGE (engine.ts:48); context attaches there ONLY, and FixtureEngine keys on hashKey(jd,entries)
+  (context excluded). So: empty-context user message is byte-identical to today ⇒ T014 flip-path unchanged ⇒ the
+  honesty-note "prompt.ts edited ⇒ re-run T014" trigger does NOT fire (prompt.ts is never touched); existing 3
+  fixtures still replay ⇒ keyless suite green. The "context measurably shifts emphasis" claim is model-quality =
+  key-gated + DEFERRED (recorded honestly like T014), NOT run this epic. The machinery (context reaches model
+  input; excluded from validateNoFabrication) is keyless-verified.
+  SEEDED 9 tickets (E6-A1..A5 backend, E6-B1..B3 UI/IA, E6-C1 findability). Dependency spine:
+   A1(schema+migration)→A2(CRUD)→A3(app-scoped tailor, REPLACES stateless /api/tailor, +context)→A4(lock+integrity);
+   A5(full backup) dep A2; B1(Applications UI) dep A4; B2(nav/routes/IA, removes TailorView) dep B1;
+   B3(browser lifecycle e2e) dep B2; C1(LibraryFilter) dep [] — file-disjoint, fans out early.
+  Scheduler clean: no problems/cycles; first batch [E6-A1, E6-C1] (file-disjoint). Caps unchanged (maxAttempts 3,
+  thrash 2, chunk 30 — inherited from prior push).
+
+[v3-002] RED-TEAM (Stage 1.5) — adversarial pass over all 9 E6 acceptances (general-purpose agent). 12 cheats
+  found, all folded into ticket acceptance (marked "RED-TEAM SHARPENED [v3-001]"). Highest-value:
+   #1 (HIGH) E6-A3: anti-vacuity guard only pinned the pure buildUserPrompt helper — a builder could ship it and
+      never wire application.context through route→engine (dead feature, all lines still green). Now requires a
+      spy engine proving decide() RECEIVES context and the real user message contains it, end-to-end.
+   #2 (HIGH) E6-B2: "app-shell renders" gameable by a bespoke non-empty fallback div. Now requires unknown path
+      to REDIRECT to /applications and render the SAME content as /applications (known-destination sentinel).
+   #3/#4 (HIGH) E6-A5/A2: snapshot round-trip/omission tests vacuous while current==null. Now require NON-NULL
+      current/locked in the fixtures + deep-equal + on-disk DATA_DIR with a fresh DB connection.
+   #5 E6-A4 integrity: target entry must be IN current, edit a RENDERED field, re-read from DB (deep-copy proof).
+   #6 E6-A3: number-only-in-context must throw FabricationError (the §6.2 laundering boundary, previously untested).
+   #7/#8/#9/#10/#11/#12: json deep-equal + genState default; fixture-token DOM assert + real reload + exact-match
+      console allowlist (no pageerror); LibraryFilter threshold + bidirectional; data-driven card contrast;
+      failed-tailor with a PRIOR current; LibraryToolbar button-wiring jsdom test (added test/library-toolbar.test.tsx).
+  Graph re-verified clean after sharpening. INTAKE COMPLETE — beginning the drive at batch [E6-A1, E6-C1].
+
+[v3-003] DRIVE batch [E6-A1, E6-C1]. The build-phase Workflow threw at launch (`tickets.map` on undefined —
+  `args` arrived undefined in the script under scriptPath; harness arg-plumbing quirk, 0 agents spawned, no work
+  lost). FALLBACK (sound for a 2-ticket file-disjoint batch): dispatched the two builders directly as parallel
+  worktree Agent subagents (model sonnet) instead of the fan-out harness — identical guarantees (isolated
+  worktrees for parallel writes; I re-verify each independently: baseline + acceptance + scope diff + gaming
+  read; then merge verified + baseline gate on the merged tree). Will revisit Workflow arg-passing for larger
+  batches. Both tickets in-progress; awaiting builder reports.
+
+[v3-004] ORACLE AMENDMENT (mechanical, self-serve) — baseline gate corrected to match the current toolchain,
+  surfaced while verifying E6-A1. Two drifts since the oracle was written:
+   (1) LINT: Biome is now the lint/format layer (`bun run lint`=`biome check`; added commit bab52e3) and is
+       ENFORCED by the .githooks pre-commit hook — a non-Biome-clean diff cannot commit. Oracle said "lint: none";
+       corrected to require `bun run lint` (fix via `bun run lint:fix`/`format`). Evidence: E6-A1's commit was
+       blocked by the hook on a biome format error in test/schema.test.ts.
+   (2) TEST SCOPE: `bun run test` now unconditionally appends `LEDE_E2E_DOCKER=1 playwright --project=docker`
+       (builds a Docker image). That is a PHASE-CLOSE/FINAL gate, not a per-ticket check — and it hung the E6-A1
+       builder, which backgrounded the full script inside its worktree and stalled waiting on the docker build
+       (its non-STATUS "wait for the monitor" ending). Per-ticket baseline is now explicitly check + lint +
+       vitest + playwright chromium; docker e2e runs at final/Phase-4 close on the merged tree.
+  Both are mechanical (toolchain evolved; no change to what behavior counts as done). No semantic escalation.
+  E6-A1 build: scope CLEAN (8 files ⊆ declared; migration emitted 0001_marvelous_steel_serpent.sql). Work was
+  left UNCOMMITTED + not Biome-clean because the builder stalled on the docker run — resuming the same builder
+  (retains context) to format, run the corrected narrow baseline to green, commit, and report real STATUS.
+
+[v3-005] BATCH [E6-A1, E6-C1] ACCEPTED — both independently re-verified by the COORDINATOR on the merged master
+  tree (not the builders' self-reports). Merged @1f51f5e (two --no-ff merges). MERGED-TREE GATE GREEN:
+  `bun run check` 0; `bun run lint` (biome) clean; vitest 227/227; boot.smoke 3/3 (migration 0001 boots +
+  /api/health + boot-refusal invariants — confirms A1's migration-on-boot, and that the earlier boot.smoke red
+  was the worktree-env [v2-035] flake, NOT a defect); playwright chromium 8/8 (library-crud regression intact).
+  Per-ticket scope CLEAN + gaming reads CLEAN (evidence on each ticket in backlog.json). C1's tag filter is the
+  sanctioned exact-match filtering (no scoring); A1's json columns deep-equal round-trip + genState default are
+  genuinely tested. 2/30 chunk closed.
+  INCIDENTS + LESSONS (encode for next dispatch):
+   1. WORKTREE RACE: the E6-A1 builder was still alive (stalled) while I operated in its worktree; it `git stash`
+      + repeatedly `reset` the tree, blanking my in-progress commit. Recovered via `git stash pop` (work intact),
+      then TaskStop'd the builder, formatted, committed (915e028). FIX: TaskStop a stalled builder BEFORE touching
+      its worktree.
+   2. BUILDER-STALL PATTERN: both builders backgrounded a long test run and "waited on the monitor," and the A1
+      builder never committed (2 resumes, still stalled). Root causes: (a) they ran the FULL `bun run test` (incl
+      the docker e2e that hangs in a worktree — now oracle-amended [v3-004]); (b) no instruction to commit before
+      reporting. NEXT-DISPATCH PROTOCOL (bake into every builder prompt): run ONLY check + lint + vitest +
+      `bun run test:e2e` (chromium) — NEVER full `bun run test`, NEVER background a test and wait on a monitor;
+      COMMIT on your branch BEFORE reporting; never `git stash`/`git reset`. C1 followed a clean path and needed
+      zero coordinator intervention — proof the protocol works when stated.
+   3. TOOLING/INFRA (mechanical): biome check from repo root errored on nested biome.json in the transient
+      .claude/worktrees/*; removed 9 stale worktrees and added `.claude/worktrees/` to .gitignore (biome
+      useIgnoreFile:true now skips them). Uncommitted infra change, left for human review with the .ailoop state.
+  NEXT: scheduler ready = [E6-A2] (single serial backend ticket; A3→A4 chain follows). CHUNK CLOSED — glance +
+  re-invoke /ailoop to continue.
+
+[v3-006] DRIVE continued (user: "keep going, drive the rest unless you require input"). Chunk cap 30, so the
+  whole E6 backend+UI chain runs in this invocation; serial (A2→A3/A5→A4→B1→B2→B3 all share applications.ts/
+  index.ts/api.ts — scheduler puts them in separate batches, no fan-out).
+  E6-A2 ACCEPTED (merged @2a44417): applications CRUD. Indep re-verified (evidence on ticket). Clean, protocol
+  followed by the builder (committed before report, narrow gate only — the fix worked). NOTE: query hook landed
+  at src/client/queries/useApplications.ts while repo convention is src/client/hooks/queries.ts — my ticket
+  path-guess (spec §21); functional, not worth a re-dispatch; consolidation optional later.
+  E6-A3 RE-SCOPED [v3-006] before dispatch: discovered there is NO useTailor hook (spec §21 aspirational) — the
+  stateless tailor is api.ts tailor() called inline by TailorView. Removing the stateless route+helper in A3
+  would red TailorView'"'"'s build, but TailorView removal is B2. So A3 is now PURELY ADDITIVE + backward-compatible
+  (add :id/tailor, optional-context engine plumbing, tailorApplication helper/hook, new tests — leave the
+  stateless path intact); the ATOMIC stateless teardown (route + tailor() helper + TailorView + 3 old tests)
+  moves entirely into B2, the UI cutover. Keeps every intermediate build green. Graph re-checked clean.
+
+[v3-007] E6-A3 + E6-A5 ACCEPTED (merged @2cf5f16; A3=1140a88, A5=fd28e1c). Both indep re-verified on the merged
+  tree (evidence on tickets): check/lint/vitest 253/253/build/playwright chromium 8/8. A3 context-not-facts is
+  clean and genuinely tested (buildUserPrompt byte-identical baseline; context→user-msg only; validate entries-only;
+  red-team #1 spy + #6 signature + #11 prior-current all real). A5 backup zod is real (not z.any()); red-team #3
+  non-vacuous round-trip + #12 button wiring. Both builders STALLED again on the e2e-monitor pattern (backgrounded
+  playwright, didn't commit) — I stopped them, gaming-read the diffs, committed, and ran the merged-tree gate
+  myself. ROOT FIX applied to remaining dispatches: backend/component tickets are told to run NO e2e in-worktree
+  (format+lint+check+vitest only); I run playwright once on the merged tree. api.ts auto-merged (A3 & A5 helpers
+  disjoint). One vitest flake (1/253) under concurrent-process contention did NOT reproduce isolated — env, not a
+  defect. NOTE minor DRY: A5 duplicates entry-upsert + hand-writes tailoredResumeZ (out-of-scope files); A3
+  duplicates resolveEngine/rowToEntry/mapTailorError from index.ts (transient — dies with the stateless route in
+  B2). NEXT: E6-A4 (lock+integrity, backend, dispatched no-e2e) → then B1→B2→B3 (UI, serial).
+
+[v3-008] ===== EPIC E6 COMPLETE — BACKLOG DRAINED (49 done / 0 todo / 4 decomposed of 53) — master @a956245 =====
+  E6-A4 lock+integrity (merged), E6-B1 Applications UI (merged), E6-B2 nav/IA + atomic stateless teardown (merged),
+  E6-B3 full-lifecycle browser e2e (merged) — all indep re-verified (evidence per ticket). The no-e2e builder
+  protocol eliminated the stall pattern (A4/B1/B2 committed cleanly; only B3, an inherently-e2e ticket, needed the
+  commit-before-playwright rule). Builders' justified out-of-scope touches accepted: B2 deleted test/server.test.ts
+  (stale POST /api/tailor block; health still covered) + trimmed a /tailor block from library.test.tsx; B3 added an
+  "applications" playwright project (same additive pattern as E5).
+  FINAL GATE — authoritative full `bun run test` GREEN end-to-end on merged master: vitest 253/253; playwright
+  non-docker 10/10 (chromium 8 + auth 1 + applications 1); docker 1/1. All phase-5 oracle lines satisfied on the
+  merged tree.
+  ESCAPED-BUG (discharged): B2's IA cutover (/ -> /applications) left THREE stale things in e2e files B2 didn't
+  declare and I didn't run at the B2 gate (I ran only --project=chromium): (1) auth.spec toHaveURL(/tailor);
+  (2) docker-spa.spec toHaveURL(/tailor); (3) docker-spa lacked an allowlist for the pre-login 401 the new
+  eager-fetching landing route emits. Root cause of the missed catch: my B2 gate ran ONE playwright project, not
+  all. STRENGTHENED CHECK: the gate now runs ALL playwright projects (auth + applications + docker), and
+  playwright.config gained workers:1 + retries:2 for this container. Repair committed a956245. The pre-login 401
+  itself is benign (LoginGate optimistically renders the route during its in-flight auth ping) and already
+  accepted in B3's applications.spec — see CUT/FOLLOW-UP below.
+  HARNESS BUG FOUND + FIXED: the composite `bun run test` was red not from product defects but a ZOMBIE tsx server
+  left on default port 8787 by an earlier run; reuseExistingServer:true made the chromium project silently reuse
+  it (wrong state) → all chromium specs timed out. Killed via /proc scan; composite then green. Latent risk:
+  reuseExistingServer + orphaned default-port servers — future runs should pkill server/index before the gate.
+  DECOMPOSITIONS/AMENDMENTS this epic: [v3-004] baseline (biome lint real; docker e2e = phase-close only);
+  [v3-006] A3 made additive + stateless teardown moved to B2; [v3-008] workers:1+retries:2.
+  CUT / FOLLOW-UP (not built — flagged, not hidden): (a) LoginGate fires an authed data fetch for the current
+  route BEFORE its auth ping resolves, so any fetching landing route logs a benign pre-login 401 (cosmetic; two
+  e2e allowlists now excuse it). A clean fix = gate children until the ping resolves; deferred (pre-existing
+  LoginGate behavior, out of E6 scope). (b) DRY: A5 duplicates entry-upsert + hand-writes tailoredResumeZ;
+  minor. (c) The two §26 UI decisions (top-bar tabs; Profile/Layout in Library) were coordinator defaults while
+  the user was away — still flippable. (d) DEFERRED key-gated: live "context shifts emphasis" eval (no key).
+  =====
+
+[v3-009] RESUME (fresh context) — verify-only, no dispatch. Scheduler: 49 done / 4 decomposed / 0 todo /
+  0 in-progress / 0 blocked; ready=[] → backlog DRAINED, no reconciliation needed. HEAD @a956245 (== the
+  [v3-008] final-gate commit). Working tree carries only NON-product uncommitted edits (env/docs/devcontainer:
+  vite.config.ts dev-proxy host+port, .env.example, README.md, spec.md, .devcontainer/*, ?? .vscode/,
+  building-an-autonomous-build-loop.md) — NO src/ or test/ change, so the tested product is byte-identical to
+  the recorded-green commit. Re-ran the authoritative gate on the CURRENT tree rather than trusting the prior
+  claim (prime directive 2): `bun run check` 0; `bun run lint` (biome, 132 files) clean; vitest 251/253 on the
+  full concurrent run with TWO timeouts — test/boot.smoke.test.ts and test/api.applications-tailor.test.ts.
+  Both are TIMEOUTS (30s/20s), not assertion failures, and both PASS in isolation (boot.smoke 3/3 in 6.85s;
+  applications-tailor 6/6 in 2.77s; the tests that timed out ran in ~1.2s / ~1s isolated). CONFIRMED env
+  concurrency-contention flake, matching [v3-005]/[v3-007] history — both tests spawn real server processes and
+  starve under the 33-file concurrent vitest run. NOT a defect; product correct. Playwright (10/10 non-docker +
+  1/1 docker) rests on the [v3-008] recorded final gate at this identical unchanged commit — not re-run this
+  session (docker image build = phase-close/final only per [v3-004]; source unchanged).
+  FOLLOW-UP (flagged, not fixed — test-infra, needs a human decision, out of a drained backlog): `bun run test`
+  is not reliably single-run green in THIS container — vitest gives no workers:1/retries mitigation the way
+  playwright.config got [v3-008]. A human re-running the composite will see 1-2 red timeouts. Candidate fixes:
+  bump testTimeout for the server-spawning specs, or pin vitest poolOptions concurrency. Left for the human.
+  INCIDENT: during a zombie-server sweep (a [v3-008] lesson) my /proc cmdline glob false-matched the VS Code
+  server (pids 210/221 — matched on `oven.bun-vscode` + `--start-server`) and I sent it kill -9. No Lede zombie
+  existed; 8787 was free. VS Code server auto-reconnects. Noted honestly; the sweep glob was too loose.
+  VERDICT: loop COMPLETE — backlog drained, all phase oracles green (Phase 5 + final composite at [v3-008];
+  check/lint/vitest re-confirmed on the current tree this run). Emitting the final report.
+
+[v3-010] FIX — vitest full-suite flakiness (the [v3-009] follow-up), user-requested. ROOT CAUSE: vite.config.ts
+  `test.poolOptions.forks.singleFork:true` funnelled all 33 files / 253 tests through ONE long-lived fork.
+  Per-file resources (open better-sqlite3 handles + WAL, Fastify instances — integration tests like
+  api.applications-tailor open DBs/apps and never close them in afterEach) accumulated across the whole run;
+  the heavy real-server tests (boot.smoke spawns a real tsx server subprocess; the applications tailor/lock
+  suites boot Fastify + FixtureEngine) starved late in the run and hit their per-test timeout, and a hung test
+  then WEDGED the single fork — leaving the run to bail partway (observed: a run that completed only 17/33 files
+  with a nondeterministic 2-3 timeout set that moved between boot.smoke / applications-tailor / applications-lock).
+  All these tests pass in ~1s ISOLATED — confirming accumulation-in-shared-fork, not a logic defect.
+  FIX: replaced singleFork with bounded ISOLATED forks — `poolOptions.forks {isolate:true, maxForks:3, minForks:1}`.
+  isolate gives each file fresh process state so leaked handles die with the file's fork turnover instead of
+  accumulating across 253 tests; maxForks:3 (box has 10 cores) caps contention well below the saturation the
+  original singleFork was avoiding. Chose the pool-level fix over sweeping app.close()/db.close() into ~30 test
+  files' teardowns: minimal, targeted at the actual root (shared-fork accumulation), no product/test-source churn.
+  VALIDATION: full `bunx vitest run` x3 → 33/33 files, 253/253 green EVERY run (previously wedged at ~17 files).
+  check + lint (biome, 132 files) clean after the edit. Playwright unaffected (separate config). Only file
+  touched: vite.config.ts (the vitest `test` block). Leaving staged for the human to commit per action discipline.

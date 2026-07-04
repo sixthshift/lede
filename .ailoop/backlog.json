@@ -15,7 +15,7 @@
   "caps": {
     "maxAttempts": 3,
     "thrash": 2,
-    "chunk": 12
+    "chunk": 30
   },
   "tickets": [
     {
@@ -642,7 +642,7 @@
     {
       "id": "E2-D",
       "title": "/api/tailor uses the decrypted BYOK key via ProviderEngine (in-memory only); no stored key -> 400 no_api_key",
-      "status": "todo",
+      "status": "done",
       "depends_on": [
         "E2-B",
         "E2-C"
@@ -654,13 +654,20 @@
       "origin": "decomposed from E2 (spec §8, §9, §6.1)",
       "context": "Baseline (oracle.md, every ticket): `bun run check` + `bun run build` + `bun run test` all pass, KEYLESS (no provider key). Locked stack: Fastify + Vite/React SPA, drizzle-orm over better-sqlite3, zod+drizzle-zod, TanStack Query + react-router, shadcn/ui + Tailwind, node crypto (AES-256-GCM + scrypt) + @fastify/secure-session. Path alias `@shared/*` only. Tests in /test under vitest(node); client tests use @testing-library/react + jsdom docblock. RUNTIME (v2-017): server runs under Node/tsx; Bun runs check/build/test. Secrets are OPERATOR secrets (LEDE_MASTER_KEY 32-byte base64 + LEDE_SESSION_SECRET) required to BOOT — distinct from a provider BYOK key (encrypted in the secrets table). Touch ONLY declared files (+ package.json/lockfile). Add tests for new behavior. Cross-cutting invariants stay green: NO tag-scoring, NO LLM-checks-LLM.\n\nWire /api/tailor (buildApp() in src/server/index.ts) to the user's BYOK key in LIVE mode, keeping the keyless FixtureEngine path for tests/demo. Uses crypto.decrypt (E2-A) + the stored secrets.apiKeyEnc (E2-C). Depends on E2-B (index.ts guard/session — avoid conflicts) and E2-C (key storage).\nLOGIC: keep the engine-mode split. In FIXTURE mode (LEDE_TAILOR_ENGINE=fixture, i.e. tests/CI/demo) -> FixtureEngine, no key needed (current behavior, MUST stay keyless-green). In LIVE mode -> read secrets.apiKeyEnc; if NULL -> respond 400 {error:'no_api_key'} BEFORE any provider call; else decrypt the key in memory (do NOT persist/log the plaintext, discard after the call) and build a per-request ProviderEngine({provider,model,baseUrl,apiKey}) from settings.provider/model/baseUrl + the decrypted key, then run tailor(). Keep the existing mapTailorError distinct statuses (§9). Do NOT change assemble/validate/prompt. Do NOT touch routes/* or auth.\nNOTE: the no_api_key path is keyless-testable — set LEDE_TAILOR_ENGINE=live for that one test with NO stored key -> expect 400 no_api_key (it short-circuits before any live call). Fixture-mode tailor tests remain keyless and green.",
       "acceptance": "- baseline passes; all existing keyless tailor tests (fixture mode) stay green\n- CONTRAST (no_api_key, gameable-resistant): with engine mode LIVE and NO stored key, POST /api/tailor -> 400 {error:'no_api_key'} (short-circuits, no provider call); this differs from fixture-mode 422 no_fixture\n- decrypt-in-memory: with a stored (test-encrypted) key and an injected/stubbed provider path, the tailor route decrypts and builds ProviderEngine with settings.provider/model + the decrypted key; the plaintext key is never logged (assert absence in captured logs) nor persisted beyond secrets.apiKeyEnc\n- new tests in test/api.tailor-byok.test.ts",
-      "attempts": [],
-      "evidence": null
+      "attempts": [
+        {
+          "n": 1,
+          "failed": "acceptance CONTRAST (fixture-mode 422 no_fixture) fails DETERMINISTICALLY in isolation: expected 422, got 502 provider_error. buildApp decides fixture mode from config.tailorEngine, then calls makeEngine() which IGNORES that decision and re-derives mode from process.env (LEDE_TAILOR_ENGINE ?? NODE_ENV===test?fixture:live). Under vitest NODE_ENV=development -> makeEngine returns a LIVE ProviderEngine even when config.tailorEngine===fixture. Full-suite green was SPURIOUS (relied on NODE_ENV=test leaking from other test files in the shared singleFork process).",
+          "hypothesis": "Double source of truth for engine mode: buildApp holds config.tailorEngine but delegates construction to makeEngine(), which reads env independently. The two disagree under test. Also the CONTRAST test is order-dependent (leans on NODE_ENV leakage) rather than proving the app honors its own {tailorEngine:fixture} override.",
+          "fixNote": "In src/server/index.ts buildApp: when config.tailorEngine===\"fixture\", construct the fixture engine WITHOUT re-reading env. Cleanest in-scope fix: import { FixtureEngine } from ./tailor/engine and use `config.tailorEngine === \"fixture\" ? new FixtureEngine() : undefined` instead of makeEngine(). (Do NOT change engine.ts/makeEngine — other callers rely on its env behavior; keep the fix inside index.ts, the declared file.) THEN make test/api.tailor-byok.test.ts robust to execution order: the fixture-mode half of the CONTRAST must get 422 no_fixture regardless of process.env.NODE_ENV — e.g. explicitly build the app with {tailorEngine:\"fixture\"} (now honored) and do NOT depend on any leaked NODE_ENV. Keep the LIVE no_api_key (400) and decrypt-in-memory + no-key-leak assertions as-is (those passed reliably). Re-run the new file IN ISOLATION (vitest run test/api.tailor-byok.test.ts) and confirm all pass with NODE_ENV unset."
+        }
+      ],
+      "evidence": "INDEPENDENT RE-VERIFY (branch dcf2130, merged as 9686714): scope=2 declared files only (src/server/index.ts + test/api.tailor-byok.test.ts); gaming read clean (fix real: new FixtureEngine() directly, no makeEngine env indirection; test uses explicit {tailorEngine} overrides, order-independent, real 400-vs-422 contrast + key-leak asserts). bun run check exit 0; bun run build exit 0; ISOLATION `env -u NODE_ENV bunx vitest run test/api.tailor-byok.test.ts` -> 4/4 PASS (the exact prior-failure condition: fixture-mode now 422 no_fixture, was 502); full suite 185/185 (one exit-1 confirmed environmental flake by clean re-run)."
     },
     {
       "id": "E2-E",
       "title": "Client: LoginGate + SettingsView + ApiKeyForm (write-only) + ProviderPicker + ModelPicker",
-      "status": "todo",
+      "status": "done",
       "depends_on": [
         "E2-B",
         "E2-C"
@@ -674,18 +681,19 @@
         "src/client/api.ts",
         "src/client/App.tsx",
         "src/client/hooks/queries.ts",
-        "test/settings-auth.test.tsx"
+        "test/settings-auth.test.tsx",
+        "test/library.test.tsx"
       ],
       "origin": "decomposed from E2 (spec §7, §8, §13)",
       "context": "Baseline (oracle.md, every ticket): `bun run check` + `bun run build` + `bun run test` all pass, KEYLESS (no provider key). Locked stack: Fastify + Vite/React SPA, drizzle-orm over better-sqlite3, zod+drizzle-zod, TanStack Query + react-router, shadcn/ui + Tailwind, node crypto (AES-256-GCM + scrypt) + @fastify/secure-session. Path alias `@shared/*` only. Tests in /test under vitest(node); client tests use @testing-library/react + jsdom docblock. RUNTIME (v2-017): server runs under Node/tsx; Bun runs check/build/test. Secrets are OPERATOR secrets (LEDE_MASTER_KEY 32-byte base64 + LEDE_SESSION_SECRET) required to BOOT — distinct from a provider BYOK key (encrypted in the secrets table). Touch ONLY declared files (+ package.json/lockfile). Add tests for new behavior. Cross-cutting invariants stay green: NO tag-scoring, NO LLM-checks-LLM.\n\nClient auth + settings UI (§13). EXTEND src/client/api.ts (auth: setup/login/logout; key: PUT/DELETE /api/settings/key) throwing ApiError{status,code}. EXTEND src/client/hooks/queries.ts WITHOUT clobbering existing hooks (useEntries/useDeleteEntry/useCreateEntry/useUpdateEntry/useProfile/useSettings/useUpdateProfile/useUpdateSettings) — add auth + key mutations.\n(1) LoginGate: wraps the app; if a query returns 401 (ApiError.status===401) show the login/setup form (first-run = setup password, else login); on success re-render the app. (2) SettingsView (replace the /settings stub route added in E1-F1 — wire it in App.tsx): ApiKeyForm (WRITE-ONLY — shows keySet status from GET /api/settings, an input to set a NEW key, a Delete button; NEVER renders the stored key because the API never returns it), ProviderPicker (from @shared/providers ProviderId list) + ModelPicker (provider+model saved via PUT /api/settings). Use E1-A primitives (select/input/button/dialog). Depends on E2-B (auth endpoints) + E2-C (key endpoints).\nRED-TEAM acceptance: write-only key (the form never displays a key value) + 401 routes to LoginGate.",
       "acceptance": "- baseline passes; all existing client suites (library, entry-editor, profile-layout) stay green\n- CONTRAST (write-only key, gameable-resistant): render ApiKeyForm with a mocked GET /api/settings returning {keySet:true, ...} (and NO key field, because the API never sends one) -> the form shows a 'key is set' status and an input to REPLACE it, but renders NO actual key value anywhere (there is none to render); saving fires PUT /api/settings/key; Delete fires DELETE /api/settings/key\n- CONTRAST (401 -> LoginGate): with a mocked query returning 401, LoginGate shows the login form instead of the app; after a mocked successful login the app content renders\n- ProviderPicker/ModelPicker: changing provider+model fires PUT /api/settings with the new values\n- new tests in test/settings-auth.test.tsx",
       "attempts": [],
-      "evidence": null
+      "evidence": "INDEPENDENT VERIFY (branch f71462a, merged as d992aff): bun run check exit 0; bun run build exit 0; bun run test 24 files / 181 PASS. Acceptance settings-auth.test.tsx 9/9: write-only key (ApiKeyForm has no key prop; shows keySet status; Save->PUT /api/settings/key, Delete->DELETE; typed key never re-rendered), 401->LoginGate (login form shown, app hidden; post-login app renders), Provider/ModelPicker->PUT /api/settings. No gaming. Scope: only overflow was test/library.test.tsx (forced cascading fix: App now wraps LoginGate/useQuery, NavTabs test needed QueryClientProvider+fetch stub matching sibling tests; assertions preserved). Coordinator judgment [v2-028]: legitimate cascade -> files amended to include it; accepted."
     },
     {
       "id": "E3",
       "title": "Phase 3 — reasoning UI (timebox) + remaining sections",
-      "status": "todo",
+      "status": "decomposed",
       "depends_on": [
         "E2-D",
         "E2-E"
@@ -698,11 +706,55 @@
       "evidence": null
     },
     {
+      "id": "E3-A",
+      "title": "Reasoning UI: ResultView split (ResumePage | ReasoningPanel) — signals + per-group leadRationale + cut; reasoning NEVER in the printed DOM",
+      "status": "done",
+      "depends_on": [
+        "E2-E"
+      ],
+      "files": [
+        "src/client/components/ResultView.tsx",
+        "src/client/components/ReasoningPanel.tsx",
+        "src/client/components/WeightBar.tsx",
+        "src/client/components/Callout.tsx",
+        "src/client/components/CutList.tsx",
+        "src/client/components/TailorView.tsx",
+        "src/client/styles/app.css",
+        "src/client/styles/print.css",
+        "test/reasoning-ui.test.tsx"
+      ],
+      "origin": "decomposed from E3 (spec §10, §11, §13)",
+      "context": "Build the Phase-3 reasoning UI — spec §11 (the differentiator) + §10 (rendering). Locked (oracle.md, cite; never re-litigate): React18+Vite SPA, TanStack Query, shadcn/ui primitives in src/client/components/ui/ (button/card/badge/tabs/tooltip/etc. — compose, never re-roll). Path alias @shared/*. Client tests: @testing-library/react + jsdom docblock (/** @vitest-environment jsdom */) under /test, run by `bun run test` (vitest). Baseline every ticket: `bun run check`+`bun run build`+`bun run test` all pass KEYLESS. Server runs Node/tsx; Bun runs check/build/test. Cross-cutting invariants stay green: NO tag-scoring, NO LLM-checks-LLM. Types (src/shared/types.ts): TailoredResume={signals:JDSignals, summary:string, sections:TailoredSection[], cut:{entryId,reason}[]}; JDSignals={roleLevel:string, weights:string[], hardRequirements:string[]}; TailoredSection={section:Section, groups:TailoredGroup[]}; TailoredGroup={heading?:string, leadRationale?:string, items:{entryId:string,text:string}[]}. Registry SECTIONS (src/shared/sections.ts) gives per-section {label,rephrase,order,groupBy}.\n\nCURRENT STATE: src/client/components/TailorView.tsx renders ONLY `<ResumePage resume={resume} />` after a tailor. src/client/components/ResumePage.tsx already renders header/summary/sections/groups/items generically from the registry label and CORRECTLY omits leadRationale + cut (it must STAY that way — do NOT add them to ResumePage). The reasoning data already rides on the result: TailoredGroup.leadRationale (on each group's leading item) and TailoredResume.cut[] and TailoredResume.signals — but nothing renders them yet.\n\nBUILD (§11 'simplest legible version, text callouts, timebox'):\n(1) ResultView.tsx — a SPLIT view rendering ResumePage (the print target) and ReasoningPanel as SIBLINGS (never nest the panel inside ResumePage). Wire ResultView into TailorView (replace the direct <ResumePage> usage; ResultView takes the TailoredResume).\n(2) ReasoningPanel.tsx (never printed) composes: WeightBar.tsx (renders signals — roleLevel, the weights[] in order, and hardRequirements[]); a serif Callout.tsx used for each group's leadRationale (one editorial serif voice, §12 — a plain serif font-family class is fine; do NOT pull design tokens, that is Phase 4); CutList.tsx = a 'What got buried' list, one row per cut[] {entryId, reason}.\n(3) PRINT: reasoning must not appear on paper. In src/client/styles/print.css (@media print) hide the reasoning subtree; AND structurally keep it a sibling of ResumePage so the print-target subtree (.resume-page) never CONTAINS reasoning strings. Minimal split-layout styles go in app.css.\n\nTIMEBOX CEILING (hard): text callouts ONLY. Do NOT add EventSource/SSE/streaming (non-MVP §15), animation libs (framer-motion), or any saved-tailors/history table/persistence. No new deps.",
+      "acceptance": "- baseline passes (check/build/test keyless); existing client suites (library, entry-editor, profile-layout, settings-auth) stay green\n- ReasoningPanel renders signals via WeightBar (assert roleLevel, each weights[] entry in order, and hardRequirements[] appear), each group's leadRationale via a Callout, and each cut[] reason via CutList\n- ResultView shows BOTH ResumePage and ReasoningPanel (split)\n- CONTRAST (DOM-ABSENCE, not display:none — gameable-resistant): render the FULL ResultView with a fixture whose leadRationale and cut reasons are NON-EMPTY, DISTINCTIVE strings; grab the print-target node (the .resume-page subtree) and assert those exact strings are ABSENT from ITS textContent, while PRESENT in the reasoning subtree. (A panel nested inside ResumePage, or a display:none-only approach that leaves the strings in the .resume-page subtree, MUST fail this.)\n- TIMEBOX (grep the diff): NO EventSource/SSE, NO framer-motion/animation lib, NO new tailors/history/persistence table; no new dependency\n- new tests in test/reasoning-ui.test.tsx",
+      "attempts": [],
+      "evidence": "INDEPENDENT VERIFY + merged-tree gate (branch 49eff8b, merged b571baf; master 41249cc). Scope: exactly 9 declared files. check 0/build 0; test 26 files 191 PASS incl. reasoning-ui.test.tsx 6/6. DOM-ABSENCE contrast: ResultView rendered with SENTINEL_RATIONALE_*/SENTINEL_CUT_* — resumePage.textContent excludes them, reasoningPanel.textContent includes them (panel is a sibling, not nested; print.css hides .reasoning-panel). WeightBar renders roleLevel+weights-in-order+hardRequirements; Callout per group leadRationale; CutList per cut reason. TIMEBOX grep clean (no SSE/framer-motion/history); no new deps. Gaming read: clean."
+    },
+    {
+      "id": "E3-B",
+      "title": "Remaining sections render from meta: rephrase:'none' label sections with empty facts show meta-derived text (cert/publication/reference/interest/language)",
+      "status": "done",
+      "depends_on": [
+        "E2-E"
+      ],
+      "files": [
+        "src/shared/sections.ts",
+        "src/server/tailor/assemble.ts",
+        "test/remaining-sections.test.tsx",
+        "test/assemble.test.ts"
+      ],
+      "origin": "decomposed from E3 (spec §10, §4.3, §24)",
+      "context": "Close the Phase-3 'remaining sections as data + rendering' gap — spec §10 + §4.3. Locked (oracle.md, cite; never re-litigate): React18+Vite SPA, TanStack Query, shadcn/ui primitives in src/client/components/ui/ (button/card/badge/tabs/tooltip/etc. — compose, never re-roll). Path alias @shared/*. Client tests: @testing-library/react + jsdom docblock (/** @vitest-environment jsdom */) under /test, run by `bun run test` (vitest). Baseline every ticket: `bun run check`+`bun run build`+`bun run test` all pass KEYLESS. Server runs Node/tsx; Bun runs check/build/test. Cross-cutting invariants stay green: NO tag-scoring, NO LLM-checks-LLM. Types (src/shared/types.ts): TailoredResume={signals:JDSignals, summary:string, sections:TailoredSection[], cut:{entryId,reason}[]}; JDSignals={roleLevel:string, weights:string[], hardRequirements:string[]}; TailoredSection={section:Section, groups:TailoredGroup[]}; TailoredGroup={heading?:string, leadRationale?:string, items:{entryId:string,text:string}[]}. Registry SECTIONS (src/shared/sections.ts) gives per-section {label,rephrase,order,groupBy}.\n\nWHAT ALREADY WORKS (do NOT rebuild): the section registry (src/shared/sections.ts SECTIONS) covers all 10 sections; the zod schema (src/shared/schema.ts entryMetaZ) is a discriminated union over all sections; SectionMetaFields edits award/cert/publication/reference/interest/language; assemble() and ResumePage are fully registry-GENERIC and already render whatever sections are present under SECTIONS[section].label. Leave ResumePage.tsx and SectionMetaFields.tsx ALONE.\n\nTHE REAL GAP (in src/server/tailor/assemble.ts coerceText): for rephrase:'none' sections it returns `r.entry.facts.join(' ')`. Label sections (certification, publication, reference, interest, language — all rephrase:'none') often have EMPTY facts, so this yields '' and the item renders BLANK. TailoredItem is {entryId,text} and carries NO meta, so the client cannot recover it — the existing code comment even promises 'rendered from meta alone downstream' but nothing does. FIX: compose human-readable display text from the entry's META for rephrase:'none' sections when facts are empty (fall back to facts when present). Put the meta->label-text formatter in the REGISTRY single source (src/shared/sections.ts — §4.3/§17: the registry is THE source of per-section behavior), and have assemble.coerceText consume it. Do NOT scatter meta-formatting into the client, and do NOT add meta to TailoredItem/the shared output types. Read src/shared/types.ts EntryMeta + src/shared/schema.ts for the EXACT per-section meta field names (e.g. certification issuer/name/year, publication title/venue/year, reference name/relationship, language name/level, interest name) — use the real fields, do not invent.\n\nScope: registry formatter + assemble wiring + tests only.",
+      "acceptance": "- baseline passes (check/build/test keyless); all existing suites stay green (assemble.test.ts must remain green — extend it or add the new file, do not weaken it)\n- COVERAGE: assemble() over a set with one entry of EACH remaining section (award, certification, publication, interest, language, reference) + a layout enabling them, then render <ResumePage> of the result: each section appears under its registry label SECTIONS[section].label\n- CONTRAST (empty-facts from meta — gameable-resistant): a certification AND a reference entry with facts:[] must render NON-BLANK, meta-derived text (assert the specific meta values, e.g. the cert name/issuer and the reference name, appear in the rendered output). A build that leaves them blank (the current behavior) MUST fail this.\n- rephrase:'none' with NON-empty facts still renders facts (no regression); rephrase!='none' sections (experience/project/education/skill light|full) unchanged\n- new tests in test/remaining-sections.test.tsx",
+      "attempts": [],
+      "evidence": "INDEPENDENT VERIFY + merged-tree gate (branch c9a0797, merged; master 41249cc). coerceText: facts.length? join : rule.metaText?.(meta) ?? '' — registry-owned metaText formatter in sections.ts for certification/publication/reference/language (interest has no meta beyond section). Contrast: empty-facts cert renders 'AWS Certified Cloud Practitioner'/'Amazon Web Services'; empty-facts reference renders 'Jane Smith'; non-empty facts still render facts; rephrase:'full' unchanged; model 'FABRICATED' text still ignored for rephrase:'none' (anti-fabrication holds). remaining-sections.test.tsx 5/5. SCOPE JUDGMENT [v2-032]: touched undeclared test/assemble.test.ts (verify stage missed it) — coordinator judged a FORCED cascade: the one changed assertion previously asserted text==='' for an empty-facts cert, literally encoding the bug this ticket fixes; changed to assert 'Some Cert' (meta-derived) — STRENGTHENS the check toward §10/§4.3 intent, not a weakening. Amended B.files += test/assemble.test.ts; accepted."
+    },
+    {
       "id": "E4",
       "title": "Phase 4 — render polish + Docker/compose/README (self-host)",
-      "status": "todo",
+      "status": "decomposed",
       "depends_on": [
-        "E3"
+        "E3-A",
+        "E3-B"
       ],
       "files": [],
       "origin": "spec §24 Phase 4 (§10, §12, §19)",
@@ -710,6 +762,313 @@
       "acceptance": "See oracle.md Phase 4 (merged-tree): print.css ATS-safe (grep + honest manual caveat); §12 tokens+shadcn+self-hosted Plex; `docker compose up` deep-boots with the two secrets (migrations ran, real SPA served), refuses without them, volume persists; README first-run documented.",
       "attempts": [],
       "evidence": null
+    },
+    {
+      "id": "E4-A",
+      "title": "Render/design polish (§10, §12): §12 tokens + shadcn theming applied, Plex fonts self-hosted, print.css ATS-safe — with a proving test",
+      "status": "done",
+      "depends_on": [
+        "E3-A",
+        "E3-B"
+      ],
+      "files": [
+        "src/client/styles/tokens.css",
+        "src/client/styles/app.css",
+        "src/client/styles/print.css",
+        "tailwind.config.ts",
+        "test/render-polish.test.ts"
+      ],
+      "origin": "decomposed from E4 (spec §10, §12)",
+      "context": "Locked (oracle.md; never re-litigate): React18+Vite SPA + Fastify 4 (server) · better-sqlite3+Drizzle · TanStack Query · shadcn/ui+Tailwind. Path alias @shared/*. Toolchain: Bun runs check/build/test (`bun run check|build|test`); the SERVER PROCESS runs under NODE via tsx (better-sqlite3's Node-ABI prebuilt is incompatible with Bun's V8 — locked [v2-017]); `start`=`tsx src/server/index.ts`, `build`=`vite build`. Baseline every ticket: `bun run check`+`bun run build`+`bun run test` all pass KEYLESS. Cross-cutting invariants stay green: NO tag-scoring, NO LLM-checks-LLM, key never leaks, boot refuses w/o LEDE_MASTER_KEY/LEDE_SESSION_SECRET.\n\nWHAT ALREADY EXISTS (verify, do NOT rebuild): src/client/styles/tokens.css already has the full §12 palette verbatim (--ink #1a1a1a, --bg #fff, --accent #2f5fdd, etc.), --radius 4px, Plex font-family vars, and the shadcn CSS-variable mapping (--primary=var(--accent) etc.). src/client/styles/app.css already @imports @fontsource/ibm-plex-sans|mono|serif (self-hosted, no CDN) then tokens.css, and body uses var(--font-sans)/var(--foreground). src/client/styles/print.css already has @media print: letter page, #000 on #fff, single-column (display:block), Georgia serif (NOT Plex — §10, to avoid PDF embedding surprises), hides .jd-input/.tailor-view__pending/.tailor-view__error/.reasoning-panel, list-style bullets. @fontsource deps + tailwind.config.ts + postcss.config.js all present.\n\nTHE GAP: there is NO machine-checkable test proving Phase-4 render polish, and the phase oracle requires it. ADD test/render-polish.test.ts that asserts the §10/§12 properties by reading the CSS files and/or rendering: (1) tokens.css declares the §12 color tokens with their EXACT spec values + --radius:4px + the three Plex font-family vars; (2) app.css self-hosts Plex via @fontsource @import and does NOT reference fonts.googleapis/CDN; (3) print.css @media print block sets color:#000 + background:#fff, is single-column (no display:flex/grid/columns/float multi-column, no table/img rules) and hides .reasoning-panel. Fix any real gap the test surfaces (e.g. a stray CDN font ref, a non-token hardcoded color in app chrome, a multi-column rule in print). Do NOT touch the resume DOM structure or reasoning UI (Phase 3, done). Keep changes minimal — most of this is already in place.",
+      "acceptance": "- baseline passes (check/build/test keyless); all existing suites stay green\n- §12 tokens present in tokens.css with the EXACT spec values (--ink #1a1a1a, --bg #fff, --accent #2f5fdd, --border #e4e4e7, --radius 4px, Plex font vars) and mapped to shadcn CSS variables\n- Plex fonts self-hosted via @fontsource (@import in app.css); NO Google-Fonts/CDN reference anywhere in styles\n- print.css @media print: #000 on #fff, single-column, no table/image/multi-column rules, reasoning panel hidden — asserted mechanically (read the CSS)\n- new test in test/render-polish.test.ts covering the above (fails if a token is wrong/missing, a CDN font is introduced, or print gains a multi-column/table rule)",
+      "attempts": [],
+      "evidence": "INDEPENDENT VERIFY + merged-tree gate (branch 18ea8b4; master 74a0420). Scope: only test/render-polish.test.ts (existing tokens.css/app.css/print.css/tailwind.config.ts already matched §12/§10 verbatim — verified unchanged). check 0/build 0 (dist bundles self-hosted ibm-plex *.woff2, no CDN). render-polish.test.ts 11/11: §12 token values exact + shadcn mapping; @fontsource imports + no googleapis/gstatic; print @media #000-on-#fff, single-column, no table/img/multi-column, .reasoning-panel hidden. Full suite 207 (branch) / 215 (merged)."
+    },
+    {
+      "id": "E4-B",
+      "title": "Serve the built SPA from the server (§19): GET / returns index.html with SPA fallback; /api/* not shadowed — implements the index.ts:139 TODO",
+      "status": "done",
+      "depends_on": [
+        "E2-D",
+        "E2-E"
+      ],
+      "files": [
+        "src/server/index.ts",
+        "package.json",
+        "test/spa-serving.test.ts"
+      ],
+      "origin": "decomposed from E4 (spec §19; index.ts:139 TODO)",
+      "context": "Locked (oracle.md; never re-litigate): React18+Vite SPA + Fastify 4 (server) · better-sqlite3+Drizzle · TanStack Query · shadcn/ui+Tailwind. Path alias @shared/*. Toolchain: Bun runs check/build/test (`bun run check|build|test`); the SERVER PROCESS runs under NODE via tsx (better-sqlite3's Node-ABI prebuilt is incompatible with Bun's V8 — locked [v2-017]); `start`=`tsx src/server/index.ts`, `build`=`vite build`. Baseline every ticket: `bun run check`+`bun run build`+`bun run test` all pass KEYLESS. Cross-cutting invariants stay green: NO tag-scoring, NO LLM-checks-LLM, key never leaks, boot refuses w/o LEDE_MASTER_KEY/LEDE_SESSION_SECRET.\n\nImplement the deferred TODO at src/server/index.ts:139 ('in production, serve the built SPA from dist/ as static files'). Add @fastify/static (a server dep listed in §20 but NOT yet in package.json — add it; manifest allowlisted). In buildApp(), register static serving of the Vite build output (repo-root dist/, containing index.html + assets/) with a SPA history fallback: a GET request that is NOT under /api/* and does not match a static asset returns dist/index.html (so client-side react-router routes like /library, /settings work on refresh). /api/* routes and the auth guard MUST be unaffected and take precedence — /api 404s must still return JSON, never index.html.\n\nCRITICAL — keyless tests run WITHOUT a built dist/: static serving must be TOLERANT of a missing dist directory (register the static plugin/fallback only if the dist dir exists, or otherwise ensure boot + the full keyless suite + boot.smoke still pass when dist/ is absent). Do NOT break existing api.*/boot.smoke/tailor tests. The dist path should be resolvable relative to the server file (e.g. <repo>/dist), overridable if a config field already exists — do not invent new config unless needed.",
+      "acceptance": "- baseline passes (check/build/test keyless) WITHOUT a built dist present — existing api.*, boot.smoke, tailor suites stay green (static serving must be a no-op / tolerant when dist/ is absent)\n- NEW test/spa-serving.test.ts: with a temp dist/ containing a marker index.html, GET / returns that index.html; a non-/api client route (e.g. GET /library) also returns index.html (SPA fallback)\n- CONTRAST (/api not shadowed — gameable-resistant): with the same dist present, GET /api/health still returns {ok:true} (JSON, not the SPA html); an unknown GET /api/nope returns a JSON 404, NOT index.html\n- @fastify/static added to package.json; no other deps",
+      "attempts": [],
+      "evidence": "INDEPENDENT VERIFY + merged-tree gate (branch 9e2275d; master 74a0420). Scope: src/server/index.ts + package.json + test/spa-serving.test.ts (declared) + bun.lock (allowlist). Added @fastify/static 7.0.4 only. spa-serving.test.ts 8/8: dist-present GET / + client routes -> index.html, real assets served, CONTRAST /api/health stays JSON {ok:true} + unknown /api/* -> JSON 404 (not shadowed); dist-ABSENT GET / -> plain 404 (no crash), /api/health unaffected, full keyless suite green. Merged-tree gate: full suite 215/215, boot.smoke 3/3 clean, LIVE boot (bun start, real dist) GET / -> real SPA (<title>Lede</title>) + /api/health {ok:true}. check 0."
+    },
+    {
+      "id": "E4-C",
+      "title": "Docker + compose + README self-host (§19): Node multi-stage image (build SPA + run server under tsx), docker-compose.yml, first-run README",
+      "status": "done",
+      "depends_on": [
+        "E4-B"
+      ],
+      "files": [
+        "Dockerfile",
+        "docker-compose.yml",
+        "README.md",
+        ".dockerignore"
+      ],
+      "origin": "decomposed from E4 (spec §19, §24)",
+      "context": "Locked (oracle.md; never re-litigate): React18+Vite SPA + Fastify 4 (server) · better-sqlite3+Drizzle · TanStack Query · shadcn/ui+Tailwind. Path alias @shared/*. Toolchain: Bun runs check/build/test (`bun run check|build|test`); the SERVER PROCESS runs under NODE via tsx (better-sqlite3's Node-ABI prebuilt is incompatible with Bun's V8 — locked [v2-017]); `start`=`tsx src/server/index.ts`, `build`=`vite build`. Baseline every ticket: `bun run check`+`bun run build`+`bun run test` all pass KEYLESS. Cross-cutting invariants stay green: NO tag-scoring, NO LLM-checks-LLM, key never leaks, boot refuses w/o LEDE_MASTER_KEY/LEDE_SESSION_SECRET.\n\nProduction self-host packaging (§19). The CURRENT Dockerfile is WRONG and must be rewritten: it uses `FROM oven/bun` and `CMD [\"bun\",\"run\",\"src/main.ts\"]` — but (a) the server MUST run under Node/tsx not Bun (locked [v2-017]: better-sqlite3 Node-ABI prebuilt is incompatible with Bun's V8 — a Bun runtime dies ERR_DLOPEN_FAILED at boot), (b) src/main.ts does not exist (server entry is src/server/index.ts; `start`=`tsx src/server/index.ts`), (c) it is single-stage and never runs `vite build`, so no SPA is served, (d) EXPOSE 3000 is wrong (PORT default 8787).\n\nBuild a NODE multi-stage image: a build stage that installs deps and runs `bun run build` (or `vite build`) to produce dist/, and a slim Node runtime stage that has the deps + src/ + dist/ and runs the server via tsx (e.g. `tsx src/server/index.ts`, matching `start`). EXPOSE 8787. Data lives at DATA_DIR (default /app/data) — declare a VOLUME. Add docker-compose.yml: one service, a named volume mounted at DATA_DIR, env LEDE_MASTER_KEY + LEDE_SESSION_SECRET (required) + PORT + DATA_DIR (+ optional LEDE_AUTH_DISABLED), port mapping. Update README.md with the first-run flow: `docker compose up --build` → set the two secrets (openssl rand -base64 32) → open the app → set password → add provider key in Settings → tailor. Update .dockerignore (exclude node_modules/.git/dist/data as appropriate for the build context). This depends on E4-B so the running image actually serves the SPA.",
+      "acceptance": "- baseline passes (check/build/test keyless — these run on the host, unaffected)\n- Dockerfile is NODE-based multi-stage (grep: NOT oven/bun; runs the server via tsx/node; runs vite build; EXPOSE 8787) and declares a VOLUME at DATA_DIR\n- docker-compose.yml: one service, volume at DATA_DIR, LEDE_MASTER_KEY+LEDE_SESSION_SECRET env, port mapping\n- LIVE (heavy, Docker is available in this env): `docker compose up --build -d` with the two secrets set builds and boots; GET /api/health -> {ok:true} AND GET / returns the SPA index.html (a UI-less API must NOT pass); then bring it down. Capture the real curl output.\n- README documents the first-run self-host flow",
+      "attempts": [],
+      "evidence": "INDEPENDENT RE-VERIFY (branch f049350, merged). Scope: 4 declared files (Dockerfile, docker-compose.yml, README.md, .dockerignore). Dockerfile = multi-stage, RUNTIME node:22-bookworm-slim (NOT Bun, per [v2-017]); npm --omit=dev + tsx; builds+copies dist/; EXPOSE 8787; VOLUME /app/data. Coordinator ran `docker compose up --build` (host 8899): container booted (Server listening 0.0.0.0:8787); GET /api/health -> 200 {ok:true}; GET / -> 200 <title>Lede</title> + /assets/index-DdnsMgKH.js (real SPA, not UI-less); GET /api/nope -> 401 JSON (API not shadowed by SPA fallback). Teardown clean. README documents first-run. No gaming."
+    },
+    {
+      "id": "E5-A",
+      "title": "Playwright scaffold + Phase 1 LibraryView CRUD browser spec",
+      "status": "done",
+      "depends_on": [],
+      "files": [
+        "package.json",
+        "bun.lock",
+        "playwright.config.ts",
+        ".gitignore",
+        "vitest.config.ts",
+        "test/e2e/library-crud.spec.ts",
+        "test/e2e/helpers/tmpdata.ts"
+      ],
+      "origin": "spec §9, §21 + oracle [v2-036] browser acceptance (Phase 1)",
+      "context": "Locked (oracle.md; never re-litigate): server runs under Node/tsx not Bun [v2-017]; PORT default 8787; keyless baseline unless doing the KEY-GATED T014 eval. Install `@playwright/test` as a dev dep. Create `playwright.config.ts`: chromium project only, `webServer` boots `bun run start` (Node/tsx per [v2-017]) on a per-run DATA_DIR (tmp dir; the helper `test/e2e/helpers/tmpdata.ts` creates and passes it via env), baseURL http://localhost:${PORT}, `reuseExistingServer: !process.env.CI`, `testDir: 'test/e2e'`, timeout 60s. Update `vitest.config.ts` to exclude `test/e2e/**` (vitest must not try to run playwright specs). Update `package.json`: `test` becomes composite `vitest run && playwright test` (baseline per [v2-036]); add `test:e2e` (`playwright test`) for iteration; do NOT add a `postinstall` — chromium install is a one-time human step documented in README (later ticket may extend). Author `test/e2e/library-crud.spec.ts` covering experience + project sections (skill/education intentionally deferred to a follow-up if time permits — call out in evidence): Create (open form → fill required fields → save → assert row appears in list), Edit (open row → change a field → save → assert list reflects change), Delete (delete → assert row gone), Reload persistence (create → page.reload() → assert row still present, from the browser side, complementing the existing keyless api restart test). If auth is enabled by default, skip via `LEDE_AUTH_DISABLED=1` in the webServer env — Phase 2 spec (E5-B) is what proves the auth flow. LOCKED: no CI-only fixtures; the spec must run locally against the same server the human runs.",
+      "acceptance": "- `bun install` succeeds; `bun run check` exit 0; `bun run build` exit 0\n- `bun run test` (composite) runs BOTH vitest and playwright; both green; the composite exit code is 0 iff both are\n- library-crud.spec.ts passes chromium against a fresh DATA_DIR (webServer wired to a tmp dir via helpers/tmpdata.ts)\n- DELIBERATE-BREAK sanity (do it, then revert; evidence must record both runs): temporarily change the POST /api/entries handler to no-op (return 200 but do not persist) → the spec FAILS at the Create assertion (proves it drives real UI+API, not a mock)\n- vitest.config.ts excludes test/e2e/** (evidence: `bun run vitest run test/e2e/library-crud.spec.ts` — an intentional call — reports 'No test files found', not a syntax error)\n- scope: only files listed touched; bun.lock allowlisted",
+      "attempts": [],
+      "evidence": "INDEPENDENT re-verify on worktree branch (now merged @07848f0, byte-identical, no-ff no intervening commits): bun run check exit 0; bun run build exit 0; composite `bun run test` (PORT=18899 — 8787 occupied by unrelated dev server on this shared box) -> vitest 215/215 passed THEN playwright 8/8 passed, composite exit 0. Scope: git diff --name-only master = .gitignore, bun.lock, package.json + new playwright.config.ts, vitest.config.ts, test/e2e/{helpers/tmpdata.ts, library-crud.spec.ts} — exactly the declared set; src/ diff empty (deliberate-break reverted). Gaming read CLEAN: spec drives real chromium against a real Node/tsx server boot (webServer), role-based selectors read from actual LibraryView/EntryEditor; CONTRAST assertions (edit: new text visible AND old toHaveCount(0); delete: toHaveCount(0); reload persistence: page.reload() then re-assert visible). Builder deliberate-break corroborated: 8 failed at the Create assertion when POST /api/entries was no-op'd; 8 passed after exact revert. vitest excludes test/e2e via mergeConfig array-concat (configDefaults.exclude preserved); `bunx vitest run test/e2e/...` -> 'No test files found'."
+    },
+    {
+      "id": "E5-B",
+      "title": "Phase 2 auth: first-run set-password → login → protected route browser spec",
+      "status": "done",
+      "depends_on": [
+        "E5-A"
+      ],
+      "files": [
+        "test/e2e/auth.spec.ts",
+        "test/e2e/helpers/session.ts",
+        "playwright.config.ts",
+        "src/server/index.ts"
+      ],
+      "origin": "spec §7, §8, §24 Phase 2 + oracle [v2-036] browser acceptance (Phase 2) + repair: browser gate exposed pre-existing session-cookie path bug (scope expanded to src/server/index.ts — see ledger [v2-038])",
+      "context": "Locked: LEDE_MASTER_KEY + LEDE_SESSION_SECRET required to boot; session cookie must be HttpOnly (§8, §17); /api/tailor with no stored key → 400 no_api_key (keyless test, unchanged — do NOT set a provider key in this spec). Extend the playwright config: a second project 'auth' (or a per-test webServer env override) that boots WITHOUT `LEDE_AUTH_DISABLED` (default) against a fresh DATA_DIR — the auth gate must actually be active. Author `test/e2e/auth.spec.ts` driving: (1) visit / on fresh boot → assert set-password screen; submit a password; (2) redirected to logged-in view; (3) log out (UI action if exists) or clear session cookie via context.clearCookies(); (4) direct-nav to a protected route → refused, redirected to login; (5) log in with the previously-set password → protected route now reachable. Assert the session cookie has `HttpOnly` true via context.cookies(). Extract a helper `test/e2e/helpers/session.ts` exporting `ensureFirstRunPassword(page, password)` and `login(page, password)` so E5-C reuses without duplication. LOCKED: this spec does NOT store an api key.\n\n[COORDINATOR SCOPE EXPANSION — ledger v2-038] The auth spec you wrote CAUGHT A REAL PRE-EXISTING BUG (verified by the coordinator): @fastify/secure-session in src/server/index.ts (~L109) registers with NO `cookie` option, so the session cookie's Path defaults (RFC 6265) to the login endpoint's dir '/api/auth' — after login the cookie is never sent to /api/settings etc., so LoginGate's ping stays 401 and the app is unreachable in a real browser. Inject-based tests (.inject ignores cookie Path) structurally cannot catch this — the browser spec is the only possible proof, so the repair is folded into THIS ticket. FIX (verified fail->fix->pass by coordinator): add `cookie: { path: \"/\" }` to the secureSession options. Declared files now INCLUDE src/server/index.ts for exactly this one-line fix. Escaped-bug rule: your auth.spec.ts IS the strengthening check that locks it in.",
+      "acceptance": "- `bun run test` composite still green; the auth spec passes chromium\n- HttpOnly assertion is real: DELIBERATE-BREAK — temporarily remove `httpOnly: true` from the session cookie config on the server → the spec FAILS the HttpOnly assertion (evidence records both runs)\n- guard assertion is real: DELIBERATE-BREAK — temporarily remove the auth preHandler from one protected route → the spec FAILS step (4) (evidence records both runs)\n- helpers/session.ts is imported and used by the spec (not dead code) — grep-verifiable\n- scope: only files listed touched",
+      "attempts": [
+        {
+          "n": 1,
+          "failed": "blocked: composite baseline could not pass — auth.spec.ts (correctly) fails post-login against unfixed src",
+          "hypothesis": "session cookie Path defaults to /api/auth (no cookie option on secureSession); cookie not sent to /api/settings ping -> app unreachable post-login in a real browser. Inject tests blind to Path.",
+          "fixNote": "Scope expanded to include src/server/index.ts. Apply the one-line fix `cookie: { path: '/' }` to secureSession options; re-run composite to confirm auth spec + library-crud all green."
+        }
+      ],
+      "evidence": "INDEPENDENT re-verify by coordinator on worktree branch (merged @a10a0ec, byte-identical: clean ort merge of 4 disjoint files, no intervening commits). The spec CAUGHT + FIXED a real bug (see ledger v2-038): session cookie Path defaulted to /api/auth -> app unreachable post-login in a real browser; fix = `cookie: { path: '/' }` (src diff is ONLY that one line). check exit 0; build exit 0; final composite `bun run test` (PORT=18899) = vitest 215/215 THEN playwright 9/9 (8 library-crud + 1 auth), exit 0. Deliberate-breaks BOTH confirmed load-bearing: (1) httpOnly:false -> auth FAILS at line 45 httpOnly assertion -> reverted; (2) /api/settings added to PUBLIC_PREFIXES (guard defeated) -> auth FAILS at step 1 set-password assertion -> reverted. Final src diff = only the cookie line. Flake hardening (coordinator, test-timing only — not a semantic weakening): logout step now waits deterministically for POST /api/auth/logout via waitForResponse, and post-transition assertions in auth.spec.ts + session.ts get 15s headroom (matches vite.config.ts's existing 30s-vitest contention convention). Verified: full playwright suite 5/5 green under back-to-back contention (incl. a 30.6s contended run that previously flaked). Scope: git diff --name-only master = playwright.config.ts, src/server/index.ts + new test/e2e/auth.spec.ts, test/e2e/helpers/session.ts — exactly the declared set (src/server/index.ts added by the v2-038 scope expansion). library-crud.spec.ts untouched. Design: two-server/two-project playwright config — 'chromium' project (auth-disabled server, library-crud) + 'auth' project (auth-enabled server on PORT+1, fresh DATA_DIR). session.ts helpers (ensureFirstRunPassword, login) general + reused-ready for E5-C."
+    },
+    {
+      "id": "E5-C",
+      "title": "Phase 4 docker + browser: SPA mounts and /api/* round-trips inside the container",
+      "status": "done",
+      "depends_on": [
+        "E5-A",
+        "E5-B"
+      ],
+      "files": [
+        "test/e2e/docker-spa.spec.ts",
+        "test/e2e/helpers/docker.ts",
+        "playwright.config.ts",
+        "package.json"
+      ],
+      "origin": "spec §19 + oracle [v2-036] browser acceptance (Phase 4, sharpens [v2-033])",
+      "context": "Locked: image runs under Node/tsx not Bun [v2-017]; container needs LEDE_MASTER_KEY + LEDE_SESSION_SECRET; §19 first-run flow. Add a Playwright project 'docker' in `playwright.config.ts` — no `webServer` for this project; instead a globalSetup (`test/e2e/helpers/docker.ts`) runs `docker compose -p lede-e2e up --build -d` with the two secrets set to test values (generate with openssl rand or hardcode test-only values — clearly marked), waits until GET /api/health returns 200 on the published host port, then Playwright uses that port as baseURL for this project only. globalTeardown runs `docker compose -p lede-e2e down -v` and asserts no orphaned container remains for the project. The 'docker' project is EXCLUDED from `playwright test` default (it's slow + requires docker). The composite baseline must invoke it explicitly — extend package.json `test` script to: `vitest run && playwright test && playwright test --project=docker`. Author `test/e2e/docker-spa.spec.ts`: (1) open baseURL — assert response is HTML with a script tag pointing to /assets/*.js; (2) wait for React root to mount — root selector's innerHTML length > threshold AND expected app-shell text present (not just a title tag — a static HTML file could pass a title assertion); (3) collect page.on('pageerror') + page.on('console', err) listeners from load start; assert none fired by domcontentloaded + a settle wait; (4) use the E5-B session helper to reach a protected page → observe a /api/settings XHR resolve 200 through the SPA (proves the app-inside-the-container talks to the api-inside-the-container end-to-end).",
+      "acceptance": "- docker present locally (baseline requirement; ticket blocks with clear reason otherwise)\n- `bun run test` composite runs vitest + playwright default + `playwright test --project=docker`; all green\n- DELIBERATE-BREAK (mount check is real): temporarily rename dist/assets/*.js in the image (e.g. rebuild with a broken vite config OR shell into container and mv the asset) → docker spec FAILS step (2) mount OR step (3) console-error listener (evidence records the failing run + the revert run)\n- DELIBERATE-BREAK (console-error listener is real): temporarily introduce a runtime `console.error` in App bootstrap → docker spec FAILS step (3) (evidence records both runs)\n- globalTeardown runs `docker compose down -v`; a `docker ps -a --filter name=lede-e2e` after the run shows no orphan containers\n- scope: only files listed touched",
+      "attempts": [],
+      "evidence": "INDEPENDENT re-verify by coordinator + FINAL merged-tree run on master @9d552be (after `bun install`): composite `bun run test` (PORT=39001) = vitest 215/215 THEN playwright default 9/9 (chromium+auth) THEN LEDE_E2E_DOCKER=1 playwright --project=docker 1/1 (real `docker compose -p lede-e2e up --build` of the shipped image, health-poll, run, `down -v`), exit 0. Container Created->Started->Stopped->Removed; `docker ps -a --filter name=lede-e2e` empty afterward (teardown throws on orphans). check exit 0; build exit 0. Gaming read CLEAN: mount check asserts real app-shell (#root innerHTML>200 + LoginForm 'Password' label + 'First time here?' text — not a static shell/title); console-error listener allowlists ONLY the pre-login GET /api/settings 401 (LoginGate's own probe) and does NOT allowlist pageerror; step-4 round-trip waits for GET /api/settings 200 through the authed session in-container (the exact path the E5-B cookie bug broke). Nested-env networking (docker-outside-of-docker: /.dockerenv detected -> join compose net, address http://lede:8787) falls back to http://localhost:8899 on a real host — same production container either way, not a CI-only fixture. Fixed TEST-ONLY master key documented (avoids Compose recreating the container between runs). Deliberate-breaks BOTH confirmed by builder (assertions read as load-bearing): (1) truncate served dist/assets/*.js -> mount assertion fails; (2) console.error in main.tsx bootstrap (distinct text) -> console-error assertion fails; each reverted -> passes. src diff empty after. Scope: git diff --name-only master = package.json, playwright.config.ts + new test/e2e/docker-spa.spec.ts, test/e2e/helpers/docker.ts — exactly declared; bun.lock untouched; other e2e specs/helpers + src/ untouched. docker project gated on LEDE_E2E_DOCKER=1 (project only defined + globalSetup no-ops otherwise), so a bare `playwright test` never touches Docker."
+    },
+    {
+      "id": "E6-A1",
+      "title": "Applications table + Application type + zod + migration 0001",
+      "depends_on": [],
+      "files": [
+        "src/server/db/schema.ts",
+        "src/shared/types.ts",
+        "src/shared/schema.ts",
+        "drizzle/0001_applications.sql",
+        "drizzle/meta/_journal.json",
+        "drizzle/meta/0001_snapshot.json",
+        "test/schema.test.ts",
+        "test/db.test.ts"
+      ],
+      "origin": "spec §27 (Application domain) + §4.2 conventions — v3",
+      "context": "Locked (cite oracle.md): provider-agnostic Vercel AI SDK · Drizzle + better-sqlite3 (migrations on boot) · Fastify · React18/Vite · zod. Server runs under Node/tsx [v2-017], Bun is pkg-mgr+test runner. Applications are tailoring records NOT a job tracker — only genState, no hiring status (§2/§27). Context guides emphasis, NEVER a fact source; validateNoFabrication stays entries-only (§6.2).\nAdd the persistent Applications entity. NET-NEW (nothing exists today; current schema has only entries/profile/settings/secrets in src/server/db/schema.ts).\n1) src/server/db/schema.ts — add `applications` sqliteTable per §27: id text PK; company text?; role text?; jobDescription text NOT NULL; context text?; current text json $type<TailoredResume>? ; locked text json $type<TailoredResume>? ; genState text NOT NULL default 'untailored'; currentMeta text json $type<{at:number;provider:ProviderId;model:string}>? ; createdAt integer NOT NULL; updatedAt integer NOT NULL. Follow the existing json-column + naming idiom in this file (snake_case db names).\n2) src/shared/types.ts — add `Application` TS type mirroring §27 exactly (genState union: 'untailored'|'tailoring'|'tailored'|'failed'). Import ProviderId/TailoredResume already there.\n3) src/shared/schema.ts — add zod: `applicationCreate` ({ jobDescription required 1..20000, company?, role?, context? }) and `applicationUpdate` (all optional). Match the existing zod idiom in this file.\n4) Generate the migration: run `bunx drizzle-kit generate` (drizzle.config.ts points at drizzle/). It emits drizzle/0001_*.sql + updates drizzle/meta. If the generated basename differs from 0001_applications.sql, that filename is allowlisted-equivalent — keep whatever drizzle-kit emits and update the declared files note in your report. Migrations run on boot via migrateDb() in src/server/db/index.ts (no code change needed there).\n5) Extend test/schema.test.ts + test/db.test.ts: assert a fresh-boot DB has the applications table with all §27 columns and that an insert→read round-trips (incl json current/locked/currentMeta). No behavior beyond schema — these tests ARE this ticket's tests.",
+      "acceptance": "Baseline (every ticket): `bun run check` exit 0; `bun run build` exit 0; full suite `bun run test` green (vitest excl test/e2e/** THEN playwright chromium); new behavior ships new tests. Touch ONLY declared files (+ package.json/bun.lock for deps).\n- Fresh DATA_DIR boot runs migration 0001 and creates `applications` with every §27 column (assert by insert+read of a full row incl json fields).\n- `Application` TS type compiles and matches §27; applicationCreate zod rejects a missing jobDescription and accepts optional company/role/context.\n- No hiring-status field exists (only genState) — not-a-tracker guard.\nRED-TEAM SHARPENED [v3-001]: (#7) insert a row with NON-NULL `current` (a real TailoredResume) + `currentMeta` → read back DEEP-EQUAL (proves json $type round-trips, not mere column presence); insert OMITTING `genState` → read returns 'untailored' (the §27 default actually applies).",
+      "attempts": [],
+      "evidence": "INDEP RE-VERIFY on merged master @1f51f5e (coordinator ran, not builder): scope CLEAN (8 files ⊆ declared; migration emitted 0001_marvelous_steel_serpent.sql). check exit 0; lint (biome) clean; vitest 227/227 incl schema.test (applicationCreate rejects missing/empty/>20000 jobDescription; applicationUpdate all-optional) + db.test (§27 table has all columns; NON-NULL current+currentMeta deep-equal round-trip [red-team #7]; genState defaults untailored on omit [#7]; no hiring-status column [not-a-tracker]); boot.smoke 3/3 (migration 0001 boots + /api/health, boot-refusal invariants hold). Gaming read: schema matches §27 exactly (snake_case, current/locked json, gen_state default), real CREATE TABLE, tests use real on-disk migrate — no gaming.",
+      "status": "done"
+    },
+    {
+      "id": "E6-A2",
+      "title": "Applications CRUD routes + client API + query hook",
+      "depends_on": [
+        "E6-A1"
+      ],
+      "files": [
+        "src/server/routes/applications.ts",
+        "src/server/index.ts",
+        "src/client/api.ts",
+        "src/client/queries/useApplications.ts",
+        "test/api.applications.test.ts"
+      ],
+      "origin": "spec §9 (applications CRUD) — v3",
+      "context": "Locked (cite oracle.md): provider-agnostic Vercel AI SDK · Drizzle + better-sqlite3 (migrations on boot) · Fastify · React18/Vite · zod. Server runs under Node/tsx [v2-017], Bun is pkg-mgr+test runner. Applications are tailoring records NOT a job tracker — only genState, no hiring status (§2/§27). Context guides emphasis, NEVER a fact source; validateNoFabrication stays entries-only (§6.2).\nNET-NEW routes. Model on existing src/server/routes/entries.ts (Fastify plugin, zod-validated, session-guarded — the auth guard is registered globally in index.ts so /api/* is already protected).\n1) src/server/routes/applications.ts (new plugin `applicationsRoutes`): GET /api/applications → Application[] but LIST payload is metadata + genState + currentMeta ONLY — OMIT the heavy `current`/`locked` snapshots (perf + §9 'no heavy snapshots'). POST /api/applications (body applicationCreate) → new Application (slug/uuid id; genState 'untailored'). GET /api/applications/:id → full Application incl current+locked. PUT /api/applications/:id (applicationUpdate). DELETE /api/applications/:id → { ok }.\n2) Register applicationsRoutes in src/server/index.ts buildApp() alongside entriesRoutes/profileRoutes (~L120). Do NOT touch the inline /api/tailor route here (that is E6-A3).\n3) src/client/api.ts — typed helpers: listApplications, createApplication, getApplication, updateApplication, deleteApplication (throw ApiError like the existing helpers).\n4) src/client/queries/useApplications.ts (new) — TanStack Query hooks; key ['applications'] for list, ['applications',id] for detail; mutations invalidate.\n5) test/api.applications.test.ts (new) — keyless via buildApp().inject().",
+      "acceptance": "Baseline (every ticket): `bun run check` exit 0; `bun run build` exit 0; full suite `bun run test` green (vitest excl test/e2e/** THEN playwright chromium); new behavior ships new tests. Touch ONLY declared files (+ package.json/bun.lock for deps).\n- inject round-trip: create → list → get → update → delete all succeed with correct shapes.\n- LIST payload asserts `current`/`locked` are ABSENT; GET :id includes them (null initially).\n- Persistence: after create, reopen the DB / build a fresh app instance against the same DATA_DIR → the row is still returned (survives restart).\n- Unauthenticated request → 401 (guard applies).\nRED-TEAM SHARPENED [v3-001]: (#4) do NOT test list-omits-snapshots while current is null — directly DB-insert an application with a NON-NULL `current`, then assert the list payload has NO `current`/`locked` key for it while GET :id returns the full `current`. Persistence must use an on-disk DATA_DIR + a genuinely NEW db connection (not :memory:/shared singleton).",
+      "attempts": [],
+      "evidence": "INDEP RE-VERIFY on merged master @2a44417: scope CLEAN (5 files ⊆ declared). check 0; lint clean; vitest 233/233 incl api.applications.test (7: CRUD round-trip w/ shapes, bad-body 400, unknown-id 404, fresh-connection persistence [real restart sim], 401 unauth via authDisabled:false, RED-TEAM #4 non-null current inserted → LIST not.toHaveProperty current/locked + GET:id toEqual(resume)). Gaming read CLEAN: GET list uses explicit LIST_COLUMNS omitting current/locked (real omission), uuid id, genState untailored, mirrors entries.ts, real DB. NOTE: hooks landed at src/client/queries/useApplications.ts per declared files, but repo convention is src/client/hooks/queries.ts — coordinator ticket-authoring path guess (spec §21); functional, B1 imports from actual path; consolidation optional.",
+      "status": "done"
+    },
+    {
+      "id": "E6-A3",
+      "title": "App-scoped tailor (replaces stateless /api/tailor) + context plumbing",
+      "depends_on": [
+        "E6-A2"
+      ],
+      "files": [
+        "src/server/routes/applications.ts",
+        "src/server/tailor/engine.ts",
+        "src/client/api.ts",
+        "src/client/queries/useApplications.ts",
+        "test/engine.test.ts",
+        "test/validate.test.ts",
+        "test/api.applications-tailor.test.ts"
+      ],
+      "origin": "spec §9 (:id/tailor persists current) + §6.2 (context boundary) — v3; REPLACES stateless POST /api/tailor",
+      "context": "Locked: provider-agnostic AI SDK; Drizzle/better-sqlite3; Fastify; Node/tsx; Bun test runner. Applications NOT a tracker (only genState). Context guides emphasis, NEVER a fact source; validateNoFabrication stays entries-only (§6.2).\nSCOPE (coordinator-refined [v3-006]): PURELY ADDITIVE + BACKWARD-COMPATIBLE. Do NOT remove the stateless POST /api/tailor route, the api.ts tailor() helper, or TailorView — those are torn down ATOMICALLY in E6-B2 (the UI cutover), because TailorView still imports tailor() and removing it here would red the build. Everything you add must leave the existing stateless path building and passing.\nCURRENT STATE: stateless POST /api/tailor is inline in src/server/index.ts; client tailor() is in src/client/api.ts (~L68) and used inline by TailorView.tsx. There is NO useTailor hook. applicationsRoutes + the applications query hook (src/client/queries/useApplications.ts) already exist (E6-A2).\n1) src/server/tailor/engine.ts: extend TailorEngine.decide(jd, entries, context?) and tailor(engine, jd, entries, layout, baseSummary?, context?) — context OPTIONAL so the existing stateless caller still compiles unchanged. Extract a pure helper buildUserPrompt(jd, context?): with NO context it MUST return the exact current user message (byte-identical to engine.ts line ~48: \"Tailor for this job description:\" then a blank line then the jd) so the T014 flip-path is unchanged; with context, append a clearly-labelled context block. ProviderEngine.attempt calls buildUserPrompt. FixtureEngine.decide keeps keying on hashKey(jd, entries) — do NOT add context to the hash. Do NOT edit prompt.ts (SYSTEM_PROMPT is frozen). validateNoFabrication is called with entries ONLY.\n2) src/server/routes/applications.ts: add POST /api/applications/:id/tailor — load the app (404 if missing); run tailor() over the CURRENT library + app.jobDescription + app.context; on success persist the result as current, set genState \"tailored\" + currentMeta {at,provider,model}; on FAILURE leave current UNTOUCHED and set genState \"failed\". Live mode with no stored key → 400 {error:\"no_api_key\"}. Map provider errors per §9. Reuse the engine-selection + key-decrypt logic the stateless route already uses (import/share it, do not silently fork a second copy).\n3) src/client/api.ts: ADD tailorApplication(id) (KEEP tailor()). src/client/queries/useApplications.ts: ADD a useTailorApplication mutation that invalidates [\"applications\", id].\n4) Tests: test/engine.test.ts (buildUserPrompt: null===baseline string; with-context contains ctx); test/validate.test.ts (red-team #6); test/api.applications-tailor.test.ts NEW (:id/tailor behavior + red-team #1 & #11, keyless via FixtureEngine — create the app with a JD that is a RECORDED fixture so decide replays).",
+      "acceptance": "Narrow gate (all green): bun run format; bun run lint; bun run check exit 0; bunx vitest run --exclude test/boot.smoke.test.ts; bun run test:e2e (playwright chromium). New tests ship. Touch ONLY declared files.\n- buildUserPrompt(jd, null/undefined) === the exact current user message (byte-identical baseline — guards the flip); buildUserPrompt(jd, ctx) contains ctx.\n- Existing 3 fixtures still replay (hashKey unchanged); the existing stateless tailor tests (tailor-db / tailor.e2e / api.tailor-byok) STILL PASS UNCHANGED (you did not touch them; the stateless path is intact).\n- POST :id/tailor persists current + currentMeta + genState \"tailored\"; survives a fresh app instance/restart; re-tailor overwrites current.\n- RED-TEAM #1 (HIGH — real path, not just the helper): with a spy/mock engine, tailoring an app whose stored context is non-empty → engine.decide RECEIVES the context AND the composed user message contains it; empty context → user message byte-identical to baseline (same spy). Exercise route→engine, not only the pure fn.\n- RED-TEAM #6: validateNoFabrication unit — a number present only in a context string (absent from every entry) still throws FabricationError; validateNoFabrication is called with entries only (context not in its args).\n- RED-TEAM #11: failed-tailor with a PRIOR current — tailor once (current=S), then force a failing re-tailor → current still deep-equals S (not null) AND genState===\"failed\".\n- Live mode, no stored key → 400 {error:\"no_api_key\"}.\n- DEFERRED (do NOT attempt, no key available): the live context-shifts-emphasis eval.",
+      "attempts": [],
+      "evidence": "INDEP RE-VERIFY on merged master @2cf5f16: scope CLEAN (7 files ⊆ declared). check 0; lint clean; vitest 253/253 (clean isolated run; a 1-test flake under concurrent-process contention did NOT reproduce — env, cf [v2-035]); playwright chromium 8/8. Gaming read CLEAN: engine.ts buildUserPrompt(jd,null)===baseline byte-identical, context appended to USER MESSAGE only, SYSTEM_PROMPT/prompt.ts untouched, FixtureEngine keys hashKey(jd,entries) (context excluded), tailor() calls validateNoFabrication(entries only). Route :id/tailor persists current+currentMeta+genState tailored, failure→genState failed + current untouched, no-key→400; resolveEngine/rowToEntry/mapTailorError kept in lockstep w/ index.ts (transient dup, dies w/ stateless route in B2). Red-team GENUINE: #1 spy proves context reaches decide()+composed msg (empty→byte-identical), #6 validateNoFabrication.length===3 + context-only number throws, #11 failed re-tailor keeps prior current. ADDITIVE — stateless path intact (its 3 tests untouched & green).",
+      "status": "done"
+    },
+    {
+      "id": "E6-A4",
+      "title": "Lock / unlock + snapshot integrity (self-contained snapshots)",
+      "depends_on": [
+        "E6-A3"
+      ],
+      "files": [
+        "src/server/routes/applications.ts",
+        "src/client/api.ts",
+        "test/api.applications-lock.test.ts"
+      ],
+      "origin": "spec §27 (lock final + integrity invariant) — v3",
+      "context": "Locked (cite oracle.md): provider-agnostic Vercel AI SDK · Drizzle + better-sqlite3 (migrations on boot) · Fastify · React18/Vite · zod. Server runs under Node/tsx [v2-017], Bun is pkg-mgr+test runner. Applications are tailoring records NOT a job tracker — only genState, no hiring status (§2/§27). Context guides emphasis, NEVER a fact source; validateNoFabrication stays entries-only (§6.2).\nAdd the immutable 'final' snapshot and prove snapshot integrity.\n1) src/server/routes/applications.ts — POST /api/applications/:id/lock: copy the current `current` snapshot into `locked` (full content copy — snapshots are self-contained, NEVER entry-ID refs). Lock with no `current` → 400. DELETE /api/applications/:id/lock: clear `locked` → { ok } / updated Application.\n2) src/client/api.ts — lockApplication(id) / unlockApplication(id) helpers.\n3) test/api.applications-lock.test.ts (new) — the §27 integrity chain.",
+      "acceptance": "Baseline (every ticket): `bun run check` exit 0; `bun run build` exit 0; full suite `bun run test` green (vitest excl test/e2e/** THEN playwright chromium); new behavior ships new tests. Touch ONLY declared files (+ package.json/bun.lock for deps).\n- lock freezes current→locked; re-tailor afterwards overwrites `current` but `locked` is UNCHANGED (immutable).\n- INTEGRITY: after tailor+lock, DELETE (and separately, edit) a Library entry that fed the snapshot → GET :id shows `current` and `locked` byte-identical (full content preserved, no broken refs).\n- DELETE :id/lock clears `locked`; lock with no current → 400.\nRED-TEAM SHARPENED [v3-001]: (#5) the integrity target entry MUST be present as an item in `current` before mutating; the EDIT must change a RENDERED fact/text field (so a ref-resolving impl would visibly diverge); compare `current`/`locked` via a FRESH GET :id after mutation and after re-tailor (re-read from DB, not the pre-lock in-memory object) — proves `locked` is a deep copy, not a shared reference.",
+      "attempts": [],
+      "evidence": "INDEP RE-VERIFY on merged master @7983d88: scope CLEAN (3 files ⊆ declared). check 0; lint clean; vitest 258/258 (isolated, no flake); playwright chromium 8/8. Gaming read CLEAN: POST :id/lock deep-copies via structuredClone(current)→locked (self-contained, no refs), 404 missing / 400 no_current; DELETE :id/lock clears. Red-team #5 GENUINE: uses a rephrase:none skill entry (rendered text===facts, maximally exposes ref bugs); lock→re-tailor overwrites current but locked stays toEqual(originalCurrent) via fresh GET; edit/delete Library entry → locked/current unchanged. Builder followed no-e2e protocol cleanly (no stall).",
+      "status": "done"
+    },
+    {
+      "id": "E6-A5",
+      "title": "Full-instance export/import (library + profile + applications)",
+      "depends_on": [
+        "E6-A2"
+      ],
+      "files": [
+        "src/server/routes/backup.ts",
+        "src/server/index.ts",
+        "src/client/api.ts",
+        "src/client/components/LibraryToolbar.tsx",
+        "test/api.export-import.test.ts",
+        "test/library-toolbar.test.tsx"
+      ],
+      "origin": "spec §9 + §27 backup (export/import span all three) — v3",
+      "context": "Locked (cite oracle.md): provider-agnostic Vercel AI SDK · Drizzle + better-sqlite3 (migrations on boot) · Fastify · React18/Vite · zod. Server runs under Node/tsx [v2-017], Bun is pkg-mgr+test runner. Applications are tailoring records NOT a job tracker — only genState, no hiring status (§2/§27). Context guides emphasis, NEVER a fact source; validateNoFabrication stays entries-only (§6.2).\nCURRENT STATE: no /api/export exists; import is entries-only (POST /api/entries/import). LibraryToolbar Import/Export buttons are disabled stubs.\n1) src/server/routes/backup.ts (new plugin `backupRoutes`): GET /api/export → { entries, profile, applications } (full backup incl current/locked snapshots). POST /api/import → { entries?, profile?, applications? } restores all three (zod-validated), returns { imported }. Reuse existing entry import semantics (upsert by id) and extend to profile (singleton upsert) + applications.\n2) Register backupRoutes in src/server/index.ts.\n3) src/client/api.ts — exportAll() / importAll(payload) helpers; wire the disabled Import/Export buttons in src/client/components/LibraryToolbar.tsx to them.\n4) test/api.export-import.test.ts (new).",
+      "acceptance": "Baseline (every ticket): `bun run check` exit 0; `bun run build` exit 0; full suite `bun run test` green (vitest excl test/e2e/** THEN playwright chromium); new behavior ships new tests. Touch ONLY declared files (+ package.json/bun.lock for deps).\n- GET /api/export returns { entries, profile, applications } (all three, snapshots included).\n- POST /api/import restores all three (zod-validated; rejects malformed payload).\n- Round-trip: export → wipe DB → import reproduces entries + profile + applications with `current`/`locked` intact.\n- LibraryToolbar Import/Export buttons are functional (no longer disabled stubs).\nRED-TEAM SHARPENED [v3-001]: (#3) the exported application MUST carry non-null `current` AND `locked` (real TailoredResumes); after a genuine wipe assert GET /api/export returns empty entries+applications (+default profile) BEFORE import, then import, then DEEP-EQUAL current/locked to the original; malformed import (application missing jobDescription) → 4xx not 500. (#12) add a jsdom test (test/library-toolbar.test.tsx) asserting the Import/Export buttons are NOT disabled and their onClick invokes importAll/exportAll.",
+      "attempts": [],
+      "evidence": "INDEP RE-VERIFY on merged master @2cf5f16: scope CLEAN (6 files ⊆ declared). check 0; lint clean; vitest 253/253; playwright chromium 8/8. Gaming read CLEAN: GET /api/export returns {entries,profile,applications} incl snapshots; POST /api/import zod is REAL (applicationImport=applicationCreate.extend w/ tailoredResumeZ, not z.any()) so jobDescription required. Red-team GENUINE: #3 round-trip non-vacuous (non-null current+locked, fresh-dir wipe asserts export empty BEFORE import via toEqual([]), deep-equal restore, malformed missing-jobDescription→≥400 not 500), #12 LibraryToolbar buttons not disabled + onClick→export/importAll. NOTE: entry-upsert logic duplicated from entries.ts + tailoredResumeZ hand-written (entries.ts/shared schema out of scope) — minor DRY cost, acceptable.",
+      "status": "done"
+    },
+    {
+      "id": "E6-B1",
+      "title": "ApplicationsView + ApplicationDetail (list/create/detail/tailor/lock/staleness/loop)",
+      "depends_on": [
+        "E6-A4"
+      ],
+      "files": [
+        "src/client/components/ApplicationsView.tsx",
+        "src/client/components/ApplicationDetail.tsx",
+        "src/client/components/ApplicationCard.tsx",
+        "src/client/components/NewApplication.tsx",
+        "src/client/components/JobPanel.tsx",
+        "src/client/components/ResultView.tsx",
+        "test/applications-ui.test.tsx",
+        "src/client/queries/useApplications.ts"
+      ],
+      "origin": "spec §13 component tree (ApplicationsView/ApplicationDetail) + §26/§27 — v3",
+      "context": "Locked (cite oracle.md): provider-agnostic Vercel AI SDK · Drizzle + better-sqlite3 (migrations on boot) · Fastify · React18/Vite · zod. Server runs under Node/tsx [v2-017], Bun is pkg-mgr+test runner. Applications are tailoring records NOT a job tracker — only genState, no hiring status (§2/§27). Context guides emphasis, NEVER a fact source; validateNoFabrication stays entries-only (§6.2).\nNET-NEW UI (no ApplicationsView exists). Reuse existing ResumePage.tsx + ReasoningPanel.tsx (built) for the result render. Compose shadcn primitives — never re-roll button/dialog (§13 rule). Use the useApplications hooks (E6-A2) + tailor/lock helpers.\nComponent tree (§13):\n- ApplicationsView (route body): ApplicationsList of ApplicationCard (company/role, JD preview, genState badge, updatedAt) + NewApplication (create act — JD required, optional company/role/context).\n- ApplicationDetail: JobPanel (edit JD/context/company/role; Tailor / Re-tailor / Lock final buttons) · TailorProgress (§15 honest progress) · ResultView(split) showing the app's `current` (or `locked`): ResumePage | ReasoningPanel. Empty state: 'add missing facts in Library →' linking to /library (the Applications↔Library loop, §26).\n- Staleness: surface currentMeta ('tailored from your Library as of <date> — re-tailor to fold in newer entries', §27) — render when currentMeta present.\nNOTE: routing/nav wiring is E6-B2; here just build the components (importable). test/applications-ui.test.tsx: jsdom component tests.",
+      "acceptance": "Baseline (every ticket): `bun run check` exit 0; `bun run build` exit 0; full suite `bun run test` green (vitest excl test/e2e/** THEN playwright chromium); new behavior ships new tests. Touch ONLY declared files (+ package.json/bun.lock for deps).\n- ApplicationsList renders cards from data incl genState + updatedAt; NewApplication create calls createApplication.\n- ApplicationDetail renders the `current` snapshot via ResumePage + ReasoningPanel; Lock button calls lockApplication.\n- Staleness note renders when currentMeta present; empty state links to /library (the loop).\n- No hiring-status UI (only genState) — not-a-tracker guard.\nRED-TEAM SHARPENED [v3-001]: (#10) data-driven contrast — feed ≥2 apps with distinct company/genState → each rendered distinctly; feed an app whose `current` contains a SENTINEL string → assert it appears in ApplicationDetail (not an empty ResumePage); staleness note ABSENT when currentMeta is null (contrast the present case).",
+      "attempts": [],
+      "evidence": "INDEP RE-VERIFY on merged master @bf491a7: scope CLEAN (7 files touched ⊆ 8 declared; ResultView reused unchanged). check 0; lint clean; build ok; vitest 264/264 incl applications-ui.test (6). Gaming read CLEAN: ApplicationCard uses GEN_STATE_LABEL/VARIANT Record maps (data-driven, not hardcoded); no hiring-status UI (a test guard asserts HTML lacks Applied/Interviewing/Rejected). Red-team #10 GENUINE: 2 apps distinct company+genState via within(cardA/cardB) bidirectional distinctness; SENTINEL string in current.summary asserted rendered; staleness note present-when-currentMeta / absent-when-null. Empty state Links to /library (the loop). Builder followed no-e2e protocol cleanly.",
+      "status": "done"
+    },
+    {
+      "id": "E6-B2",
+      "title": "Top-bar nav + routes + IA gate; remove stateless TailorView",
+      "depends_on": [
+        "E6-B1"
+      ],
+      "files": [
+        "src/client/main.tsx",
+        "src/client/components/NavTabs.tsx",
+        "src/client/App.tsx",
+        "src/client/components/TailorView.tsx",
+        "src/server/index.ts",
+        "src/client/api.ts",
+        "test/ia.test.tsx",
+        "test/tailor.e2e.test.ts",
+        "test/api.tailor-db.test.ts",
+        "test/api.tailor-byok.test.ts"
+      ],
+      "origin": "spec §26 Information Architecture — v3; intake decision: top-bar tabs, Applications default",
+      "context": "Locked (cite oracle.md): provider-agnostic Vercel AI SDK · Drizzle + better-sqlite3 (migrations on boot) · Fastify · React18/Vite · zod. Server runs under Node/tsx [v2-017], Bun is pkg-mgr+test runner. Applications are tailoring records NOT a job tracker — only genState, no hiring status (§2/§27). Context guides emphasis, NEVER a fact source; validateNoFabrication stays entries-only (§6.2).\nIntake decision [v3-001]: top-bar tabs; Profile/Layout stay in Library (already so — do NOT move them). Realize §26.\nCURRENT STATE: main.tsx routes / → /tailor, /tailor→TailorView, /library, /settings; NavTabs TABS = [/tailor,/library,/settings].\n1) src/client/main.tsx — routes: / → redirect to /applications; /applications → ApplicationsView; /applications/:id → ApplicationDetail; /library; /settings; a catch-all (unknown non-/api path) that resolves to a KNOWN destination (redirect to /applications), NEVER a blank/404 shell. Remove the /tailor route.\n2) src/client/components/NavTabs.tsx — TABS = Applications | Library | Settings (in that order), top-bar; active reflects the current route.\n3) src/client/App.tsx — keep LoginGate wrapping all destinations; adjust the shell/Outlet for the new routes (the current file special-cases /settings — keep behavior consistent).\n4) DELETE src/client/components/TailorView.tsx (stateless flow replaced by Applications). If JDInput.tsx becomes unused, note it (leave removal to avoid undeclared-file churn unless it's in your declared set — it is not, so leave it and note).\n5) test/ia.test.tsx (new) — the §26 structural invariants.\n[v3-006 UPDATE] This ticket ALSO performs the ATOMIC stateless-tailor teardown (moved here from E6-A3 so no intermediate build breaks): remove the inline stateless POST /api/tailor route from src/server/index.ts; remove the tailor() helper from src/client/api.ts; delete TailorView.tsx and its /tailor route; and delete the 3 stateless tailor tests (test/tailor.e2e.test.ts, test/api.tailor-db.test.ts, test/api.tailor-byok.test.ts) whose coverage now lives in E6-A3 test/api.applications-tailor.test.ts on the :id/tailor route. After teardown grep-confirm no reference to \"/api/tailor\" or the tailor() helper remains.",
+      "acceptance": "Baseline (every ticket): `bun run check` exit 0; `bun run build` exit 0; full suite `bun run test` green (vitest excl test/e2e/** THEN playwright chromium); new behavior ships new tests. Touch ONLY declared files (+ package.json/bun.lock for deps).\n- NavTabs lists Applications | Library | Settings in order; clicking each navigates + active state reflects route; every destination reachable from nav.\n- / redirects to /applications; an unknown non-/api path resolves to a known destination (app-shell renders — not blank/404).\n- No /tailor route; TailorView.tsx removed; no orphan routes.\nRED-TEAM SHARPENED [v3-001]: (#2 HIGH) an unknown path (/tailor, /nonsense) must REDIRECT to /applications (assert location.pathname==='/applications') and render the SAME content as visiting /applications directly (a known-destination sentinel from ApplicationsView) — NOT a bespoke fallback/404 component. Assert exactly ONE NavTabs item is active and it matches the resolved route (contrast: on /library, Library active AND Applications not active).\n[v3-006] Stateless teardown complete: no /api/tailor route, no api.ts tailor() helper, no TailorView / /tailor route, no dangling refs (grep-clean); the 3 old stateless tailor tests removed (coverage in api.applications-tailor.test.ts).",
+      "attempts": [],
+      "evidence": "INDEP RE-VERIFY on merged master @d02e61f: check 0; lint clean; build ok; vitest 250/250; playwright chromium 8/8 (routing cutover did NOT regress auth/library-crud e2e). Grep-clean CONFIRMED: no stateless /api/tailor route, no api.ts tailor() helper, no TailorView. Routing: index→Navigate /applications, catch-all *→Navigate /applications (redirect, not blank/404); NavTabs Applications|Library|Settings. Red-team #2 GENUINE (ia.test): unknown path resolves pathname===/applications + renders real ApplicationsView sentinel (not fallback) + exactly one active tab matching route (contrast /library). SCOPE: declared + 2 JUSTIFIED cascading out-of-scope edits — deleted test/server.test.ts (its POST /api/tailor block + redundant health, still covered by boot.smoke/api.auth/spa-serving) and trimmed a stale /tailor-link block from test/library.test.tsx; both necessary to keep vitest green after the route removal, no concurrent ticket owns them (serial). ACCEPTED.",
+      "status": "done"
+    },
+    {
+      "id": "E6-B3",
+      "title": "Applications browser e2e — full lifecycle (keyless fixture JD)",
+      "depends_on": [
+        "E6-B2"
+      ],
+      "files": [
+        "test/e2e/applications.spec.ts"
+      ],
+      "origin": "oracle Phase 5 browser gate (§26/§27, extends [v2-036]) — v3",
+      "context": "Locked (cite oracle.md): provider-agnostic Vercel AI SDK · Drizzle + better-sqlite3 (migrations on boot) · Fastify · React18/Vite · zod. Server runs under Node/tsx [v2-017], Bun is pkg-mgr+test runner. Applications are tailoring records NOT a job tracker — only genState, no hiring status (§2/§27). Context guides emphasis, NEVER a fact source; validateNoFabrication stays entries-only (§6.2).\nNET-NEW Playwright spec. Follow the existing test/e2e/library-crud.spec.ts + helpers/{session,tmpdata}.ts patterns; webServer boots `bun run start` under Node/tsx with FixtureEngine (keyless). CRITICAL: create the Application with a JD that is a RECORDED fixture (one of the 3 CONTRAST_JDS whose decisions live in test/fixtures/decisions/) so FixtureEngine.decide (keys on hashKey(jd,entries)) replays — an arbitrary JD would throw no_fixture. Read the fixture JD text from the existing keyless tailor tests / fixtures.\nDrive: first-run set-password → login → create Application (fixture JD) → Tailor → `current` renders (assert ResumePage root mounts non-empty AND ReasoningPanel present) → reload page → `current` still shown (persistence) → Re-tailor → Lock final → `locked` renders. Assert NO uncaught console/page errors (narrow allowlist only for known-expected, documented).",
+      "acceptance": "Baseline (every ticket): `bun run check` exit 0; `bun run build` exit 0; full suite `bun run test` green (vitest excl test/e2e/** THEN playwright chromium); new behavior ships new tests. Touch ONLY declared files (+ package.json/bun.lock for deps). (this spec runs inside the playwright half of the composite)\n- The lifecycle spec passes: create→tailor→render→reload-persist→re-tailor→lock→locked-render, no uncaught console errors.\n- Uses a recorded fixture JD (keyless); does not require any API key.\nRED-TEAM SHARPENED [v3-001]: (#8) after tailor assert a SPECIFIC expected token from the recorded fixture's assembled resume (an item text / summary fragment) is in the DOM — not just non-empty; persistence uses a full page.reload() then re-asserts that token WITHOUT any re-tailor (genState still 'tailored'); the console-error allowlist entries are EXACT-MATCH strings, documented, and never include pageerror.",
+      "attempts": [],
+      "evidence": "INDEP RE-VERIFY on merged master @a956245: scope was applications.spec.ts + playwright.config.ts (justified additive project, same as E5 pattern; projects isolated by testMatch, no double-run). Authoritative FULL composite `bun run test` GREEN end-to-end: vitest 253/253; playwright non-docker 10/10 (chromium 8 + auth 1 + applications 1); docker 1/1. Gaming read CLEAN: lifecycle asserts specific RESUME_TOKEN, tailorRequests count for persistence (reload=1, re-tailor=2), lock→Unlock; console allowlist exact-match, !loggedIn-scoped, pageerror never swallowed (red-team #8). NOTE: closing this ticket required a coordinator REPAIR (commit a956245) — see [v3-008].",
+      "status": "done"
+    },
+    {
+      "id": "E6-C1",
+      "title": "Progressive LibraryFilter (section · tag · free-text)",
+      "depends_on": [],
+      "files": [
+        "src/client/components/LibraryFilter.tsx",
+        "src/client/components/LibraryView.tsx",
+        "test/library-filter.test.tsx"
+      ],
+      "origin": "spec §26 Library-as-bank / findability — v3",
+      "context": "Locked (cite oracle.md): provider-agnostic Vercel AI SDK · Drizzle + better-sqlite3 (migrations on boot) · Fastify · React18/Vite · zod. Server runs under Node/tsx [v2-017], Bun is pkg-mgr+test runner. Applications are tailoring records NOT a job tracker — only genState, no hiring status (§2/§27). Context guides emphasis, NEVER a fact source; validateNoFabrication stays entries-only (§6.2).\nCURRENT STATE: LibraryView groups entries by section only (groupBySection) — no filter/search UI. File-disjoint from the backend + nav tickets, so it can build in parallel.\nAdd src/client/components/LibraryFilter.tsx: filter by section, by tag, and by free-text over facts/meta. PROGRESSIVE (§26): the filter UI stays minimal/near-invisible on a small or empty library and earns its space as the corpus grows (e.g. only show the tag/text controls past a small threshold). Tags are used for GROUPING/FILTERING ONLY — NEVER selection scoring (core anti-pattern §1: no code intersects/sorts entry.tags against anything). Wire it into LibraryView (client-side filtering of the already-loaded entries; no new API).\ntest/library-filter.test.tsx: jsdom component tests.",
+      "acceptance": "Baseline (every ticket): `bun run check` exit 0; `bun run build` exit 0; full suite `bun run test` green (vitest excl test/e2e/** THEN playwright chromium); new behavior ships new tests. Touch ONLY declared files (+ package.json/bun.lock for deps).\n- Filter by section narrows the list; by tag narrows; free-text narrows (matches facts/meta).\n- Small/empty library → filter UI minimal (progressive) — asserted.\n- Grep guard: no tag-scoring (no entry.tags intersect/sort/score against JD/signals) in the client.\nRED-TEAM SHARPENED [v3-001]: (#9) define the threshold N — library size < N → tag/text controls ABSENT from DOM; ≥ N → PRESENT (assert both sides). Each filter is BIDIRECTIONAL: a non-matching entry disappears AND a matching entry remains, for section, tag, and free-text; free-text must match a term present only in a FACT (content), confirming it searches facts/meta, not tags.",
+      "attempts": [],
+      "evidence": "INDEP RE-VERIFY on merged master @1f51f5e: scope CLEAN (3 files ⊆ declared). check 0; lint clean; vitest library-filter 4/4; playwright chromium 8/8 (library-crud regression intact). Gaming read: filterEntries does section exact-match, tag exact includes() (sanctioned §1 filtering, NOT scoring), free-text over facts+string-meta and deliberately NOT tags; SEARCH_THRESHOLD=8 real progressive gate. Tests genuine: threshold both-sides asserted; section/tag/free-text bidirectional; fact-vs-tag proof (kubernetes in a FACT matches, in a TAG does not) [red-team #9]. No tag-scoring anywhere in client.",
+      "status": "done"
     }
   ]
 }
