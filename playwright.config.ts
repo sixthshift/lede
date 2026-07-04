@@ -53,6 +53,14 @@ export default defineConfig({
   testDir: "test/e2e",
   timeout: 60000,
   fullyParallel: false,
+  // One worker + retries: each project boots its own tsx+sqlite webServer, and
+  // when the composite (`bun run test`) runs all projects together the first
+  // specs to execute hit still-cold servers on this resource-constrained
+  // container and time out (they pass in isolation once warm). Serial workers
+  // reduce contention; retries absorb the cold-boot timing flake without hiding
+  // real defects — a genuine failure fails all attempts. (ailoop [v3-008])
+  workers: 1,
+  retries: 2,
   use: {
     baseURL: BASE_URL,
   },

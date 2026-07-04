@@ -46,7 +46,16 @@ test("dockerized SPA mounts and round-trips /api/* through the authed session", 
   page.on("pageerror", (err) => pageErrors.push(err));
   page.on("console", (msg) => {
     if (msg.type() !== "error") return;
-    if (msg.text().includes("401") && msg.location().url.includes("/api/settings")) return;
+    // Pre-login, LoginGate optimistically renders the landing route while its
+    // own auth ping is in flight, so both its /api/settings ping AND the
+    // default route's (/applications, §26) eager data fetch fire before the
+    // session exists and 401 — expected, not a break.
+    if (
+      msg.text().includes("401") &&
+      (msg.location().url.includes("/api/settings") ||
+        msg.location().url.includes("/api/applications"))
+    )
+      return;
     consoleErrors.push(msg.text());
   });
 
@@ -69,7 +78,7 @@ test("dockerized SPA mounts and round-trips /api/* through the authed session", 
   // 200 against the API running in the same container — the actual
   // end-to-end proof, not just that the two are independently reachable.
   await ensureFirstRunPassword(page, PASSWORD);
-  await expect(page).toHaveURL(/\/tailor$/);
+  await expect(page).toHaveURL(/\/applications$/);
 
   const [settingsResponse] = await Promise.all([
     page.waitForResponse(

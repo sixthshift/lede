@@ -32,9 +32,9 @@ test.describe("first-run set-password -> login -> protected route", () => {
 
     await ensureFirstRunPassword(page, PASSWORD);
 
-    // (2) redirected to the logged-in app view (index route -> /tailor,
-    // main.tsx) with the primary nav now reachable.
-    await expect(page).toHaveURL(/\/tailor$/);
+    // (2) redirected to the logged-in app view (index route -> /applications,
+    // main.tsx, §26 IA) with the primary nav now reachable.
+    await expect(page).toHaveURL(/\/applications$/);
     await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
 
     // Session cookie must be HttpOnly (spec.md §8/§17) — this is the whole

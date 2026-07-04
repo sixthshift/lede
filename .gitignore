@@ -6,3 +6,6 @@ data/
 test-results/
 playwright-report/
 .playwright/
+
+# ailoop transient agent worktrees
+.claude/worktrees/
