@@ -1,5 +1,5 @@
-// Library actions — spec.md §13. Add is a plumbing stub until E1-F2; Import
-// and Export are wired to the full-instance backup endpoints (§27).
+// Library actions — spec.md §13. Import and Export are wired to the
+// full-instance backup endpoints (§27); adding entries lives in LibraryView.
 
 import { useRef } from "react";
 import { exportAll, importAll } from "../api";
@@ -38,9 +38,6 @@ export function LibraryToolbar() {
 
   return (
     <div className="mb-4 flex gap-2">
-      <Button size="sm" disabled title="Coming soon">
-        Add
-      </Button>
       <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
         Import
       </Button>

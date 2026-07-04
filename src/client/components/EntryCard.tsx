@@ -1,5 +1,6 @@
 // One entry, library view — spec.md §13. Renders facts/tags only (never
-// scores or reorders by tag — §1); edit/delete are the only user actions.
+// scores or reorders by tag — §1). Delete is inline; editing goes through
+// LibraryView's entry picker.
 
 import type { Entry } from "@shared/types";
 import { Card, CardContent } from "./ui/card";
@@ -28,9 +29,6 @@ export function EntryCard({ entry, onDelete }: { entry: Entry; onDelete: () => v
         ) : null}
 
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" disabled title="Coming soon">
-            Edit
-          </Button>
           <Button variant="destructive" size="sm" onClick={onDelete}>
             Delete
           </Button>

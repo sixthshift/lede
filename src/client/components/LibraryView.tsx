@@ -67,9 +67,8 @@ export function LibraryView() {
         </Button>
       </div>
 
-      {/* Add/edit entry points — E1-F2. EntryCard's own "Edit" affordance is a
-          disabled stub (EntryCard.tsx is not a file this ticket may touch);
-          this picker is the working edit entry point until that lands. */}
+      {/* Add/edit entry points — E1-F2. Add opens a blank editor; the picker
+          selects an existing entry to edit (EntryCard itself only deletes). */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Button size="sm" onClick={openCreate}>
           Add entry
