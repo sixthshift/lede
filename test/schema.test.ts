@@ -5,6 +5,8 @@ import {
   entryInput,
   profileInput,
   settingsInput,
+  applicationCreate,
+  applicationUpdate,
 } from "@shared/schema";
 
 // ── TailorDecisionZ ──
@@ -241,5 +243,49 @@ describe("settingsInput", () => {
   it("rejects a layout entry with an invalid section", () => {
     const bad = { layout: [{ section: "not-a-section", enabled: true }] };
     expect(settingsInput.safeParse(bad).success).toBe(false);
+  });
+});
+
+// ── applicationCreate / applicationUpdate (§27) ──
+
+describe("applicationCreate", () => {
+  it("accepts jobDescription alone (company/role/context optional)", () => {
+    expect(applicationCreate.safeParse({ jobDescription: "We are hiring..." }).success).toBe(true);
+  });
+
+  it("accepts jobDescription plus optional company/role/context", () => {
+    const ok = {
+      jobDescription: "We are hiring...",
+      company: "Acme Corp",
+      role: "Senior Backend Engineer",
+      context: "Emphasize distributed systems.",
+    };
+    expect(applicationCreate.safeParse(ok).success).toBe(true);
+  });
+
+  it("rejects a missing jobDescription", () => {
+    expect(applicationCreate.safeParse({ company: "Acme Corp" }).success).toBe(false);
+  });
+
+  it("rejects an empty jobDescription", () => {
+    expect(applicationCreate.safeParse({ jobDescription: "" }).success).toBe(false);
+  });
+
+  it("rejects a jobDescription over 20000 chars", () => {
+    expect(applicationCreate.safeParse({ jobDescription: "x".repeat(20001) }).success).toBe(false);
+  });
+});
+
+describe("applicationUpdate", () => {
+  it("accepts an empty (all-optional) payload", () => {
+    expect(applicationUpdate.safeParse({}).success).toBe(true);
+  });
+
+  it("accepts a partial update of just company", () => {
+    expect(applicationUpdate.safeParse({ company: "New Co" }).success).toBe(true);
+  });
+
+  it("rejects an empty-string jobDescription when provided", () => {
+    expect(applicationUpdate.safeParse({ jobDescription: "" }).success).toBe(false);
   });
 });

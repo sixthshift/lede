@@ -112,3 +112,18 @@ export type TailoredResume = {
   sections: TailoredSection[]; // layout order; groups & flat-item order per the section registry
   cut: { entryId: string; reason: string }[];
 };
+
+// ── a tailoring record for one job — NOT a hiring tracker; no status field (§27) ──
+export type Application = {
+  id: string;
+  company?: string;
+  role?: string;
+  jobDescription: string;
+  context?: string; // guides emphasis only — never a fact source
+  current: TailoredResume | null;
+  locked: TailoredResume | null;
+  genState: "untailored" | "tailoring" | "tailored" | "failed";
+  currentMeta: { at: number; provider: ProviderId; model: string } | null;
+  createdAt: number;
+  updatedAt: number;
+};

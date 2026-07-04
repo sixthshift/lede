@@ -191,6 +191,21 @@ export const settingsInput = z.object({
   layout: z.array(layoutEntryZ).optional(),
 });
 
+// ── §27 application input — a tailoring record for one job, no hiring status ──
+export const applicationCreate = z.object({
+  company: z.string().min(1).max(200).nullish(),
+  role: z.string().min(1).max(200).nullish(),
+  jobDescription: z.string().min(1).max(20000),
+  context: z.string().min(1).max(4000).nullish(),
+});
+
+export const applicationUpdate = z.object({
+  company: z.string().min(1).max(200).nullish(),
+  role: z.string().min(1).max(200).nullish(),
+  jobDescription: z.string().min(1).max(20000).optional(),
+  context: z.string().min(1).max(4000).nullish(),
+});
+
 // ── §5 the model's flat output contract — hand-written, passed straight to generateObject ──
 const jdSignalsZ = z.object({
   roleLevel: z.string(),
