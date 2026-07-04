@@ -235,4 +235,41 @@ export function applicationsRoutes(
       return reply.code(status).send(body);
     }
   });
+
+  // ── lock/unlock (§27 integrity invariant) — `locked` is a deep copy of
+  // `current`'s content at lock time, never a reference to it or to the
+  // Library entries it was built from, so editing/deleting an entry (or a
+  // later re-tailor) can never retroactively change a locked snapshot ──
+  app.post<{ Params: { id: string } }>("/api/applications/:id/lock", async (request, reply) => {
+    const existing = db
+      .select()
+      .from(applications)
+      .where(eq(applications.id, request.params.id))
+      .get();
+    if (!existing) {
+      return reply.code(404).send({ error: "not_found" });
+    }
+    if (existing.current === null) {
+      return reply.code(400).send({ error: "no_current" });
+    }
+
+    const row = { ...existing, locked: structuredClone(existing.current), updatedAt: Date.now() };
+    db.update(applications).set(row).where(eq(applications.id, existing.id)).run();
+    return reply.code(200).send(row);
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/applications/:id/lock", async (request, reply) => {
+    const existing = db
+      .select()
+      .from(applications)
+      .where(eq(applications.id, request.params.id))
+      .get();
+    if (!existing) {
+      return reply.code(404).send({ error: "not_found" });
+    }
+
+    const row = { ...existing, locked: null, updatedAt: Date.now() };
+    db.update(applications).set(row).where(eq(applications.id, existing.id)).run();
+    return reply.code(200).send(row);
+  });
 }
