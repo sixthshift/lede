@@ -1,74 +1,72 @@
 # lede
 
-A Bun + TypeScript HTTP server, developed inside an isolated dev container.
+A self-hosted resume-tailoring tool. You keep a library of career **entries**
+(experience, projects, education, skills, …); paste a job description; the model
+**selects, orders, and re-frames** the relevant entries into a tailored resume —
+judging from the facts you recorded, never inventing beyond them. One instance
+per person, bring-your-own model key.
 
 ## Tech stack
 
-- **Runtime:** [Bun](https://bun.sh) 1.x
-- **Language:** TypeScript 5.6
-- **Server:** `Bun.serve()` (no framework)
+- **Server:** Fastify 4 on Node ≥ 20 (TypeScript, ESM), run via `tsx`.
+- **Storage:** single-file SQLite (`better-sqlite3`, WAL) + Drizzle (migrations on boot).
+- **Model:** provider-agnostic via the Vercel AI SDK (`ai` + `@ai-sdk/anthropic|openai|google`,
+  plus any OpenAI-compatible `baseURL`). Default `claude-opus-4-8`; picked per instance in Settings.
+- **Client:** React 18 + Vite, shadcn/ui + Tailwind, TanStack Query, IBM Plex (self-hosted).
+- **Auth / secrets:** single-password session gate (`@fastify/secure-session`); the
+  provider key is stored **encrypted** (AES-256-GCM) under an operator-provided master key.
+
+> The server always runs under **Node, never Bun** — `better-sqlite3` ships a
+> Node-ABI native binary Bun can't load. Bun is fine as the package manager and
+> for `check`/`build`/`test`.
 
 ## Development
 
-The dev environment is a Debian container with Bun, Node 22, the Docker CLI, Go +
-[`mcp-language-server`](https://github.com/isaacphi/mcp-language-server), and the
-Claude Code CLI preinstalled. It mounts your workspace, SSH keys, and gitconfig,
-and keeps `node_modules` in a container-private volume so host/container native
-binaries don't collide.
-
-### Option A — VS Code / Cursor Dev Containers
-
-Open the folder and **Reopen in Container**. The `postCreateCommand` runs
-`bun install` automatically. Then, in the container terminal:
+The repo ships a dev container (`.devcontainer/`) with Bun, Node 22, the Docker
+CLI, and the Claude Code CLI preinstalled. Open the folder in VS Code / Cursor and
+**Reopen in Container** (the `postCreateCommand` runs `bun install`), or start it
+directly:
 
 ```bash
-bun run dev
-```
-
-### Option B — Docker Compose directly
-
-```bash
-# Build and start the dev container in the background
 docker compose -f .devcontainer/docker-compose.dev.yml up -d --build
-
-# Drop into a shell
 docker compose -f .devcontainer/docker-compose.dev.yml exec dev bash
-
-# Inside the container (first time only)
-bun install
-
-# Run the server (watch mode)
-bun run dev
 ```
 
-The server listens on container port `3000`, published to **http://localhost:3737**
-on the host. Health check:
+Inside the container, run the two dev processes (in separate shells):
 
 ```bash
-curl http://localhost:3737/health
+bun run dev:api   # Fastify API on :8787
+bun run dev:web   # Vite dev server on :6173, proxies /api → :8787
 ```
 
-To stop and tear down:
+Open the Vite URL your editor forwards, and check the API with:
 
 ```bash
-docker compose -f .devcontainer/docker-compose.dev.yml down
+curl http://localhost:8787/api/health   # → {"ok":true}
 ```
 
 ## Scripts
 
-| Command         | Description                          |
-| --------------- | ------------------------------------ |
-| `bun run dev`      | Start the server with `--watch`      |
-| `bun run start`    | Start the server once                |
-| `bun run check`    | Type-check with `tsc --noEmit`       |
-| `bun run lint`     | Lint + format check ([Biome](https://biomejs.dev)) |
-| `bun run lint:fix` | Apply safe lint fixes + format       |
-| `bun run format`   | Format only                          |
+| Command            | Description                                          |
+| ------------------ | ---------------------------------------------------- |
+| `bun run dev:api`  | Fastify API in watch mode (`tsx watch`, port 8787)   |
+| `bun run dev:web`  | Vite dev server on :6173 (proxies `/api` → :8787)    |
+| `bun run build`    | Build the SPA to `dist/`                             |
+| `bun run start`    | Run the server once (`tsx`) — serves the built SPA   |
+| `bun run check`    | Type-check both tsconfigs (`tsc --noEmit`)           |
+| `bun run test`     | Run the test suite (`vitest run`) — keyless          |
+| `bun run lint`     | Lint + format check ([Biome](https://biomejs.dev))   |
+| `bun run lint:fix` | Apply safe lint fixes + format                       |
+| `bun run format`   | Format only                                          |
+
+The full test suite and a complete demo run **without any model API key** — the
+model call sits behind a swappable engine, and CI replays recorded decisions.
+A key is needed only for live tailoring (BYOK) and the opt-in model-quality eval
+(`scripts/eval.ts`).
 
 Biome is enforced at commit time: `bun install` runs `prepare`, which points
 `core.hooksPath` at `.githooks/`, and the `pre-commit` hook blocks any commit
-whose staged files have lint or format issues. Run `bun run lint:fix` to clear
-them.
+whose staged files have lint or format issues. Run `bun run lint:fix` to clear them.
 
 ## Configuration
 
@@ -108,6 +106,10 @@ To persist the secrets across shells, put them in a `.env` file next to
 `docker-compose.yml` (compose loads it automatically) instead of `export`ing
 them each time. Optional env vars: `PORT` (host port, default `8787`) and
 `LEDE_AUTH_DISABLED=true` (skips the login gate — local/dev use only).
+
+> **Keep `LEDE_MASTER_KEY` safe and backed up.** It encrypts your stored provider
+> key; lose it or change it and the stored key can no longer be decrypted (there
+> is no rotation path today) — you'll need to re-enter the provider key.
 
 Stop the stack with `docker compose down`; add `-v` to also drop the data
 volume.

@@ -36,8 +36,8 @@ Corollaries:
 ## 2. Scope
 
 **In scope (MVP):**
-- Paste a JD → tailored, reordered resume with an explicit rationale for every lead decision.
-- An entry library editor (section-aware) with persistence + JSON import/export.
+- **Applications** (§27): a job application is a persistent entity — a JD + optional tailoring context + the tailored, reordered resume it produces, with an explicit rationale for every lead decision. One tailored résumé per application, kept.
+- An entry library (§26) that works as an intentionally over-complete **information bank** — section-aware editor, persistence, JSON import/export, and browse/filter that scales with the corpus.
 - A reasoning UI surfacing *why* each section leads the way it does.
 - Deterministic render to a clean, ATS-safe, single-column document → PDF.
 - BYOK: enter/validate/store (encrypted) a provider key (Anthropic, OpenAI, Google, or OpenAI-compatible); pick provider + model.
@@ -46,7 +46,7 @@ Corollaries:
 
 **Section rollout:** the *schema* accommodates all ten sections now (so it's never reworked). Ship the pipeline + editor for **experience, project, education, and skill** first (the sections that move a hiring decision); the rest (award, certification, publication, interest, language, reference) come online as data + rendering, since the engine already handles their shape.
 
-**Out of scope, with the merit reason (§20 expands):** no multi-user/accounts/hosted auth (single-user self-host); no vector DB/RAG (entries fit in the prompt); no Postgres (single-file SQLite is the right self-host fit); no auto-apply/scraping/ATS integration.
+**Out of scope, with the merit reason (§20 expands):** no multi-user/accounts/hosted auth (single-user self-host); no vector DB/RAG (entries fit in the prompt); no Postgres (single-file SQLite is the right self-host fit); no auto-apply/scraping/ATS integration; **Applications are tailoring records, not a job tracker** — no application-status pipelines (applied/interviewing/rejected), kanban, or reminders (§27); the only status an application carries is its *generation* state, never a *hiring* state.
 
 ---
 
@@ -345,6 +345,8 @@ export async function tailor(engine: TailorEngine, jd: string, entries: Entry[],
 
 Encodes: facts-not-tags; the fact-lock (never invent, never strengthen — "contributed to" ≠ "led"); the section registry's rephrase policy (`full`/`light`/`none`, generated from the registry so prompt and code never drift); rank-within-group as the lede; a `leadRationale` on each group's leading item tied to a named JD signal; and return-only-the-flat-`TailorDecision` with every number grounded in facts. Full text lives in `prompt.ts` (the draft agreed in design).
 
+**Tailoring context (from an Application, §27) — a hard boundary.** An application may carry free-text context beyond the JD ("this role stresses X; I have adjacent Y"). It is fed to the prompt **only to guide selection and emphasis** — it is *not* a source of quotable facts. The fact-lock is unchanged: every kept item and every number still traces to an **entry**'s `facts` (§6.3), never to context or JD text. If context names a real fact worth using, the flow's answer is to **promote it to a Library entry**, not to let the model quote loose prose. `validateNoFabrication` continues to check against `entries` alone — context is deliberately absent from `keptBlob`, so it can never launder a fabrication.
+
 ### 6.3 No-fabrication validation (deterministic, honestly imperfect — §23)
 
 ```ts
@@ -412,9 +414,18 @@ All JSON under `/api`, zod-validated, session-guarded except `/api/auth/*` and `
 | `PUT` | `/api/entries/:id` | `Entry` | `Entry` |
 | `DELETE` | `/api/entries/:id` | — | `{ ok }` |
 | `POST` | `/api/entries/import` | `Entry[]` | `{ imported: n }` |
-| `POST` | `/api/tailor` | `{ jobDescription }` | `TailoredResume` |
+| `GET` | `/api/applications` | — | `Application[]` (metadata + genState; no heavy snapshots) |
+| `POST` | `/api/applications` | `{ jobDescription, company?, role?, context? }` | `Application` |
+| `GET` | `/api/applications/:id` | — | `Application` (incl. `current` + `locked` snapshots) |
+| `PUT` | `/api/applications/:id` | `{ jobDescription?, company?, role?, context? }` | `Application` |
+| `DELETE` | `/api/applications/:id` | — | `{ ok }` |
+| `POST` | `/api/applications/:id/tailor` | — | `TailoredResume` (persisted as the app's `current`) |
+| `POST` | `/api/applications/:id/lock` | — | `Application` (freezes `current` → immutable `locked`) |
+| `DELETE` | `/api/applications/:id/lock` | — | `Application` (clears `locked`) |
+| `GET` | `/api/export` | — | `{ entries, profile, applications }` (full backup) |
+| `POST` | `/api/import` | `{ entries?, profile?, applications? }` | `{ imported }` (full restore) |
 
-`/api/tailor` reads entries + decrypted key + model. No key ⇒ 400 `{ error: 'no_api_key' }` (UI routes to Settings). Map provider errors (generic across providers): auth → "key invalid"; provider rate-limit → 429; other provider failure → 502; zod failure on LLM output → 502 "model returned off-contract"; fixture mode, unrecorded JD → 422 `no_fixture` (§6.1).
+`/api/applications/:id/tailor` runs the pipeline (§6) over the current library + the app's JD and optional `context` (§6.2 boundary: context guides, never a fact source), reads decrypted key + model, and **persists the result as the application's `current` snapshot** (self-contained full copy, §27). No key ⇒ 400 `{ error: 'no_api_key' }` (UI routes to Settings). Map provider errors (generic across providers): auth → "key invalid"; provider rate-limit → 429; other provider failure → 502; zod failure on LLM output → 502 "model returned off-contract"; fixture mode, unrecorded JD → 422 `no_fixture` (§6.1). A failed tailor leaves the app's `current` untouched and sets genState `failed`. Export/import cover **library + profile + applications** so a self-host backup is the whole instance, not just entries (§27).
 
 ---
 
@@ -450,31 +461,42 @@ Split view: rendered resume | reasoning. Shows `signals` ("this JD weights X, th
 
 From shadcn: `button input textarea label form dialog dropdown-menu tooltip tabs badge card sonner alert select skeleton` (pull Radix + `cva`/`clsx`/`tailwind-merge`/`lucide-react`).
 
+The page/navigation model this inventory realizes is **§26 (Information Architecture)**; the Applications entity it renders is **§27**.
+
 ```
-AppShell → NavTabs (Tailor | Library | Settings)
+AppShell → NavTabs (Applications | Library | Settings)   ← top-bar tabs (§26)
 Auth: LoginGate
 
-TailorView (/tailor)
-  JDInput  TailorProgress(§15)  ResultView(split)
-    ResumePage (§10, print target): ProfileHeader, SummarySection,
-        SectionBlock (registry-driven: label + groups) → GroupBlock → ItemRow
-    ReasoningPanel (never printed): SignalsBar→WeightBar, SectionRationale→Callout, CutList
+ApplicationsView (/applications)
+  ApplicationsList: ApplicationCard (company/role/JD preview, genState, updatedAt)
+    + NewApplication (create act — the "officialness", §27)
+  ApplicationDetail (/applications/:id)
+    JobPanel: JD + context editor (company/role/context) · "Tailor" / "Re-tailor" · "Lock final"
+    TailorProgress(§15)
+    ResultView(split) — shows the app's `current` (or `locked`) snapshot:
+      ResumePage (§10, print target): ProfileHeader, SummarySection,
+          SectionBlock (registry-driven: label + groups) → GroupBlock → ItemRow
+      ReasoningPanel (never printed): SignalsBar→WeightBar, SectionRationale→Callout, CutList
+    (empty state: "add missing facts in Library →" — the Applications↔Library loop, §26)
 
-LibraryView (/library)
+LibraryView (/library)  — the information bank (§26)
   LibraryToolbar (Add · Import · Export)
+  LibraryFilter (section · tag · text — PROGRESSIVE: earns its space as the corpus grows; §26)
   SectionAccordion (one per Section, registry label)
     EntryCard (facts preview, Tag chips, edit/delete)
   EntryEditor (Dialog) — SECTION-AWARE: renders the right meta fields per section
       (SectionMetaFields), plus RepeatableList(facts, framings) + TagInput.
       Label sections (skill/interest/language) show a compact single-fact form.
-  ProfileEditor (Dialog): name/contact/links/baseSummary
-  LayoutEditor: reorder/toggle resume sections (settings.layout)
+  ProfileEditor (Dialog): name/contact/links/baseSummary          ┐ resume MATERIAL, so
+  LayoutEditor: reorder/toggle resume sections (settings.layout)  ┘ they live with the Library (§26)
 
-SettingsView (/settings): ApiKeyForm (write-only), ProviderPicker, ModelPicker
+SettingsView (/settings): ApiKeyForm (write-only), ProviderPicker, ModelPicker  ← instance plumbing only
 
 Bespoke: WeightBar, serif Callout, RepeatableList, TagInput, SectionMetaFields.
 ```
 **Rule:** domain components compose primitives; never re-roll a button or dialog. One `EntryEditor` handles all sections via the registry — not one editor per section.
+
+> **Two decisions here are coordinator recommendations pending your final word (2026-07-03), both aligned with the current build so nothing already shipped churns:** (a) **top-bar tabs**, not a sidebar — 3 flat destinations, and the Applications split-view wants the width; (b) **Profile + Layout live with the Library** (resume *material*, not instance plumbing), keeping Settings clean. Flip either in §26 and this tree follows.
 
 ---
 
@@ -666,4 +688,68 @@ Two things define success; the rest is table stakes. Structured so that **all bu
 **Keyless guarantee:** the default test/CI suite and a full click-through demo need **no API key** — the engine is swappable and the pipeline is deterministic. The only check that needs a key is the live model-quality eval (Tier 0 repositioning), which is opt-in and becomes replayable once recorded as fixtures. Honest caveat: the key verifies the *model*, not the *machinery* — everything else is keyless.
 
 **Spec-level success:** a competent engineer can build the MVP one-shot with no undefined decisions. Remaining gaps to that: full `assemble()`, the exact `renderLibrary` format, complete zod schemas.
+
+---
+
+## 26. Information Architecture (page map · navigation · placement)
+
+*Realizes the component tree in §13. The nav pattern and Profile/Layout placement below are coordinator recommendations (2026-07-03) pending your final confirmation — both align with the current build.*
+
+**Vision.** Lede is a single-user tool with three jobs; each maps to exactly one destination. Destinations are flat and non-nested — there is no hierarchy to model, so navigation is a control surface, not a tree.
+
+**Navigation model (contract).**
+- Primary nav is an ordered destination list rendered as **top-bar tabs** (`aria-label="Primary"`). Top-bar, not sidebar: three flat destinations, and the Applications split-view (résumé | reasoning) wants full width. Revisit only if destinations exceed ~5 or gain nesting.
+- Destinations, in order: **Applications** (`/applications`, default via `/` redirect) · **Library** (`/library`) · **Settings** (`/settings`). `LoginGate` (§7) wraps all of them.
+- Invariants: every destination reachable from the primary nav on every page; active destination reflects the current route; no route exists that isn't a destination or a child of one (no orphan routes); an unknown non-API path resolves through the SPA fallback to a known destination, never a blank/404 shell (§19).
+
+**Page responsibilities & the placement rule** — where does a new UI element go?
+- *Persistent per-JD tailoring work* → **Applications** (§27): the JD, its context, and the tailored résumé + reasoning it produces.
+- *Persistent résumé material* → **Library**: the Entry corpus across all sections, **plus** résumé-shell material — Profile (identity/contact/`baseSummary`) and Layout (section order/visibility) — because these are résumé content/shaping, not instance config.
+- *Instance / operator configuration* → **Settings**: BYOK key, provider, model, password/logout. No résumé content here.
+
+**Library — the information bank (vision).** The Library is an intentionally **over-complete** bank: the user is expected to capture far more than any single résumé holds. More source material gives the tailor more to draw on — especially to **bridge an imperfect JD match**, where the right facts exist but aren't the obvious ones. The corpus is the raw material; a résumé is a per-JD *projection* of it (§1, §27). There is **no separate "master résumé" artifact** — Library + Profile is the single source of truth; applications are projections. "Multiple copies" (§27) means multiple projections, not multiple originals. Scales down cleanly: a targeted user with a small, focused corpus uses the identical select/cut machinery.
+- **Corollary (page, not model): findability is the Library's real job at scale.** Browse/filter by section, tag, and free text — tags in their spec-sanctioned grouping/filtering role (§1), **never** selection scoring. These affordances are **progressive**: they scale up with corpus size and never burden a small library (empty/small states stay dead-simple).
+
+**The Applications ↔ Library loop.** The most common real task: mid-tailoring you discover a bridging fact is missing (exactly the bank premise) → jump to Library → add an entry → return to the application → re-tailor. The IA must make this a **loop, not a dead-end** — the application context survives the detour. (A long Applications list reuses the *same* progressive find/filter pattern as the Library — solve findability once.)
+
+**First-run path.** A fresh instance is a set of empty rooms; guide the happy path: set password (§7) → add provider key (Settings, §8) → seed the Library (add/import entries) → create the first Application → tailor. Empty states point to the next step, not a blank page.
+
+**Rejected (vision):** sidebar nav (over-structure for 3 flat items; steals Applications-view width); Profile/Layout in Settings (mixes résumé content with operator plumbing); a dedicated Profile destination (a 4th destination for rare-edit config, not yet earned); a hand-authored "master résumé" (the Library already is the source of truth).
+
+---
+
+## 27. Applications (the persistent tailoring entity)
+
+The unit of use. Replaces the stateless "paste a JD" flow (old §6/§9): tailoring now happens *inside* an application, and its output is kept — one tailored résumé per job.
+
+**Domain (new `applications` table, Drizzle; §4.2 conventions).** Snapshots store **full content, never entry-ID references** (see integrity below).
+```ts
+type Application = {
+  id: string;                 // slug/uuid
+  company?: string;           // label + optional tailoring context
+  role?: string;
+  jobDescription: string;     // the JD (required)
+  context?: string;           // free-text tailoring context — guides emphasis, NOT a fact source (§6.2)
+  current?: TailoredResume;   // last tailor output; OVERWRITTEN on re-tailor (self-contained snapshot)
+  locked?: TailoredResume;    // optional immutable "final" snapshot (see below)
+  genState: 'untailored' | 'tailoring' | 'tailored' | 'failed';   // GENERATION state — never a hiring state (§2)
+  currentMeta?: { at: number; provider: ProviderId; model: string };  // provenance for staleness
+  createdAt: number; updatedAt: number;
+};
 ```
+
+**Lifecycle.** create (JD + optional company/role/context) → `tailor` runs the pipeline (§6) over the *current* Library + this JD/context, persisting the result as `current` (genState `tailored`) → edit JD/context and **re-tailor** (overwrites `current`) → optionally **lock** the final version.
+
+**Snapshots: `current` + optional `locked` — no version history (decided, with rationale).** A saved résumé is a point-in-time projection of a *living* Library. Two things follow:
+- **Self-contained (integrity invariant).** `current`/`locked` hold the full assembled `TailoredResume`, not references. Editing or deleting a Library entry later can never corrupt or break a saved application.
+- **No per-application version history.** Re-tailoring a fixed JD mostly yields model-noise near-duplicates; when the input meaningfully changes it's because the Library grew — in which case the *fresh* version is wanted. A history would accrete low-signal clutter (and drift toward the tracker §2 forbids). Instead: `current` overwrites on re-tailor, and the user may **lock** one version as an immutable `locked` — framed as *locking an artifact* ("this is the final for this job"), **not** a hiring status. The locked snapshot is the one thing both *unreconstructable* (the Library has moved on) and genuinely wanted later (what you actually sent, for interview prep). An optional one-level "undo last re-tailor" covers regret without a real history.
+
+**Provenance & staleness.** `currentMeta` records when `current` was generated and the model/provider used. Surface staleness against the live Library ("tailored from your Library as of <date> — re-tailor to fold in newer entries"), so a stale projection is visible, not silent.
+
+**Context is not facts (contract, §6.2).** `context` shapes selection/emphasis only; every kept item and number still traces to a Library **entry**'s `facts`. `validateNoFabrication` checks against `entries` alone — context is deliberately excluded from grounding. A real fact worth using is **promoted to an entry**, never quoted from loose prose.
+
+**Backup (self-host, §2/§19/§25).** Export/import span **library + profile + applications** (`/api/export`, `/api/import`, §9) — losing a year of tailored applications on a container rebuild is a data-loss surprise a self-hoster shouldn't hit. "Backup = copy the SQLite file" already covers all three (one DB).
+
+**Not a tracker (tripwire, §2).** The only status is `genState` (generation). No applied/interviewing/rejected pipeline, kanban, or reminders — that dilutes the differentiator (repositioning, not tracking) and edges the spirit of "no ATS."
+
+**Acceptance shape (for the oracle when this epic is built).** create → persist → set JD+context → tailor → `current` persists and **survives reload + server restart** (keyless integration + browser) → re-tailor overwrites `current` → lock freezes `locked` immutably (later Library edits don't change it) → deleting a Library entry does **not** alter any saved snapshot (integrity) → a number present only in `context` (not in any entry) still throws fabrication (§6.3).
