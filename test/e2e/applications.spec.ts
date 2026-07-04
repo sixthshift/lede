@@ -47,20 +47,25 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   // ping (see below) alongside anything a real break would produce.
   const pageErrors: unknown[] = [];
   const consoleErrors: string[] = [];
+  let loggedIn = false;
   page.on("pageerror", (err) => pageErrors.push(err));
   page.on("console", (msg) => {
     if (msg.type() !== "error") return;
-    // EXACT-MATCH allowlist, one entry: LoginGate's own auth ping
-    // (GET /api/settings, src/client/components/LoginGate.tsx) always fires
-    // on mount and always 401s before sign-in — that's the mechanism the
-    // gate uses to detect "not logged in," not a bug. Chromium logs the
-    // exact text below for any non-2xx fetch response regardless of the
-    // app catching it; a real break (bad asset, thrown error) produces
-    // different text or a pageerror, which this allowlist never touches.
+    // EXACT-MATCH allowlist, one entry, scoped to before sign-in only:
+    // LoginGate (src/client/components/LoginGate.tsx) only swaps in the
+    // password form once its own auth ping (GET /api/settings) has RESOLVED
+    // 401 — while that ping is still in flight, `unauthorized` is false and
+    // LoginGate renders the real app underneath it, so whatever route is
+    // current (ApplicationsView, GET /api/applications) fires its own query
+    // in the same unauthenticated window and 401s too. Both are the same
+    // expected pre-session race, not a bug — Chromium logs this exact text
+    // for any non-2xx fetch response regardless of the app catching it. Once
+    // `loggedIn` flips true (post sign-in), this text is no longer excused:
+    // a real break here still fails the test.
     if (
+      !loggedIn &&
       msg.text() ===
-        "Failed to load resource: the server responded with a status of 401 (Unauthorized)" &&
-      msg.location().url.endsWith("/api/settings")
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
     ) {
       return;
     }
@@ -80,6 +85,7 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   await page.goto("/");
   await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
   await ensureFirstRunPassword(page, PASSWORD);
+  loggedIn = true;
   await expect(page).toHaveURL(/\/applications$/);
   await expect(page.getByRole("button", { name: "New application" })).toBeVisible();
 
