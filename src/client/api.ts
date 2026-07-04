@@ -160,3 +160,20 @@ export async function setApiKey(apiKey: string): Promise<{ keySet: true }> {
 export async function deleteApiKey(): Promise<{ keySet: false }> {
   return request<{ keySet: false }>("/api/settings/key", { method: "DELETE" });
 }
+
+// ── backup (spec.md §27) — full-instance export/import: library + profile + applications ──
+export type BackupPayload = {
+  entries: Entry[];
+  profile: Profile;
+  applications: Application[];
+};
+
+export async function exportAll(): Promise<BackupPayload> {
+  return request<BackupPayload>("/api/export");
+}
+
+export async function importAll(
+  payload: Partial<BackupPayload>,
+): Promise<{ imported: { entries: number; profile: number; applications: number } }> {
+  return request("/api/import", jsonInit("POST", payload));
+}
