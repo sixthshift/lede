@@ -19,6 +19,7 @@ import {
   NoFixtureError,
   tailor,
   makeEngine,
+  buildUserPrompt,
   type TailorEngine,
 } from "../src/server/tailor/engine";
 
@@ -193,6 +194,65 @@ describe("makeEngine", () => {
         GOOGLE_GENERATIVE_AI_API_KEY: "k",
       } as NodeJS.ProcessEnv),
     ).toBeInstanceOf(ProviderEngine);
+  });
+});
+
+// ── CONTEXT PLUMBING (E6-A3) ──
+
+describe("buildUserPrompt — the T014 baseline is byte-identical with no context", () => {
+  const jd = "some job description";
+  const baseline = `Tailor for this job description:\n\n${jd}`;
+
+  it("returns the exact baseline string when context is undefined", () => {
+    expect(buildUserPrompt(jd)).toBe(baseline);
+  });
+
+  it("returns the exact baseline string when context is null", () => {
+    expect(buildUserPrompt(jd, null)).toBe(baseline);
+  });
+
+  it("returns the exact baseline string when context is an empty string", () => {
+    expect(buildUserPrompt(jd, "")).toBe(baseline);
+  });
+
+  it("appends a clearly-labelled context block when context is provided", () => {
+    const prompt = buildUserPrompt(jd, "prioritize distributed systems experience");
+    expect(prompt.startsWith(baseline)).toBe(true);
+    expect(prompt).toContain("prioritize distributed systems experience");
+    expect(prompt).toContain("Tailoring context");
+  });
+});
+
+describe("ProviderEngine.attempt — calls buildUserPrompt for the `prompt` field", () => {
+  const jd = "some job description";
+
+  beforeEach(() => {
+    generateObjectMock.mockReset();
+  });
+
+  it("with no context, sends the byte-identical baseline prompt", async () => {
+    generateObjectMock.mockResolvedValueOnce({ object: makeDecision() });
+    const engine = new ProviderEngine({
+      provider: "google",
+      model: "gemini-2.5-flash",
+      apiKey: "k",
+    });
+    await engine.decide(jd, SEED_ENTRIES);
+    const callArgs = generateObjectMock.mock.calls[0]![0];
+    expect(callArgs.prompt).toBe(buildUserPrompt(jd));
+  });
+
+  it("with context, sends the context-augmented prompt", async () => {
+    generateObjectMock.mockResolvedValueOnce({ object: makeDecision() });
+    const engine = new ProviderEngine({
+      provider: "google",
+      model: "gemini-2.5-flash",
+      apiKey: "k",
+    });
+    await engine.decide(jd, SEED_ENTRIES, "emphasize platform work");
+    const callArgs = generateObjectMock.mock.calls[0]![0];
+    expect(callArgs.prompt).toBe(buildUserPrompt(jd, "emphasize platform work"));
+    expect(callArgs.prompt).toContain("emphasize platform work");
   });
 });
 

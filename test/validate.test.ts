@@ -123,4 +123,31 @@ describe("validateNoFabrication", () => {
     );
     expect(() => validateNoFabrication(resume, [e1, e2], null)).toThrow(FabricationError);
   });
+
+  // RED-TEAM #6 (E6-A3): context guides emphasis, never a fact source (§27).
+  // validateNoFabrication's signature takes entries only — a number that
+  // exists ONLY in a context string, in no entry's facts, must still be
+  // treated as ungrounded if it shows up in a resume item or the summary.
+  it("RED-TEAM #6: a number present only in context (in no entry) still fabricates in an item", () => {
+    // validateNoFabrication has no context parameter at all — this call
+    // signature itself is the contract: context is never an argument.
+    expect(validateNoFabrication.length).toBe(3); // (resume, entries, baseSummary?)
+
+    const context = "Ideally 77 years of combined team experience across the org.";
+    const resume = resumeWithItems([
+      { entryId: "e1", text: "Led a team of 5 with 77 years of combined experience." },
+    ]);
+    // The context string is never passed to validateNoFabrication — proving
+    // it cannot ground the "77" even if it were (incorrectly) consulted.
+    void context;
+    expect(() => validateNoFabrication(resume, [e1, e2])).toThrow(FabricationError);
+  });
+
+  it("RED-TEAM #6: a context-only number in the summary still fabricates", () => {
+    const resume = resumeWithItems(
+      [{ entryId: "e1", text: "Led a team of 5." }],
+      "Brings 77 years of combined team experience.",
+    );
+    expect(() => validateNoFabrication(resume, [e1, e2], null)).toThrow(FabricationError);
+  });
 });

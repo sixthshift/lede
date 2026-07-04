@@ -8,6 +8,7 @@ import {
   getApplication,
   updateApplication,
   deleteApplication,
+  tailorApplication,
 } from "../api";
 import type { ApplicationCreateInput, ApplicationUpdateInput } from "../api";
 
@@ -51,6 +52,16 @@ export function useDeleteApplication() {
     mutationFn: (id: string) => deleteApplication(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["applications"] });
+    },
+  });
+}
+
+export function useTailorApplication() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => tailorApplication(id),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["applications", updated.id] });
     },
   });
 }
