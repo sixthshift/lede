@@ -14,6 +14,16 @@
 // DATA_DIR) for the "auth" project — each project scoped via testMatch so
 // specs never hit the wrong server. Both ports derive from PORT so a
 // non-default PORT still works.
+//
+// E6-B3 adds a third server/project ("applications", APPLICATIONS_BASE_URL):
+// applications.spec.ts drives first-run set-password -> login (like
+// auth.spec.ts, so the gate must be ON — it can't reuse the "chromium"
+// server) AND needs the keyless tailor path (LEDE_TAILOR_ENGINE=fixture, so
+// FixtureEngine's recorded CONTRAST_JDS fixtures replay with no API key —
+// it can't reuse the "auth" server either, which leaves tailorEngine at its
+// default "live"). Own fresh DATA_DIR so its seeded library entries hash to
+// the fixtures' recorded key regardless of what the other two servers' data
+// dirs accumulate.
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -24,6 +34,9 @@ const BASE_URL = `http://localhost:${PORT}`;
 
 const AUTH_PORT = String(Number(PORT) + 1);
 const AUTH_BASE_URL = `http://localhost:${AUTH_PORT}`;
+
+const APPLICATIONS_PORT = String(Number(PORT) + 2);
+const APPLICATIONS_BASE_URL = `http://localhost:${APPLICATIONS_PORT}`;
 
 // E5-C's docker project runs a real container (helpers/docker.ts globalSetup)
 // instead of a webServer, and is driven by its own `playwright test
@@ -54,6 +67,11 @@ export default defineConfig({
       name: "auth",
       testMatch: /auth\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: AUTH_BASE_URL },
+    },
+    {
+      name: "applications",
+      testMatch: /applications\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject
       ? [
@@ -91,6 +109,21 @@ export default defineConfig({
         LEDE_SESSION_SECRET: "playwright-e2e-auth-session-secret-at-least-32-chars",
         // No LEDE_AUTH_DISABLED here — the whole point of this server is to
         // exercise the real guard (registerAuthGuard, src/server/auth.ts).
+      },
+    },
+    {
+      command: "bun run start",
+      url: `${APPLICATIONS_BASE_URL}/api/health`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 60000,
+      env: {
+        PORT: APPLICATIONS_PORT,
+        DATA_DIR: createTmpDataDir(),
+        LEDE_MASTER_KEY: randomBytes(32).toString("base64"),
+        LEDE_SESSION_SECRET: "playwright-e2e-applications-session-secret-at-least-32-chars",
+        // No LEDE_AUTH_DISABLED — applications.spec.ts drives the real
+        // first-run set-password -> login arc, same as the "auth" server.
+        LEDE_TAILOR_ENGINE: "fixture",
       },
     },
   ],
