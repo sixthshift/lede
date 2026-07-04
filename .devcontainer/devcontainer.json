@@ -21,11 +21,15 @@
     }
   },
 
-  "forwardPorts": [3737],
+  "forwardPorts": [6173, 8787],
   "portsAttributes": {
-    "3737": {
-      "label": "HTTP Server",
+    "6173": {
+      "label": "Lede (Vite dev)",
       "onAutoForward": "notify"
+    },
+    "8787": {
+      "label": "Lede API",
+      "onAutoForward": "silent"
     }
   },
 

@@ -11,6 +11,8 @@ export default defineConfig({
     },
   },
   server: {
+    host: true, // bind 0.0.0.0 so devcontainer/docker port publishing works
+    port: 6173,
     proxy: {
       "/api": "http://localhost:8787",
     },

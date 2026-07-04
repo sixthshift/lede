@@ -20,9 +20,9 @@ services:
         required: false
     environment:
       - NODE_ENV=development
-      - PORT=3000
     ports:
-      - '3737:3000'
+      - '6173:6173' # Vite dev server (the SPA — proxies /api → :8787)
+      - '8787:8787' # Fastify API
     command: sleep infinity
     working_dir: /workspace
 
