@@ -38,6 +38,9 @@
     padding: 0;
     color: #000;
     background: #fff;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .resume-header,

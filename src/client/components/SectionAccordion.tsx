@@ -17,10 +17,11 @@ export function SectionAccordion({
 }) {
   return (
     <Card data-section={section}>
-      <CardHeader>
-        <CardTitle>{SECTIONS[section].label}</CardTitle>
+      <CardHeader className="flex-row items-center justify-between space-y-0 pb-1">
+        <CardTitle className="text-md">{SECTIONS[section].label}</CardTitle>
+        <span className="text-sm tabular-nums text-muted-foreground">{entries.length}</span>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      <CardContent className="divide-y divide-border/60">
         {entries.map((entry) => (
           <EntryCard key={entry.id} entry={entry} onDelete={() => onDelete(entry.id)} />
         ))}

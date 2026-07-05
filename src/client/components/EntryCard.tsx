@@ -3,15 +3,14 @@
 // LibraryView's entry picker.
 
 import type { Entry } from "@shared/types";
-import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 
 export function EntryCard({ entry, onDelete }: { entry: Entry; onDelete: () => void }) {
   return (
-    <Card data-entry-id={entry.id} className="p-4">
-      <CardContent className="flex flex-col gap-2 p-0">
-        <ul className="list-inside list-disc text-sm">
+    <div data-entry-id={entry.id} className="flex items-start justify-between gap-4 py-4">
+      <div className="flex min-w-0 flex-col gap-2.5">
+        <ul className="list-inside list-disc text-sm leading-relaxed">
           {entry.facts.map((fact, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: facts are raw strings (may repeat) in fixed manual order — no stable id in the data model
             <li key={i}>{fact}</li>
@@ -19,7 +18,7 @@ export function EntryCard({ entry, onDelete }: { entry: Entry; onDelete: () => v
         </ul>
 
         {entry.tags.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1.5">
             {entry.tags.map((tag) => (
               <Badge key={tag} variant="secondary">
                 {tag}
@@ -27,13 +26,16 @@ export function EntryCard({ entry, onDelete }: { entry: Entry; onDelete: () => v
             ))}
           </div>
         ) : null}
+      </div>
 
-        <div className="flex gap-2">
-          <Button variant="destructive" size="sm" onClick={onDelete}>
-            Delete
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      <Button
+        variant="destructive-ghost"
+        size="sm"
+        className="shrink-0 text-muted-foreground hover:text-destructive"
+        onClick={onDelete}
+      >
+        Delete
+      </Button>
+    </div>
   );
 }

@@ -37,8 +37,13 @@ export function LibraryToolbar() {
   }
 
   return (
-    <div className="mb-4 flex gap-2">
-      <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+    <div className="flex gap-1">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-muted-foreground"
+        onClick={() => fileInputRef.current?.click()}
+      >
         Import
       </Button>
       <input
@@ -48,7 +53,7 @@ export function LibraryToolbar() {
         className="hidden"
         onChange={handleFileSelected}
       />
-      <Button variant="outline" size="sm" onClick={handleExport}>
+      <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={handleExport}>
         Export
       </Button>
     </div>

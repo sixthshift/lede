@@ -11,6 +11,7 @@ export default {
     extend: {
       colors: {
         border: "var(--border)",
+        "border-strong": "var(--border-strong)",
         input: "var(--border)",
         ring: "var(--accent)",
         background: "var(--background)",
@@ -43,13 +44,33 @@ export default {
           DEFAULT: "var(--card)",
           foreground: "var(--card-foreground)",
         },
-        success: "var(--success)",
-        warn: "var(--warn)",
+        success: {
+          DEFAULT: "var(--success)",
+          soft: "var(--success-soft)",
+        },
+        warn: {
+          DEFAULT: "var(--warn)",
+          soft: "var(--warn-soft)",
+        },
+        danger: {
+          DEFAULT: "var(--danger)",
+          soft: "var(--danger-soft)",
+        },
+        surface: "var(--surface)",
+        "primary-hover": "var(--accent-hover)",
       },
       borderRadius: {
+        xl: "calc(var(--radius) + 4px)",
         lg: "calc(var(--radius) + 2px)",
         md: "var(--radius)",
         sm: "calc(var(--radius) - 2px)",
+      },
+      boxShadow: {
+        xs: "var(--shadow-xs)",
+        sm: "var(--shadow-sm)",
+        DEFAULT: "var(--shadow-sm)",
+        md: "var(--shadow-md)",
+        lg: "var(--shadow-lg)",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "ui-sans-serif", "sans-serif"],
@@ -62,8 +83,9 @@ export default {
         base: ".875rem",
         md: "1rem",
         lg: "1.125rem",
-        xl: "1.375rem",
-        "2xl": "1.75rem",
+        xl: "1.25rem",
+        "2xl": "1.5rem",
+        "3xl": "1.875rem",
       },
     },
   },

@@ -23,11 +23,12 @@ describe("ui-foundation: tokens.css (§12)", () => {
   );
 
   it("defines the §12 palette verbatim", () => {
-    expect(tokens).toMatch(/--ink:\s*#1a1a1a/);
-    expect(tokens).toMatch(/--bg:\s*#fff/);
+    expect(tokens).toMatch(/--ink:\s*#18181b/);
+    expect(tokens).toMatch(/--bg:\s*#f4f4f6/);
+    expect(tokens).toMatch(/--surface:\s*#fff/);
     expect(tokens).toMatch(/--border:\s*#e4e4e7/);
-    expect(tokens).toMatch(/--accent:\s*#2f5fdd/);
-    expect(tokens).toMatch(/--accent-weak:\s*#eef2fe/);
+    expect(tokens).toMatch(/--accent:\s*#2643bd/);
+    expect(tokens).toMatch(/--accent-weak:\s*#e9edfa/);
     expect(tokens).toMatch(/--success:\s*#15803d/);
     expect(tokens).toMatch(/--warn:\s*#b45309/);
     expect(tokens).toMatch(/--danger:\s*#b91c1c/);

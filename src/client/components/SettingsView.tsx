@@ -1,22 +1,27 @@
-// Settings route — spec.md §9/§4.2/§8. Replaces the E1-F1 stub. Provider and
-// model changes save immediately via PUT /api/settings; the BYOK key has its
-// own write-only sub-form (ApiKeyForm) since it never round-trips a value.
+// Settings route — spec.md §9/§4.2/§8. Provider and model changes save
+// immediately via PUT /api/settings; the BYOK key has its own write-only
+// sub-form (ApiKeyForm) since it never round-trips a value.
 import { PROVIDERS } from "@shared/providers";
 import type { ProviderId } from "@shared/types";
 
-import { useAuthLogout, useSettings, useUpdateSettings } from "../hooks/queries";
+import { useSettings, useUpdateSettings } from "../hooks/queries";
 import { ApiKeyForm } from "./ApiKeyForm";
 import { ModelPicker } from "./ModelPicker";
 import { ProviderPicker } from "./ProviderPicker";
-import { Button } from "./ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { Skeleton } from "./ui/skeleton";
 
 export function SettingsView() {
   const settingsQuery = useSettings();
   const updateSettings = useUpdateSettings();
-  const logout = useAuthLogout();
 
   if (settingsQuery.isPending) {
-    return <p className="text-sm text-muted-foreground">Loading settings…</p>;
+    return (
+      <div className="flex max-w-2xl flex-col gap-6">
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="h-40 rounded-xl" />
+      </div>
+    );
   }
   if (settingsQuery.isError || !settingsQuery.data) {
     return <p className="text-sm text-destructive">Could not load settings.</p>;
@@ -33,27 +38,43 @@ export function SettingsView() {
   }
 
   return (
-    <div className="flex max-w-xl flex-col gap-8">
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold">Provider &amp; model</h2>
-        <div className="flex flex-wrap gap-3">
-          <ProviderPicker value={provider as ProviderId} onChange={handleProviderChange} />
-          <ModelPicker
-            provider={provider as ProviderId}
-            value={model}
-            onChange={handleModelChange}
-          />
-        </div>
-      </section>
+    <div className="flex max-w-2xl flex-col gap-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          The provider, model, and key Lede uses to tailor.
+        </p>
+      </div>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold">API key</h2>
-        <ApiKeyForm keySet={keySet} />
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-md">Provider &amp; model</CardTitle>
+          <CardDescription>Every tailor call runs against this model.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3">
+            <ProviderPicker value={provider as ProviderId} onChange={handleProviderChange} />
+            <ModelPicker
+              provider={provider as ProviderId}
+              value={model}
+              onChange={handleModelChange}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-      <Button type="button" variant="outline" className="w-fit" onClick={() => logout.mutate()}>
-        Log out
-      </Button>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-md">API key</CardTitle>
+          <CardDescription>
+            Stored encrypted on the server and never shown again — you bring your own key for the
+            provider above.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ApiKeyForm keySet={keySet} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

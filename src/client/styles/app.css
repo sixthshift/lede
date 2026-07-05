@@ -61,29 +61,66 @@ body {
   color: #b00020;
 }
 
+/* The resume preview is a paper sheet: same Georgia the print stylesheet
+   uses (WYSIWYG with the printed page), raised off the gray canvas. */
 .resume-page {
   background: #fff;
-  border: 1px solid #ddd;
-  padding: 32px;
-  margin-top: 16px;
+  border: 1px solid var(--border, #e4e4e7);
+  border-radius: calc(var(--radius, 8px) + 4px);
+  box-shadow: var(--shadow-md);
+  padding: 48px 44px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #1a1a1a;
+}
+
+.resume-header__name {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.resume-summary {
+  margin-top: 12px;
+}
+
+.resume-summary p {
+  margin: 0;
 }
 
 .resume-section {
-  margin-top: 20px;
+  margin-top: 28px;
 }
 
 .resume-section__label {
-  border-bottom: 1px solid #ccc;
-  padding-bottom: 4px;
+  margin: 0 0 10px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid var(--border-strong, #d4d4d8);
+  padding-bottom: 5px;
 }
 
 .resume-group {
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .resume-group__heading {
   margin: 0 0 4px;
-  font-size: 1em;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.resume-group__items {
+  margin: 4px 0 0;
+  padding-left: 1.1em;
+}
+
+.resume-item {
+  margin-bottom: 4px;
 }
 
 /* Split view (§11) — ResumePage and ReasoningPanel side by side, siblings. */
@@ -98,88 +135,107 @@ body {
   min-width: 0;
 }
 
+/* The margin-note to the resume's document: a quiet card that follows the
+   scroll (sticky offset = header height + page padding). */
 .reasoning-panel {
   flex: 1 1 40%;
   min-width: 0;
-  background: var(--bg-subtle, #fafafa);
+  position: sticky;
+  top: 80px;
+  background: var(--surface, #fff);
   border: 1px solid var(--border, #e4e4e7);
-  border-radius: var(--radius, 4px);
-  padding: 16px;
-  margin-top: 16px;
+  border-radius: calc(var(--radius, 8px) + 4px);
+  box-shadow: var(--shadow-sm);
+  padding: 20px;
 }
 
 .reasoning-panel__heading {
-  margin: 0 0 12px;
-  font-size: 1em;
+  margin: 0 0 16px;
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 .reasoning-panel__rationale {
-  margin: 12px 0;
+  margin: 14px 0;
+  padding-left: 12px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .reasoning-panel__rationale-source {
   display: block;
-  font-size: 0.75em;
-  color: var(--ink-soft, #52525b);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint, #a1a1aa);
   margin-bottom: 4px;
 }
 
 .callout {
   font-family: var(--font-serif, Georgia, serif);
-  font-size: 1em;
+  font-size: 0.875rem;
   font-style: italic;
+  line-height: 1.55;
   margin: 0;
 }
 
 .weight-bar {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 14px;
+  margin-bottom: 20px;
 }
 
 .weight-bar__row {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .weight-bar__label {
-  font-size: 0.75em;
-  color: var(--ink-soft, #52525b);
-  min-width: 110px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint, #a1a1aa);
 }
 
 .weight-bar__chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   list-style: none;
   margin: 0;
   padding: 0;
   counter-reset: weight;
 }
 
+/* Rank + chip stay glued together — the li is the flex unit, so a wrap can
+   never orphan the counter from its chip. */
 .weight-bar__chips li {
   counter-increment: weight;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .weight-bar__chips li::before {
-  content: counter(weight) ". ";
-  font-size: 0.75em;
-  color: var(--ink-soft, #52525b);
+  content: counter(weight);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--ink-faint, #a1a1aa);
 }
 
 .cut-list {
-  margin-top: 16px;
+  margin-top: 20px;
   border-top: 1px solid var(--border, #e4e4e7);
-  padding-top: 12px;
+  padding-top: 14px;
 }
 
 .cut-list__heading {
   margin: 0 0 8px;
-  font-size: 0.9em;
+  font-size: 0.8125rem;
+  font-weight: 600;
 }
 
 .cut-list__items {
@@ -188,7 +244,8 @@ body {
 }
 
 .cut-list__item {
-  font-size: 0.9em;
+  font-size: 0.8125rem;
+  line-height: 1.5;
   color: var(--ink-soft, #52525b);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }

@@ -1,28 +1,38 @@
 /*
- * Design tokens (§12) — the single source of color/radius truth.
- * Verbatim §12 palette first, then shadcn's CSS variable names mapped onto
- * it ("--accent is primary"). Components (ours and shadcn's) should read the
+ * Design tokens (§12) — the single source of color/radius/shadow truth.
+ * §12 palette first, then shadcn's CSS variable names mapped onto it
+ * ("--accent is primary"). Components (ours and shadcn's) should read the
  * shadcn-named variables below, never re-declare a color.
  */
 
 :root {
-  /* §12 palette — verbatim */
-  --ink: #1a1a1a;
+  /* §12 palette */
+  --ink: #18181b;
   --ink-soft: #52525b;
   --ink-faint: #a1a1aa;
-  --bg: #fff;
-  --bg-subtle: #fafafa;
+  --bg: #f4f4f6; /* page canvas — cool gray so white surfaces read as raised */
+  --surface: #ffffff; /* cards, header, inputs */
+  --bg-subtle: #fafafa; /* muted fills inside a surface */
   --border: #e4e4e7;
   --border-strong: #d4d4d8;
-  --accent: #2f5fdd;
-  --accent-weak: #eef2fe;
+  --accent: #2643bd;
+  --accent-hover: #1e35a0;
+  --accent-weak: #e9edfa;
   --success: #15803d;
+  --success-soft: #e8f5ed;
   --warn: #b45309;
+  --warn-soft: #fdf3e4;
   --danger: #b91c1c;
+  --danger-soft: #fdeded;
 
-  /* §12 radius: 4px base, 6px cards/dialogs (tailwind.config.ts derives
-     lg/md/sm from this single value) */
-  --radius: 4px;
+  /* §12 radius: 8px base; tailwind.config.ts derives sm/md/lg/xl from it */
+  --radius: 8px;
+
+  /* §12 shadows: soft, layered, barely-there — depth over borders */
+  --shadow-xs: 0 1px 2px rgb(24 24 27 / 0.05);
+  --shadow-sm: 0 1px 2px rgb(24 24 27 / 0.05), 0 1px 3px rgb(24 24 27 / 0.07);
+  --shadow-md: 0 2px 4px rgb(24 24 27 / 0.05), 0 4px 12px rgb(24 24 27 / 0.08);
+  --shadow-lg: 0 4px 8px rgb(24 24 27 / 0.06), 0 12px 32px rgb(24 24 27 / 0.12);
 
   /* §12 type: IBM Plex, self-hosted (imported in app.css) */
   --font-sans: "IBM Plex Sans", ui-sans-serif, sans-serif;
@@ -33,12 +43,12 @@
      defaults. --accent is primary. */
   --background: var(--bg);
   --foreground: var(--ink);
-  --card: var(--bg);
+  --card: var(--surface);
   --card-foreground: var(--ink);
-  --popover: var(--bg);
+  --popover: var(--surface);
   --popover-foreground: var(--ink);
   --primary: var(--accent);
-  --primary-foreground: var(--bg);
+  --primary-foreground: var(--surface);
   --secondary: var(--bg-subtle);
   --secondary-foreground: var(--ink);
   --muted: var(--bg-subtle);
@@ -46,5 +56,5 @@
   --accent-bg: var(--accent-weak);
   --accent-foreground: var(--ink);
   --destructive: var(--danger);
-  --destructive-foreground: var(--bg);
+  --destructive-foreground: var(--surface);
 }

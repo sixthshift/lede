@@ -12,6 +12,7 @@ import { ProfileEditor } from "./ProfileEditor";
 import { LayoutEditor } from "./LayoutEditor";
 import { Button } from "./ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Skeleton } from "./ui/skeleton";
 import {
   LibraryFilter,
   DEFAULT_LIBRARY_FILTER,
@@ -54,28 +55,43 @@ export function LibraryView() {
   }
 
   return (
-    <div>
-      <LibraryToolbar />
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Library</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Every fact tailoring can draw from, grouped by section.
+          </p>
+        </div>
 
-      {/* Profile identity + resume layout entry points — E1-F3. */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="outline" onClick={() => setProfileOpen(true)}>
-          Edit profile
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => setLayoutOpen(true)}>
-          Edit layout
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <LibraryToolbar />
+          <div aria-hidden className="mx-1 h-5 w-px bg-border" />
+          {/* Profile identity + resume layout entry points — E1-F3. */}
+          <Button size="sm" variant="outline" onClick={() => setProfileOpen(true)}>
+            Edit profile
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setLayoutOpen(true)}>
+            Edit layout
+          </Button>
+          <Button size="sm" onClick={openCreate}>
+            Add entry
+          </Button>
+        </div>
       </div>
 
-      {/* Add/edit entry points — E1-F2. Add opens a blank editor; the picker
-          selects an existing entry to edit (EntryCard itself only deletes). */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Button size="sm" onClick={openCreate}>
-          Add entry
-        </Button>
+      {/* Filter on the left; picking an existing entry to edit on the right
+          (EntryCard itself only deletes) — E1-F2/E6-C1. */}
+      {entries && entries.length > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <LibraryFilter
+            entries={entries}
+            filter={filter}
+            onFilterChange={setFilter}
+            resultCount={filteredEntries.length}
+          />
 
-        {entries && entries.length > 0 ? (
-          <>
+          <div className="flex flex-wrap items-center gap-2">
             <Select value={editTargetId} onValueChange={setEditTargetId}>
               <SelectTrigger aria-label="Choose entry to edit" className="w-64">
                 <SelectValue placeholder="Select an entry to edit…" />
@@ -99,24 +115,15 @@ export function LibraryView() {
             >
               Edit selected
             </Button>
-          </>
-        ) : null}
-      </div>
+          </div>
+        </div>
+      ) : null}
 
-      {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
+      {isLoading ? <Skeleton className="h-48 rounded-xl" /> : null}
       {isError ? (
         <p role="alert" className="text-sm text-destructive">
           Couldn't load entries.
         </p>
-      ) : null}
-
-      {entries && entries.length > 0 ? (
-        <LibraryFilter
-          entries={entries}
-          filter={filter}
-          onFilterChange={setFilter}
-          resultCount={filteredEntries.length}
-        />
       ) : null}
 
       <div className="flex flex-col gap-4">

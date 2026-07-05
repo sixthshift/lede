@@ -14,7 +14,6 @@ import type { Entry, Section } from "@shared/types";
 import { SECTIONS, SECTION_VALUES } from "@shared/sections";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Badge } from "./ui/badge";
 
 // Below this many entries, section grouping alone is enough to find things.
 // Picked as a small, sensible threshold — big enough that a handful of
@@ -75,7 +74,7 @@ export function LibraryFilter({
   const showSearchControls = entries.length >= SEARCH_THRESHOLD;
 
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <Select
         value={filter.section}
         onValueChange={(value) => onFilterChange({ ...filter, section: value as Section | "all" })}
@@ -123,9 +122,9 @@ export function LibraryFilter({
         </>
       ) : null}
 
-      <Badge variant="secondary">
+      <span className="text-sm tabular-nums text-muted-foreground">
         {resultCount} of {entries.length}
-      </Badge>
+      </span>
     </div>
   );
 }

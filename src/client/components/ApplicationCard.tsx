@@ -4,24 +4,11 @@
 // rejected or any kanban-style hiring status.
 
 import type { Application } from "@shared/types";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Badge, type BadgeProps } from "./ui/badge";
+import { Link } from "react-router-dom";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
+import { GenStateBadge } from "./GenStateBadge";
 
 type ApplicationSummary = Omit<Application, "current" | "locked">;
-
-const GEN_STATE_LABEL: Record<Application["genState"], string> = {
-  untailored: "Untailored",
-  tailoring: "Tailoring…",
-  tailored: "Tailored",
-  failed: "Failed",
-};
-
-const GEN_STATE_VARIANT: Record<Application["genState"], NonNullable<BadgeProps["variant"]>> = {
-  untailored: "outline",
-  tailoring: "secondary",
-  tailored: "default",
-  failed: "destructive",
-};
 
 const JD_PREVIEW_LENGTH = 160;
 
@@ -39,22 +26,37 @@ function formatUpdatedAt(updatedAt: number): string {
 }
 
 export function ApplicationCard({ application }: { application: ApplicationSummary }) {
-  const title = [application.role, application.company].filter(Boolean).join(" · ");
-
   return (
-    <Card data-application-id={application.id}>
-      <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
-        <CardTitle className="text-base">{title || "Untitled application"}</CardTitle>
-        <Badge variant={GEN_STATE_VARIANT[application.genState]}>
-          {GEN_STATE_LABEL[application.genState]}
-        </Badge>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-2">
-        <p className="text-sm text-muted-foreground">{jdPreview(application.jobDescription)}</p>
-        <p className="text-xs text-muted-foreground">
-          Updated {formatUpdatedAt(application.updatedAt)}
-        </p>
-      </CardContent>
-    </Card>
+    <Link
+      to={`/applications/${application.id}`}
+      className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      <Card
+        data-application-id={application.id}
+        className="flex h-full flex-col transition-shadow hover:shadow-md"
+      >
+        <CardHeader className="gap-1 space-y-0 pb-3">
+          {application.company ? (
+            <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              {application.company}
+            </p>
+          ) : null}
+          <CardTitle className="text-md leading-snug">
+            {application.role || "Untitled application"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+            {jdPreview(application.jobDescription)}
+          </p>
+        </CardContent>
+        <CardFooter className="mt-auto justify-between border-t border-border/60 py-3">
+          <GenStateBadge state={application.genState} />
+          <span className="text-xs text-muted-foreground">
+            Updated {formatUpdatedAt(application.updatedAt)}
+          </span>
+        </CardFooter>
+      </Card>
+    </Link>
   );
 }

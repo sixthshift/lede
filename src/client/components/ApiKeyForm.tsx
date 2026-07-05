@@ -38,11 +38,21 @@ export function ApiKeyForm({ keySet }: { keySet: boolean }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm text-muted-foreground">{keySet ? "A key is set." : "No key set."}</p>
+      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <span
+          aria-hidden
+          className={`h-1.5 w-1.5 rounded-full ${keySet ? "bg-success" : "bg-border-strong"}`}
+        />
+        {keySet ? "A key is set." : "No key set."}
+      </p>
 
       <form onSubmit={handleSave} className="flex items-end gap-2">
         <div className="flex flex-1 flex-col gap-1.5">
-          <Label htmlFor="api-key-input">{keySet ? "Replace key" : "API key"}</Label>
+          {/* Visually the card title + status line already say "API key"; the
+              label exists for the accessible name only. */}
+          <Label htmlFor="api-key-input" className="sr-only">
+            {keySet ? "Replace key" : "API key"}
+          </Label>
           <Input
             id="api-key-input"
             type="password"
@@ -57,7 +67,12 @@ export function ApiKeyForm({ keySet }: { keySet: boolean }) {
           Save
         </Button>
         {keySet ? (
-          <Button type="button" variant="destructive" onClick={handleDelete} disabled={pending}>
+          <Button
+            type="button"
+            variant="destructive-ghost"
+            onClick={handleDelete}
+            disabled={pending}
+          >
             Delete
           </Button>
         ) : null}

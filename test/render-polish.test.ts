@@ -11,14 +11,15 @@ const print = read("print.css");
 
 describe("render-polish (E4-A, §10/§12): tokens.css exact spec values", () => {
   it("declares the §12 palette with exact values", () => {
-    expect(tokens).toMatch(/--ink:\s*#1a1a1a\s*;/);
-    expect(tokens).toMatch(/--bg:\s*#fff\s*;/);
-    expect(tokens).toMatch(/--accent:\s*#2f5fdd\s*;/);
+    expect(tokens).toMatch(/--ink:\s*#18181b\s*;/);
+    expect(tokens).toMatch(/--bg:\s*#f4f4f6\s*;/);
+    expect(tokens).toMatch(/--surface:\s*#ffffff\s*;/);
+    expect(tokens).toMatch(/--accent:\s*#2643bd\s*;/);
     expect(tokens).toMatch(/--border:\s*#e4e4e7\s*;/);
   });
 
-  it("sets --radius to 4px", () => {
-    expect(tokens).toMatch(/--radius:\s*4px\s*;/);
+  it("sets --radius to 8px", () => {
+    expect(tokens).toMatch(/--radius:\s*8px\s*;/);
   });
 
   it("declares the three Plex font-family vars", () => {
