@@ -4,10 +4,13 @@
 // visible — while JobPanel below is just the editable record.
 
 import { ArrowLeft, BookOpen, Clock } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { DEFAULT_FORMAT } from "@shared/format";
-import type { DocumentFormat } from "@shared/types";
+import type { DocumentFormat, Paper, Profile, TailoredResume } from "@shared/types";
 import { downloadResumePdf } from "../document/download";
+import { applyDensity, fitToPages, type FitResult } from "../document/fit";
+import { getTemplate } from "../document/registry";
 import { useProfile, useSettings } from "../hooks/queries";
 import {
   useApplication,
@@ -17,6 +20,7 @@ import {
   useUpdateApplication,
 } from "../queries/useApplications";
 import { DesignPanel } from "./DesignPanel";
+import { FitChip } from "./FitChip";
 import { GenStateBadge } from "./GenStateBadge";
 import { JobPanel } from "./JobPanel";
 import { ResultView } from "./ResultView";
@@ -33,6 +37,42 @@ function formatStaleDate(at: number): string {
   });
 }
 
+// The fit ladder (§28.4) is a per-render computation, never persisted — this
+// hook just re-runs it whenever the inputs that could change the outcome
+// change, so the chip/preview/download always agree on the SAME FitResult.
+function useFit(args: {
+  resume: TailoredResume | null;
+  profile: Profile | undefined;
+  format: DocumentFormat;
+  paper: Paper;
+  targetPages: number;
+}): FitResult | null {
+  const { resume, profile, format, paper, targetPages } = args;
+  const [fit, setFit] = useState<FitResult | null>(null);
+
+  useEffect(() => {
+    setFit(null);
+    if (!resume || !profile) return;
+    let cancelled = false;
+    fitToPages({ resume, profile, format, paper, targetPages }).then(
+      (result) => {
+        if (!cancelled) setFit(result);
+      },
+      () => {
+        // A failed fit measurement (e.g. a font asset unavailable in a given
+        // render context) just leaves the density decision unmade — the
+        // chip stays hidden and preview/download fall back to the authored
+        // format untouched; it never surfaces as an unhandled rejection.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [resume, profile, format, paper, targetPages]);
+
+  return fit;
+}
+
 export function ApplicationDetail({ applicationId }: { applicationId: string }) {
   const { data: application, isLoading, isError } = useApplication(applicationId);
   const { data: profile } = useProfile();
@@ -41,6 +81,36 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   const lockApplication = useLockApplication();
   const unlockApplication = useUnlockApplication();
   const updateApplication = useUpdateApplication();
+
+  // Locked freezes the look along with the resume — editing a locked app's
+  // format is out of scope (it froze what was actually sent), so the design
+  // panel reflects lockedFormat.format/paper read-only rather than the live
+  // application.format/settings fallback chain. Computed ahead of the
+  // isLoading/isError early returns below so useFit (a hook) is never called
+  // conditionally.
+  const isLocked = Boolean(application?.locked);
+  const resolvedFormat: DocumentFormat = isLocked
+    ? (application?.lockedFormat?.format ?? DEFAULT_FORMAT)
+    : (application?.format ?? settings?.defaultFormat ?? DEFAULT_FORMAT);
+  const paper: Paper = isLocked
+    ? (application?.lockedFormat?.paper ?? settings?.paper ?? "letter")
+    : (settings?.paper ?? "letter");
+  const targetPages = application?.targetPages ?? 1;
+
+  // Fit once, here — the SAME FitResult drives the chip, the preview, and
+  // the download, so the density the chip claims is the density the file
+  // actually renders at (§28.4).
+  const fit = useFit({
+    resume: application?.current ?? null,
+    profile,
+    format: resolvedFormat,
+    paper,
+    targetPages,
+  });
+  const { densityMultipliers } = getTemplate(resolvedFormat.templateId);
+  const fittedFormat = fit
+    ? applyDensity(resolvedFormat, fit.density, densityMultipliers)
+    : resolvedFormat;
 
   if (isLoading) {
     return (
@@ -60,15 +130,6 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
 
   const isTailoring = tailorApplication.isPending || application.genState === "tailoring";
   const tailorLabel = application.genState === "untailored" ? "Tailor" : "Re-tailor";
-
-  // Locked freezes the look along with the resume — editing a locked app's
-  // format is out of scope (it froze what was actually sent), so the design
-  // panel reflects lockedFormat.format read-only rather than the live
-  // application.format/settings.defaultFormat fallback chain.
-  const isLocked = Boolean(application.locked);
-  const resolvedFormat: DocumentFormat = isLocked
-    ? (application.lockedFormat?.format ?? DEFAULT_FORMAT)
-    : (application.format ?? settings?.defaultFormat ?? DEFAULT_FORMAT);
 
   const handleFormatChange = (next: DocumentFormat) => {
     if (isLocked) return;
@@ -132,6 +193,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
                   profile,
                   company: application.company,
                   role: application.role,
+                  format: fittedFormat,
                 })
               }
             >
@@ -171,7 +233,43 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
       ) : null}
 
       {application.current ? (
-        <ResultView resume={application.current} format={resolvedFormat} />
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {fit ? <FitChip fit={fit} /> : null}
+          </div>
+
+          {fit && !fit.fits ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-warn-soft px-4 py-3 text-sm text-warn">
+              <span>
+                Exceeds the {targetPages}-page target — even at the tightest density this renders at{" "}
+                {fit.pageCount} pages. Nothing was cut.
+              </span>
+              <div className="flex gap-2">
+                {targetPages === 1 ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      updateApplication.mutate({ id: applicationId, input: { targetPages: 2 } })
+                    }
+                  >
+                    Allow 2 pages
+                  </Button>
+                ) : null}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled
+                  title="Re-tailoring to a tighter budget is coming in a later update (E7-D1)."
+                >
+                  Re-tailor to a tighter budget
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          <ResultView resume={application.current} format={fittedFormat} />
+        </div>
       ) : (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border-strong py-16 text-center">
           <BookOpen aria-hidden className="h-8 w-8 text-muted-foreground/60" strokeWidth={1.5} />
