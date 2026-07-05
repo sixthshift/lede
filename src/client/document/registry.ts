@@ -8,6 +8,7 @@
 import type { ReactElement } from "react";
 import type { Profile, TailoredResume } from "@shared/types";
 import { StrictTemplate } from "./templates/strict";
+import { SidebarTemplate } from "./templates/sidebar";
 
 export type TemplateLayout = "single" | "sidebar-left" | "sidebar-right";
 export type AtsGrade = "strict" | "good";
@@ -36,6 +37,19 @@ export const TEMPLATES = {
     atsGrade: "strict",
     densityLadder: ["comfortable", "standard", "compact"],
     render: StrictTemplate,
+  },
+  "sidebar-left": {
+    id: "sidebar-left",
+    name: "Sidebar",
+    description:
+      "Two-column layout — skills/contact-adjacent sections in a left sidebar, narrative sections in the main column.",
+    layout: "sidebar-left",
+    // Two-column; modern parsers handle it but strict-order ATS parsers
+    // (Workday/Taleo) read left-to-right — that caveat belongs in the
+    // picker UI later, not here.
+    atsGrade: "good",
+    densityLadder: ["comfortable", "standard", "compact"],
+    render: SidebarTemplate,
   },
 } satisfies Record<string, TemplateManifest>;
 
