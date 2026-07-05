@@ -258,6 +258,116 @@ describe("ProviderEngine.attempt — calls buildUserPrompt for the `prompt` fiel
 
 // ── WIRING ──
 
+// ── BUDGET PLUMBING (E7-D1a, §28.5) ──
+
+describe("buildUserPrompt — budget block is appended AFTER context, guarded like context", () => {
+  const jd = "some job description";
+  const baseline = `Tailor for this job description:\n\n${jd}`;
+
+  it("no budget arg — byte-identical baseline (no context)", () => {
+    expect(buildUserPrompt(jd)).toBe(baseline);
+  });
+
+  it("no budget arg — byte-identical context path", () => {
+    expect(buildUserPrompt(jd, "emphasize platform work")).toBe(
+      `${baseline}\n\nTailoring context (guides emphasis; not a source of facts):\nemphasize platform work`,
+    );
+  });
+
+  it("null/empty budget — byte-identical to the no-budget baseline", () => {
+    expect(buildUserPrompt(jd, null, null)).toBe(baseline);
+    expect(buildUserPrompt(jd, null, "")).toBe(baseline);
+  });
+
+  it("null/empty budget with context — byte-identical to the context-only baseline", () => {
+    const withContext = buildUserPrompt(jd, "emphasize platform work");
+    expect(buildUserPrompt(jd, "emphasize platform work", null)).toBe(withContext);
+    expect(buildUserPrompt(jd, "emphasize platform work", "")).toBe(withContext);
+  });
+
+  it("a real budget with no context appends after the base prompt", () => {
+    const prompt = buildUserPrompt(jd, null, "Aim for roughly 40 bullets (~500 words) total.");
+    expect(prompt.startsWith(baseline)).toBe(true);
+    expect(prompt).toContain("Aim for roughly 40 bullets");
+    expect(prompt).toContain("Content budget");
+  });
+
+  it("a real budget with context appends after the context block, not before it", () => {
+    const prompt = buildUserPrompt(
+      jd,
+      "emphasize platform work",
+      "Aim for roughly 40 bullets (~500 words) total.",
+    );
+    const contextOnly = buildUserPrompt(jd, "emphasize platform work");
+    expect(prompt.startsWith(contextOnly)).toBe(true);
+    expect(prompt).toContain("Aim for roughly 40 bullets");
+    expect(prompt.indexOf("Tailoring context")).toBeLessThan(prompt.indexOf("Content budget"));
+  });
+});
+
+describe("ProviderEngine.attempt — budget threads into the `prompt` field", () => {
+  const jd = "some job description";
+
+  beforeEach(() => {
+    generateObjectMock.mockReset();
+  });
+
+  it("with no budget, sends exactly buildUserPrompt(jd) — unchanged from pre-budget behavior", async () => {
+    generateObjectMock.mockResolvedValueOnce({ object: makeDecision() });
+    const engine = new ProviderEngine({
+      provider: "google",
+      model: "gemini-2.5-flash",
+      apiKey: "k",
+    });
+    await engine.decide(jd, SEED_ENTRIES);
+    const callArgs = generateObjectMock.mock.calls[0]![0];
+    expect(callArgs.prompt).toBe(buildUserPrompt(jd));
+  });
+
+  it("with context and no budget, sends buildUserPrompt(jd, ctx) unchanged", async () => {
+    generateObjectMock.mockResolvedValueOnce({ object: makeDecision() });
+    const engine = new ProviderEngine({
+      provider: "google",
+      model: "gemini-2.5-flash",
+      apiKey: "k",
+    });
+    await engine.decide(jd, SEED_ENTRIES, "emphasize platform work");
+    const callArgs = generateObjectMock.mock.calls[0]![0];
+    expect(callArgs.prompt).toBe(buildUserPrompt(jd, "emphasize platform work"));
+  });
+
+  it("with a budget, the prompt contains the derived budget text and still starts with the base(+context) prefix", async () => {
+    generateObjectMock.mockResolvedValueOnce({ object: makeDecision() });
+    const engine = new ProviderEngine({
+      provider: "google",
+      model: "gemini-2.5-flash",
+      apiKey: "k",
+    });
+    const budget = "Aim for roughly 40 bullets (~500 words) total so the resume fits 1 page.";
+    await engine.decide(jd, SEED_ENTRIES, "emphasize platform work", budget);
+    const callArgs = generateObjectMock.mock.calls[0]![0];
+    expect(callArgs.prompt).toBe(buildUserPrompt(jd, "emphasize platform work", budget));
+    expect(callArgs.prompt.startsWith(buildUserPrompt(jd, "emphasize platform work"))).toBe(true);
+    expect(callArgs.prompt).toContain(budget);
+  });
+});
+
+describe("FixtureEngine — ignores budget (keys on jd+entries only, per hashKey's contract)", () => {
+  it("resolves the same fixture regardless of budget argument", async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "lede-fixtures-budget-"));
+    const jd = "job description — budget-ignoring scenario";
+    const decision = makeDecision({ summary: "Budget-ignoring scenario summary." });
+    writeFileSync(
+      path.join(dir, "a.json"),
+      JSON.stringify({ key: hashKey(jd, SEED_ENTRIES), name: "budget-scenario", decision }),
+    );
+
+    const engine = new FixtureEngine(dir);
+    await expect(engine.decide(jd, SEED_ENTRIES, null, "some budget")).resolves.toEqual(decision);
+    await expect(engine.decide(jd, SEED_ENTRIES, null, null)).resolves.toEqual(decision);
+  });
+});
+
 describe("ProviderEngine.decide — wiring to generateObject", () => {
   const jd = "some job description";
 

@@ -16,17 +16,32 @@ import { validateNoFabrication } from "./validate";
 import { hashKey } from "./evalcore";
 
 export interface TailorEngine {
-  decide(jd: string, entries: Entry[], context?: string | null): Promise<TailorDecision>;
+  decide(
+    jd: string,
+    entries: Entry[],
+    context?: string | null,
+    budget?: string | null,
+  ): Promise<TailorDecision>;
 }
 
-// The exact user message ProviderEngine sends. With no context, byte-identical
-// to the pre-context baseline (T014 fixtures/replays depend on this). With
-// context, appends a clearly-labelled block — context guides emphasis, never
-// a fact source (§27), so it's kept visibly separate from the JD itself.
-export function buildUserPrompt(jd: string, context?: string | null): string {
+// The exact user message ProviderEngine sends. With no context and no budget,
+// byte-identical to the pre-context baseline (T014 fixtures/replays depend on
+// this). Context appends a clearly-labelled block — context guides emphasis,
+// never a fact source (§27), so it's kept visibly separate from the JD
+// itself. Budget (§28.5) appends a further block AFTER context, phrasing the
+// server-derived content budget; same `!budget` guard keeps the no-budget
+// path byte-identical.
+export function buildUserPrompt(
+  jd: string,
+  context?: string | null,
+  budget?: string | null,
+): string {
   const base = `Tailor for this job description:\n\n${jd}`;
-  if (!context) return base;
-  return `${base}\n\nTailoring context (guides emphasis; not a source of facts):\n${context}`;
+  const withContext = !context
+    ? base
+    : `${base}\n\nTailoring context (guides emphasis; not a source of facts):\n${context}`;
+  if (!budget) return withContext;
+  return `${withContext}\n\nContent budget (approximate — prefer relevance over completeness):\n${budget}`;
 }
 
 // ── real — provider-agnostic via the Vercel AI SDK; production (user's decrypted key) ──
@@ -40,12 +55,17 @@ export type ProviderEngineConfig = {
 export class ProviderEngine implements TailorEngine {
   constructor(private cfg: ProviderEngineConfig) {}
 
-  async decide(jd: string, entries: Entry[], context?: string | null): Promise<TailorDecision> {
+  async decide(
+    jd: string,
+    entries: Entry[],
+    context?: string | null,
+    budget?: string | null,
+  ): Promise<TailorDecision> {
     try {
-      return await this.attempt(jd, entries, context);
+      return await this.attempt(jd, entries, context, budget);
     } catch {
       // retry exactly once; a second failure propagates (route maps it to 502)
-      return await this.attempt(jd, entries, context);
+      return await this.attempt(jd, entries, context, budget);
     }
   }
 
@@ -53,13 +73,14 @@ export class ProviderEngine implements TailorEngine {
     jd: string,
     entries: Entry[],
     context?: string | null,
+    budget?: string | null,
   ): Promise<TailorDecision> {
     const model = resolveModel(this.cfg);
     const { object } = await generateObject({
       model,
       schema: TailorDecisionZ,
       system: `${SYSTEM_PROMPT}\n\n${renderLibrary(entries)}`,
-      prompt: buildUserPrompt(jd, context),
+      prompt: buildUserPrompt(jd, context, budget),
       providerOptions: providerOptionsFor(this.cfg.provider) as Parameters<
         typeof generateObject
       >[0]["providerOptions"],
@@ -89,9 +110,15 @@ const DEFAULT_FIXTURES_DIR = path.join(process.cwd(), "test/fixtures/decisions")
 export class FixtureEngine implements TailorEngine {
   constructor(private dir: string = DEFAULT_FIXTURES_DIR) {}
 
-  async decide(jd: string, entries: Entry[], _context?: string | null): Promise<TailorDecision> {
-    // Recorded fixtures key on (jd, entries) only — context never affects
-    // replay matching, matching validateNoFabrication's entries-only contract.
+  async decide(
+    jd: string,
+    entries: Entry[],
+    _context?: string | null,
+    _budget?: string | null,
+  ): Promise<TailorDecision> {
+    // Recorded fixtures key on (jd, entries) only — context/budget never
+    // affect replay matching, matching validateNoFabrication's entries-only
+    // contract (§28.5: budget rides the prompt, never the replay key).
     const key = hashKey(jd, entries);
     const fixtures = this.loadFixtures();
     const match = fixtures.find((f) => f.key === key);
@@ -137,8 +164,9 @@ export async function tailor(
   layout: Layout,
   baseSummary?: string | null,
   context?: string | null,
+  budget?: string | null,
 ): Promise<TailoredResume> {
-  const decision = await engine.decide(jd, entries, context);
+  const decision = await engine.decide(jd, entries, context, budget);
   const resume = assemble(decision, entries, layout, SECTIONS);
   // validateNoFabrication takes entries only — context guides emphasis, never
   // a fact source (§27), so it must never be checked against as if it were one.

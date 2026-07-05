@@ -14,6 +14,8 @@ import { initDb, type Db } from "../src/server/db";
 import { seedIfEmpty } from "../src/server/seed";
 import { CONTRAST_JDS } from "../src/server/tailor/evalcore";
 import { buildUserPrompt, type TailorEngine } from "../src/server/tailor/engine";
+import { deriveContentBudget } from "../src/server/tailor/budget";
+import { DEFAULT_FORMAT } from "@shared/format";
 import { applicationsRoutes } from "../src/server/routes/applications";
 
 const tmpDirs: string[] = [];
@@ -98,10 +100,27 @@ describe("POST /api/applications/:id/tailor — persists via FixtureEngine (keyl
 // route wires context all the way to the engine call — not just that the
 // pure helper works in isolation.
 class SpyEngine implements TailorEngine {
-  calls: { jd: string; entries: Entry[]; context?: string | null; composedPrompt: string }[] = [];
+  calls: {
+    jd: string;
+    entries: Entry[];
+    context?: string | null;
+    budget?: string | null;
+    composedPrompt: string;
+  }[] = [];
   constructor(private response: TailorDecision) {}
-  async decide(jd: string, entries: Entry[], context?: string | null): Promise<TailorDecision> {
-    this.calls.push({ jd, entries, context, composedPrompt: buildUserPrompt(jd, context) });
+  async decide(
+    jd: string,
+    entries: Entry[],
+    context?: string | null,
+    budget?: string | null,
+  ): Promise<TailorDecision> {
+    this.calls.push({
+      jd,
+      entries,
+      context,
+      budget,
+      composedPrompt: buildUserPrompt(jd, context, budget),
+    });
     return this.response;
   }
 }
@@ -139,7 +158,7 @@ describe("RED-TEAM #1: stored context reaches decide() and the composed user mes
     expect(spy.calls[0]!.composedPrompt.startsWith(buildUserPrompt(jd))).toBe(true);
   });
 
-  it("an empty (absent) stored context yields the byte-identical baseline message", async () => {
+  it("an empty (absent) stored context yields the byte-identical baseline prefix (budget still appends, §28.5)", async () => {
     const db = freshDb();
     const spy = new SpyEngine(EMPTY_DECISION);
     const app = appWithSpy(db, spy);
@@ -153,7 +172,61 @@ describe("RED-TEAM #1: stored context reaches decide() and the composed user mes
 
     expect(spy.calls).toHaveLength(1);
     expect(spy.calls[0]!.context ?? null).toBeNull();
-    expect(spy.calls[0]!.composedPrompt).toBe(buildUserPrompt(jd));
+    // No context ⇒ context-block-free, exactly like before E7-D1a. The route
+    // now always derives a content budget (§28.5), so the composed message
+    // gains a budget block after the (context-free) base — the byte-identity
+    // guarantee is on buildUserPrompt's context/budget guards, not on the
+    // route's end-to-end output once a budget is always supplied.
+    expect(spy.calls[0]!.composedPrompt.startsWith(buildUserPrompt(jd))).toBe(true);
+    expect(spy.calls[0]!.composedPrompt).toBe(buildUserPrompt(jd, null, spy.calls[0]!.budget));
+  });
+});
+
+describe("E7-D1a: the route derives and threads a content budget to the engine (§28.5)", () => {
+  it("an application with a 1-page target receives a budget matching deriveContentBudget for its paper/targetPages/format", async () => {
+    const db = freshDb();
+    const spy = new SpyEngine(EMPTY_DECISION);
+    const app = appWithSpy(db, spy);
+
+    const created = await post(app, "/api/applications", {
+      jobDescription: "Hiring a backend engineer.",
+      targetPages: 1,
+    });
+    const id = created.json().id as string;
+
+    const res = await post(app, `/api/applications/${id}/tailor`);
+    expect(res.statusCode).toBe(200);
+
+    expect(spy.calls).toHaveLength(1);
+    const expectedBudget = deriveContentBudget({
+      paper: "letter", // settings.paper default
+      targetPages: 1,
+      format: DEFAULT_FORMAT, // settings.defaultFormat default; app.format is null
+    });
+    expect(spy.calls[0]!.budget).toBe(expectedBudget);
+    expect(spy.calls[0]!.composedPrompt).toContain(expectedBudget);
+  });
+
+  it("a 2-page target yields a distinctly larger budget than a 1-page target for the same app otherwise", async () => {
+    const db = freshDb();
+    const spy = new SpyEngine(EMPTY_DECISION);
+    const app = appWithSpy(db, spy);
+
+    const created = await post(app, "/api/applications", {
+      jobDescription: "Hiring a staff engineer.",
+      targetPages: 2,
+    });
+    const id = created.json().id as string;
+
+    await post(app, `/api/applications/${id}/tailor`);
+
+    const expectedOnePageBudget = deriveContentBudget({
+      paper: "letter",
+      targetPages: 1,
+      format: DEFAULT_FORMAT,
+    });
+    expect(spy.calls[0]!.budget).not.toBe(expectedOnePageBudget);
+    expect(spy.calls[0]!.budget).toContain("2 pages");
   });
 });
 

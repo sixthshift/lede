@@ -19,6 +19,7 @@ import {
   type TailorEngine,
 } from "../tailor/engine";
 import { FabricationError } from "../tailor/validate";
+import { deriveContentBudget } from "../tailor/budget";
 
 // Row -> domain Entry — same shape/key-order as index.ts's rowToEntry, kept
 // in lockstep so hashKey() (FixtureEngine's replay key) matches identically
@@ -213,6 +214,15 @@ export function applicationsRoutes(
       const settingsRow = db.select().from(settings).where(eq(settings.id, 1)).get()!;
       const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get();
 
+      // §28.5 — derive a content budget from paper/targetPages/effective
+      // format and ride it on the user message, same transport as context.
+      const effectiveFormat = existing.format ?? settingsRow.defaultFormat;
+      const budget = deriveContentBudget({
+        paper: settingsRow.paper,
+        targetPages: existing.targetPages,
+        format: effectiveFormat,
+      });
+
       const resume = await tailor(
         engine,
         existing.jobDescription,
@@ -220,6 +230,7 @@ export function applicationsRoutes(
         settingsRow.layout,
         profileRow?.baseSummary,
         existing.context,
+        budget,
       );
 
       const row = {
