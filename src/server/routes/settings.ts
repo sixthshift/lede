@@ -6,7 +6,7 @@ import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { settingsInput } from "@shared/schema";
+import { settingsInput, documentFormatZ } from "@shared/schema";
 import type { Db } from "../db";
 import { settings, secrets } from "../db/schema";
 import { encrypt } from "../crypto";
@@ -15,6 +15,10 @@ import { validateProviderKey, type ProviderKeyValidator } from "../keyvalidation
 import type { ProviderId } from "@shared/types";
 
 const keyInput = z.object({ apiKey: z.string().min(1).max(2000) });
+
+// settingsInput (@shared/schema) doesn't own DocumentFormat — extended here
+// with the bounded documentFormatZ validator, same as application.format (§28.3).
+const settingsInputWithFormat = settingsInput.extend({ defaultFormat: documentFormatZ.optional() });
 
 function currentSettings(db: Db) {
   const row = db.select().from(settings).where(eq(settings.id, 1)).get()!;
@@ -26,6 +30,7 @@ function currentSettings(db: Db) {
     baseUrl: row.baseUrl,
     layout: row.layout,
     paper: row.paper,
+    defaultFormat: row.defaultFormat,
   };
 }
 
@@ -37,7 +42,7 @@ export function settingsRoutes(
   app.get("/api/settings", async () => currentSettings(db));
 
   app.put("/api/settings", async (request, reply) => {
-    const parsed = settingsInput.safeParse(request.body);
+    const parsed = settingsInputWithFormat.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "invalid_body", issues: parsed.error.issues });
     }

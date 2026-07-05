@@ -5,7 +5,23 @@
 import { sqliteTable, text, integer, check } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
-import type { EntryMeta, Paper, ProviderId, Section, TailoredResume } from "@shared/types";
+import type {
+  DocumentFormat,
+  EntryMeta,
+  Paper,
+  ProviderId,
+  Section,
+  TailoredResume,
+} from "@shared/types";
+import { DEFAULT_FORMAT } from "@shared/format";
+
+// ── frozen at lock time alongside the resume snapshot (§28.3) — the fit
+// ladder is a later epic, so resolvedDensity is 'as-set' = 'comfortable' until then ──
+type LockedFormat = {
+  format: DocumentFormat;
+  resolvedDensity: "comfortable" | "standard" | "compact";
+  paper: Paper;
+};
 
 // ── all resume content ────────────────────────────────────
 export const entries = sqliteTable("entries", {
@@ -35,6 +51,7 @@ export const profile = sqliteTable(
       .$type<{ type: "github" | "linkedin" | "site" | "other"; label: string; url: string }[]>()
       .default([]),
     baseSummary: text("base_summary"), // optional; AI reworks it, else fully generated
+    photoUrl: text("photo_url"), // asset is identity; display lives on DocumentFormat.photo (§28.3)
     updatedAt: integer("updated_at").notNull(),
   },
   (t) => ({ singleton: check("profile_singleton", sql`${t.id} = 1`) }),
@@ -53,6 +70,10 @@ export const settings = sqliteTable(
       .$type<{ section: Section | "summary"; enabled: boolean }[]>()
       .default([]),
     paper: text("paper").notNull().default("letter").$type<Paper>(), // page size, global (§28.1)
+    defaultFormat: text("default_format", { mode: "json" })
+      .notNull()
+      .$type<DocumentFormat>()
+      .default(DEFAULT_FORMAT), // instance-level fallback for application.format (§28.3)
     updatedAt: integer("updated_at").notNull(),
   },
   (t) => ({ singleton: check("settings_singleton", sql`${t.id} = 1`) }),
@@ -66,8 +87,10 @@ export const applications = sqliteTable("applications", {
   jobDescription: text("job_description").notNull(),
   context: text("context"), // guides emphasis only — never a fact source
   targetPages: integer("target_pages").notNull().default(1).$type<1 | 2>(), // page budget for this role (§28.1)
+  format: text("format", { mode: "json" }).$type<DocumentFormat | null>(), // per-app override of settings.defaultFormat (§28.3)
   current: text("current", { mode: "json" }).$type<TailoredResume | null>(),
   locked: text("locked", { mode: "json" }).$type<TailoredResume | null>(),
+  lockedFormat: text("locked_format", { mode: "json" }).$type<LockedFormat | null>(), // frozen at lock time (§28.3)
   genState: text("gen_state").notNull().default("untailored"), // 'untailored'|'tailoring'|'tailored'|'failed'
   currentMeta: text("current_meta", { mode: "json" }).$type<{
     at: number;

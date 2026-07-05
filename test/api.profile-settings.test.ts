@@ -41,6 +41,7 @@ describe("GET/PUT /api/profile", () => {
       location: "Remote",
       links: [{ type: "github", label: "GitHub", url: "https://github.com/jane" }],
       baseSummary: "Ships platform SDKs.",
+      photoUrl: "https://example.com/jane.jpg",
     };
     const putRes = await app.inject({ method: "PUT", url: "/api/profile", payload });
     expect(putRes.statusCode).toBe(200);
@@ -114,7 +115,15 @@ describe("CONTRAST: /api/settings never leaks the key or auth hash", () => {
     expect(raw).not.toMatch(/"hash"/);
     expect(raw).not.toMatch(/"salt"/);
 
-    const allowed = new Set(["keySet", "provider", "model", "baseUrl", "layout", "paper"]);
+    const allowed = new Set([
+      "keySet",
+      "provider",
+      "model",
+      "baseUrl",
+      "layout",
+      "paper",
+      "defaultFormat",
+    ]);
     for (const key of Object.keys(body)) {
       expect(allowed.has(key)).toBe(true);
     }
