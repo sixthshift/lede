@@ -150,6 +150,29 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   await expectCanvasPainted(page);
   await expect(page.locator(".reasoning-panel")).toBeVisible();
 
+  // (4b) Design panel (E7-B1e) — change the TEMPLATE and the body FONT; each
+  // change PUTs application.format and the preview canvas repaints (§28.3).
+  // Both PUTs are proven to persist below by the SAME full reload (5) uses.
+  const applicationPut = (r: import("@playwright/test").Response) =>
+    r.url().endsWith(`/api/applications/${applicationId}`) && r.request().method() === "PUT";
+
+  const [templatePutResponse] = await Promise.all([
+    page.waitForResponse(applicationPut),
+    page.getByRole("button", { name: /Sidebar/ }).click(),
+  ]);
+  expect(templatePutResponse.status()).toBe(200);
+  expect((await templatePutResponse.json()).format.templateId).toBe("sidebar-left");
+  await expectCanvasPainted(page);
+
+  await page.getByRole("combobox", { name: "Body font" }).click();
+  const [fontPutResponse] = await Promise.all([
+    page.waitForResponse(applicationPut),
+    page.getByRole("option", { name: "Arimo (Arial)" }).click(),
+  ]);
+  expect(fontPutResponse.status()).toBe(200);
+  expect((await fontPutResponse.json()).format.typography.body.family).toBe("arimo");
+  await expectCanvasPainted(page);
+
   // (5) full reload -> the same content still persists, with NO re-tailor
   // (persistence: genState stays 'tailored', current was persisted by (3),
   // not re-derived on load) — checked against the record itself, since the
@@ -160,6 +183,15 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   const afterReload = await page.request.get(`/api/applications/${applicationId}`);
   expect(JSON.stringify(await afterReload.json())).toContain(RESUME_TOKEN);
   expect(tailorRequests, "reload must not trigger a re-tailor").toHaveLength(1);
+
+  // (4c) the format change from (4b) PERSISTS across the reload — the
+  // TemplatePicker/DesignPanel controls reflect the saved value, not a
+  // client-only draft.
+  await expect(page.getByRole("button", { name: /Sidebar/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByRole("combobox", { name: "Body font" })).toHaveText(/Arimo/);
 
   // (6) re-tailor.
   const [retailorResponse] = await Promise.all([

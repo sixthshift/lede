@@ -2,10 +2,12 @@
 // immediately via PUT /api/settings; the BYOK key has its own write-only
 // sub-form (ApiKeyForm) since it never round-trips a value.
 import { PROVIDERS } from "@shared/providers";
-import type { ProviderId } from "@shared/types";
+import { DEFAULT_FORMAT } from "@shared/format";
+import type { DocumentFormat, ProviderId } from "@shared/types";
 
 import { useSettings, useUpdateSettings } from "../hooks/queries";
 import { ApiKeyForm } from "./ApiKeyForm";
+import { DesignPanel } from "./DesignPanel";
 import { ModelPicker } from "./ModelPicker";
 import { ProviderPicker } from "./ProviderPicker";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -27,7 +29,7 @@ export function SettingsView() {
     return <p className="text-sm text-destructive">Could not load settings.</p>;
   }
 
-  const { provider, model, keySet } = settingsQuery.data;
+  const { provider, model, keySet, defaultFormat } = settingsQuery.data;
 
   function handleProviderChange(nextProvider: ProviderId) {
     updateSettings.mutate({ provider: nextProvider, model: PROVIDERS[nextProvider].default });
@@ -35,6 +37,10 @@ export function SettingsView() {
 
   function handleModelChange(nextModel: string) {
     updateSettings.mutate({ model: nextModel });
+  }
+
+  function handleDefaultFormatChange(next: DocumentFormat) {
+    updateSettings.mutate({ defaultFormat: next });
   }
 
   return (
@@ -73,6 +79,21 @@ export function SettingsView() {
         </CardHeader>
         <CardContent>
           <ApiKeyForm keySet={keySet} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-md">Default document format</CardTitle>
+          <CardDescription>
+            The starting look for a new application — any application can override it.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DesignPanel
+            format={defaultFormat ?? DEFAULT_FORMAT}
+            onChange={handleDefaultFormatChange}
+          />
         </CardContent>
       </Card>
     </div>

@@ -143,6 +143,15 @@ export type DocumentFormat = {
   sections: Partial<Record<Section, { columns?: 1 | 2 | 3 }>>; // e.g. skills in 2 columns
 };
 
+// ── frozen at lock time alongside the resume snapshot (§28.3) — mirrors the
+// DB shape (server/db/schema.ts's LockedFormat); the fit ladder is a later
+// epic, so resolvedDensity is 'as-set' = 'comfortable' until then ──
+export type LockedFormat = {
+  format: DocumentFormat;
+  resolvedDensity: "comfortable" | "standard" | "compact";
+  paper: Paper;
+};
+
 // ── a tailoring record for one job — NOT a hiring tracker; no status field (§27) ──
 export type Application = {
   id: string;
@@ -151,8 +160,10 @@ export type Application = {
   jobDescription: string;
   context?: string; // guides emphasis only — never a fact source
   targetPages: 1 | 2; // page budget for this role, default 1 (§28.1)
+  format: DocumentFormat | null; // per-app override of settings.defaultFormat (§28.3)
   current: TailoredResume | null;
   locked: TailoredResume | null;
+  lockedFormat: LockedFormat | null; // frozen at lock time (§28.3)
   genState: "untailored" | "tailoring" | "tailored" | "failed";
   currentMeta: { at: number; provider: ProviderId; model: string } | null;
   createdAt: number;

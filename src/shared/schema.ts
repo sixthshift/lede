@@ -161,57 +161,11 @@ export const entryInput = createInsertSchema(entries, {
 
 export const entryImport = z.array(entryInput).max(200);
 
-// ── §4.2/§16 profile input (identity for the header) ──
-const profileLinkZ = z.object({
-  type: z.enum(["github", "linkedin", "site", "other"]),
-  label: z.string().min(1).max(120),
-  url: z.string().min(1).max(120),
-});
-
-export const profileInput = z.object({
-  name: z.string().min(1).max(120),
-  headline: z.string().min(1).max(120).nullish(),
-  email: z.string().min(1).max(120),
-  phone: z.string().min(1).max(120).nullish(),
-  location: z.string().min(1).max(120).nullish(),
-  links: z.array(profileLinkZ).max(8),
-  baseSummary: z.string().min(1).max(2000).nullish(),
-});
-
-// ── §4.2/§9 settings input (provider/model/baseUrl/layout) ──
-const layoutEntryZ = z.object({
-  section: z.enum([...SECTION_VALUES, "summary"]),
-  enabled: z.boolean(),
-});
-
-export const settingsInput = z.object({
-  provider: z.string().min(1).max(120).optional(),
-  model: z.string().min(1).max(120).optional(),
-  baseUrl: z.string().min(1).max(200).nullish(),
-  layout: z.array(layoutEntryZ).optional(),
-  paper: z.enum(["letter", "a4"]).optional(),
-});
-
-// ── §27 application input — a tailoring record for one job, no hiring status ──
-export const applicationCreate = z.object({
-  company: z.string().min(1).max(200).nullish(),
-  role: z.string().min(1).max(200).nullish(),
-  jobDescription: z.string().min(1).max(20000),
-  context: z.string().min(1).max(4000).nullish(),
-  targetPages: z.union([z.literal(1), z.literal(2)]).optional(),
-});
-
-export const applicationUpdate = z.object({
-  company: z.string().min(1).max(200).nullish(),
-  role: z.string().min(1).max(200).nullish(),
-  jobDescription: z.string().min(1).max(20000).optional(),
-  context: z.string().min(1).max(4000).nullish(),
-  targetPages: z.union([z.literal(1), z.literal(2)]).optional(),
-});
-
 // ── §28.3 DocumentFormat — hand-written (never table-derived): bounded design-
 // panel overrides, validated the same way regardless of storage location
-// (settings.defaultFormat / application.format are both JSON columns). ──
+// (settings.defaultFormat / application.format are both JSON columns).
+// Declared ahead of profileInput/settingsInput/applicationCreate/Update
+// below, all of which reference it. ──
 const FONT_IDS = [
   "ibm-plex-sans",
   "ibm-plex-serif",
@@ -255,6 +209,58 @@ export const documentFormatZ = z.object({
       columns: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
     }),
   ),
+});
+
+// ── §4.2/§16 profile input (identity for the header) ──
+const profileLinkZ = z.object({
+  type: z.enum(["github", "linkedin", "site", "other"]),
+  label: z.string().min(1).max(120),
+  url: z.string().min(1).max(120),
+});
+
+export const profileInput = z.object({
+  name: z.string().min(1).max(120),
+  headline: z.string().min(1).max(120).nullish(),
+  email: z.string().min(1).max(120),
+  phone: z.string().min(1).max(120).nullish(),
+  location: z.string().min(1).max(120).nullish(),
+  links: z.array(profileLinkZ).max(8),
+  baseSummary: z.string().min(1).max(2000).nullish(),
+  photoUrl: z.string().optional(), // asset is identity; display lives on DocumentFormat.photo (§28.3)
+});
+
+// ── §4.2/§9 settings input (provider/model/baseUrl/layout) ──
+const layoutEntryZ = z.object({
+  section: z.enum([...SECTION_VALUES, "summary"]),
+  enabled: z.boolean(),
+});
+
+export const settingsInput = z.object({
+  provider: z.string().min(1).max(120).optional(),
+  model: z.string().min(1).max(120).optional(),
+  baseUrl: z.string().min(1).max(200).nullish(),
+  layout: z.array(layoutEntryZ).optional(),
+  paper: z.enum(["letter", "a4"]).optional(),
+  defaultFormat: documentFormatZ.optional(), // instance-level fallback for application.format (§28.3)
+});
+
+// ── §27 application input — a tailoring record for one job, no hiring status ──
+export const applicationCreate = z.object({
+  company: z.string().min(1).max(200).nullish(),
+  role: z.string().min(1).max(200).nullish(),
+  jobDescription: z.string().min(1).max(20000),
+  context: z.string().min(1).max(4000).nullish(),
+  targetPages: z.union([z.literal(1), z.literal(2)]).optional(),
+  format: documentFormatZ.nullish(), // per-app override of settings.defaultFormat (§28.3)
+});
+
+export const applicationUpdate = z.object({
+  company: z.string().min(1).max(200).nullish(),
+  role: z.string().min(1).max(200).nullish(),
+  jobDescription: z.string().min(1).max(20000).optional(),
+  context: z.string().min(1).max(4000).nullish(),
+  targetPages: z.union([z.literal(1), z.literal(2)]).optional(),
+  format: documentFormatZ.nullish(), // per-app override of settings.defaultFormat (§28.3)
 });
 
 // ── §5 the model's flat output contract — hand-written, passed straight to generateObject ──
