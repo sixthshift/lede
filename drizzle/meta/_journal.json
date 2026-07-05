@@ -22,6 +22,13 @@
       "when": 1783240484054,
       "tag": "0002_freezing_ink",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1783255867782,
+      "tag": "0003_typical_malice",
+      "breakpoints": true
     }
   ]
 }

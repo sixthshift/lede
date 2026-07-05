@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { APICallError, NoObjectGeneratedError } from "ai";
 
-import { applicationCreate, applicationUpdate } from "@shared/schema";
+import { applicationCreate, applicationUpdate, documentFormatZ } from "@shared/schema";
 import type { Entry, ProviderId, Section } from "@shared/types";
 import type { Db } from "../db";
 import { applications, entries, profile, settings, secrets } from "../db/schema";
@@ -54,6 +54,11 @@ function mapTailorError(err: unknown): { status: number; body: { error: string }
 
   return { status: 502, body: { error: "provider_error" } };
 }
+
+// applicationCreate/Update (@shared/schema) don't own DocumentFormat —
+// extended here with the bounded documentFormatZ validator (§28.3).
+const applicationCreateWithFormat = applicationCreate.extend({ format: documentFormatZ.nullish() });
+const applicationUpdateWithFormat = applicationUpdate.extend({ format: documentFormatZ.nullish() });
 
 export type ApplicationsRoutesDeps = {
   // Test-only seam (mirrors settingsRoutes' injected validator): a fixed
@@ -114,7 +119,7 @@ export function applicationsRoutes(
   });
 
   app.post("/api/applications", async (request, reply) => {
-    const parsed = applicationCreate.safeParse(request.body);
+    const parsed = applicationCreateWithFormat.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "invalid_body", issues: parsed.error.issues });
     }
@@ -128,8 +133,10 @@ export function applicationsRoutes(
       jobDescription: input.jobDescription,
       context: input.context ?? null,
       targetPages: input.targetPages ?? 1,
+      format: input.format ?? null,
       current: null,
       locked: null,
+      lockedFormat: null,
       genState: "untailored" as const,
       currentMeta: null,
       createdAt: now,
@@ -148,7 +155,7 @@ export function applicationsRoutes(
   });
 
   app.put<{ Params: { id: string } }>("/api/applications/:id", async (request, reply) => {
-    const parsed = applicationUpdate.safeParse(request.body);
+    const parsed = applicationUpdateWithFormat.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: "invalid_body", issues: parsed.error.issues });
     }
@@ -170,6 +177,7 @@ export function applicationsRoutes(
       ...(input.jobDescription !== undefined ? { jobDescription: input.jobDescription } : {}),
       ...(input.context !== undefined ? { context: input.context ?? null } : {}),
       ...(input.targetPages !== undefined ? { targetPages: input.targetPages } : {}),
+      ...(input.format !== undefined ? { format: input.format ?? null } : {}),
       updatedAt: Date.now(),
     };
     db.update(applications).set(row).where(eq(applications.id, existing.id)).run();
@@ -242,7 +250,9 @@ export function applicationsRoutes(
   // ── lock/unlock (§27 integrity invariant) — `locked` is a deep copy of
   // `current`'s content at lock time, never a reference to it or to the
   // Library entries it was built from, so editing/deleting an entry (or a
-  // later re-tailor) can never retroactively change a locked snapshot ──
+  // later re-tailor) can never retroactively change a locked snapshot.
+  // `lockedFormat` freezes the same way: the fit ladder is a later epic, so
+  // resolvedDensity is 'as-set' = 'comfortable' until then (§28.3) ──
   app.post<{ Params: { id: string } }>("/api/applications/:id/lock", async (request, reply) => {
     const existing = db
       .select()
@@ -256,7 +266,19 @@ export function applicationsRoutes(
       return reply.code(400).send({ error: "no_current" });
     }
 
-    const row = { ...existing, locked: structuredClone(existing.current), updatedAt: Date.now() };
+    const settingsRow = db.select().from(settings).where(eq(settings.id, 1)).get()!;
+    const lockedFormat = structuredClone({
+      format: existing.format ?? settingsRow.defaultFormat,
+      resolvedDensity: "comfortable" as const,
+      paper: settingsRow.paper,
+    });
+
+    const row = {
+      ...existing,
+      locked: structuredClone(existing.current),
+      lockedFormat,
+      updatedAt: Date.now(),
+    };
     db.update(applications).set(row).where(eq(applications.id, existing.id)).run();
     return reply.code(200).send(row);
   });
@@ -271,7 +293,7 @@ export function applicationsRoutes(
       return reply.code(404).send({ error: "not_found" });
     }
 
-    const row = { ...existing, locked: null, updatedAt: Date.now() };
+    const row = { ...existing, locked: null, lockedFormat: null, updatedAt: Date.now() };
     db.update(applications).set(row).where(eq(applications.id, existing.id)).run();
     return reply.code(200).send(row);
   });

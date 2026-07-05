@@ -192,6 +192,8 @@ describe("applications table (§27)", () => {
       "created_at",
       "updated_at",
       "target_pages",
+      "format",
+      "locked_format",
     ]);
     expect(columns).not.toContain("status");
     expect(columns).not.toContain("hiring_status");

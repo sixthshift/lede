@@ -6,7 +6,7 @@ import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { entryImport, profileInput, applicationCreate } from "@shared/schema";
+import { entryImport, profileInput, applicationCreate, documentFormatZ } from "@shared/schema";
 import { SECTION_VALUES } from "@shared/sections";
 import type { Db } from "../db";
 import { entries, profile, applications } from "../db/schema";
@@ -40,13 +40,23 @@ const tailoredResumeZ = z.object({
   cut: z.array(z.object({ entryId: z.string(), reason: z.string() })),
 });
 
+// Mirrors the applications.ts lock endpoint's frozen shape (§28.3) — not
+// owned by @shared/schema, hand-written here for the same reason as tailoredResumeZ.
+const lockedFormatZ = z.object({
+  format: documentFormatZ,
+  resolvedDensity: z.enum(["comfortable", "standard", "compact"]),
+  paper: z.enum(["letter", "a4"]),
+});
+
 // A backed-up application carries its id + storage timestamps + the full
 // current/locked snapshots — applicationCreate/Update (routes/applications.ts)
 // only cover the user-editable subset, so this extends it for round-tripping.
 const applicationImport = applicationCreate.extend({
   id: z.string().min(1),
+  format: documentFormatZ.nullish(),
   current: tailoredResumeZ.nullable(),
   locked: tailoredResumeZ.nullable(),
+  lockedFormat: lockedFormatZ.nullish(),
   genState: z.enum(["untailored", "tailoring", "tailored", "failed"]),
   currentMeta: z
     .object({
@@ -59,9 +69,12 @@ const applicationImport = applicationCreate.extend({
   updatedAt: z.number(),
 });
 
+// profileInput (@shared/schema) doesn't own photoUrl — extended here, same as routes/profile.ts.
+const profileImport = profileInput.extend({ photoUrl: z.string().min(1).max(2000).nullish() });
+
 const backupImport = z.object({
   entries: entryImport.optional(),
-  profile: profileInput.optional(),
+  profile: profileImport.optional(),
   applications: z.array(applicationImport).max(500).optional(),
 });
 
