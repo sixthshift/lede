@@ -11,24 +11,23 @@ const PAGE_SIZE: Record<TemplateProps["paper"], "LETTER" | "A4"> = {
   a4: "A4",
 };
 
-const styles = StyleSheet.create({
-  page: {
-    paddingTop: 36,
-    paddingBottom: 36,
-    paddingHorizontal: 40,
-    fontSize: 10,
-    fontFamily: "Helvetica",
-  },
-});
-
-export function StrictTemplate({ resume, profile, paper }: TemplateProps) {
+export function StrictTemplate({ resume, profile, paper, format }: TemplateProps) {
+  const styles = StyleSheet.create({
+    page: {
+      paddingTop: format.page.marginY,
+      paddingBottom: format.page.marginY,
+      paddingHorizontal: format.page.marginX,
+      fontSize: format.typography.body.size,
+      fontFamily: format.typography.body.family,
+    },
+  });
   return (
     <Document title={profile.name} author={profile.name}>
       <Page size={PAGE_SIZE[paper]} style={styles.page}>
-        <ProfileHeader profile={profile} />
-        <SummarySection summary={resume.summary} />
+        <ProfileHeader profile={profile} format={format} />
+        <SummarySection summary={resume.summary} format={format} />
         {resume.sections.map((section) => (
-          <SectionBlock key={section.section} section={section} />
+          <SectionBlock key={section.section} section={section} format={format} />
         ))}
       </Page>
     </Document>

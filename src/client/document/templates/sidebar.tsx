@@ -19,27 +19,6 @@ const PAGE_SIZE: Record<TemplateProps["paper"], "LETTER" | "A4"> = {
 // is a layout split only — every section still renders through SectionBlock.
 const SIDEBAR_SECTIONS: Section[] = ["skill", "language", "interest", "certification"];
 
-const styles = StyleSheet.create({
-  page: {
-    paddingTop: 36,
-    paddingBottom: 36,
-    paddingHorizontal: 0,
-    fontSize: 10,
-    fontFamily: "Helvetica",
-    flexDirection: "row",
-  },
-  sidebar: {
-    width: "32%",
-    paddingLeft: 28,
-    paddingRight: 16,
-  },
-  main: {
-    width: "68%",
-    paddingLeft: 16,
-    paddingRight: 40,
-  },
-});
-
 function splitSections(sections: TailoredSection[]) {
   const sidebar: TailoredSection[] = [];
   const main: TailoredSection[] = [];
@@ -49,21 +28,41 @@ function splitSections(sections: TailoredSection[]) {
   return { sidebar, main };
 }
 
-export function SidebarTemplate({ resume, profile, paper }: TemplateProps) {
+export function SidebarTemplate({ resume, profile, paper, format }: TemplateProps) {
   const { sidebar, main } = splitSections(resume.sections);
+  const styles = StyleSheet.create({
+    page: {
+      paddingTop: format.page.marginY,
+      paddingBottom: format.page.marginY,
+      paddingHorizontal: 0,
+      fontSize: format.typography.body.size,
+      fontFamily: format.typography.body.family,
+      flexDirection: "row",
+    },
+    sidebar: {
+      width: "32%",
+      paddingLeft: format.page.marginX,
+      paddingRight: 16,
+    },
+    main: {
+      width: "68%",
+      paddingLeft: 16,
+      paddingRight: format.page.marginX,
+    },
+  });
   return (
     <Document title={profile.name} author={profile.name}>
       <Page size={PAGE_SIZE[paper]} style={styles.page}>
         <View style={styles.sidebar}>
           {sidebar.map((section) => (
-            <SectionBlock key={section.section} section={section} />
+            <SectionBlock key={section.section} section={section} format={format} />
           ))}
         </View>
         <View style={styles.main}>
-          <ProfileHeader profile={profile} />
-          <SummarySection summary={resume.summary} />
+          <ProfileHeader profile={profile} format={format} />
+          <SummarySection summary={resume.summary} format={format} />
           {main.map((section) => (
-            <SectionBlock key={section.section} section={section} />
+            <SectionBlock key={section.section} section={section} format={format} />
           ))}
         </View>
       </Page>

@@ -7,7 +7,8 @@
 
 import { useEffect, useRef } from "react";
 import { usePDF } from "@react-pdf/renderer";
-import type { Profile, TailoredResume } from "@shared/types";
+import { DEFAULT_FORMAT } from "@shared/format";
+import type { DocumentFormat, Profile, TailoredResume } from "@shared/types";
 import type { Paper } from "../document";
 import { renderResumeDocument } from "../document";
 import { useProfile, useSettings } from "../hooks/queries";
@@ -63,12 +64,16 @@ function RenderedPreview({
   resume,
   profile,
   paper,
+  format,
 }: {
   resume: TailoredResume;
   profile: Profile;
   paper: Paper;
+  format: DocumentFormat;
 }) {
-  const [instance] = usePDF({ document: renderResumeDocument({ resume, profile, paper }) });
+  const [instance] = usePDF({
+    document: renderResumeDocument({ resume, profile, paper, format }),
+  });
 
   if (instance.error) {
     return (
@@ -83,7 +88,13 @@ function RenderedPreview({
   return <PdfCanvas url={instance.url} />;
 }
 
-export function DocumentPreview({ resume }: { resume: TailoredResume }) {
+export function DocumentPreview({
+  resume,
+  format = DEFAULT_FORMAT,
+}: {
+  resume: TailoredResume;
+  format?: DocumentFormat;
+}) {
   const { data: profile } = useProfile();
   const { data: settings } = useSettings();
 
@@ -92,7 +103,7 @@ export function DocumentPreview({ resume }: { resume: TailoredResume }) {
   return (
     <div className="document-preview">
       {profile && settings ? (
-        <RenderedPreview resume={resume} profile={profile} paper={settings.paper} />
+        <RenderedPreview resume={resume} profile={profile} paper={settings.paper} format={format} />
       ) : (
         <p className="document-preview__loading">Loading preview…</p>
       )}

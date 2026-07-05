@@ -3,7 +3,9 @@
 // bytes — formatting never mutates the stored TailoredResume (§28.1).
 
 import { renderToBuffer } from "@react-pdf/renderer";
-import type { Profile, TailoredResume } from "@shared/types";
+import { DEFAULT_FORMAT } from "@shared/format";
+import type { DocumentFormat, Profile, TailoredResume } from "@shared/types";
+import { registerDocumentFonts } from "./fonts";
 import { getTemplate, type Paper } from "./registry";
 
 export type RenderResumeArgs = {
@@ -11,6 +13,7 @@ export type RenderResumeArgs = {
   profile: Profile;
   paper?: Paper;
   templateId?: string;
+  format?: DocumentFormat;
 };
 
 export function renderResumeDocument({
@@ -18,9 +21,11 @@ export function renderResumeDocument({
   profile,
   paper = "letter",
   templateId = "strict",
+  format = DEFAULT_FORMAT,
 }: RenderResumeArgs) {
+  registerDocumentFonts();
   const template = getTemplate(templateId);
-  return template.render({ resume, profile, paper });
+  return template.render({ resume, profile, paper, format });
 }
 
 export async function renderResumeToBuffer(args: RenderResumeArgs): Promise<Buffer> {

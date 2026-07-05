@@ -6,7 +6,7 @@
 // never in which sections/features they render (rx-resume's rule, §28.2).
 
 import type { ReactElement } from "react";
-import type { Profile, TailoredResume } from "@shared/types";
+import type { DocumentFormat, Profile, TailoredResume } from "@shared/types";
 import { StrictTemplate } from "./templates/strict";
 import { SidebarTemplate } from "./templates/sidebar";
 
@@ -16,7 +16,12 @@ export type Paper = "letter" | "a4";
 // §28.4 fit ladder — auto density, template-declared multipliers land in a later ticket.
 export type Density = "comfortable" | "standard" | "compact";
 
-export type TemplateProps = { resume: TailoredResume; profile: Profile; paper: Paper };
+export type TemplateProps = {
+  resume: TailoredResume;
+  profile: Profile;
+  paper: Paper;
+  format: DocumentFormat;
+};
 
 export type TemplateManifest = {
   id: string;
@@ -59,4 +64,14 @@ export function getTemplate(id: string): TemplateManifest {
   const template = (TEMPLATES as Record<string, TemplateManifest>)[id];
   if (!template) throw new Error(`Unknown template id: ${id}`);
   return template;
+}
+
+// §28.2: a sidebar layout or a shown photo reads to an ATS parser as
+// something less linear than plain top-to-bottom text, no matter how
+// ATS-strict the template's own composition claims to be — so both cap the
+// grade at 'good', never letting a template's declared atsGrade overstate
+// what the chosen format actually produces.
+export function effectiveAtsGrade(manifest: TemplateManifest, format: DocumentFormat): AtsGrade {
+  const capped = format.photo.hidden === false || manifest.layout !== "single";
+  return capped ? "good" : manifest.atsGrade;
 }
