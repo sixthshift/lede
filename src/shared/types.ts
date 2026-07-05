@@ -76,6 +76,7 @@ export type Profile = {
   location?: string;
   links: { type: "github" | "linkedin" | "site" | "other"; label: string; url: string }[];
   baseSummary?: string; // optional; AI reworks it, else fully generated
+  photoUrl?: string; // asset is identity; display (shown/size/shape) lives on DocumentFormat.photo (§28.3)
 };
 
 // ── ordered, toggleable resume sections (§4.2 settings.layout) ──
@@ -114,6 +115,32 @@ export type TailoredResume = {
   summary: string;
   sections: TailoredSection[]; // layout order; groups & flat-item order per the section registry
   cut: { entryId: string; reason: string }[];
+};
+
+// ── document design layer (§28.3): the curated, self-hosted font registry ──
+// (a later ticket registers the actual faces via Font.register; metric
+// stand-ins for the Word classics: Arimo→Arial, Tinos→Times New Roman, Carlito→Calibri)
+export type FontId =
+  | "ibm-plex-sans"
+  | "ibm-plex-serif"
+  | "ibm-plex-mono"
+  | "arimo"
+  | "tinos"
+  | "carlito";
+
+// ── bounded design-panel overrides on top of a template (§28.3) ──
+// persisted per application as `format`, with instance defaults in
+// `settings.defaultFormat`. The renderer never cuts (§28.4) — this only styles.
+export type DocumentFormat = {
+  templateId: string;
+  typography: {
+    body: { family: FontId; size: number; lineHeight: number }; // size 9–12pt
+    heading: { family: FontId; weight: 400 | 500 | 600 | 700 };
+  };
+  colors: { primary: string; text: string }; // primary drives headings/rules/links per template
+  page: { marginX: number; marginY: number; sectionGap: number }; // pt, bounded ranges
+  photo: { hidden: boolean; size: number; shape: "circle" | "rounded" | "square" }; // default hidden
+  sections: Partial<Record<Section, { columns?: 1 | 2 | 3 }>>; // e.g. skills in 2 columns
 };
 
 // ── a tailoring record for one job — NOT a hiring tracker; no status field (§27) ──

@@ -209,6 +209,54 @@ export const applicationUpdate = z.object({
   targetPages: z.union([z.literal(1), z.literal(2)]).optional(),
 });
 
+// ── §28.3 DocumentFormat — hand-written (never table-derived): bounded design-
+// panel overrides, validated the same way regardless of storage location
+// (settings.defaultFormat / application.format are both JSON columns). ──
+const FONT_IDS = [
+  "ibm-plex-sans",
+  "ibm-plex-serif",
+  "ibm-plex-mono",
+  "arimo",
+  "tinos",
+  "carlito",
+] as const;
+const hexColorZ = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
+export const documentFormatZ = z.object({
+  templateId: z.string().min(1),
+  typography: z.object({
+    body: z.object({
+      family: z.enum(FONT_IDS),
+      size: z.number().min(9).max(12),
+      lineHeight: z.number().min(1).max(1.8),
+    }),
+    heading: z.object({
+      family: z.enum(FONT_IDS),
+      weight: z.union([z.literal(400), z.literal(500), z.literal(600), z.literal(700)]),
+    }),
+  }),
+  colors: z.object({
+    primary: hexColorZ,
+    text: hexColorZ,
+  }),
+  page: z.object({
+    marginX: z.number().min(18).max(72),
+    marginY: z.number().min(18).max(72),
+    sectionGap: z.number().min(0).max(24),
+  }),
+  photo: z.object({
+    hidden: z.boolean(),
+    size: z.number().min(32).max(160),
+    shape: z.enum(["circle", "rounded", "square"]),
+  }),
+  sections: z.partialRecord(
+    z.enum(SECTION_VALUES),
+    z.object({
+      columns: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+    }),
+  ),
+});
+
 // ── §5 the model's flat output contract — hand-written, passed straight to generateObject ──
 const jdSignalsZ = z.object({
   roleLevel: z.string(),
