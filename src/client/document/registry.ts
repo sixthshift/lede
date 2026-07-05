@@ -30,6 +30,9 @@ export type TemplateManifest = {
   layout: TemplateLayout;
   atsGrade: AtsGrade;
   densityLadder: Density[];
+  // §28.4 fit ladder — scale factors applied to type size/line-height/page
+  // gaps only; comfortable is always 1 (exactly as authored).
+  densityMultipliers: Record<Density, number>;
   render: (props: TemplateProps) => ReactElement;
 };
 
@@ -41,6 +44,7 @@ export const TEMPLATES = {
     layout: "single",
     atsGrade: "strict",
     densityLadder: ["comfortable", "standard", "compact"],
+    densityMultipliers: { comfortable: 1, standard: 0.94, compact: 0.88 },
     render: StrictTemplate,
   },
   "sidebar-left": {
@@ -54,6 +58,7 @@ export const TEMPLATES = {
     // picker UI later, not here.
     atsGrade: "good",
     densityLadder: ["comfortable", "standard", "compact"],
+    densityMultipliers: { comfortable: 1, standard: 0.94, compact: 0.88 },
     render: SidebarTemplate,
   },
 } satisfies Record<string, TemplateManifest>;
