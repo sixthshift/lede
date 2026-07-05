@@ -5,8 +5,9 @@
 // is a pure, per-render computation — it is never persisted (§28.4).
 
 import type { DocumentFormat, Paper, Profile, TailoredResume } from "@shared/types";
+import { loadPdfDocument } from "./extractText";
 import { type Density, getTemplate } from "./registry";
-import { renderResumeToBuffer } from "./renderResume";
+import { renderResumeToBlob, renderResumeToBuffer } from "./renderResume";
 
 const BODY_SIZE_FLOOR_PT = 9.5;
 const DENSITY_LADDER: Density[] = ["comfortable", "standard", "compact"];
@@ -37,6 +38,24 @@ export function applyDensity(
   };
 }
 
+// jsdom's Blob shim (and some real-world Blob implementations) don't support
+// arrayBuffer() directly — FileReader.readAsArrayBuffer is the one
+// bytes-out-of-a-Blob path both a real browser and jsdom actually support
+// (same constraint AtsView.tsx's blobToArrayBuffer already solved).
+function blobToBytes(blob: Blob): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
+async function countPages(bytes: Uint8Array): Promise<number> {
+  const doc = await loadPdfDocument(bytes);
+  return doc.numPages;
+}
+
 async function pageCountAt(args: {
   resume: TailoredResume;
   profile: Profile;
@@ -46,16 +65,28 @@ async function pageCountAt(args: {
   multipliers: Record<Density, number>;
 }): Promise<number> {
   const densedFormat = applyDensity(args.format, args.density, args.multipliers);
-  const buffer = await renderResumeToBuffer({
+  const renderArgs = {
     resume: args.resume,
     profile: args.profile,
     paper: args.paper,
     templateId: args.format.templateId,
     format: densedFormat,
-  });
-  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const doc = await getDocument({ data: new Uint8Array(buffer) }).promise;
-  return doc.numPages;
+  };
+
+  // @react-pdf/renderer's browser build stubs renderToBuffer to throw ("Node
+  // specific API") — only pdf(doc).toBlob() is implemented there. Node/SSR
+  // (vitest, this file's own unit tests) keeps the renderResumeToBuffer path;
+  // the real browser bundle takes the toBlob path instead. Same
+  // import.meta.env.SSR branch fonts.ts already uses for its dual-environment
+  // font resolution.
+  if (import.meta.env.SSR) {
+    const buffer = await renderResumeToBuffer(renderArgs);
+    return countPages(new Uint8Array(buffer));
+  }
+
+  const blob = await renderResumeToBlob(renderArgs);
+  const bytes = await blobToBytes(blob);
+  return countPages(bytes);
 }
 
 export type FitResult = { density: Density; pageCount: number; fits: boolean };

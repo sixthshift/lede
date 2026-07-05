@@ -41,29 +41,40 @@ function formatStaleDate(at: number): string {
 // The fit ladder (§28.4) is a per-render computation, never persisted — this
 // hook just re-runs it whenever the inputs that could change the outcome
 // change, so the chip/preview/download always agree on the SAME FitResult.
+//
+// fitToPages THROWING is a bug (e.g. its render path broke), never a
+// legitimate outcome — the ladder already reports "doesn't fit" via
+// FitResult.fits:false. A thrown render must stay visibly distinct from that
+// so a broken render can't hide behind the same blank state overflow never
+// produces (that swallow is exactly how this feature went silently broken in
+// the browser once already).
 function useFit(args: {
   resume: TailoredResume | null;
   profile: Profile | undefined;
   format: DocumentFormat;
   paper: Paper;
   targetPages: number;
-}): FitResult | null {
+}): { fit: FitResult | null; fitError: boolean } {
   const { resume, profile, format, paper, targetPages } = args;
   const [fit, setFit] = useState<FitResult | null>(null);
+  const [fitError, setFitError] = useState(false);
 
   useEffect(() => {
     setFit(null);
+    setFitError(false);
     if (!resume || !profile) return;
     let cancelled = false;
     fitToPages({ resume, profile, format, paper, targetPages }).then(
       (result) => {
         if (!cancelled) setFit(result);
       },
-      () => {
-        // A failed fit measurement (e.g. a font asset unavailable in a given
-        // render context) just leaves the density decision unmade — the
-        // chip stays hidden and preview/download fall back to the authored
-        // format untouched; it never surfaces as an unhandled rejection.
+      (error) => {
+        if (cancelled) return;
+        console.error(
+          "fitToPages threw — the fit chip and fitted density were not computed",
+          error,
+        );
+        setFitError(true);
       },
     );
     return () => {
@@ -71,7 +82,7 @@ function useFit(args: {
     };
   }, [resume, profile, format, paper, targetPages]);
 
-  return fit;
+  return { fit, fitError };
 }
 
 export function ApplicationDetail({ applicationId }: { applicationId: string }) {
@@ -106,7 +117,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   // Fit once, here — the SAME FitResult drives the chip, the preview, and
   // the download, so the density the chip claims is the density the file
   // actually renders at (§28.4).
-  const fit = useFit({
+  const { fit, fitError } = useFit({
     resume: application?.current ?? null,
     profile,
     format: resolvedFormat,
@@ -258,6 +269,11 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-3">
             {fit ? <FitChip fit={fit} /> : null}
+            {fitError ? (
+              <span role="alert" className="text-xs text-destructive">
+                Couldn't measure the fitted page count.
+              </span>
+            ) : null}
             <div className="flex items-center gap-1">
               <Button
                 size="sm"

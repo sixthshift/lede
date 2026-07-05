@@ -171,6 +171,18 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   await expectCanvasPainted(page);
   await expect(page.locator(".reasoning-panel")).toBeVisible();
 
+  // (4·fit) BROWSER FIT PROOF (E7-C2 escaped-bug guard): fit.ts's page-count
+  // measurement used to call renderToBuffer, which @react-pdf/renderer's
+  // browser build stubs to throw ("Node specific API") — in a REAL browser
+  // (unlike vitest, which always runs under Node) that throw got swallowed
+  // by useFit's catch, so the FitChip silently never rendered and the
+  // fitted density never reached the live preview/download. Node-only unit
+  // tests (test/fit.test.ts) can't catch this — they don't run in a browser.
+  // Asserting the chip's exact rendered text (src/client/components/
+  // FitChip.tsx: `Fits <n> page(s) · <density>`) is visible here proves
+  // fitToPages actually completed in-browser instead of throwing-and-hiding.
+  await expect(page.getByText(/^Fits \d+ pages? · (comfortable|standard|compact)$/)).toBeVisible();
+
   // (4a) REAL-PDF content-fidelity (ledger [v3-016], §28.6) — the ESCAPED-BUG
   // COMPENSATION this ticket exists for. Since E7-A4 swapped the resume DOM
   // for a pdf.js canvas, expectCanvasPainted only proves SOME PDF painted,
