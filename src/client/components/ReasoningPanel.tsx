@@ -1,7 +1,7 @@
 // The differentiator — spec.md §11. Renders WHY the resume looks the way it
-// does: signals, per-group leadRationale, and what got cut. NEVER printed
-// (hidden in print.css) and NEVER nested inside ResumePage/.resume-page —
-// see ResultView, which renders this as a sibling.
+// does: signals, per-group leadRationale, and what got cut. This panel is
+// never part of the react-pdf document — see ResultView, which renders it as
+// a sibling of DocumentPreview, so its content can never reach the PDF.
 
 import type { TailoredResume } from "@shared/types";
 import { SECTIONS } from "@shared/sections";

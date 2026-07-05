@@ -196,19 +196,3 @@ describe("ResultView", () => {
     }
   });
 });
-
-describe("print.css (§11 reasoning never on paper)", () => {
-  it("hides .reasoning-panel inside @media print", async () => {
-    const fs = await import("node:fs/promises");
-    const path = await import("node:path");
-    const css = await fs.readFile(
-      path.resolve(__dirname, "../src/client/styles/print.css"),
-      "utf-8",
-    );
-
-    const printBlockMatch = css.match(/@media\s+print\s*{([\s\S]*)}\s*$/);
-    expect(printBlockMatch).toBeTruthy();
-    const printBlock = printBlockMatch![1];
-    expect(printBlock).toMatch(/\.reasoning-panel\s*[,{][\s\S]*display:\s*none/);
-  });
-});

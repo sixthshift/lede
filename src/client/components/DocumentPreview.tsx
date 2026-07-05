@@ -1,10 +1,9 @@
 // The preview IS the artifact — spec.md §28.0/§11. Renders the same react-pdf
 // Document that export/lock would produce (renderResumeDocument), then paints
 // those exact PDF bytes onto a canvas via pdf.js. There is no separate DOM
-// approximation to keep in sync, and no window.print()/print.css path — both
-// are rejected (§28.0). ReasoningPanel is a SIBLING (see ResultView); nothing
-// here ever sees leadRationale/cut — renderResumeDocument only ever receives
-// resume/profile/paper, so those strings cannot enter this subtree.
+// approximation to keep in sync. ReasoningPanel is a SIBLING (see ResultView);
+// nothing here ever sees leadRationale/cut — renderResumeDocument only ever
+// receives resume/profile/paper, so those strings cannot enter this subtree.
 
 import { useEffect, useRef } from "react";
 import { usePDF } from "@react-pdf/renderer";

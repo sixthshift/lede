@@ -1,14 +1,11 @@
-// @vitest-environment jsdom
 // E3-B — remaining sections render from meta when facts are empty (spec §10, §4.3).
-import "@testing-library/jest-dom/vitest";
-import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
-import type { Entry, EntryMeta, Layout, TailorDecision } from "@shared/types";
+// Ported to the react-pdf document (E7-A6): renders via renderResumeToBuffer and
+// asserts against pdf.js-extracted text instead of the retired DOM ResumePage.
+import { describe, it, expect } from "vitest";
+import type { Entry, EntryMeta, Layout, Profile, TailorDecision } from "@shared/types";
 import { SECTIONS } from "@shared/sections";
 import { assemble } from "../src/server/tailor/assemble";
-import { ResumePage } from "../src/client/components/ResumePage";
-
-afterEach(cleanup);
+import { renderResumeToBuffer } from "../src/client/document/renderResume";
 
 function entry(
   id: string,
@@ -33,8 +30,26 @@ function layoutFor(sections: Layout[number]["section"][]): Layout {
   return sections.map((section) => ({ section, enabled: true }));
 }
 
+function profileFixture(): Profile {
+  return {
+    name: "Jordan Rivera",
+    email: "jordan@example.com",
+    phone: "555-0100",
+    location: "Remote",
+    links: [],
+  };
+}
+
+async function extractText(buffer: Buffer): Promise<string> {
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await getDocument({ data: new Uint8Array(buffer) }).promise;
+  const page = await doc.getPage(1);
+  const content = await page.getTextContent();
+  return content.items.map((item) => ("str" in item ? item.str : "")).join(" ");
+}
+
 describe("remaining sections — coverage (§10)", () => {
-  it("renders one entry of each remaining section under its registry label", () => {
+  it("renders one entry of each remaining section under its registry label", async () => {
     const entries = [
       entry(
         "award1",
@@ -76,8 +91,14 @@ describe("remaining sections — coverage (§10)", () => {
       "reference",
     ]);
     const resume = assemble(decisionFor(entries), entries, layout);
-    render(<ResumePage resume={resume} />);
+    const buffer = await renderResumeToBuffer({ resume, profile: profileFixture() });
+    const text = await extractText(buffer);
 
+    // Section labels render through sections.tsx's textTransform:"uppercase"
+    // style, which react-pdf bakes into the PDF's actual text runs (unlike
+    // CSS, there is no separate visual-only transform) — compare
+    // case-insensitively so the assertion targets the label, not its case.
+    const upperText = text.toUpperCase();
     for (const section of [
       "award",
       "certification",
@@ -86,13 +107,13 @@ describe("remaining sections — coverage (§10)", () => {
       "language",
       "reference",
     ] as const) {
-      expect(screen.getByText(SECTIONS[section].label)).toBeInTheDocument();
+      expect(upperText).toContain(SECTIONS[section].label.toUpperCase());
     }
   });
 });
 
 describe("remaining sections — meta fallback for empty facts (§4.3, gameable-resistant)", () => {
-  it("renders a certification with empty facts from its meta, not blank", () => {
+  it("renders a certification with empty facts from its meta, not blank", async () => {
     const entries = [
       entry(
         "cert2",
@@ -108,13 +129,14 @@ describe("remaining sections — meta fallback for empty facts (§4.3, gameable-
     ];
     const layout = layoutFor(["certification"]);
     const resume = assemble(decisionFor(entries), entries, layout);
-    render(<ResumePage resume={resume} />);
+    const buffer = await renderResumeToBuffer({ resume, profile: profileFixture() });
+    const text = await extractText(buffer);
 
-    expect(screen.getByText(/AWS Certified Cloud Practitioner/)).toBeInTheDocument();
-    expect(screen.getByText(/Amazon Web Services/)).toBeInTheDocument();
+    expect(text).toContain("AWS Certified Cloud Practitioner");
+    expect(text).toContain("Amazon Web Services");
   });
 
-  it("renders a reference with empty facts from its meta, not blank", () => {
+  it("renders a reference with empty facts from its meta, not blank", async () => {
     const entries = [
       entry(
         "ref2",
@@ -126,12 +148,13 @@ describe("remaining sections — meta fallback for empty facts (§4.3, gameable-
     ];
     const layout = layoutFor(["reference"]);
     const resume = assemble(decisionFor(entries), entries, layout);
-    render(<ResumePage resume={resume} />);
+    const buffer = await renderResumeToBuffer({ resume, profile: profileFixture() });
+    const text = await extractText(buffer);
 
-    expect(screen.getByText(/Jane Smith/)).toBeInTheDocument();
+    expect(text).toContain("Jane Smith");
   });
 
-  it("still renders facts verbatim when present (no regression for rephrase:'none')", () => {
+  it("still renders facts verbatim when present (no regression for rephrase:'none')", async () => {
     const entries = [
       entry(
         "cert3",
@@ -143,13 +166,14 @@ describe("remaining sections — meta fallback for empty facts (§4.3, gameable-
     ];
     const layout = layoutFor(["certification"]);
     const resume = assemble(decisionFor(entries), entries, layout);
-    render(<ResumePage resume={resume} />);
+    const buffer = await renderResumeToBuffer({ resume, profile: profileFixture() });
+    const text = await extractText(buffer);
 
-    expect(screen.getByText("Verbatim Fact Text")).toBeInTheDocument();
-    expect(screen.queryByText(/Should Not Appear/)).not.toBeInTheDocument();
+    expect(text).toContain("Verbatim Fact Text");
+    expect(text).not.toContain("Should Not Appear");
   });
 
-  it("leaves rephrase:'full'/'light' sections rendering the model's text unchanged", () => {
+  it("leaves rephrase:'full'/'light' sections rendering the model's text unchanged", async () => {
     const entries = [
       entry(
         "exp1",
@@ -161,8 +185,9 @@ describe("remaining sections — meta fallback for empty facts (§4.3, gameable-
     ];
     const layout = layoutFor(["experience"]);
     const resume = assemble(decisionFor(entries), entries, layout);
-    render(<ResumePage resume={resume} />);
+    const buffer = await renderResumeToBuffer({ resume, profile: profileFixture() });
+    const text = await extractText(buffer);
 
-    expect(screen.getByText("MODEL_TEXT_exp1")).toBeInTheDocument();
+    expect(text).toContain("MODEL_TEXT_exp1");
   });
 });
