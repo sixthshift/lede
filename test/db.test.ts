@@ -191,6 +191,7 @@ describe("applications table (§27)", () => {
       "current_meta",
       "created_at",
       "updated_at",
+      "target_pages",
     ]);
     expect(columns).not.toContain("status");
     expect(columns).not.toContain("hiring_status");

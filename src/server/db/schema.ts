@@ -5,7 +5,7 @@
 import { sqliteTable, text, integer, check } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
-import type { EntryMeta, ProviderId, Section, TailoredResume } from "@shared/types";
+import type { EntryMeta, Paper, ProviderId, Section, TailoredResume } from "@shared/types";
 
 // ── all resume content ────────────────────────────────────
 export const entries = sqliteTable("entries", {
@@ -52,6 +52,7 @@ export const settings = sqliteTable(
       .notNull() // ordered, toggleable resume sections
       .$type<{ section: Section | "summary"; enabled: boolean }[]>()
       .default([]),
+    paper: text("paper").notNull().default("letter").$type<Paper>(), // page size, global (§28.1)
     updatedAt: integer("updated_at").notNull(),
   },
   (t) => ({ singleton: check("settings_singleton", sql`${t.id} = 1`) }),
@@ -64,6 +65,7 @@ export const applications = sqliteTable("applications", {
   role: text("role"),
   jobDescription: text("job_description").notNull(),
   context: text("context"), // guides emphasis only — never a fact source
+  targetPages: integer("target_pages").notNull().default(1).$type<1 | 2>(), // page budget for this role (§28.1)
   current: text("current", { mode: "json" }).$type<TailoredResume | null>(),
   locked: text("locked", { mode: "json" }).$type<TailoredResume | null>(),
   genState: text("gen_state").notNull().default("untailored"), // 'untailored'|'tailoring'|'tailored'|'failed'

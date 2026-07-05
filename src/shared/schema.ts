@@ -189,6 +189,7 @@ export const settingsInput = z.object({
   model: z.string().min(1).max(120).optional(),
   baseUrl: z.string().min(1).max(200).nullish(),
   layout: z.array(layoutEntryZ).optional(),
+  paper: z.enum(["letter", "a4"]).optional(),
 });
 
 // ── §27 application input — a tailoring record for one job, no hiring status ──
@@ -197,6 +198,7 @@ export const applicationCreate = z.object({
   role: z.string().min(1).max(200).nullish(),
   jobDescription: z.string().min(1).max(20000),
   context: z.string().min(1).max(4000).nullish(),
+  targetPages: z.union([z.literal(1), z.literal(2)]).optional(),
 });
 
 export const applicationUpdate = z.object({
@@ -204,6 +206,7 @@ export const applicationUpdate = z.object({
   role: z.string().min(1).max(200).nullish(),
   jobDescription: z.string().min(1).max(20000).optional(),
   context: z.string().min(1).max(4000).nullish(),
+  targetPages: z.union([z.literal(1), z.literal(2)]).optional(),
 });
 
 // ── §5 the model's flat output contract — hand-written, passed straight to generateObject ──

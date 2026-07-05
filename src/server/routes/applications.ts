@@ -97,6 +97,7 @@ const LIST_COLUMNS = {
   role: applications.role,
   jobDescription: applications.jobDescription,
   context: applications.context,
+  targetPages: applications.targetPages,
   genState: applications.genState,
   currentMeta: applications.currentMeta,
   createdAt: applications.createdAt,
@@ -126,6 +127,7 @@ export function applicationsRoutes(
       role: input.role ?? null,
       jobDescription: input.jobDescription,
       context: input.context ?? null,
+      targetPages: input.targetPages ?? 1,
       current: null,
       locked: null,
       genState: "untailored" as const,
@@ -167,6 +169,7 @@ export function applicationsRoutes(
       ...(input.role !== undefined ? { role: input.role ?? null } : {}),
       ...(input.jobDescription !== undefined ? { jobDescription: input.jobDescription } : {}),
       ...(input.context !== undefined ? { context: input.context ?? null } : {}),
+      ...(input.targetPages !== undefined ? { targetPages: input.targetPages } : {}),
       updatedAt: Date.now(),
     };
     db.update(applications).set(row).where(eq(applications.id, existing.id)).run();

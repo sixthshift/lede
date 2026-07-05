@@ -114,7 +114,7 @@ describe("CONTRAST: /api/settings never leaks the key or auth hash", () => {
     expect(raw).not.toMatch(/"hash"/);
     expect(raw).not.toMatch(/"salt"/);
 
-    const allowed = new Set(["keySet", "provider", "model", "baseUrl", "layout"]);
+    const allowed = new Set(["keySet", "provider", "model", "baseUrl", "layout", "paper"]);
     for (const key of Object.keys(body)) {
       expect(allowed.has(key)).toBe(true);
     }

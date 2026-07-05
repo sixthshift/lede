@@ -25,6 +25,7 @@ function currentSettings(db: Db) {
     model: row.model,
     baseUrl: row.baseUrl,
     layout: row.layout,
+    paper: row.paper,
   };
 }
 

@@ -15,6 +15,13 @@
       "when": 1783123069181,
       "tag": "0001_marvelous_steel_serpent",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783240484054,
+      "tag": "0002_freezing_ink",
+      "breakpoints": true
     }
   ]
 }

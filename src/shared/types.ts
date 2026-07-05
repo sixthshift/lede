@@ -84,6 +84,9 @@ export type Layout = { section: Section | "summary"; enabled: boolean }[];
 // ── providers (§6.1) ──
 export type ProviderId = "anthropic" | "openai" | "google" | "openai-compatible";
 
+// ── page model (§28.1): paper is a global setting, targetPages is per-application ──
+export type Paper = "letter" | "a4";
+
 // ── output contract (§5): the model decides, the server assembles ──
 export type JDSignals = { roleLevel: string; weights: string[]; hardRequirements: string[] };
 
@@ -120,6 +123,7 @@ export type Application = {
   role?: string;
   jobDescription: string;
   context?: string; // guides emphasis only — never a fact source
+  targetPages: 1 | 2; // page budget for this role, default 1 (§28.1)
   current: TailoredResume | null;
   locked: TailoredResume | null;
   genState: "untailored" | "tailoring" | "tailored" | "failed";

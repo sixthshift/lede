@@ -3,7 +3,7 @@
 // the server's `error` string verbatim (e.g. "key_invalid", "no_api_key") so
 // later tickets can switch on it (401→LoginGate, 400 no_api_key→Settings).
 
-import type { Entry, Profile, Layout, Section, Application } from "@shared/types";
+import type { Entry, Profile, Layout, Section, Application, Paper } from "@shared/types";
 import type { z } from "zod";
 import type {
   entryInput,
@@ -26,6 +26,7 @@ export type SettingsResponse = {
   model: string;
   baseUrl: string | null;
   layout: Layout;
+  paper: Paper;
 };
 
 export class ApiError extends Error {
