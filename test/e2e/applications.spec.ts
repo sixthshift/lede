@@ -32,14 +32,19 @@
 // step's assertions depend on the previous step's state, and the
 // console/pageerror listeners have to be registered before the one
 // first-run goto() every step shares (same rationale as docker-spa.spec.ts).
+import { readFileSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
 import { ensureFirstRunPassword } from "./helpers/session";
 import { CONTRAST_JDS } from "../../src/server/tailor/evalcore";
+import { extractPdfText } from "../../src/client/document/extractText";
 
 const PASSWORD = "correct horse battery staple e2e applications";
 const JD = CONTRAST_JDS[0]!.jd; // "platform-sdk" scenario
 const RESUME_TOKEN =
   "Built a platform SDK that programmatically exposed the platform for the first time";
+// The fixture's rank-2 item (entryId "cloudcase-frontend-rewrite") — proves
+// ORDER, not just presence, of the real extracted content (see (4a) below).
+const SECOND_TOKEN = "Replaced legacy jQuery with a new three-layer React/TypeScript architecture";
 
 // Unique per test run so the created card is unambiguously findable in a
 // list that (on a reused dev server) may carry rows from a previous run.
@@ -72,6 +77,17 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   const pageErrors: unknown[] = [];
   const consoleErrors: string[] = [];
   let loggedIn = false;
+  // Set true only around the (4a) Download PDF click below — DocumentPreview
+  // (src/client/components/DocumentPreview.tsx) runs its OWN concurrent
+  // react-pdf render (usePDF) for the live canvas; racing it against a
+  // SECOND react-pdf render for the download (downloadResumePdf) can
+  // occasionally cause pdf.js's canvas-side blob fetch to lose a revoke race
+  // on react-pdf's internal (not this ticket's) blob url, logging a
+  // same-text net::ERR_FILE_NOT_FOUND — harmless to what's under test here,
+  // since (4a)'s own assertions independently verify the REAL downloaded
+  // PDF's bytes are correct. Scoped tightly (only while true) so a real
+  // regression anywhere else in the flow still fails the test.
+  let downloadInFlight = false;
   page.on("pageerror", (err) => pageErrors.push(err));
   page.on("console", (msg) => {
     if (msg.type() !== "error") return;
@@ -91,6 +107,11 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
       msg.text() ===
         "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
     ) {
+      return;
+    }
+    // EXACT-MATCH allowlist, scoped to the (4a) download window only — see
+    // downloadInFlight's comment above.
+    if (downloadInFlight && msg.text() === "Failed to load resource: net::ERR_FILE_NOT_FOUND") {
       return;
     }
     consoleErrors.push(msg.text());
@@ -149,6 +170,41 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   await expect(page.getByRole("button", { name: "Re-tailor", exact: true })).toBeVisible();
   await expectCanvasPainted(page);
   await expect(page.locator(".reasoning-panel")).toBeVisible();
+
+  // (4a) REAL-PDF content-fidelity (ledger [v3-016], §28.6) — the ESCAPED-BUG
+  // COMPENSATION this ticket exists for. Since E7-A4 swapped the resume DOM
+  // for a pdf.js canvas, expectCanvasPainted only proves SOME PDF painted,
+  // and the tailor-response assertions above only prove the server's JSON
+  // carried the right content — neither proves the file a real applicant
+  // would actually submit contains it. Capture the REAL generated PDF via
+  // the Download PDF button + a real browser download event, then run the
+  // SAME extractPdfText an ATS parser's extraction would use over its actual
+  // bytes, asserting the live-tailored RESUME_TOKEN and a second selected
+  // item (rank-2, so ORDER is checked too) are both present, in order.
+  downloadInFlight = true;
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Download PDF" }).click(),
+  ]);
+  const downloadPath = await download.path();
+  expect(downloadPath, "Download PDF must produce a real saved file").toBeTruthy();
+  const pdfBytes = readFileSync(downloadPath!);
+  const extractedText = (await extractPdfText(pdfBytes)).join(" ");
+
+  const firstIdx = extractedText.indexOf(RESUME_TOKEN);
+  const secondIdx = extractedText.indexOf(SECOND_TOKEN);
+  expect(
+    firstIdx,
+    "RESUME_TOKEN must be in the REAL downloaded PDF's extracted text",
+  ).toBeGreaterThan(-1);
+  expect(
+    secondIdx,
+    "the second selected item must be in the REAL downloaded PDF's extracted text",
+  ).toBeGreaterThan(-1);
+  expect(secondIdx, "content order: RESUME_TOKEN must precede the second item").toBeGreaterThan(
+    firstIdx,
+  );
+  downloadInFlight = false;
 
   // (4b) Design panel (E7-B1e) — change the TEMPLATE and the body FONT; each
   // change PUTs application.format and the preview canvas repaints (§28.3).

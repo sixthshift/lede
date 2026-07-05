@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { DEFAULT_FORMAT } from "@shared/format";
 import type { DocumentFormat, Paper, Profile, TailoredResume } from "@shared/types";
-import { downloadResumePdf } from "../document/download";
+import { downloadResumePdf, downloadResumeText } from "../document/download";
 import { applyDensity, fitToPages, type FitResult } from "../document/fit";
 import { getTemplate } from "../document/registry";
 import { useProfile, useSettings } from "../hooks/queries";
@@ -19,6 +19,7 @@ import {
   useUnlockApplication,
   useUpdateApplication,
 } from "../queries/useApplications";
+import { AtsView } from "./AtsView";
 import { DesignPanel } from "./DesignPanel";
 import { FitChip } from "./FitChip";
 import { GenStateBadge } from "./GenStateBadge";
@@ -81,6 +82,11 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   const lockApplication = useLockApplication();
   const unlockApplication = useUnlockApplication();
   const updateApplication = useUpdateApplication();
+
+  // Preview vs "what the ATS sees" (§28.6) — a view toggle, not a route:
+  // both read the SAME current resume + fittedFormat computed below, so
+  // switching never re-tailors or re-fits.
+  const [view, setView] = useState<"preview" | "ats">("preview");
 
   // Locked freezes the look along with the resume — editing a locked app's
   // format is out of scope (it froze what was actually sent), so the design
@@ -199,6 +205,22 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
             >
               Download PDF
             </Button>
+            <Button
+              variant="outline"
+              disabled={!application.current || !profile}
+              onClick={() =>
+                profile &&
+                application.current &&
+                downloadResumeText({
+                  resume: application.current,
+                  profile,
+                  company: application.company,
+                  role: application.role,
+                })
+              }
+            >
+              Plain text
+            </Button>
           </div>
         </div>
       </div>
@@ -236,6 +258,24 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-3">
             {fit ? <FitChip fit={fit} /> : null}
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant={view === "preview" ? "default" : "outline"}
+                aria-pressed={view === "preview"}
+                onClick={() => setView("preview")}
+              >
+                Preview
+              </Button>
+              <Button
+                size="sm"
+                variant={view === "ats" ? "default" : "outline"}
+                aria-pressed={view === "ats"}
+                onClick={() => setView("ats")}
+              >
+                What the ATS sees
+              </Button>
+            </div>
           </div>
 
           {fit && !fit.fits ? (
@@ -268,7 +308,16 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
             </div>
           ) : null}
 
-          <ResultView resume={application.current} format={fittedFormat} />
+          {view === "ats" && profile ? (
+            <AtsView
+              resume={application.current}
+              profile={profile}
+              format={fittedFormat}
+              paper={paper}
+            />
+          ) : (
+            <ResultView resume={application.current} format={fittedFormat} />
+          )}
         </div>
       ) : (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border-strong py-16 text-center">
