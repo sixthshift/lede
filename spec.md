@@ -39,7 +39,7 @@ Corollaries:
 - **Applications** (§27): a job application is a persistent entity — a JD + optional tailoring context + the tailored, reordered resume it produces, with an explicit rationale for every lead decision. One tailored résumé per application, kept.
 - An entry library (§26) that works as an intentionally over-complete **information bank** — section-aware editor, persistence, JSON import/export, and browse/filter that scales with the corpus.
 - A reasoning UI surfacing *why* each section leads the way it does.
-- Deterministic render to a clean, ATS-safe, single-column document → PDF.
+- Deterministic render to a clean, ATS-graded document (single-column `strict` templates by default) → real PDF export via the document engine (§28).
 - BYOK: enter/validate/store (encrypted) a provider key (Anthropic, OpenAI, Google, or OpenAI-compatible); pick provider + model.
 - A light password gate.
 - Docker packaging for self-hosting.
@@ -62,7 +62,7 @@ Settings (key, model) ─────────▶ /api/settings   key → enc
 Entry library editor  ─────────▶ /api/entries    CRUD → SQLite (Drizzle)
 JD paste + tailor     ─────────▶ /api/tailor     decrypt key → provider → { resume }
 Review + reorder      ◀───────── returns TailoredResume (+ rationale)
-Export (print)        ── client  window.print() over a print stylesheet
+Export (PDF)          ── client  react-pdf render — preview IS the file (§28)
 ```
 
 - **Dev:** Vite proxies `/api/*` to Fastify. **Prod:** Fastify serves the built SPA from `dist/` and `/api/*`. One port, one Docker container.
@@ -378,6 +378,8 @@ Single-user → a **single password gate**, not accounts.
 - **First-run:** if no `auth` secret exists, prompt to set an instance password; store `scrypt(password, salt)`.
 - **Login:** `POST /api/auth/login` verifies, issues an encrypted session cookie (`@fastify/secure-session`, secret from `LEDE_SESSION_SECRET`).
 - **Guard:** all `/api/*` except `/api/auth/*` and `/api/health` require a valid session.
+- **Throttling (2026-07-04 — a gate with unlimited attempts isn't a gate):** in-process counter, no deps: after **5 consecutive failed logins, refuse attempts for 30s** (per instance — single-user, so per-IP machinery is overkill); reset on success. Same response body whether wrong password or locked (no oracle for attackers). Setup (`/api/auth/setup`) throttles identically.
+- **Session lifetime:** rolling **7-day** expiry — cookie `maxAge` refreshed on authenticated activity; logout invalidates immediately. A self-hosted tool shouldn't demand daily logins, and shouldn't mint immortal cookies either.
 - **Escape hatch:** `LEDE_AUTH_DISABLED=true` for localhost/VPN-only use. Off by default.
 
 ---
@@ -392,6 +394,7 @@ Single-user → a **single password gate**, not accounts.
 - **Validate on save:** one cheap provider call (a minimal `generateText`) with the key before storing; reject on failure.
 - **Decrypt in memory only** at call time; discard after.
 - **Delete:** `DELETE /api/settings/key` purges it.
+- **Master-key rotation & mismatch (2026-07-04):** rotation is deliberately simple — there is exactly one secret, so rotating `LEDE_MASTER_KEY` = delete the stored key and re-enter it under the new master key. If decryption fails at call time (master key changed without rotating), the app must **not** crash or pretend: surface `keySet: false` with a distinct "stored key unreadable — re-enter it in Settings" state. No `_OLD`-key re-encryption machinery until multiple secrets exist.
 - **Provider + model** in `settings.provider`/`settings.model` (+ `settings.baseUrl` for openai-compatible); default Anthropic `claude-opus-4-8`. Key errors (invalid/expired/quota/their 429) surface distinctly from app errors.
 
 ---
@@ -422,19 +425,22 @@ All JSON under `/api`, zod-validated, session-guarded except `/api/auth/*` and `
 | `POST` | `/api/applications/:id/tailor` | — | `TailoredResume` (persisted as the app's `current`) |
 | `POST` | `/api/applications/:id/lock` | — | `Application` (freezes `current` → immutable `locked`) |
 | `DELETE` | `/api/applications/:id/lock` | — | `Application` (clears `locked`) |
+| `POST` | `/api/applications/:id/undo-tailor` | — | `Application` (swaps `current` ↔ `previous`, §27) |
+| `POST` | `/api/applications/:id/duplicate` | — | `Application` (fresh `untailored` copy of JD/context/company/role, §27) |
+| `POST` | `/api/extract` | `{ text }` | `{ proposed: ProposedEntry[] }` (resume-import extraction, §29 — never writes) |
 | `GET` | `/api/export` | — | `{ entries, profile, applications }` (full backup) |
 | `POST` | `/api/import` | `{ entries?, profile?, applications? }` | `{ imported }` (full restore) |
 
-`/api/applications/:id/tailor` runs the pipeline (§6) over the current library + the app's JD and optional `context` (§6.2 boundary: context guides, never a fact source), reads decrypted key + model, and **persists the result as the application's `current` snapshot** (self-contained full copy, §27). No key ⇒ 400 `{ error: 'no_api_key' }` (UI routes to Settings). Map provider errors (generic across providers): auth → "key invalid"; provider rate-limit → 429; other provider failure → 502; zod failure on LLM output → 502 "model returned off-contract"; fixture mode, unrecorded JD → 422 `no_fixture` (§6.1). A failed tailor leaves the app's `current` untouched and sets genState `failed`. Export/import cover **library + profile + applications** so a self-host backup is the whole instance, not just entries (§27).
+`/api/applications/:id/tailor` runs the pipeline (§6) over the current library + the app's JD and optional `context` (§6.2 boundary: context guides, never a fact source), reads decrypted key + model, and **persists the result as the application's `current` snapshot** (self-contained full copy, §27; displaced `current` → `previous`). No key ⇒ 400 `{ error: 'no_api_key' }` (UI routes to Settings). Already tailoring ⇒ **409 `tailor_in_flight`** (§15). Map provider errors (generic across providers): auth → "key invalid"; provider rate-limit → 429; other provider failure → 502; zod failure on LLM output → 502 "model returned off-contract"; fixture mode, unrecorded JD → 422 `no_fixture` (§6.1). A failed tailor leaves the app's `current`/`previous` untouched and sets genState `failed` **with a typed `failedReason`** (taxonomy in §15). Export/import cover **library + profile + applications** so a self-host backup is the whole instance, not just entries (§27).
 
 ---
 
-## 10. Rendering (deterministic, ATS-safe)
+## 10. Rendering (deterministic — semantics live here, mechanics in §28)
 
-- `<ResumePage>` renders a `TailoredResume` into a **single-column** DOM: header (profile), summary, then each `TailoredSection` (registry `label` + groups) in `layout` order, groups rendered per the registry's `groupBy`.
-- `print.css` (`@media print`): US-Letter, 0.5–0.75in margins, `#000` on `#fff`, real text, no images/tables/multi-column/borders. System serif/sans (Georgia/Arial), **not** Plex, to avoid print→PDF embedding surprises.
-- Export = `window.print()`. No PDF library — reliable + ATS-safe; no server-PDF need for a single-user tool (revisit if that changes).
-- `leadRationale` and `cut[]` are **never** on the document — reasoning UI only (§11).
+- The document renders a `TailoredResume` deterministically: header (profile §16 — name/contact/links), summary, then each `TailoredSection` (registry `label` + groups) in `layout` order, groups per the registry's `groupBy`. Templates (§28.2) vary composition, never content or section order.
+- **Rendering/export mechanics are §28's** (`@react-pdf/renderer`; the preview is the actual PDF). The interim DOM + `print.css` + `window.print()` pipeline shipped by earlier phases remains only until §28.8-A lands, then retires.
+- **Document invariants every template must satisfy:** real extractable text (embedded, subset fonts with correct ToUnicode); standard bullets; contact info in body flow, never header/footer regions; no text baked into images; `strict` templates single-column with extraction order = content order (§28.6).
+- `leadRationale` and `cut[]` are **never** on the document — reasoning UI only (§11); §28.8-A gates this via text extraction.
 
 ---
 
@@ -446,12 +452,14 @@ Split view: rendered resume | reasoning. Shows `signals` ("this JD weights X, th
 
 ## 12. Design system
 
-**Utilitarian.** Restrained, dense, functional; borders over shadows; no ornament for its own sake — a considered tool, not a themed artifact and not a dev-tool costume. One serif voice used sparingly (the editorial nod). App chrome uses the tokens below; the resume document (§10) is exempt and ATS-plain.
+**Soft product surface** (2026-07-04 — supersedes the original borders-over-shadows utilitarian skin). Polished, calm, functional: a gray canvas with white raised surfaces, gentle layered shadows, tinted status pills, one blue accent. Opinion comes from surface depth + type hierarchy + color discipline — still no ornament for its own sake, no gradients. One serif voice used sparingly (the editorial nod: `Lede` wordmark + rationale callouts). App chrome uses the tokens below; the resume document is exempt — its typography belongs to the chosen §28 template, and the preview shows the actual rendered PDF (§28.0), so screen = file by construction.
 
-- **Type — IBM Plex** (self-hosted via `@fontsource/*`): Plex Sans (UI/body), Plex Mono (IDs, numbers, JSON box — functional only), Plex Serif (the `Lede` wordmark + `leadRationale` callouts only). Scale (rem): .75/.8125/.875/1/1.125/1.375/1.75.
-- **Color:** `--ink:#1a1a1a --ink-soft:#52525b --ink-faint:#a1a1aa --bg:#fff --bg-subtle:#fafafa --border:#e4e4e7 --border-strong:#d4d4d8 --accent:#2f5fdd --accent-weak:#eef2fe --success:#15803d --warn:#b45309 --danger:#b91c1c`. No gradients.
-- **Spacing** 4/8/12/16/24/32/48; **radius** 4px (6 cards/dialogs); borders first, ≤1 shadow token; inputs 32–36px.
-- **shadcn theming:** re-theme on day one — map tokens to shadcn CSS variables, Plex font stack, low radius, `--accent` as primary. Config task, not per-component.
+- **Type — IBM Plex** (self-hosted via `@fontsource/*`): Plex Sans (UI/body), Plex Mono (IDs, metadata overlines, numbers — functional only), Plex Serif (the `Lede` wordmark + `leadRationale` callouts only). Scale (rem): .75/.8125/.875/1/1.125/1.25/1.5/1.875; page titles 1.5rem semibold tracking-tight.
+- **Color:** `--ink:#18181b --ink-soft:#52525b --ink-faint:#a1a1aa --bg:#f4f4f6` (page canvas) `--surface:#fff` (cards/header/inputs) `--bg-subtle:#fafafa --border:#e4e4e7 --border-strong:#d4d4d8 --accent:#2643bd (blue-pencil ink — the editor's mark) --accent-hover:#1e35a0 --accent-weak:#e9edfa --success:#15803d --warn:#b45309 --danger:#b91c1c`, plus soft tint pairs (`--success-soft --warn-soft --danger-soft`) for pills and notices. No gradients.
+- **Depth:** shadow ramp `--shadow-xs/sm/md/lg` — inputs/buttons xs, cards sm, resume sheet + popovers md, dialogs lg. Hairline borders remain, softened (`border/70`), no longer the only separator.
+- **Spacing** 4/8/12/16/24/32/48; **radius** 8px base (10–12 cards/dialogs, pills full); inputs 32–36px, white on the gray canvas.
+- **Status pills:** tinted bg + colored text, never loud solid fills — tailored=success, tailoring=accent, failed=danger, untailored=outline. Destructive actions are quiet (ghost/tinted) until confirmed.
+- **shadcn theming:** re-theme on day one — map tokens to shadcn CSS variables, Plex font stack, `--accent` as primary. Config task, not per-component.
 
 ---
 
@@ -472,15 +480,16 @@ ApplicationsView (/applications)
     + NewApplication (create act — the "officialness", §27)
   ApplicationDetail (/applications/:id)
     JobPanel: JD + context editor (company/role/context) · "Tailor" / "Re-tailor" · "Lock final"
+    FormatBar(§28): TemplatePicker + DesignPanel entry · target-pages toggle · fit chip · Download PDF
     TailorProgress(§15)
     ResultView(split) — shows the app's `current` (or `locked`) snapshot:
-      ResumePage (§10, print target): ProfileHeader, SummarySection,
-          SectionBlock (registry-driven: label + groups) → GroupBlock → ItemRow
-      ReasoningPanel (never printed): SignalsBar→WeightBar, SectionRationale→Callout, CutList
+      DocumentPreview (§28: pdf.js canvas of the real PDF; templates render ProfileHeader,
+          SummarySection, SectionBlock (registry-driven) → GroupBlock → ItemRow via react-pdf)
+      ReasoningPanel (never on the document): SignalsBar→WeightBar, SectionRationale→Callout, CutList
     (empty state: "add missing facts in Library →" — the Applications↔Library loop, §26)
 
 LibraryView (/library)  — the information bank (§26)
-  LibraryToolbar (Add · Import · Export)
+  LibraryToolbar (Add · Import · Export · "Import from resume…" → ImportReview, §29)
   LibraryFilter (section · tag · text — PROGRESSIVE: earns its space as the corpus grows; §26)
   SectionAccordion (one per Section, registry label)
     EntryCard (facts preview, Tag chips, edit/delete)
@@ -509,15 +518,38 @@ Bespoke: WeightBar, serif Callout, RepeatableList, TagInput, SectionMetaFields.
 
 ---
 
-## 15. Async UX & tailor latency
+## 15. The tailor lifecycle: progress, failure, concurrency, cost
 
-`claude-opus-4-8` at effort `high` realistically takes **~15–40s**. MVP: non-streaming + honest `TailorProgress` — one animated indicator with rotating honest copy ("Reading the job description…" → "Weighing your experience…" → "Choosing what leads…" → "Composing…"), an elapsed counter, and "usually ~15–30s", presented as an estimate (one opaque call). Disable input while pending; on error, inline `alert` + Retry. **Upgrade path (not MVP):** stream real pipeline stages via SSE.
+*(Expanded 2026-07-04 — the original section covered only the spinner. A 15–60s model call is a lifecycle, not a loading state.)*
+
+**Progress (MVP: honest, non-streaming).** `TailorProgress`: one animated indicator with rotating honest copy ("Reading the job description…" → "Weighing your experience…" → "Choosing what leads…" → "Composing…"), an elapsed counter, and "usually ~15–30s" framed as an estimate (it's one opaque call — don't fake stage precision). Tailor/Re-tailor disabled while pending. **Upgrade path (not MVP):** stream real pipeline stages via SSE.
+
+**Failure is typed, stored, and actionable.** `genState: 'failed'` alone tells the user nothing. Applications gain `failedReason` (§27):
+
+| `failedReason` | Meaning | UI action offered |
+|---|---|---|
+| `key_invalid` | provider rejected auth | → Settings |
+| `provider_rate_limit` | provider 429 | Retry (with "wait a moment") |
+| `provider_error` | provider 5xx/network | Retry |
+| `off_contract` | LLM output failed zod | Retry ("the model returned an unusable answer") |
+| `fabrication` | §6.3 validation rejected the output | Honest copy: "the model claimed something your Library can't back — nothing was saved." Retry. **This is the product working, not breaking — never dress it as a generic error.** |
+| `timeout` | exceeded the hard cap | Retry |
+| `interrupted` | server restarted mid-tailor | Retry |
+| `no_fixture` | fixture mode, unrecorded JD (§6.1) | dev-facing |
+
+A failed tailor never touches `current` (§9). `failedReason` clears on the next tailor attempt.
+
+**Concurrency & recovery.** One tailor in flight per application: a second `POST /tailor` while `genState='tailoring'` returns **409 `tailor_in_flight`** (guards double-clicks and second tabs). Navigating away is safe — the call completes server-side and persists; the list's `tailoring` badge is the live indicator. No mid-flight cancel in MVP (the tokens are already spent; a cancel that discards a finished result is a footgun). Recovery: on boot, any row stuck at `tailoring` → `failed`/`interrupted` (a restart can't resume an in-flight provider call).
+
+**Timeout:** hard server-side cap **120s** per tailor call → abort, `failed`/`timeout`. No config knob.
+
+**Cost is surfaced, because it's the user's money (BYOK).** `currentMeta` gains `usage: { inputTokens, outputTokens }` from the SDK result; the detail page shows it quietly next to provenance ("tailored with claude-opus-4-8 · 41k in / 2k out"). No dollar conversion (price tables rot); tokens are honest and stable.
 
 ---
 
 ## 16. Profile
 
-Identity for the header, stored in the `profile` table (§4.2), never sent into the tailor prompt *except* `baseSummary` (which the AI may rework into the generated summary). Edited via `ProfileEditor`, rendered by `ProfileHeader`.
+Identity for the header, stored in the `profile` table (§4.2), never sent into the tailor prompt *except* `baseSummary` (which the AI may rework into the generated summary). Edited via `ProfileEditor`, rendered by `ProfileHeader`. Gains `photoUrl?` for the §28.3 photo block (the asset is identity; whether/how it displays is per-application `format` — default hidden).
 
 ---
 
@@ -531,7 +563,9 @@ Identity for the header, stored in the `profile` table (§4.2), never sent into 
 - **JSON import/export** of `Entry[]` — also the fast path to author a real library (write JSON, import).
 - **Config (fail-fast):** `LEDE_MASTER_KEY` (required), `LEDE_SESSION_SECRET` (required), `PORT` (8787), `DATA_DIR` (`./data`), `LEDE_AUTH_DISABLED` (false), `LEDE_TAILOR_ENGINE` (`live` | `fixture`; `fixture` by default under `NODE_ENV=test` and for keyless demo, `live` in production). The user's provider key is BYOK (stored encrypted, §8) — not an env var.
 - **Path aliases:** `@shared/*` → `src/shared/*` (tsconfig + vite).
-- **Tailored results ephemeral** — not stored; saved-tailors/history deferred (would add a `tailors` table + `/tailor/:id`).
+- ~~Tailored results ephemeral~~ **Superseded by §27** (2026-07-03): tailored results persist as each application's `current`/`locked` snapshots. (Kept struck-through because this bullet contradicted §27 for two days — the spec's own drift tripwire.)
+- **Responsive stance (2026-07-04):** desktop-first — the split resume/reasoning view wants width. Everything must remain *functional and readable* down to ~380px (single column, panels stack; no separate mobile IA, no gestures). Reviewing an application on a phone is in scope; authoring a library on one is not a design target.
+- **Accessibility baseline (2026-07-04):** keyboard-complete (every action reachable, visible focus ring — already a token), WCAG AA contrast for all text (§12 tokens are chosen to pass), form fields always labeled (visually or `sr-only`), async states announced (`role="alert"` on errors, `aria-busy` while tailoring). Radix primitives carry the widget semantics; this line makes it a gate, not an accident.
 
 ---
 
@@ -556,10 +590,10 @@ Docker (multi-stage build SPA + server → slim runtime) + `docker-compose.yml` 
 ## 20. Dependency ledger
 
 **Server:** `fastify @fastify/static @fastify/secure-session better-sqlite3 drizzle-orm ai @ai-sdk/anthropic @ai-sdk/openai @ai-sdk/google zod drizzle-zod` (crypto = Node built-in). `ai` = Vercel AI SDK (multi-provider `generateObject`); dropped `@anthropic-ai/sdk` and `zod-to-json-schema` (the AI SDK covers both).
-**Client:** `react react-dom react-router-dom @tanstack/react-query tailwindcss class-variance-authority clsx tailwind-merge lucide-react tailwindcss-animate @radix-ui/*` (via shadcn) `@fontsource/ibm-plex-sans|mono|serif`.
+**Client:** `react react-dom react-router-dom @tanstack/react-query tailwindcss class-variance-authority clsx tailwind-merge lucide-react tailwindcss-animate @radix-ui/*` (via shadcn) `@fontsource/ibm-plex-sans|mono|serif`; **document engine (§28):** `@react-pdf/renderer pdfjs-dist` (+ self-hosted OFL TTFs for the §28.3 font registry).
 **Dev:** `vite @vitejs/plugin-react typescript tsx vitest concurrently drizzle-kit postcss autoprefixer @types/*`.
 
-**Deferred, with reason:** multi-user/accounts/hosted auth (single-user self-host); Postgres (single-file SQLite fits self-host); vector DB/embeddings (entries fit in the prompt); global store (TanStack Query covers server state); tRPC (typed fetch is enough); PDF-generation library (browser print is reliable + ATS-safe).
+**Deferred, with reason:** multi-user/accounts/hosted auth (single-user self-host); Postgres (single-file SQLite fits self-host); vector DB/embeddings (entries fit in the prompt); global store (TanStack Query covers server state); tRPC (typed fetch is enough); headless-Chromium print service (react-pdf renders deterministic PDFs with no Chromium in the image — §28.0; this supersedes the earlier "browser print, no PDF library" decision, revised 2026-07-04 with evidence); DOCX export + PDF/A (§28.7); JD-by-URL fetch (paste is reliable; fetching arbitrary job boards is scraping-adjacent brittleness the product explicitly rejects — §2); LinkedIn import (no API; scraping violates ToS — §29); cover letters (same Library + judgment machinery, plausible future epic — deferred until the resume loop is polished, not because it doesn't fit); DOCX *input* for §29 (PDF + paste cover the real cases).
 
 ---
 
@@ -594,7 +628,7 @@ lede/
         SettingsView.tsx ApiKeyForm.tsx ProviderPicker.tsx ModelPicker.tsx
         domain/ WeightBar.tsx Callout.tsx RepeatableList.tsx TagInput.tsx
         ui/     # shadcn
-      styles/ tokens.css app.css print.css
+      styles/ tokens.css app.css print.css   # print.css retires with §28.8-A
 ```
 
 ---
@@ -710,9 +744,11 @@ Two things define success; the rest is table stakes. Structured so that **all bu
 **Library — the information bank (vision).** The Library is an intentionally **over-complete** bank: the user is expected to capture far more than any single résumé holds. More source material gives the tailor more to draw on — especially to **bridge an imperfect JD match**, where the right facts exist but aren't the obvious ones. The corpus is the raw material; a résumé is a per-JD *projection* of it (§1, §27). There is **no separate "master résumé" artifact** — Library + Profile is the single source of truth; applications are projections. "Multiple copies" (§27) means multiple projections, not multiple originals. Scales down cleanly: a targeted user with a small, focused corpus uses the identical select/cut machinery.
 - **Corollary (page, not model): findability is the Library's real job at scale.** Browse/filter by section, tag, and free text — tags in their spec-sanctioned grouping/filtering role (§1), **never** selection scoring. These affordances are **progressive**: they scale up with corpus size and never burden a small library (empty/small states stay dead-simple).
 
-**The Applications ↔ Library loop.** The most common real task: mid-tailoring you discover a bridging fact is missing (exactly the bank premise) → jump to Library → add an entry → return to the application → re-tailor. The IA must make this a **loop, not a dead-end** — the application context survives the detour. (A long Applications list reuses the *same* progressive find/filter pattern as the Library — solve findability once.)
+**The Applications ↔ Library loop.** The most common real task: mid-tailoring you discover a bridging fact is missing (exactly the bank premise) → jump to Library → add an entry → return to the application → re-tailor. The IA must make this a **loop, not a dead-end** — the application context survives the detour.
 
-**First-run path.** A fresh instance is a set of empty rooms; guide the happy path: set password (§7) → add provider key (Settings, §8) → seed the Library (add/import entries) → create the first Application → tailor. Empty states point to the next step, not a blank page.
+**Applications at scale (2026-07-04 — the concrete contract for the line above).** A job search produces 30–100 applications; the grid must stay usable. Same progressive pattern as the Library, same threshold discipline: below ~10 applications, nothing but the grid; above it, a find row appears — **free-text search over company/role**, a **genState filter**, sort fixed at `updatedAt` desc (recency is the only ordering a tailoring record needs). All client-side (the list endpoint already returns lightweight metadata, §9). **No archive, no folders, no manual pinning** — organizing applications by hiring progress is the tracker §2 forbids wearing a different hat; delete exists for records that no longer matter.
+
+**First-run path.** A fresh instance is a set of empty rooms; guide the happy path: set password (§7) → add provider key (Settings, §8) → seed the Library (resume import §29, or add/import entries) → create the first Application → tailor. Empty states point to the next step, not a blank page. **Concretized in §30** (empty-by-default seed policy + the derived getting-started panel).
 
 **Rejected (vision):** sidebar nav (over-structure for 3 flat items; steals Applications-view width); Profile/Layout in Settings (mixes résumé content with operator plumbing); a dedicated Profile destination (a 4th destination for rare-edit config, not yet earned); a hand-authored "master résumé" (the Library already is the source of truth).
 
@@ -733,12 +769,22 @@ type Application = {
   current?: TailoredResume;   // last tailor output; OVERWRITTEN on re-tailor (self-contained snapshot)
   locked?: TailoredResume;    // optional immutable "final" snapshot (see below)
   genState: 'untailored' | 'tailoring' | 'tailored' | 'failed';   // GENERATION state — never a hiring state (§2)
-  currentMeta?: { at: number; provider: ProviderId; model: string };  // provenance for staleness
+  failedReason?: FailedReason; // typed failure taxonomy (§15) — cleared on next tailor
+  previous?: TailoredResume;  // ONE-level undo: the `current` displaced by the last re-tailor (self-contained, overwritten each re-tailor)
+  currentMeta?: { at: number; provider: ProviderId; model: string;
+                  usage?: { inputTokens: number; outputTokens: number } };  // provenance + cost (§15)
+  targetPages?: 1 | 2;        // page budget for THIS role (default 1) — §28.1
+  format?: DocumentFormat;    // template + design overrides for THIS role (default settings.defaultFormat) — §28.3
+  lockedFormat?: DocumentFormat & { paper: 'letter' | 'a4'; targetPages: 1 | 2; resolvedDensity: string };  // frozen with `locked` — §28.3
   createdAt: number; updatedAt: number;
 };
 ```
 
-**Lifecycle.** create (JD + optional company/role/context) → `tailor` runs the pipeline (§6) over the *current* Library + this JD/context, persisting the result as `current` (genState `tailored`) → edit JD/context and **re-tailor** (overwrites `current`) → optionally **lock** the final version.
+**Lifecycle.** create (JD + optional company/role/context) → `tailor` runs the pipeline (§6) over the *current* Library + this JD/context, persisting the result as `current` (genState `tailored`) → edit JD/context and **re-tailor** (moves the old `current` to `previous`, writes the new one) → optionally **lock** the final version.
+
+**Undo last re-tailor (concretized 2026-07-04).** Exactly one level: re-tailor copies the displaced `current` into `previous` before overwriting; `POST /api/applications/:id/undo-tailor` swaps them back (the regretted version moves to `previous`, so undo is itself undoable once). Not a history — `previous` is overwritten by every re-tailor, invisible in any list, and exists only behind an "Undo re-tailor" action shown while it differs from `current`.
+
+**Duplicate (2026-07-04).** `POST /api/applications/:id/duplicate` — copies JD/context/company/role into a fresh `untailored` application (never the snapshots; the new JD deserves its own judgment). Covers the real "same role, different company" workflow with one button on the detail page.
 
 **Snapshots: `current` + optional `locked` — no version history (decided, with rationale).** A saved résumé is a point-in-time projection of a *living* Library. Two things follow:
 - **Self-contained (integrity invariant).** `current`/`locked` hold the full assembled `TailoredResume`, not references. Editing or deleting a Library entry later can never corrupt or break a saved application.
@@ -750,6 +796,129 @@ type Application = {
 
 **Backup (self-host, §2/§19/§25).** Export/import span **library + profile + applications** (`/api/export`, `/api/import`, §9) — losing a year of tailored applications on a container rebuild is a data-loss surprise a self-hoster shouldn't hit. "Backup = copy the SQLite file" already covers all three (one DB).
 
+**What backup deliberately excludes, and restore semantics (2026-07-04).** The export omits `settings` and `secrets` **by design**: the provider key must never leave the instance in plaintext, and its ciphertext is useless under a different `LEDE_MASTER_KEY` — including it would only create a backup that silently half-works. Consequence, documented in the README's restore checklist: restoring to a fresh instance = set env secrets (§19) → import the backup file → **re-enter the provider key and re-pick provider/model in Settings** (~30 seconds of config, zero data loss). The SQLite-file copy path restores settings/ciphertext too, but only boots usable if `LEDE_MASTER_KEY` is unchanged — say so where the copy path is documented.
+
 **Not a tracker (tripwire, §2).** The only status is `genState` (generation). No applied/interviewing/rejected pipeline, kanban, or reminders — that dilutes the differentiator (repositioning, not tracking) and edges the spirit of "no ATS."
 
 **Acceptance shape (for the oracle when this epic is built).** create → persist → set JD+context → tailor → `current` persists and **survives reload + server restart** (keyless integration + browser) → re-tailor overwrites `current` → lock freezes `locked` immutably (later Library edits don't change it) → deleting a Library entry does **not** alter any saved snapshot (integrity) → a number present only in `context` (not in any entry) still throws fabrication (§6.3).
+
+---
+
+## 28. The document engine: templates, design layer, page fit & PDF
+
+*(Rewritten 2026-07-04 after a comparative study of Reactive Resume v5, OpenResume, FlowCV, Enhancv, resume.io, Novoresume, Teal, JSON Resume themes, and the LaTeX/Typst ecosystems, plus ATS-parser research — Textkernel engineering posts, Greenhouse parse-failure docs. Decisions below were made against that evidence, not defaults.)*
+
+Lede grows a real **document design layer** — a template gallery plus a design panel, in the two-layer shape the whole field converges on: **template = layout identity** (chosen from a gallery, switchable with reflow) and **design panel = bounded overrides on top**. The judgment thesis is untouched: templates and knobs style the *presentation* of a `TailoredResume`; selection/ordering/cutting stay the tailor's (§5/§6), and **the renderer never cuts** (28.4) — a render-side cut would bury a lede with no rationale, breaking §11's promise.
+
+### 28.0 Engine: `@react-pdf/renderer` (supersedes §10's print pipeline)
+
+- The document renders through **react-pdf primitives** — one React component tree per template — into a real PDF, in the browser (preview + download; the server can render the identical document via the same package if a tokenized-download need appears). The **preview is the artifact**: the builder shows the actual PDF via a **pdf.js** canvas. `window.print()` + `print.css` retire when 28.8-A lands.
+- **Why (evidence):** both flagship OSS builders (Reactive Resume v5.1+, OpenResume) converged here — rx-resume after years maintaining a Browserless/Chromium printer sidecar. This buys: no Chromium in the image (≈1 GB + shm/zombie config avoided); deterministic output independent of the user's browser; first-class PDF metadata and clickable `Link`s; embedded, subset fonts with correct ToUnicode (no extraction garbage); and **text draw order we control — ATS extraction order is correct by construction**, which 28.6 turns into a CI invariant.
+- **The accepted constraint:** templates are **code** (react-pdf components), not HTML/CSS — which was already our stance (a code-defined registry, not user-authored files).
+- Fabrication validation (§6.3) is untouched: it runs on `TailoredResume` data server-side, upstream of any rendering.
+- **File hygiene:** downloads are named `<Name> — <Company> — <Role>.pdf` (slugged); PDF title/author set from the profile. No print-dialog roulette.
+
+### 28.1 Page model
+
+- **Paper:** `letter | a4` — one **global setting** (`settings.paper`, default `letter`). Affects the page size and budget math only.
+- **Target pages:** `1 | 2` — **per application** (`targetPages`, default `1`). One page is the convention; senior/academic roles legitimately need two. Lives on the application because it depends on the role.
+- Formatting never mutates snapshots; re-render is cheap and local.
+
+### 28.2 Templates (gallery, code-defined, ATS-graded)
+
+- A **template registry** (same pattern as §4.3's section registry): each template = a react-pdf Page component + a manifest `{ id, name, description, layout: 'single' | 'sidebar-left' | 'sidebar-right', atsGrade, densityLadder, previewImage }`. Launch with **4–6 templates**: at least two single-column (`strict`) and two sidebar layouts. All templates render every section through **shared section renderers** — they differ in composition (header treatment, sidebar, rules, heading style), never in features (rx-resume's own rule, worth copying).
+- **ATS grade is a badge, not marketing** (verified per 28.6): `strict` — single column, standard bullets, contact in body flow; `good` — well-structured two-column (modern ML parsers such as Textkernel-class handle ≈90% of column CVs, but **Workday/Taleo still read strictly left-to-right** — that caveat is surfaced in the picker, not hidden). Enabling the photo caps a template's effective grade at `good` (Greenhouse officially lists photos among parse-failure causes).
+- Template choice is **per application** (`format.templateId`) — the right look depends on the company; global default in `settings.defaultFormat`.
+- **Deliberately rejected:** user-authored templates and arbitrary custom CSS. rx-resume removed raw CSS in v5 in favor of constrained, structured "style rules" — if an escape hatch is ever wanted, that is the model to copy; **deferred**.
+
+### 28.3 The design panel (bounded overrides)
+
+Grouped the way the field consistently groups it (typography → color → page → structure), persisted **per application** as `format`, with instance defaults in `settings.defaultFormat`:
+
+```ts
+type DocumentFormat = {
+  templateId: string;
+  typography: {
+    body:    { family: FontId; size: number; lineHeight: number };  // size 9–12pt
+    heading: { family: FontId; weight: 400 | 500 | 600 | 700 };
+  };
+  colors: { primary: string; text: string };   // primary drives headings/rules/links per template
+  page:   { marginX: number; marginY: number; sectionGap: number }; // pt, bounded ranges
+  photo:  { hidden: boolean; size: number; shape: 'circle' | 'rounded' | 'square' }; // default hidden
+  sections: Partial<Record<Section, { columns?: 1 | 2 | 3 }>>;      // e.g. skills in 2 columns
+};
+```
+
+- **Fonts: a curated, self-hosted registry of ~12 OFL faces** registered via `Font.register` — picked for resume typography plus metric-compatible stand-ins for the Word classics (Arimo→Arial, Tinos→Times New Roman, Carlito→Calibri), IBM Plex among them. Never a 500-font list, never free-form input — font choice is the axis every mainstream builder restricts hardest, deliberately.
+- **Colors: two, not three** — `primary` accent + `text` ink. The page background stays paper-white (tinted backgrounds are where both ATS trouble and taste trouble start). Curated palette first, hex input as escape hatch.
+- **Photo:** default **hidden**. Enabling shows a regional-norms note (expected in DACH/JP CVs, discouraged US/UK) and downgrades the ATS badge (28.2). The image lives on the profile (§16 gains `photoUrl`); display settings live in `format`.
+- **Structure:** section order/visibility remains the **LayoutEditor**'s job (§13/§26 — resume *material* lives with the Library); the design panel adds only per-section `columns`. rx-resume's drag-drop page/column builder is **deferred** — sidebar templates + per-section columns cover the demand at a fraction of the build/QA surface.
+- **Locking:** `locked` freezes `lockedFormat` (the resolved `format` + `resolvedDensity` + paper) — "what you actually sent" includes how it was set. `current` re-resolves live.
+
+### 28.4 Fit ladder (auto density — exact, because the renderer paginates)
+
+- react-pdf reports the true page count, so fitting is exact, not estimated: render at the user's chosen format (**comfortable** = exactly as set) → if `pages > targetPages`, re-render at **standard**, then **compact** (template-declared multipliers over type size / line-height / gaps; floor **9.5pt body**) → first fit wins.
+- Deterministic: same content + format + paper ⇒ same density ⇒ same bytes. Density is **auto-only** — it is derived, and persisting it would be a knob carrying no information the fit doesn't already have.
+- **Overflow:** if `compact` still exceeds the target — render at compact, show the true page count, and offer the two honest actions: *re-tailor to a tighter budget* (28.5) or *allow 2 pages*. Never shrink past the floor; **never cut** (item count in the document is invariant across densities — an oracle check).
+- UI: a fit chip ("Fits 1 page · compact") and the real page boundaries visible in the pdf.js preview (they're actual PDF pages).
+- Field note: genuine auto-fit is rare — of every tool surveyed only Rezi ships a one-button version; the rest hand users sliders and a page counter. This is a differentiator; keep it central.
+
+### 28.5 Length budget (judgment — the tailor's half)
+
+- The server derives a **content budget** from (paper, targetPages, format, ladder): ≈ lines-per-page × chars-per-line at `standard` density, expressed to the model as approximate bullets/words. Heuristic is fine — the fit ladder absorbs estimation error; the budget's job is to make the model *select to the page*, not hit it exactly.
+- **Transport: the budget rides the user message, exactly like per-app `context` (§6.2 / ledger [v3-001]) — `prompt.ts` stays frozen.** No budget ⇒ user message byte-identical to today ⇒ existing fixtures replay ⇒ keyless suite stays green. "Budget measurably changes selection" is a **model-quality claim = key-gated**, recorded honestly like T014.
+- Budget-driven cuts land in `cut[]` with rationales — "What got buried" now also explains what the *page* cost, the most editorial sentence in the product.
+
+### 28.6 ATS honesty: badges backed by extraction, not vibes
+
+- **CI invariant:** for `strict` templates, running pdf.js text extraction over the generated PDF yields the profile header and every selected fact **in exactly `TailoredResume` order** — extraction order = content order. "ATS-safe" becomes a regression test, not a claim.
+- **"What the ATS sees" view:** a preview tab that runs that same extraction over the user's actual export (OpenResume-style parser round-trip — the most honest mechanism in the field). Doubles as **plain-text export** for pasting into application form fields. Lede shows its work about the model's judgment; this shows its work about the file.
+
+### 28.7 Exports & explicit deferrals
+
+- **PDF** — canonical (28.0). **Plain text** — from 28.6.
+- **Deferred, with reason:** **DOCX** (genuinely demanded in Word-first markets and the most reliably parsed format; generate later from the same `TailoredResume` via the `docx` package — same data model, no container deps; a planned follow-up, not a hole) · **PDF/A / tagged-PDF accessibility** (Chromium can't emit PDF/A; Ghostscript pipelines strip structure tags; WeasyPrint would add a Python sidecar — skip until a user asks) · **custom style rules** (28.2) · **drag-drop layout builder** (28.3) · **public share links** (rx has them; wrong shape for a self-hosted single-user instance).
+
+### 28.8 Phasing & acceptance shape (keyless unless noted)
+
+- **A — Engine migration:** react-pdf document model + 2 launch templates (1 `strict`, 1 sidebar) + **the profile header finally on the document** (name/contact/links from §16, replacing the hardcoded placeholder) + pdf.js preview + Download PDF + page model. Oracle: fixture resume renders to PDF under both templates; extracted text contains profile + every selected fact in order; `leadRationale`/`cut[]` strings absent from extraction; paper/targetPages/template changes never mutate snapshots; filename + metadata correct.
+- **B — Design panel:** typography/colors/page/photo/section-columns; per-app `format` + `settings.defaultFormat`; `lockedFormat`. Oracle: format round-trips; a locked app renders byte-stable when live defaults change; photo hidden by default; ATS badge downgrades with photo/sidebar.
+- **C — Fit + honesty:** density ladder + overflow reporting + extraction view / plain-text export + the 28.6 invariant in CI. Oracle: growing fixture content walks comfortable→compact with item count invariant across densities; overflow reports, never cuts.
+- **D — Budget → selection (key-gated):** per 28.5. Oracle: empty budget ⇒ byte-identical user message (fixture-replay guard); with a live key, a 1-page budget over the over-complete seed library produces more `cut[]` than 2-page, each with a rationale.
+
+---
+
+## 29. Resume import — seeding the Library from an existing resume
+
+*(Added 2026-07-04.)* The activation wall: before Lede does anything, a new user must hand-author their entire history as entries — the one place every competitor is easier. The fix is the **inverse of tailoring**: extraction. It reuses the product's own vocabulary — a resume is a projection of a Library (§26); import runs the projection backwards, under the same fabrication discipline.
+
+**Flow (review-then-commit — nothing writes directly):**
+1. **Input:** paste resume text, or upload a PDF — text extracted **client-side** via pdf.js (already a §28 dependency; the file never leaves the browser). DOCX input deferred (§20).
+2. **`POST /api/extract` `{ text }`** → model call (BYOK, `generateObject` with a hand-written `ExtractionZ`) → `{ proposed: ProposedEntry[] }`. Each proposal: `section`, `meta` (per the §4.3 registry), `facts[]`, suggested `tags[]`, `sortKey` guess, and a **`source` quote** — the resume text span it came from.
+3. **`ImportReview` UI:** proposals grouped by section, each showing its `source` quote beside the structured entry; the user **edits / accepts / rejects per entry**. Accepted entries flow through the existing `POST /api/entries` path (slugging, validation, dedupe `-2` — §17).
+
+**The fabrication contract, mirrored.** Tailoring's gate is `validateNoFabrication` on the way *out*; import's gate is **human review with the source visible** on the way *in*. The extraction prompt enforces: facts restate the source, numbers appear **verbatim or not at all**, nothing inferred; granularity per §1 (bullet-level entries — a job with 5 accomplishments proposes 5 experience entries). The review UI exists precisely because extraction can't be machine-validated the way assembly can — the user is the validator, so show them the evidence.
+
+**Keyless discipline (§18):** extraction is a live-model feature, so it follows the tailor's pattern exactly — a recorded **extraction fixture** (one real resume text → recorded proposals) drives all tests; "extraction is faithful on arbitrary resumes" is a **key-gated model-quality claim**, recorded honestly like T014.
+
+**Placement (§26):** the Library's empty state leads with "Import your existing resume" (primary CTA) over "Add entry" (secondary); a quieter "Import from resume…" lives in the Library toolbar thereafter. Distinct from JSON Import (§17), which is the machine-to-machine path.
+
+**Not in scope:** LinkedIn import (no API for this; scraping violates ToS — §20); auto-accepting proposals (removes the human gate that makes import trustworthy); re-import merge intelligence (re-running proposes again; slug dedupe prevents duplicates; the user rejects what they already have).
+
+---
+
+## 30. First run & sample data
+
+*(Added 2026-07-04.)* Two decisions that shape a stranger's first ten minutes.
+
+**A fresh instance starts EMPTY.** `seedIfEmpty` stops planting demo entries in real instances: the current seed is the developer's own work history, which every real user would have to recognize as fake and delete — noise dressed as help. The seed corpus moves behind **`LEDE_SEED_DEMO=1`** (default off): dev environments and the e2e/fixture machinery set it explicitly (the recorded decision fixtures hash over the seed corpus — §22/§18 — so the `applications` Playwright project and keyless demos flip it on; CI config change, no test rewrites).
+
+**Getting-started panel, derived not stored.** The empty Applications view (the landing page) renders a four-step panel computed live from instance state — no onboarding flags in the DB, it disappears the moment reality completes it:
+1. ~~Set a password~~ (implicitly done — they're logged in)
+2. **Add your provider key** → Settings (done when `keySet`)
+3. **Put yourself in the Library** → §29 import or manual entry (done when `entries.length > 0`; shows the count)
+4. **Create your first application** → the §27 create dialog (done when one exists — at which point the whole panel is gone)
+
+Each step deep-links to where it's completed; the Applications↔Library loop (§26) brings the user back. The first tailor attempt with no key already routes to Settings (§9's `no_api_key`) — the panel exists so that dead-end is never reached.
+
+**Acceptance shape:** fresh boot (no `LEDE_SEED_DEMO`) → `/api/entries` returns `[]`, Library and Applications show their guided empty states, panel shows steps 2–4 pending → set key → panel updates → import/add an entry → panel updates → create + tailor an application → panel gone, never returns. With `LEDE_SEED_DEMO=1`: current seeded behavior, byte-identical fixtures.
