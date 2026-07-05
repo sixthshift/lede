@@ -5,6 +5,8 @@
 
 import { ArrowLeft, BookOpen, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
+import { downloadResumePdf } from "../document/download";
+import { useProfile } from "../hooks/queries";
 import {
   useApplication,
   useLockApplication,
@@ -27,6 +29,7 @@ function formatStaleDate(at: number): string {
 
 export function ApplicationDetail({ applicationId }: { applicationId: string }) {
   const { data: application, isLoading, isError } = useApplication(applicationId);
+  const { data: profile } = useProfile();
   const tailorApplication = useTailorApplication();
   const lockApplication = useLockApplication();
   const unlockApplication = useUnlockApplication();
@@ -95,6 +98,22 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
             </Button>
             <Button onClick={() => tailorApplication.mutate(application.id)} disabled={isTailoring}>
               {tailorLabel}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!application.current || !profile}
+              onClick={() =>
+                profile &&
+                application.current &&
+                downloadResumePdf({
+                  resume: application.current,
+                  profile,
+                  company: application.company,
+                  role: application.role,
+                })
+              }
+            >
+              Download PDF
             </Button>
           </div>
         </div>
