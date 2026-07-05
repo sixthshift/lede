@@ -19,14 +19,20 @@
 // RESUME_TOKEN is a verbatim substring of that fixture's leading item text
 // (rank 1, entryId "cloudcase-platform-sdk") — RED-TEAM #8: proves the
 // specific recorded content rendered, not just that *some* non-empty resume
-// appeared.
+// appeared. Since E7-A4, the artifact is a react-pdf PDF painted onto a pdf.js
+// <canvas> (§28.0) — there's no DOM text node to assert on — so RESUME_TOKEN
+// is checked against the tailor/lock endpoints' own JSON response bodies
+// (server-side proof of the exact recorded content), and expectCanvasPainted
+// below is the client-side proof that DocumentPreview's real react-pdf ->
+// pdf.js pipeline actually painted something (not just mounted in a loading
+// state) — non-white pixels in the canvas.
 //
 // One continuous test rather than several independent ones: it's a single
 // lifecycle (create -> tailor -> persist -> re-tailor -> lock) where each
 // step's assertions depend on the previous step's state, and the
 // console/pageerror listeners have to be registered before the one
 // first-run goto() every step shares (same rationale as docker-spa.spec.ts).
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { ensureFirstRunPassword } from "./helpers/session";
 import { CONTRAST_JDS } from "../../src/server/tailor/evalcore";
 
@@ -39,6 +45,24 @@ const RESUME_TOKEN =
 // list that (on a reused dev server) may carry rows from a previous run.
 const runId = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 const COMPANY_MARKER = `E2E Applications Co ${runId}`;
+
+async function expectCanvasPainted(page: Page): Promise<void> {
+  const canvas = page.locator(".document-preview canvas");
+  await expect(canvas).toBeVisible();
+  await expect
+    .poll(() =>
+      canvas.evaluate((el: HTMLCanvasElement) => {
+        const ctx = el.getContext("2d");
+        if (!ctx || el.width === 0) return false;
+        const { data } = ctx.getImageData(0, 0, el.width, el.height);
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i] !== 255 || data[i + 1] !== 255 || data[i + 2] !== 255) return true;
+        }
+        return false;
+      }),
+    )
+    .toBe(true);
+}
 
 test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock", async ({
   page,
@@ -109,53 +133,58 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   await page.goto(`/applications/${applicationId}`);
   await expect(page.getByRole("button", { name: "Tailor", exact: true })).toBeVisible();
 
-  await Promise.all([
+  const [tailorResponse] = await Promise.all([
     page.waitForResponse(
       (r) => r.url().endsWith(`/api/applications/${applicationId}/tailor`) && r.status() === 200,
     ),
     page.getByRole("button", { name: "Tailor", exact: true }).click(),
   ]);
   expect(tailorRequests).toHaveLength(1);
+  expect(JSON.stringify(await tailorResponse.json())).toContain(RESUME_TOKEN);
 
-  // (4) current renders: ResumePage root non-empty, ReasoningPanel present,
-  // and the specific fixture token in the DOM (RED-TEAM #8).
+  // (4) current renders: DocumentPreview painted a real PDF, ReasoningPanel
+  // present, as SIBLINGS (§11/§28.0) — the specific fixture token (RED-TEAM
+  // #8) is proven server-side above (the tailor response body), since the
+  // rendered artifact is a canvas, not DOM text.
   await expect(page.getByRole("button", { name: "Re-tailor", exact: true })).toBeVisible();
-  const resumePage = page.locator(".resume-page");
-  await expect(resumePage).toBeVisible();
-  expect((await resumePage.innerText()).trim().length).toBeGreaterThan(0);
+  await expectCanvasPainted(page);
   await expect(page.locator(".reasoning-panel")).toBeVisible();
-  await expect(resumePage).toContainText(RESUME_TOKEN);
 
-  // (5) full reload -> the same token still renders, with NO re-tailor
+  // (5) full reload -> the same content still persists, with NO re-tailor
   // (persistence: genState stays 'tailored', current was persisted by (3),
-  // not re-derived on load).
+  // not re-derived on load) — checked against the record itself, since the
+  // canvas has no DOM text to assert a token against.
   await page.reload();
   await expect(page.getByRole("button", { name: "Re-tailor", exact: true })).toBeVisible();
-  await expect(page.locator(".resume-page")).toContainText(RESUME_TOKEN);
+  await expectCanvasPainted(page);
+  const afterReload = await page.request.get(`/api/applications/${applicationId}`);
+  expect(JSON.stringify(await afterReload.json())).toContain(RESUME_TOKEN);
   expect(tailorRequests, "reload must not trigger a re-tailor").toHaveLength(1);
 
   // (6) re-tailor.
-  await Promise.all([
+  const [retailorResponse] = await Promise.all([
     page.waitForResponse(
       (r) => r.url().endsWith(`/api/applications/${applicationId}/tailor`) && r.status() === 200,
     ),
     page.getByRole("button", { name: "Re-tailor", exact: true }).click(),
   ]);
   expect(tailorRequests).toHaveLength(2);
-  await expect(page.locator(".resume-page")).toContainText(RESUME_TOKEN);
+  expect(JSON.stringify(await retailorResponse.json())).toContain(RESUME_TOKEN);
+  await expectCanvasPainted(page);
 
   // (7) lock final -> `locked` renders: the lock/unlock toggle (JobPanel's
   // only locked-state UI, src/client/components/JobPanel.tsx) flips to
   // "Unlock", and the resume content (still driven by `current`, which lock
   // deep-copies rather than replaces) stays visible.
-  await Promise.all([
+  const [lockResponse] = await Promise.all([
     page.waitForResponse(
       (r) => r.url().endsWith(`/api/applications/${applicationId}/lock`) && r.status() === 200,
     ),
     page.getByRole("button", { name: "Lock final", exact: true }).click(),
   ]);
   await expect(page.getByRole("button", { name: "Unlock", exact: true })).toBeVisible();
-  await expect(page.locator(".resume-page")).toContainText(RESUME_TOKEN);
+  expect(JSON.stringify(await lockResponse.json())).toContain(RESUME_TOKEN);
+  await expectCanvasPainted(page);
 
   expect(pageErrors, `unexpected page errors: ${pageErrors.join(", ")}`).toHaveLength(0);
   expect(consoleErrors, `unexpected console errors: ${consoleErrors.join(", ")}`).toHaveLength(0);

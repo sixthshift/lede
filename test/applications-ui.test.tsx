@@ -9,10 +9,24 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, within, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
-import type { Application, TailoredResume } from "@shared/types";
+import type { Application, Profile, TailoredResume } from "@shared/types";
 
 import { ApplicationsView } from "../src/client/components/ApplicationsView";
 import { ApplicationDetail } from "../src/client/components/ApplicationDetail";
+import type { SettingsResponse } from "../src/client/api";
+
+// DocumentPreview's real render (usePDF -> pdf.js canvas) needs a browser
+// bundle/worker that vitest's jsdom env doesn't provide (§28.0's real
+// coverage is the playwright applications e2e). Here we only need the
+// component to mount without the perpetual "loading" state throwing, so
+// usePDF is stubbed to its own documented loading shape.
+vi.mock("@react-pdf/renderer", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@react-pdf/renderer")>();
+  return {
+    ...actual,
+    usePDF: () => [{ loading: true, blob: null, url: null, error: null }, vi.fn()],
+  };
+});
 
 afterEach(() => {
   cleanup();
@@ -35,7 +49,22 @@ function resumeFixture(sentinel: string): TailoredResume {
         ],
       },
     ],
-    cut: [],
+    cut: [{ entryId: "c1", reason: "CUT_REASON_SENTINEL" }],
+  };
+}
+
+function profileFixture(): Profile {
+  return { name: "Jordan Rivera", email: "jordan@example.com", links: [] };
+}
+
+function settingsFixture(): SettingsResponse {
+  return {
+    keySet: false,
+    provider: "anthropic",
+    model: "claude-opus-4-8",
+    baseUrl: null,
+    layout: [],
+    paper: "letter",
   };
 }
 
@@ -66,6 +95,20 @@ function mockFetch(handlers: {
     const method = init?.method ?? "GET";
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     handlers.onRequest?.(method, url, body);
+
+    // DocumentPreview pulls these for every rendered application (§28.1).
+    if (method === "GET" && url === "/api/profile") {
+      return new Response(JSON.stringify(profileFixture()), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (method === "GET" && url === "/api/settings") {
+      return new Response(JSON.stringify(settingsFixture()), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     if (method === "GET" && url === "/api/applications") {
       const list = (handlers.list?.() ?? []).map(({ current: _c, locked: _l, ...rest }) => rest);
@@ -198,7 +241,7 @@ describe("ApplicationsView", () => {
 });
 
 describe("ApplicationDetail", () => {
-  it("renders the `current` snapshot via ResumePage + ReasoningPanel, and empty state links to /library when there is none", async () => {
+  it("renders the `current` snapshot via DocumentPreview + ReasoningPanel (never the legacy .resume-page), siblings not nested, reasoning never reachable inside the preview; empty state links to /library when there is none", async () => {
     const withCurrent = applicationFixture({
       id: "a1",
       current: resumeFixture("SENTINEL_CURRENT_SUMMARY"),
@@ -209,9 +252,31 @@ describe("ApplicationDetail", () => {
     mockFetch({ get: (id) => (id === "a1" ? withCurrent : withoutCurrent) });
 
     const { unmount } = renderWithProviders(<ApplicationDetail applicationId="a1" />);
-    expect(await screen.findByText("SENTINEL_CURRENT_SUMMARY")).toBeInTheDocument();
-    expect(document.querySelector(".resume-page")).toBeTruthy();
-    expect(document.querySelector(".reasoning-panel")).toBeTruthy();
+
+    const preview = await waitFor(() => {
+      const el = document.querySelector(".document-preview");
+      expect(el).toBeTruthy();
+      return el as HTMLElement;
+    });
+    const reasoningPanel = document.querySelector(".reasoning-panel") as HTMLElement;
+    expect(reasoningPanel).toBeTruthy();
+
+    // E7-A4: the DOM ResumePage is gone from this flow — DocumentPreview
+    // (the real react-pdf/pdf.js artifact) replaces it.
+    expect(document.querySelector(".resume-page")).toBeFalsy();
+
+    // §11 invariant: siblings, never nested either direction.
+    expect(preview.contains(reasoningPanel)).toBe(false);
+    expect(reasoningPanel.contains(preview)).toBe(false);
+
+    // leadRationale/cut are reasoning UI only — never reachable inside the
+    // preview subtree — but they DO surface in the reasoning panel, proving
+    // this is real per-resume data and not just an empty container.
+    expect(preview.textContent).not.toContain("led the migration");
+    expect(preview.textContent).not.toContain("CUT_REASON_SENTINEL");
+    expect(reasoningPanel.textContent).toContain("led the migration");
+    expect(reasoningPanel.textContent).toContain("CUT_REASON_SENTINEL");
+
     unmount();
 
     mockFetch({ get: () => withoutCurrent });
@@ -261,7 +326,7 @@ describe("ApplicationDetail", () => {
 
     mockFetch({ get: () => fresh });
     renderWithProviders(<ApplicationDetail applicationId="a2" />);
-    await screen.findByText("SENTINEL_FRESH");
+    await waitFor(() => expect(document.querySelector(".document-preview")).toBeTruthy());
     expect(screen.queryByText(/re-tailor to fold in newer entries/)).not.toBeInTheDocument();
   });
 });

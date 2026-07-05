@@ -1,15 +1,15 @@
-// Split view — spec.md §11. ResumePage (the print target) and ReasoningPanel
-// render as SIBLINGS, never nested, so the reasoning strings never enter the
-// .resume-page subtree that print.css/window.print() emits.
+// Split view — spec.md §11/§28.0. DocumentPreview (the real react-pdf
+// artifact, rendered via pdf.js) and ReasoningPanel render as SIBLINGS, never
+// nested, so the reasoning strings never enter the rendered-PDF subtree.
 
 import type { TailoredResume } from "@shared/types";
-import { ResumePage } from "./ResumePage";
+import { DocumentPreview } from "./DocumentPreview";
 import { ReasoningPanel } from "./ReasoningPanel";
 
 export function ResultView({ resume }: { resume: TailoredResume }) {
   return (
     <div className="result-view">
-      <ResumePage resume={resume} />
+      <DocumentPreview resume={resume} />
       <ReasoningPanel resume={resume} />
     </div>
   );

@@ -1,18 +1,73 @@
 // @vitest-environment jsdom
-// ResultView split — ResumePage | ReasoningPanel (ticket E3-A, spec.md §11/§10).
-// RED-TEAM focus: reasoning strings (leadRationale, cut reasons) must never
-// enter the .resume-page (print-target) subtree, by DOM absence — not
-// display:none. A panel nested inside ResumePage must fail this.
+// ResultView split — DocumentPreview | ReasoningPanel (ticket E3-A, updated
+// E7-A4, spec.md §11/§28.0). RED-TEAM focus: reasoning strings (leadRationale,
+// cut reasons) must never enter the rendered-document (print-target) subtree,
+// by DOM absence — not display:none. A panel nested inside the preview must
+// fail this.
 import "@testing-library/jest-dom/vitest";
-import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
-import type { TailoredResume } from "@shared/types";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { Profile, TailoredResume } from "@shared/types";
 import { ResultView } from "../src/client/components/ResultView";
 import { ReasoningPanel } from "../src/client/components/ReasoningPanel";
 import { WeightBar } from "../src/client/components/WeightBar";
 import { CutList } from "../src/client/components/CutList";
+import type { SettingsResponse } from "../src/client/api";
 
-afterEach(cleanup);
+// DocumentPreview's real render (usePDF -> pdf.js canvas) needs a browser
+// bundle/worker vitest's jsdom env doesn't provide (§28.0's real coverage is
+// the playwright applications e2e) — stubbed to its documented loading shape
+// so ResultView can mount here.
+vi.mock("@react-pdf/renderer", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@react-pdf/renderer")>();
+  return {
+    ...actual,
+    usePDF: () => [{ loading: true, blob: null, url: null, error: null }, vi.fn()],
+  };
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+function profileFixture(): Profile {
+  return { name: "Jordan Rivera", email: "jordan@example.com", links: [] };
+}
+
+function settingsFixture(): SettingsResponse {
+  return {
+    keySet: false,
+    provider: "anthropic",
+    model: "claude-opus-4-8",
+    baseUrl: null,
+    layout: [],
+    paper: "letter",
+  };
+}
+
+function renderResultView(resume: TailoredResume) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/profile") {
+        return new Response(JSON.stringify(profileFixture()), { status: 200 });
+      }
+      if (url === "/api/settings") {
+        return new Response(JSON.stringify(settingsFixture()), { status: 200 });
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    }),
+  );
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ResultView resume={resume} />
+    </QueryClientProvider>,
+  );
+}
 
 function fixture(): TailoredResume {
   return {
@@ -101,23 +156,31 @@ describe("ReasoningPanel", () => {
 });
 
 describe("ResultView", () => {
-  it("renders both ResumePage and ReasoningPanel as siblings", () => {
-    const { container } = render(<ResultView resume={fixture()} />);
+  it("renders both DocumentPreview and ReasoningPanel as siblings, never the legacy .resume-page", async () => {
+    const { container } = renderResultView(fixture());
 
-    const resumePage = container.querySelector(".resume-page");
+    const preview = await waitFor(() => {
+      const el = container.querySelector(".document-preview");
+      expect(el).toBeTruthy();
+      return el!;
+    });
     const reasoningPanel = container.querySelector(".reasoning-panel");
-    expect(resumePage).toBeTruthy();
     expect(reasoningPanel).toBeTruthy();
+    expect(container.querySelector(".resume-page")).toBeFalsy();
 
     // sibling, never nested: neither contains the other
-    expect(resumePage!.contains(reasoningPanel!)).toBe(false);
-    expect(reasoningPanel!.contains(resumePage!)).toBe(false);
+    expect(preview.contains(reasoningPanel!)).toBe(false);
+    expect(reasoningPanel!.contains(preview)).toBe(false);
   });
 
-  it("CONTRAST: leadRationale and cut reasons are DOM-absent from .resume-page, present in the reasoning subtree", () => {
-    const { container } = render(<ResultView resume={fixture()} />);
+  it("CONTRAST: leadRationale and cut reasons are DOM-absent from the preview, present in the reasoning subtree", async () => {
+    const { container } = renderResultView(fixture());
 
-    const resumePage = container.querySelector(".resume-page")!;
+    const preview = await waitFor(() => {
+      const el = container.querySelector(".document-preview");
+      expect(el).toBeTruthy();
+      return el!;
+    });
     const reasoningPanel = container.querySelector(".reasoning-panel")!;
 
     const sentinels = [
@@ -128,7 +191,7 @@ describe("ResultView", () => {
     ];
 
     for (const sentinel of sentinels) {
-      expect(resumePage.textContent).not.toContain(sentinel);
+      expect(preview.textContent).not.toContain(sentinel);
       expect(reasoningPanel.textContent).toContain(sentinel);
     }
   });
