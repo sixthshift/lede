@@ -1,12 +1,18 @@
-// CI EXTRACTION-ORDER INVARIANT (spec.md §28.6/§11): for the strict
-// template, extractPdfText over the rendered PDF must contain the profile
-// header + every selected item.text in EXACT TailoredResume content order
+// CI EXTRACTION-ORDER INVARIANT (spec.md §28.6/§11): for every template
+// declaring atsGrade 'strict' — a declared grade must be EARNED —
+// extractPdfText over the rendered PDF must contain the profile header +
+// every selected item.text in EXACT TailoredResume content order
 // (index-increasing), and leadRationale/cut[] sentinel strings — reasoning
 // UI only — must never reach the document.
 import { describe, expect, it } from "vitest";
 import type { Profile, TailoredResume } from "@shared/types";
 import { extractPdfText } from "../src/client/document/extractText";
 import { renderResumeToBuffer } from "../src/client/document/renderResume";
+import { TEMPLATES } from "../src/client/document/registry";
+
+const STRICT_TEMPLATE_IDS = Object.values(TEMPLATES)
+  .filter((template) => template.atsGrade === "strict")
+  .map((template) => template.id);
 
 function profileFixture(): Profile {
   return {
@@ -57,13 +63,15 @@ function resumeFixture(): TailoredResume {
   };
 }
 
-describe("extractPdfText extraction-order invariant (strict template, §28.6/§11)", () => {
+describe.each(
+  STRICT_TEMPLATE_IDS,
+)("extractPdfText extraction-order invariant (%s template, §28.6/§11)", (templateId) => {
   it("contains profile header + every item.text in exact TailoredResume order; leadRationale/cut absent", async () => {
     const profile = profileFixture();
     const buffer = await renderResumeToBuffer({
       resume: resumeFixture(),
       profile,
-      templateId: "strict",
+      templateId,
     });
     const items = await extractPdfText(buffer);
     const text = items.join(" ");

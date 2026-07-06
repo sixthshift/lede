@@ -23,12 +23,24 @@ function buildStyles(format: DocumentFormat) {
 
   return StyleSheet.create({
     header: { marginBottom: 12, flexDirection: "row", alignItems: "center" },
+    // centered/inline are alternate header compositions (spec.md §28.2's
+    // classic/compact templates) — the profile's fields never change, only
+    // which axis they're laid out on.
+    headerCentered: { marginBottom: 12, flexDirection: "column", alignItems: "center" },
+    headerInline: {
+      marginBottom: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    headerInlineLeft: { flexDirection: "row", alignItems: "center" },
     photo: {
       width: photo.size,
       height: photo.size,
       marginRight: 12,
       borderRadius: photoRadius,
     },
+    photoCenterOverride: { marginRight: 0, marginBottom: 8 },
     headerText: { flex: 1 },
     name: {
       fontSize: 20,
@@ -43,6 +55,7 @@ function buildStyles(format: DocumentFormat) {
       flexWrap: "wrap",
       fontFamily: typography.body.family,
     },
+    contactLineInline: { marginTop: 0 },
     contactItem: { marginRight: 8, color: colors.text },
     link: { marginRight: 8, color: colors.primary },
     summary: {
@@ -85,30 +98,73 @@ function buildStyles(format: DocumentFormat) {
   });
 }
 
-export function ProfileHeader({ profile, format }: { profile: Profile; format: DocumentFormat }) {
+// 'left' (default, strict/sidebar's header): photo + name-above-contact block,
+// left-anchored. 'centered' (classic): the whole block centered on the page.
+// 'inline' (compact): name and contact share one row. Composition only — the
+// profile fields and shared contact/link rendering never change by variant.
+export type ProfileHeaderVariant = "left" | "centered" | "inline";
+
+export function ProfileHeader({
+  profile,
+  format,
+  variant = "left",
+}: {
+  profile: Profile;
+  format: DocumentFormat;
+  variant?: ProfileHeaderVariant;
+}) {
   const styles = buildStyles(format);
   const contactParts = [profile.email, profile.phone, profile.location].filter(
     (part): part is string => Boolean(part),
   );
   const showPhoto = format.photo.hidden === false;
+  const contactItems = (
+    <>
+      {contactParts.map((part) => (
+        <Text key={part} style={styles.contactItem}>
+          {part}
+        </Text>
+      ))}
+      {profile.links.map((link) => (
+        <Link key={link.url} style={styles.link} src={link.url}>
+          {link.label}
+        </Link>
+      ))}
+    </>
+  );
+
+  if (variant === "centered") {
+    return (
+      <View style={styles.headerCentered}>
+        {showPhoto && profile.photoUrl ? (
+          <Image src={profile.photoUrl} style={[styles.photo, styles.photoCenterOverride]} />
+        ) : null}
+        <Text style={styles.name}>{profile.name}</Text>
+        <View style={styles.contactLine}>{contactItems}</View>
+      </View>
+    );
+  }
+
+  if (variant === "inline") {
+    return (
+      <View style={styles.headerInline}>
+        <View style={styles.headerInlineLeft}>
+          {showPhoto && profile.photoUrl ? (
+            <Image src={profile.photoUrl} style={styles.photo} />
+          ) : null}
+          <Text style={styles.name}>{profile.name}</Text>
+        </View>
+        <View style={[styles.contactLine, styles.contactLineInline]}>{contactItems}</View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.header}>
       {showPhoto && profile.photoUrl ? <Image src={profile.photoUrl} style={styles.photo} /> : null}
       <View style={styles.headerText}>
         <Text style={styles.name}>{profile.name}</Text>
-        <View style={styles.contactLine}>
-          {contactParts.map((part) => (
-            <Text key={part} style={styles.contactItem}>
-              {part}
-            </Text>
-          ))}
-          {profile.links.map((link) => (
-            <Link key={link.url} style={styles.link} src={link.url}>
-              {link.label}
-            </Link>
-          ))}
-        </View>
+        <View style={styles.contactLine}>{contactItems}</View>
       </View>
     </View>
   );

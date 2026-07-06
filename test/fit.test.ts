@@ -9,7 +9,7 @@ import type { Profile, TailoredResume } from "@shared/types";
 import { DEFAULT_FORMAT } from "@shared/format";
 import { applyDensity, fitToPages } from "../src/client/document/fit";
 import { extractPdfText } from "../src/client/document/extractText";
-import { getTemplate } from "../src/client/document/registry";
+import { getTemplate, TEMPLATES } from "../src/client/document/registry";
 import { renderResumeToBuffer } from "../src/client/document/renderResume";
 
 function profileFixture(): Profile {
@@ -122,6 +122,33 @@ describe("fitToPages (§28.4 fit ladder engine)", () => {
     for (const density of ["comfortable", "standard", "compact"] as const) {
       const densedFormat = applyDensity(DEFAULT_FORMAT, density, densityMultipliers);
       const buffer = await renderResumeToBuffer({ resume, profile, format: densedFormat });
+      const extracted = (await extractPdfText(buffer)).join(" ");
+      for (const text of expectedItems) {
+        expect(extracted).toContain(text);
+      }
+    }
+  });
+});
+
+// Same never-cut guard as above, generalized over every registered template
+// (not just DEFAULT_FORMAT's) — a template swap must never change which
+// items survive at a given density.
+describe.each(
+  Object.entries(TEMPLATES),
+)("ITEM-COUNT INVARIANT (§28.4, never-cut) — %s", (templateId, manifest) => {
+  it("every selected item.text is present in the extraction at every density in the template's ladder", async () => {
+    const resume = resumeFixture(24);
+    const profile = profileFixture();
+    const expectedItems = resume.sections[0].groups[0].items.map((item) => item.text);
+
+    for (const density of manifest.densityLadder) {
+      const densedFormat = applyDensity(DEFAULT_FORMAT, density, manifest.densityMultipliers);
+      const buffer = await renderResumeToBuffer({
+        resume,
+        profile,
+        format: densedFormat,
+        templateId,
+      });
       const extracted = (await extractPdfText(buffer)).join(" ");
       for (const text of expectedItems) {
         expect(extracted).toContain(text);

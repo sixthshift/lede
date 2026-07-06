@@ -9,6 +9,8 @@ import type { ReactElement } from "react";
 import type { DocumentFormat, Profile, TailoredResume } from "@shared/types";
 import { StrictTemplate } from "./templates/strict";
 import { SidebarTemplate } from "./templates/sidebar";
+import { ClassicTemplate } from "./templates/classic";
+import { CompactTemplate } from "./templates/compact";
 
 export type TemplateLayout = "single" | "sidebar-left" | "sidebar-right";
 export type AtsGrade = "strict" | "good";
@@ -46,6 +48,28 @@ export const TEMPLATES = {
     densityLadder: ["comfortable", "standard", "compact"],
     densityMultipliers: { comfortable: 1, standard: 0.94, compact: 0.88 },
     render: StrictTemplate,
+  },
+  classic: {
+    id: "classic",
+    name: "Classic",
+    description:
+      "Single-column, ATS-strict layout — centered profile header, hairline rule under each section heading.",
+    layout: "single",
+    atsGrade: "strict",
+    densityLadder: ["comfortable", "standard", "compact"],
+    densityMultipliers: { comfortable: 1, standard: 0.94, compact: 0.88 },
+    render: ClassicTemplate,
+  },
+  compact: {
+    id: "compact",
+    name: "Compact",
+    description:
+      "Single-column, ATS-strict layout — one-line header (name + contact on the same row), tighter section rhythm.",
+    layout: "single",
+    atsGrade: "strict",
+    densityLadder: ["comfortable", "standard", "compact"],
+    densityMultipliers: { comfortable: 1, standard: 0.94, compact: 0.88 },
+    render: CompactTemplate,
   },
   "sidebar-left": {
     id: "sidebar-left",
