@@ -35,20 +35,25 @@ function hashString(input: string): string {
 // The cache key mirrors exactly what changes the rendered pixels: the
 // template being previewed (the explicit prop, NOT format.templateId — a
 // card previews a template regardless of which one is currently selected),
-// every other format field, the paper size, and the resume's content. profile
-// is deliberately excluded (spec'd) — it rarely changes within a picker's
-// lifetime, and isn't worth widening the key for.
+// every other format field, the paper size, the resume's content, and the
+// render scale (the gallery, §28.2, renders the SAME component at a larger
+// scale than the inline picker — a bigger raster is different pixels, so it
+// needs its own cache entry). profile is deliberately excluded (spec'd) — it
+// rarely changes within a picker's lifetime, and isn't worth widening the
+// key for. scale defaults to THUMBNAIL_SCALE so callers that never pass it
+// (every call site before the gallery) are unaffected.
 export function thumbnailCacheKey(args: {
   templateId: string;
   format: DocumentFormat;
   paper: Paper;
   resume: TailoredResume;
+  scale?: number;
 }): string {
-  const { templateId, format, paper, resume } = args;
+  const { templateId, format, paper, resume, scale = THUMBNAIL_SCALE } = args;
   const { templateId: _formatTemplateId, ...formatRest } = format;
   const formatKey = hashString(JSON.stringify(formatRest));
   const resumeKey = hashString(JSON.stringify(resume));
-  return `${templateId}::${paper}::${formatKey}::${resumeKey}`;
+  return `${templateId}::${paper}::${formatKey}::${resumeKey}::${scale}`;
 }
 
 // Module-level (app-wide) render queue — six cards mounting together must
@@ -102,6 +107,7 @@ async function paintFirstPage(
   blob: Blob,
   canvas: HTMLCanvasElement,
   isCancelled: () => boolean,
+  scale: number,
 ): Promise<void> {
   // Raw bytes, not an object URL: pdf.js fetches a URL-backed document
   // lazily (range requests can outlive this function), so revoking a blob
@@ -119,7 +125,7 @@ async function paintFirstPage(
   const doc = await pdfjs.getDocument({ data }).promise;
   const page = await doc.getPage(1);
   if (isCancelled()) return;
-  const viewport = page.getViewport({ scale: THUMBNAIL_SCALE });
+  const viewport = page.getViewport({ scale });
   canvas.width = viewport.width;
   canvas.height = viewport.height;
   const context = canvas.getContext("2d");
@@ -133,17 +139,21 @@ export function TemplateThumbnail({
   paper,
   format,
   templateId,
+  scale = THUMBNAIL_SCALE,
 }: {
   resume: TailoredResume;
   profile: Profile;
   paper: Paper;
   format: DocumentFormat;
   templateId: string;
+  // Larger for the dedicated gallery (§28.2) than the inline picker's card —
+  // same component, same render/paint path, just a bigger pdf.js viewport.
+  scale?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cacheKey = useMemo(
-    () => thumbnailCacheKey({ templateId, format, paper, resume }),
-    [templateId, format, paper, resume],
+    () => thumbnailCacheKey({ templateId, format, paper, resume, scale }),
+    [templateId, format, paper, resume, scale],
   );
 
   useEffect(() => {
@@ -163,7 +173,7 @@ export function TemplateThumbnail({
       )
         .then((blob) => {
           if (cancelled) return;
-          return paintFirstPage(blob, canvas, () => cancelled);
+          return paintFirstPage(blob, canvas, () => cancelled, scale);
         })
         .catch(() => {
           // Best-effort thumbnail — leave the canvas blank.
@@ -199,7 +209,7 @@ export function TemplateThumbnail({
       cancelled = true;
       observer.disconnect();
     };
-  }, [cacheKey, resume, profile, paper, format, templateId]);
+  }, [cacheKey, resume, profile, paper, format, templateId, scale]);
 
   return <canvas ref={canvasRef} className="template-thumbnail__canvas" aria-hidden />;
 }

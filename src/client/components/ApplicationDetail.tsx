@@ -25,6 +25,7 @@ import { FitChip } from "./FitChip";
 import { GenStateBadge } from "./GenStateBadge";
 import { JobPanel } from "./JobPanel";
 import { ResultView } from "./ResultView";
+import { TemplateGallery } from "./TemplateGallery";
 import { TemplatePicker } from "./TemplatePicker";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
@@ -248,14 +249,26 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
-          <TemplatePicker
-            format={resolvedFormat}
-            onChange={handleFormatChange}
-            readOnly={isLocked}
-            resume={application.current}
-            profile={profile}
-            paper={paper}
-          />
+          <div className="flex flex-col gap-3">
+            <div className="flex justify-end">
+              <TemplateGallery
+                format={resolvedFormat}
+                onChange={handleFormatChange}
+                readOnly={isLocked}
+                resume={application.current}
+                profile={profile}
+                paper={paper}
+              />
+            </div>
+            <TemplatePicker
+              format={resolvedFormat}
+              onChange={handleFormatChange}
+              readOnly={isLocked}
+              resume={application.current}
+              profile={profile}
+              paper={paper}
+            />
+          </div>
           <DesignPanel format={resolvedFormat} onChange={handleFormatChange} readOnly={isLocked} />
         </CardContent>
       </Card>

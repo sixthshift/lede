@@ -33,7 +33,7 @@
 // console/pageerror listeners have to be registered before the one
 // first-run goto() every step shares (same rationale as docker-spa.spec.ts).
 import { readFileSync } from "node:fs";
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Locator } from "@playwright/test";
 import { ensureFirstRunPassword } from "./helpers/session";
 import { CONTRAST_JDS } from "../../src/server/tailor/evalcore";
 import { extractPdfText } from "../../src/client/document/extractText";
@@ -72,16 +72,21 @@ async function expectCanvasPainted(page: Page): Promise<void> {
 
 const TEMPLATE_IDS = Object.keys(TEMPLATES);
 
-function thumbnailCanvas(page: Page, templateId: string) {
-  return page.locator(`[data-template-id="${templateId}"] canvas`);
+// Scope defaults to the page, but the E8-C1 gallery dialog renders its OWN
+// set of `data-template-id` cards (one large preview each) ON TOP of the
+// inline TemplatePicker's — both mounted at once while the dialog is open —
+// so a gallery scenario must pass the dialog's own Locator as `scope` to
+// avoid a strict-mode "resolved to N elements" ambiguity between the two.
+function thumbnailCanvas(scope: Page | Locator, templateId: string) {
+  return scope.locator(`[data-template-id="${templateId}"] canvas`);
 }
 
 // E8-B1: TemplatePicker cards render LIVE mini-renders, never static images
 // (§28.2, decided 2026-07-05) — proof is a painted (non-blank) canvas, same
 // "not just white pixels" oracle expectCanvasPainted already uses for the
 // main preview, applied to a template card's thumbnail canvas instead.
-async function expectThumbnailPainted(page: Page, templateId: string): Promise<void> {
-  const canvas = thumbnailCanvas(page, templateId);
+async function expectThumbnailPainted(scope: Page | Locator, templateId: string): Promise<void> {
+  const canvas = thumbnailCanvas(scope, templateId);
   await canvas.scrollIntoViewIfNeeded();
   await expect(canvas).toBeVisible();
   await expect
@@ -366,6 +371,53 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
     "true",
   );
   await expect(page.getByRole("combobox", { name: "Body font" })).toHaveText(/Arimo/);
+
+  // (4d) Dedicated template gallery (E8-C1, §28.2) — a full-screen browse
+  // dialog off the Design card, opened here (AFTER (4b)/(4c)'s sidebar-LEFT
+  // selection + reload-persistence checks, BEFORE (6)'s template-agnostic
+  // re-tailor/lock) so switching the template to sidebar-RIGHT can't disturb
+  // any earlier assertion.
+  await page.getByRole("button", { name: "Browse templates" }).click();
+  const gallery = page.getByRole("dialog");
+  await expect(gallery).toBeVisible();
+
+  // All 6 cards visible with PAINTED canvases — scoped to the gallery
+  // dialog, since the inline TemplatePicker (same data-template-id
+  // attributes) is still mounted underneath it while the dialog is open.
+  for (const templateId of TEMPLATE_IDS) {
+    await expectThumbnailPainted(gallery, templateId);
+  }
+
+  // Selecting a card sets format.templateId ONLY (mirrors TemplatePicker's
+  // onChange contract) — the (4b) color/font PUTs must survive untouched.
+  const [galleryPutResponse] = await Promise.all([
+    page.waitForResponse(applicationPut),
+    gallery.getByRole("button", { name: /^Sidebar Right/ }).click(),
+  ]);
+  expect(galleryPutResponse.status()).toBe(200);
+  const galleryPutFormat = (await galleryPutResponse.json()).format;
+  expect(galleryPutFormat.templateId).toBe("sidebar-right");
+  expect(galleryPutFormat.colors.primary).toBe("#14532d");
+  expect(galleryPutFormat.typography.body.family).toBe("arimo");
+
+  // Selecting closes the gallery; the inline picker + preview reflect the
+  // new choice immediately.
+  await expect(gallery).toBeHidden();
+  await expect(page.getByRole("button", { name: /^Sidebar Right ATS/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expectCanvasPainted(page);
+
+  // Persists across a reload.
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Re-tailor", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Sidebar Right ATS/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expectCanvasPainted(page);
+  expect(tailorRequests, "the gallery reload must not trigger a re-tailor").toHaveLength(1);
 
   // (6) re-tailor.
   const [retailorResponse] = await Promise.all([
