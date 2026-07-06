@@ -35,6 +35,23 @@ Core principle (§1) — the reason the product exists:
   the thing Lede rejects. Tags are grouping/filtering metadata only. Scoring on
   tags = you rebuilt Teal = failed ticket.
 
+Document/PDF engine (§28 — added 2026-07-05, epic E7):
+- **PDFs are produced ONLY by `@react-pdf/renderer`.** Browser printing —
+  `window.print()` / `print.css` "Save as PDF" — is **REJECTED**: not the primary
+  path, not an interim, not a fallback (§28.0, user directive 2026-07-05). One
+  route only: react-pdf renders → pdf.js preview shows that exact file →
+  Download PDF saves it. `print.css` + the DOM `ResumePage` are legacy, deleted by
+  E7-A6. A ticket that reintroduces a print-to-PDF path = failed ticket.
+- **Templates are CODE** (react-pdf components), never HTML/CSS or user-authored;
+  all templates render every section through **shared section renderers** —
+  differ in composition, never features.
+- **The renderer NEVER cuts** (§28.4): item count in the document is invariant
+  across densities. A render-side cut buries a lede with no rationale (breaks §11).
+- **leadRationale + cut[] never reach the document** (§11) — enforced by pdf.js
+  text extraction, not by inspection.
+- **Formatting never mutates snapshots** (§28.1): changing paper / targetPages /
+  format leaves a stored `TailoredResume` byte-identical.
+
 Pipeline shape (§5, §6):
 - The model returns **judgment only** — a flat `TailorDecision` (signals, select/
   cut, `rank`, composed `text`, per-group `leadRationale`, summary). The **server
@@ -277,6 +294,62 @@ Run on the MERGED tree. All keyless via `FixtureEngine` except the one deferred 
       `context` measurably shifts selection/emphasis over a fixed Library+JD." A model-quality claim,
       opt-in, recorded honestly like T014's flip. Add when a live key is available; the keyless
       machinery checks above are what gate the build.
+
+### Phase 6 / E7 — the document engine: react-pdf, templates, page model (§28) — added 2026-07-05
+Run on the MERGED tree. Keyless (E7-D budget→selection is the one key-gated line, deferred).
+The engine's oracle is **extraction-based** (proven runnable at intake [v3-012]): render via
+`renderToBuffer` → extract text via `pdfjs-dist/legacy/build/pdf.mjs` → assert on the extracted
+items. This is sharper than DOM inspection: it tests the actual bytes a parser sees.
+- [ ] `bun run check` + the full baseline composite pass.
+- [ ] **A — engine migration (§28.8-A):** a fixture `TailoredResume` + `Profile` renders to a real
+      PDF under **both** launch templates (≥1 `strict` single-column + ≥1 `sidebar-left`); pdf.js
+      extraction over the `strict` render contains the profile header + **every selected `item.text`
+      in exactly `TailoredResume` content order** (index-increasing contrast, not mere presence);
+      the `leadRationale`/`cut[]` sentinel strings are **absent** from the extraction; changing
+      `paper`/`targetPages`/`templateId` never mutates the stored snapshot (byte-identical); the
+      download filename is the slugged `<Name> — <Company> — <Role>.pdf` and PDF Title/Author come
+      from the profile (`getMetadata()`); **`grep -rniE 'window\.print|print\.css' src/client` → 0
+      matches** and `ResumePage.tsx`/`print.css` no longer exist.
+- [ ] **B — design panel (§28.8-B):** `DocumentFormat` round-trips per-app + `settings.defaultFormat`;
+      a **locked** app renders byte-stable when live defaults change (`lockedFormat`); photo hidden by
+      default; ATS badge downgrades when photo/sidebar enabled. *(coarse E7-B1 — decompose at pickup.)*
+- [ ] **C — fit + honesty (§28.8-C):** growing fixture content walks comfortable→standard→compact
+      with **item count invariant across densities**; overflow reports the true page count and never
+      cuts; the strict extraction-order invariant runs green as a CI regression test; "what the ATS
+      sees" extraction view / plain-text export. *(coarse E7-C1 — decompose at pickup.)*
+- [ ] **D — budget→selection (§28.8-D, KEY-GATED, deferred):** empty budget ⇒ byte-identical user
+      message (keyless fixture-replay guard, `prompt.ts` frozen); with a live key, a 1-page budget
+      yields more `cut[]` than 2-page, each with a rationale. Recorded honestly like T014.
+      *(coarse E7-D1 — decompose at pickup.)*
+
+### Phase 7 / E8 — template roster + live gallery (§28.2/§28.8-E) — added 2026-07-05, user-directed
+
+Scope locked at intake (ledger [v3-032]; spec §28.2 amended same day, user decision):
+- Roster completes to 6: `strict`, `classic`, `compact`, `banner` (single-column, declared `strict`)
+  + `sidebar-left`, `sidebar-right` (declared `good`). Composition-only; every template renders every
+  section through the shared renderers (registry pattern unchanged). A declared `strict` grade is
+  EARNED via the §28.6 extraction-order CI invariant, never asserted.
+- Previews are LIVE mini-renders of this application's tailored resume (browser-safe render +
+  pdf.js page 1 — the E7-C2 lesson applies: pdf().toBlob() in the browser, never renderToBuffer),
+  lazy, serialized, cached per (templateId, format-minus-templateId, paper, resume). Untailored app
+  ⇒ bundled SAMPLE_RESUME, visibly badged "Sample content". Static preview images are REJECTED
+  (supersedes spec's earlier `previewImage` field).
+- Dedicated gallery: full-screen dialog/sheet from the Design card; large live previews + ATS
+  badge/caveat; selecting sets `format.templateId` only. `window.print()`/`print.css` remain rejected.
+
+Executable checks (merged tree, keyless):
+- [ ] registry roster: 6 templates; ≥2 single-column strict; both sidebar orientations present
+- [ ] for EVERY template: fixture resume renders; extraction contains profile + every selected item;
+      `leadRationale`/`cut[]` strings absent (parameterized over `Object.values(TEMPLATES)`)
+- [ ] for every `atsGrade: 'strict'` template: extraction order strictly index-increasing (§28.6)
+- [ ] for EVERY template: item count invariant across its whole density ladder (§28.4 never-cuts)
+- [ ] `effectiveAtsGrade` honesty: sidebar-right ⇒ `good`; any template + shown photo ⇒ `good`
+- [ ] REAL-BROWSER e2e (chromium): picker/gallery thumbnails PAINT (non-blank canvas); two different
+      templates' thumbnails differ pixelwise; changing `colors.primary` repaints a thumbnail
+      (the anti-stock-image proof); selecting a template in the gallery persists across reload;
+      an untailored application's picker shows the "Sample content" badge
+- [ ] format/template changes never mutate stored snapshots (§28.1 — existing byte-stability guard
+      stays green)
 
 ## Browser acceptance ([v2-036] semantic amendment) — added 2026-07-03
 

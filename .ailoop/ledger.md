@@ -968,3 +968,518 @@ Append-only journal. Newest at bottom.
   VALIDATION: full `bunx vitest run` x3 → 33/33 files, 253/253 green EVERY run (previously wedged at ~17 files).
   check + lint (biome, 132 files) clean after the edit. Playwright unaffected (separate config). Only file
   touched: vite.config.ts (the vitest `test` block). Leaving staged for the human to commit per action discipline.
+
+[v3-011] RESUME (fresh context) — verify-only, no dispatch. Scheduler: 49 done / 4 decomposed /
+  0 todo / 0 in-progress / 0 blocked; ready=[] → backlog DRAINED. HEAD @43d246a (soft UI restyle
+  §12 v2 + docs), tree CLEAN (the [v3-010] vite.config.ts fix and subsequent UI/docs work all
+  committed since the ledger's last-recorded a956245). Re-ran the authoritative gate on the CURRENT
+  committed tree rather than trusting prior green (prime directive 2): `bun run check` 0;
+  `bun run lint` (biome, 133 files) clean; `bunx vitest run` = 33/33 files, 253/253 green in a
+  SINGLE run (confirming the [v3-010] isolated-forks fix holds — no timeouts/wedging this run).
+  Closed the e2e gap: HEAD's UI restyle had NOT been through a recorded playwright gate, so re-ran
+  it — `bunx playwright test` (non-docker) = 10/10 (chromium library-crud 8 + auth 1 +
+  applications 1). Docker project (phase-close only, builds image) rests on the prior recorded
+  gate; client-source changes it packages are already exercised green by the browser e2e above.
+  VERDICT: loop COMPLETE — backlog drained, baseline + non-docker e2e re-confirmed green on the
+  current committed tree. No follow-ups outstanding (the [v3-009] vitest-flake follow-up was
+  resolved by [v3-010] and verified reliably green here).
+
+[v3-012] NEW EPIC INTAKE — E7: the document engine (§28), added to a drained backlog. Trigger: user
+  rejected browser-print as a PDF path (2026-07-05, spec §10/§28.0 updated) and asked to build the
+  resume document design/output; §28 (the react-pdf doc engine) postdates the drained v3 backlog and
+  is unbuilt — no working PDF export exists today (no button + no engine).
+  REFUSE-TO-START GATE — PASSED. Probed env preconditions before seeding (scratchpad, no project
+  mutation): `bun add @react-pdf/renderer pdfjs-dist` installs clean (react-pdf 4.5.1, pdfjs 6.1.200,
+  71 pkgs); renderToBuffer produces a valid headless PDF (1847B, %PDF- header); pdfjs-dist/legacy
+  extracts text in Node with extraction order == content order (profile + 4 ordered facts). So the
+  §28.6/§28.8-A extraction-order oracle is RUNNABLE here → the epic's definition-of-done is
+  machine-checkable. One benign `standardFontDataUrl` warning (no effect on extraction; noted for the
+  §28-B font-registry ticket).
+  SEEDED 9 tickets. E7-A (engine migration) fine-grained into 6: A1 react-pdf document model +
+  template registry + shared section renderers + 1 strict template + profile header (replaces the
+  hardcoded "Your Name"); A2 sidebar template; A3 page model (settings.paper global + app.targetPages
+  per-app, snapshot-invariant); A4 pdf.js preview (DocumentPreview) replacing DOM ResumePage in
+  ResultView (§11 sibling invariant preserved); A5 Download PDF + slugged filename + PDF metadata;
+  A6 retire print pipeline (delete print.css + ResumePage; grep-zero window.print/print.css). B/C/D
+  seeded COARSE (files:[], decompose-at-pickup): B1 design panel §28.3, C1 fit ladder + ATS honesty
+  §28.4/28.6, D1 budget→selection §28.5 (key-gated). Dependency spine: {A1,A3} ready & file-disjoint
+  → A2/A4/A5 after A1(+A3) → A6 after A4+A5 → B1 → C1 → D1. oracle.md amended (additive, not a
+  weakening): react-pdf-only + print-rejected locked decision; new "Phase 6 / E7" per-phase oracle
+  (extraction-based). Chunk cap is 30, but PLAN: drive only E7-A this chunk (the migration is the
+  risky part) and stop for a human glance before the design layer (B) lands on top.
+  RED-TEAM (Stage 1.5) of the A acceptance — how could a lazy builder pass without delivering intent:
+  · A1/A2 use extraction with an INDEX-INCREASING order contrast + ABSENT-sentinel check for
+    rationale/cut → can't be passed by hardcoding presence or by leaking reasoning text. Residual:
+    section labels aren't asserted (cosmetic; fact extraction-order is the invariant). ACCEPT.
+  · A3 asserts byte-identical snapshot before/after paper+targetPages change (strong contrast) +
+    exact defaults. ACCEPT.
+  · A5 asserts EXACT slugged filename string + a distinct-input contrast + PDF Title/Author via
+    getMetadata(). ACCEPT.
+  · A6 ties grep-zero + files-deleted to "extraction oracle still green" (negative existence bound to
+    positive behavior). ACCEPT.
+  · A4 is the WEAKEST oracle: pdf.js canvas rendering is hard under jsdom, so the unit check only
+    asserts DocumentPreview mounts (not the old .resume-page) + ReasoningPanel stays a sibling; a
+    stubbed-empty preview could slip the unit test. Its REAL coverage is the keyless playwright
+    applications e2e (renders a real tailored resume) staying green + the verifier's gaming read of
+    the diff. FLAGGED — judge A4 harder on the gaming read.
+
+[v3-013] CHUNK — E7-A batch 1 dispatched (fan-out workflow wf_d80424cf-435, tickets E7-A1 + E7-A3).
+  E7-A1 → DONE. Built in worktree, INDEPENDENTLY verified (no undeclared files, no gaming), merged
+  clean (9ff015b + merge 757ce0a). Coordinator re-verified on the MERGED tree: check 0, lint clean
+  (139 files), document-render.test 2/2 (extraction order + sentinel-absent). react-pdf 4.5.1 +
+  pdfjs-dist 6.1.200 added. The hardcoded "Your Name" is replaced by ProfileHeader in the react-pdf
+  document (though the DOM ResumePage the USER still sees is not swapped until E7-A4).
+  E7-A3 → BLOCKED, re-cut. NOT a builder failure and NOT a thrash attempt — a COORDINATOR TICKET BUG:
+  I under-declared files. Acceptance needs paper/targetPages to persist via SQLite, but I omitted
+  src/server/db/schema.ts + drizzle/* from DECLARED FILES. The worker correctly refused to half-build
+  and cited E6-A1 precedent (915e028). Fixed the ticket: added src/server/db/schema.ts + drizzle/ to
+  files, context now spells out the columns (settings.paper text default 'letter'; applications.
+  targetPages int default 1) + `bunx drizzle-kit generate` for drizzle/0002_*. attempts[1] logged.
+  GATE red — NOT a real integration failure: (1) vitest full-suite flaked on api.export-import
+  (30s timeout, passes isolated in 1269ms) = the known [v3-010]-class env contention, worker
+  confirmed reproducible on bare master; (2) the page-model half of the E7-A oracle is unsatisfiable
+  because A3 didn't land — the phase oracle isn't due until all of E7-A closes. A1 alone merged clean.
+  NEXT: scheduler → batch 2 = [E7-A2 (dep A1 met), E7-A3 (re-cut, no deps)], file-disjoint.
+
+[v3-014] CHUNK — E7-A batch 2 (workflow wf_559fbe81-79a, E7-A2 + E7-A3).
+  E7-A2 → DONE. Verified + merged (e58a32c + c822861). Re-verified on merged tree: check 0, lint
+  clean (141 files), document-templates+document-render 5/5; registry has strict + sidebar-left;
+  both render the same fixture (features equal, composition differs). Gate red ONLY due to A3 absent
+  (partial phase) — not an A2 fault.
+  E7-A3 → BLOCKED again (attempt 2), re-cut for attempt 3. DEEPER than attempt 1: worker built the
+  FULL change (drizzle 0002_amused_wrecking_crew.sql + all wiring), ran the suite, and found TWO
+  pre-existing exhaustive-allowlist GUARD tests that trip on ANY new column — test/db.test.ts:182
+  (toEqual exact applications columns; target_pages breaks it) and test/api.profile-settings.test.ts:117
+  (allowed-keys Set; paper breaks it). Worker correctly REVERTED rather than touch undeclared tests.
+  Root cause AGAIN a coordinator under-declared-files bug, not builder thrash: the two blockers were
+  DIFFERENT (attempt1=missing db/drizzle; attempt2=missing guard tests) and each a real ticket-scope
+  discovery, so the failing set is progressing, not stuck.
+  ORACLE AMENDMENT (mechanical-class, invariant-preserving) — added test/db.test.ts +
+  test/api.profile-settings.test.ts to E7-A3's declared files so it may make ONE additive edit to
+  each: append "target_pages" to the db column allowlist, add "paper" to the settings-response key
+  allowlist. RATIONALE + guard: both tests' REAL invariants are untouched — db.test.ts keeps its
+  not.toContain("status"/"hiring_status") denylist (the §2/§27 no-hiring-tracker teeth), and the
+  profile-settings test still fails on any ciphertext/auth-material key (the key-leak teeth). Self-test:
+  after the edit, a hiring-status column OR a leaked secret key STILL fails these tests → teeth intact,
+  only knowledge of legit columns grew. NOT a semantic weakening. Coordinator will gaming-read the
+  diff to confirm the worker only appended the one field to each and gutted nothing.
+  DISPATCH: single Agent (sonnet) for A3 attempt 3 (the only buildable ticket — A4/A5 depend on it),
+  coordinator re-verifies. CAP: attempt 3 of maxAttempts 3 — if it blocks again, ESCALATE.
+
+[v3-015] E7-A3 attempt 3 → DONE (single-agent). Independently re-verified: scope clean (12 files all
+  in-scope); gaming read confirms both guard-test edits are STRICTLY ADDITIVE (+"paper", +"target_pages")
+  — db.test.ts 1 insertion/0 deletions, denylist intact; check 0; lint clean (142); page-model + db +
+  profile-settings 15/15 incl the snapshot-invariant contrast. Migration 0002_freezing_ink.sql on master
+  (a9c3798). The oracle amendment [v3-014] applied cleanly and safely. Page-model data foundation complete.
+  NEXT: batch [E7-A4 (pdf.js preview → ResultView), E7-A5 (Download PDF + file hygiene)] — deps A1+A3
+  met, file-disjoint. A4 remains the flagged-weak oracle (jsdom can't render pdf.js canvas) → its real
+  coverage is the keyless playwright applications e2e + a hard gaming read of the diff.
+
+[v3-016] E7-A batch 3 (workflow wf_30ce3b28-24e, E7-A4 + E7-A5).
+  E7-A5 → DONE. Verified clean by the workflow (only declared files) + coordinator re-verify:
+  download.test 5/5 (exact slug filename + contrast + illegal-char strip + omitted segments; pdfjs
+  getMetadata Title/Author = profile.name); Download button disabled when current null. Fast-forwarded
+  onto master (9467bb4).
+  E7-A4 → DONE after coordinator judgment. Verify was RED on SCOPE only: touched 2 undeclared files
+  (test/reasoning-ui.test.tsx, test/e2e/applications.spec.ts). JUDGED legitimate cascading updates —
+  another coordinator under-declared-files bug (I omitted the tests that assert on ResultView's DOM),
+  not a builder overreach. reasoning-ui.test.tsx: clean cascade, §11 CONTRAST retargeted to
+  .document-preview + now asserts .resume-page ABSENT (strengthened). Amended A4 declared files, merged
+  myself (306716c + 8322d1e), re-verified on merged tree: check 0, lint clean (145), 19/19 unit,
+  `bunx playwright test` 10/10 non-docker INCLUDING applications.spec's expectCanvasPainted — the
+  react-pdf→pdf.js preview paints non-white pixels in real chromium END TO END. The user-visible PDF
+  preview + Download button now exist.
+  E2E WEAKENING — judged, ACCEPTED with compensation (NOT gaming). Old applications.spec asserted
+  RESUME_TOKEN in the .resume-page DOM (RED-TEAM #8: proved the SPECIFIC recorded content rendered).
+  A pdf.js canvas has NO queryable DOM text, so the builder replaced it with (a) RESUME_TOKEN vs the
+  tailor/lock/GET JSON bodies + (b) expectCanvasPainted. Defensible platform adaptation; the
+  'content renders in exact order' proof still exists at A1's unit extraction (document-render.test).
+  Residual gap: nothing proves the BROWSER painted THIS content (only that something painted + server
+  content is right). ESCAPED-BUG RULE applied: added an explicit strengthening to E7-C1 — extract text
+  from the REAL generated/downloaded PDF and assert live-tailored content in order (§28.6 mechanism),
+  reclaiming the content-fidelity proof at the output layer. Recorded, not silently dropped.
+  NEXT: E7-A6 (retire print pipeline) — the last E7-A ticket. Then phase-close gate + chunk report.
+
+[v3-017] E7-A6 re-scoped before dispatch. FINDING: print.css is ORPHANED — nothing imports it
+  (main.tsx imports only app.css; no index.html <link>; no @import). Confirms the print pipeline was
+  never wired: no button + not even loaded. So A6 = delete a dead file + scrub stale comments, NOT
+  unwire a live path. Expanded A6 to 8 files because two tests still USE ResumePage for real coverage:
+  remaining-sections.test.tsx (every section type renders under its registry label + meta-fallback +
+  rephrase behavior) is PORTED to renderResumeToBuffer + pdf.js extraction (coverage moves to the real
+  PDF, not dropped); render-polish.test.ts (tests print.css @media print ATS-safety) is DELETED as
+  obsolete — its ATS-safety intent now lives in the extraction-order invariant (document-render.test,
+  §28.6). Kept as ONE ticket (not decomposed): the delete + migrate are naturally sequential in one
+  worktree; splitting would race (A6a deleting ResumePage would red its own baseline while the
+  unmigrated remaining-sections still imported it). Dispatching single Agent; coordinator re-verifies +
+  runs the E7-A phase-close gate on the merged tree.
+
+[v3-018] E7-A6 → DONE. Print pipeline retired. Re-verified: scope 9 files (8 declared ∪ reasoning-ui.test.tsx,
+  a flagged legit cascade — obsolete print.css-on-disk describe block removed, §11 CONTRAST intact); gaming
+  read clean (remaining-sections migrated to renderResumeToBuffer + pdf.js extraction, every invariant
+  preserved incl the not.toContain negative; uppercase label compare is the documented react-pdf adaptation);
+  grep window.print|print.css src/client → ZERO. Deleted print.css (confirmed orphaned), ResumePage.tsx,
+  resumepage.test.tsx, render-polish.test.ts (obsolete — print-ATS intent now carried by document-render
+  extraction §28.6). Commit e3fe709.
+  ===== E7-A PHASE COMPLETE (engine migration) =====
+  PHASE-CLOSE GATE on merged tree (HEAD e3fe709): bun run check exit 0; bun run lint clean (141 files);
+  bunx vitest run = 35 files / 250 tests ALL GREEN in a SINGLE run (no flakes this run); bun run build ok;
+  bunx playwright test = 10/10 non-docker (chromium 8 + auth + applications incl expectCanvasPainted, the
+  end-to-end react-pdf→pdf.js proof). DOCKER e2e NOT re-run: phase-close-only per [v3-004]; E7-A changed
+  client rendering (covered by the browser e2e above), docker SPA-serving/packaging shape unchanged — rests
+  on the prior recorded gate, flagged honestly for the human.
+  SHIPPED (user-visible): react-pdf document (strict + sidebar-left templates, real profile header replacing
+  the "Your Name" placeholder), pdf.js preview that IS the artifact, Download PDF button (slugged filename +
+  metadata), page model (paper letter/a4 + per-app targetPages 1/2, migration 0002_freezing_ink). Browser
+  printing fully retired — react-pdf is the ONLY PDF path (spec §28.0 / user directive 2026-07-05).
+  CHUNK BOUNDARY — stopping here per plan (drive E7-A, human glance before the design layer E7-B lands on top).
+  NEXT READY: E7-B1 (design panel §28.3 — COARSE, decompose at pickup). E7-C1, E7-D1 wait behind it.
+
+[v3-019] RESUME (fresh context) — E7-B1 (design panel §28.3) DECOMPOSED at pickup into 5 children.
+  Scheduler on resume: 55 done / 4 decomposed / 3 todo (E7-B1,C1,D1) / 0 in-progress; ready=[E7-B1]
+  (coarse). Backlog HEAD e3fe709 (E7-A phase complete). No reconciliation needed (no stale in-progress).
+  Grounded the split by reading the current doc engine (registry/renderResume/sections/strict template +
+  schema.ts + DocumentPreview + ApplicationDetail): today templates HARDCODE Helvetica + fixed sizes/
+  margins + no color, no DocumentFormat/Font.register/photo/columns/ATS-badge/lockedFormat exist.
+  FEASIBILITY PROBED before seeding (refuse-to-start discipline for the font layer, [v3-012] had only
+  flagged fonts): (1) react-pdf 4.5.1 registers an OFFLINE @fontsource IBM Plex .woff and renders %PDF-
+  (coordinator probe, 4172B) — fontkit takes .woff not .woff2, register the .woff; (2) IBM Plex sans/
+  serif/mono already vendored (@fontsource, latin .woff present); (3) npm registry reachable → Arimo/
+  Tinos/Carlito metric stand-ins installable via bun add. So the §28.3 font registry is buildable here.
+  CHILDREN (dependency spine): B1a foundation (DocumentFormat type + documentFormatZ bounded + DEFAULT_
+  FORMAT + FontId union + Profile.photoUrl; pure, no DB/render) deps[] → B1b font registry (Font.register
+  curated OFL, no runtime CDN) deps[B1a] + B1c persistence (format/lockedFormat/defaultFormat/photoUrl
+  columns + migration 0003 + API round-trip + lock-freeze + guard-allowlist ADDITIVE edits) deps[B1a] →
+  B1d renderer-consumes-format (typography/colors/page/photo/columns + effectiveAtsGrade; §11 extraction-
+  absent preserved) deps[B1a,B1b] → B1e design panel UI (bounded controls + template picker + ATS badge +
+  settings.defaultFormat + e2e persist) deps[B1c,B1d]. Fan-out: [B1a]→[B1b,B1c disjoint]→[B1d]→[B1e].
+  E7-C1.depends_on rewired [E7-B1]→[E7-B1e] (terminal leaf transitively covers all B). E7-B1 status=decomposed.
+  RED-TEAM (Stage 1.5) of the child acceptance — contrast over existence throughout:
+  · B1a: zod REJECTS out-of-bounds (size 8/13, weight 550, non-hex color, columns 4) + ACCEPTS DEFAULT_
+    FORMAT + asserts photo.hidden===true. Existence-proof only on the type shape (cosmetic). ACCEPT.
+  · B1b: coverage assert (every FontId registered) + BYTE-DIFF contrast (tinos vs ibm-plex-sans render
+    differ → real distinct faces, not silent fallback) + grep-zero CDN. Strong. ACCEPT.
+  · B1c: lockedFormat FREEZE contrast (change defaultFormat AFTER lock → locked byte-identical) is the
+    §28.8-B teeth; guard-allowlist edits bounded additive with denylist/leak-teeth-intact self-test
+    (the [v3-014] escaped-bug pattern, pre-armed in the ticket). ACCEPT.
+  · B1d: reuses the A1 extraction-order invariant (must STAY green) + format-applied byte-diff contrast +
+    photo-only-when-shown + effectiveAtsGrade cases. This is the strongest re-verify surface. ACCEPT.
+  · B1e is the WEAKEST oracle (jsdom can't paint pdf.js): unit ATS-badge/photo-default + the keyless
+    playwright e2e (change format → canvas repaints → reload persists). FLAG — judge B1e harder on the
+    gaming read + rely on the e2e, same posture as E7-A4.
+  PLAN: drive E7-B (the design layer) this chunk; C (fit ladder) then D (key-gated) wait. Dispatching B1a
+  single (sole ready foundation); coordinator re-verifies before the [B1b,B1c] fan-out.
+
+[v3-020] E7-B1a — ACCEPTED (single-agent dispatch; coordinator independent re-verify green).
+  Scope CLEAN (only the 4 declared files: types.ts + schema.ts + format.ts + test/format.test.ts).
+  check 0 / lint clean (143) / build ok / bunx vitest run 36 files 263 tests GREEN in a SINGLE run
+  (no flakes — [v3-010] isolated-forks holding). documentFormatZ is REAL bounded validation (FontId
+  z.enum, body.size .min(9).max(12), hex-regex colors, weight/columns literal-unions, shape enum,
+  sections partialRecord keyed to SECTION_VALUES) — gaming read confirms no rubber-stamp/bypass; 13
+  distinct reject-contrasts + accept DEFAULT_FORMAT + photo.hidden===true. DocumentFormat = §28.3
+  field-for-field; FontId 6 faces (incl arimo/tinos/carlito); Profile.photoUrl optional added.
+  Foundation complete. NEXT: scheduler → batch [E7-B1b fonts, E7-B1c persistence] (file-disjoint). chunk 1.
+
+[v3-021] E7-B1b + E7-B1c — ACCEPTED (parallel worktree fan-out; coordinator independent re-verify + merged-tree gate).
+  Both scope-CLEAN, gaming-read clean, merged file-disjoint into master @2b6bd7e. MERGED-TREE GATE GREEN:
+  check 0 / lint clean (146) / build ok / bunx vitest 38 files 274 tests (single run, no flakes) /
+  playwright 10/10 non-docker (chromium 8 + applications 1 + auth 1 — the react-pdf→canvas spec passes,
+  no render regression). Pruned both agent worktrees + 4 STALE leftover worktrees from prior E7-A chunks
+  (wf_559fbe81/d80424cf/30ce3b28 ×2) — tree now clean (master only).
+  B1b (fonts): registerDocumentFonts() idempotent, FONT_FACES covers all 6 FontIds, tinos≠ibm-plex-sans
+    byte-diff proves distinct embedded faces, 0 CDN refs. @fontsource/{arimo,tinos,carlito} vendored.
+    KNOWN LIMIT (flagged, not a B1b failure — its acceptance is Node-based and green): font src resolved
+    via createRequire.resolve = absolute FS path, Node-only. Browser react-pdf can't consume it. CARRIED
+    FORWARD to B1d.
+  B1c (persistence): schema + migration 0003 (additive ALTERs) for applications.format/lockedFormat,
+    settings.defaultFormat (DEFAULT_FORMAT default), profile.photoUrl. Lock FREEZE via structuredClone
+    (deep copy, immune to later default change); freeze-contrast test green; unlock clears both. format
+    validated by documentFormatZ.nullish(). GUARD TEETH INTACT: the [v3-014] escaped-bug allowlist edits
+    were STRICTLY additive (db.test.ts +format/+locked_format, status/hiring_status denylist preserved;
+    api.profile-settings +defaultFormat/+photoUrl, hash/salt/key-leak denylist preserved) — verified by
+    reading the diffs, not the self-report.
+  B1d AMENDED before dispatch (browser/Node dual-env fonts): added src/client/document/fonts.ts to its
+    declared files so it may make the font src browser-safe; context now requires proof in BOTH envs
+    (Node byte-diff stays green + the browser applications e2e canvas stays painted after DocumentPreview
+    registers fonts) — the existing expectCanvasPainted e2e is the browser font-load smoke. This is the
+    forward-carry of the B1b limit, not a silent acceptance.
+  chunk: 3 tickets closed this run (B1a, B1b, B1c). Dispatching B1d (renderer consumes format) single.
+
+[v3-022] E7-B1d — ACCEPTED (single dispatch; committed 516e800). See backlog evidence: renderer now obeys
+  DocumentFormat (sections.tsx reads all knobs), effectiveAtsGrade caps sidebar/photo, dual-env fonts SOLVED
+  (import.meta.env.SSR branch + 12 literal Vite asset URLs; the carried B1b browser-font limit discharged),
+  browser proof via applications canvas e2e. Real contrast tests (byte-diff, pdf.js paintImageXObject photo,
+  x-offset columns). §11 extraction-absent green.
+
+[v3-023] E7-B1e — ACCEPTED (single dispatch; committed 890df69). Design panel UI + type-plumbing cascade.
+  B1e's declared files were EXPANDED by the coordinator before dispatch (+src/shared/types.ts, schema.ts,
+  client/api.ts, ResultView.tsx) — a proactive fix for the recurring under-declared-files pattern: E7-B1c
+  persisted format/lockedFormat/defaultFormat/photoUrl at the DB+route layer but did NOT update the shared
+  Application TYPE, the shared input schemas, or the client api.ts contracts (its runtime round-trip tests
+  passed without them). B1e absorbed that cascade additively. Independent re-verify green (see backlog):
+  scope clean, gaming clean (bounded controls, effectiveAtsGrade badge, documentFormatZ moved-not-weakened,
+  additive type edits), browser e2e proves change→repaint→reload-persist. The weakest-oracle ticket
+  (jsdom can't paint pdf.js) was judged on the real chromium canvas e2e + a hard diff read, per the flag.
+  ===== E7-B PHASE COMPLETE (design layer, 5/5 children: B1a/b/c/d/e) =====
+  PHASE-CLOSE ORACLE §28.8-B on merged tree (HEAD 890df69), ALL GREEN:
+   [x] DocumentFormat round-trips per-app + settings.defaultFormat → api.applications-format.test 7/7
+   [x] a LOCKED app renders byte-stable when live defaults change (lockedFormat freeze) → freeze-contrast
+       (structuredClone deep-copy; lockedFormat byte-identical after defaultFormat changes; not.toEqual new default)
+   [x] photo hidden by default → format.test (DEFAULT_FORMAT.photo.hidden) + document-format-render (image
+       present ONLY when hidden:false, via pdf.js paintImageXObject)
+   [x] ATS badge downgrades with photo/sidebar → effectiveAtsGrade (document-format-render) + TemplatePicker (design-panel)
+  Full merged suite: check 0 / lint clean (150) / build ok / vitest 40 files 289 tests / playwright 10/10 non-docker.
+  DOCKER e2e NOT re-run (phase-close-only per [v3-004]; E7-B changed client design UI + additive server columns,
+  docker SPA-serving/packaging shape unchanged — rests on the prior recorded gate, flagged honestly).
+  SHIPPED (user-visible): a real design panel — per-app template gallery (strict + sidebar) with honest ATS
+  badges (Workday/Taleo caveat), bounded typography/color/page/photo/section-column controls, self-hosted
+  ~6-face font registry (IBM Plex + Arimo/Tinos/Carlito) that loads in the pdf.js preview, settings.defaultFormat,
+  and lockedFormat freezing "what you actually sent" on lock. The preview repaints live as you edit.
+  ===== CHUNK BOUNDARY — 5 tickets closed this run (E7-B1a/b/c/d/e) + E7-B phase closed =====
+  Stopping at the phase boundary (healthy human checkpoint after the design layer, before E7-C's fit-ladder
+  complexity). NEXT READY: E7-C1 (fit ladder + ATS honesty §28.4/§28.6 — COARSE, decompose at pickup;
+  carries the E7-A4 escaped-bug compensation: extract text from the REAL generated PDF, assert live-tailored
+  content in order). E7-D1 (key-gated budget→selection) waits behind it.
+
+[v3-024] RESUME (new chunk) — E7-C1 (fit ladder + ATS honesty §28.4/§28.6) DECOMPOSED at pickup into 3
+  children. Scheduler on resume: 60 done / 5 decomposed / 2 todo; ready=[E7-C1] (coarse); HEAD 890df69,
+  tree clean (only coordinator .ailoop/spec.md uncommitted). No reconciliation needed. Confirmed NO existing
+  fit/density logic (registry has the Density type + densityLadder labels but zero multipliers; renderResume
+  only renderToBuffer) — the ladder is net-new.
+  CHILDREN (spine): C1a fit-ladder ENGINE (per-template density multipliers + applyDensity w/ 9.5pt floor +
+  fitToPages first-fit-wins + extractPdfText shared helper + the §28.6 CI extraction-order invariant test)
+  deps[] → C1b fit-into-preview UI (DocumentPreview renders at fitted density + FitChip + overflow allow-2-pages,
+  download matches) deps[C1a] → C1c "what the ATS sees" view + plain-text export + the A4 ESCAPED-BUG real-PDF
+  content-fidelity e2e deps[C1a]. C1b & C1c both touch ApplicationDetail.tsx → scheduler serializes them (not a
+  fan-out batch); dispatched as single Agents in sequence after C1a. E7-D1.depends_on rewired [E7-C1]→[E7-C1b,E7-C1c].
+  RED-TEAM (Stage 1.5) of the C acceptance — contrast over existence:
+  · C1a strongest: LADDER-WALK contrast (small→comfortable, larger→standard, largest→compact — not a constant) +
+    ITEM-COUNT-INVARIANT across densities (extract count equal — the §28.4 never-cut teeth, the thing a lazy fit
+    could game by dropping items) + 9.5pt floor + density-not-persisted + the CI extraction-order invariant. ACCEPT.
+  · C1b: OVERFLOW contrast (a fixture that overflows compact@1 shows TRUE page count + allow-2-pages PUTs
+    targetPages=2, item count unchanged) + preview==download density. Residual: "re-tailor tighter" is only a
+    button until E7-D wires the budget — flagged, not hidden. ACCEPT.
+  · C1c: the escaped-bug compensation is the point — REAL-PDF extraction asserts live RESUME_TOKEN content IN
+    ORDER at the output layer (A4 [v3-016] left this only at A1's fixture unit + server JSON). Plain-text export
+    contrast (contains items, excludes leadRationale/cut). ACCEPT. FLAG: AtsView/plain-text unit under jsdom
+    can't paint pdf.js — real coverage is the e2e extraction + gaming read, same posture as A4/B1e.
+  Dispatching C1a single (sole ready engine); coordinator re-verifies before C1b.
+
+[v3-025] E7-C1a — ACCEPTED (single dispatch; committed). Fit-ladder engine. Independent re-verify green
+  (see backlog evidence): real page-measurement ladder (renders each density, counts pdf.js pages, first-fit),
+  9.5pt floor, immutable, density RETURNED-not-persisted; item-count invariant = presence-of-each-item across
+  all 3 densities (robust, not fragile run-count); CI extraction-order invariant (strict, index-increasing,
+  sentinels absent). vitest 42 files 298 tests. Gaming clean. NEXT: C1b (fit-into-preview UI) — single dispatch
+  (C1b & C1c serialize on ApplicationDetail.tsx). chunk: 1 closed this run.
+
+[v3-026] E7-C1b — ACCEPTED (single dispatch; committed). Fit ladder wired into preview+download+chip+overflow.
+  Independent re-verify green (see backlog): fittedFormat (one applyDensity) drives preview==download; overflow
+  surfaces true page count + Allow-2-pages (never cuts); no density control/persistence. Full suite 300/302 —
+  the 2 FAILs (api.applications-format + -tailor, 32-36s) are the documented env-contention flake, CONFIRMED
+  green in isolation (13/13, 6.46s); C1b is client-only so cannot regress server integration. NEXT: C1c (ATS
+  view + plain-text + A4 escaped-bug real-PDF e2e) — the last E7-C ticket. chunk: 2 closed this run.
+
+[v3-027] E7-C1c — ACCEPTED (single dispatch; committed e9b03b4). ATS view + plain-text + the A4 escaped-bug
+  real-PDF e2e. Independent re-verify green (see backlog). The (4a) e2e is a genuine output-layer content proof
+  (real Download-PDF file → extractPdfText → RESUME_TOKEN + SECOND_TOKEN present AND in order). Console allowlist
+  tight (exact-text, download-window-scoped). Full suite 305/306, the 1 FAIL = the known api.applications-format
+  contention flake (7/7 isolated).
+  *** ESCAPED BUG #1 (fixed in-scope by C1c) — Download PDF was broken in the real browser ***: downloadResumePdf
+  (E7-A5) + renderResumeToBuffer use @react-pdf/renderer's renderToBuffer, which the BROWSER build STUBS to throw
+  ("Node specific API"). Every prior test ran under Node (even jsdom-env vitest), so the stub never fired — E7-A5's
+  "Download PDF" acceptance was GAMEABLE (it exercised the Node render, not the browser button). C1c's real-browser
+  e2e (the A4 escaped-bug compensation) caught it; C1c fixed download.ts + AtsView to pdf().toBlob(). This is
+  exactly why the A4 compensation was mandated — it paid off.
+  *** ESCAPED BUG #2 (NOT in C1c's scope → repair E7-C2) — the FIT LADDER is broken in the browser ***: same root
+  cause. src/client/document/fit.ts's fitToPages STILL calls renderResumeToBuffer (Node-only renderToBuffer), so in
+  the real browser it THROWS → E7-C1b's useFit catch swallows it → fit=null → FitChip NEVER renders and the fitted
+  density is NEVER applied. C1a/C1b passed only because their tests ran in Node. No e2e asserted the chip renders in
+  the browser, so it slipped. ESCAPED-BUG RULE → repair E7-C2 (deps C1c): make fit.ts's page-count render browser-
+  safe (pdf().toBlob() branch, Node unit path preserved), harden useFit to not swallow a real render throw as
+  "no overflow", AND STRENGTHEN THE CHECK — the applications e2e must assert the FitChip's "Fits N page · density"
+  text is visible in the REAL browser (the regression guard the Node unit tests structurally cannot give). E7-D1
+  rewired to depend on [E7-C2]. E7-C PHASE IS NOT CLOSED until E7-C2 lands (the fit ladder must work in the product,
+  not just in Node) — do not declare §28.8-C green on the unit tests alone while the browser feature is dead.
+
+[v3-028] E7-C2 (repair) — ACCEPTED (single dispatch; committed 5aff4f3). Browser-broken fit ladder FIXED +
+  strengthened check landed. The builder found TWO stacked browser-only throws (Node-only renderToBuffer AND
+  pdf.js needing a worker), fixed both (import.meta.env.SSR branch + renderResumeToBlob + main-thread worker
+  fallback), hardened useFit (render-error ≠ overflow), and — crucially — VERIFIED the new e2e FitChip-visible
+  assertion FAILS against pre-fix code and passes after (escaped-bug rule teeth confirmed). Independent re-verify
+  green (backlog): playwright applications 3/3 isolated + 10/10 all-projects; Node fit.test 8/8 unchanged; full
+  vitest 305/306 (the 1 = the api.applications-format contention flake, 7/7 isolated). My first gate run showed
+  the applications spec failing — reproduced as pure external contention (playwright + heavy vitest stacked on a
+  loaded box), 3/3 clean in isolation; NOT a fix defect. Trust-the-oracle held: I re-ran rather than trust the
+  builder's "green twice" OR my own contended red.
+  ===== E7-C PHASE COMPLETE (fit ladder + ATS honesty, C1a/C1b/C1c + repair C2) =====
+  PHASE-CLOSE ORACLE §28.8-C on merged tree (HEAD 5aff4f3), ALL GREEN:
+   [x] growing fixture content walks comfortable→standard→compact with ITEM COUNT INVARIANT across densities
+       (never cuts, §28.4) → test/fit.test.ts ladder-walk (20→comfortable,22→standard,24→compact) + per-item
+       presence at all 3 densities
+   [x] overflow reports the TRUE page count and never cuts → fit.test overflow (40-item→compact/2pg/fits:false) +
+       C1b ApplicationDetail overflow UI (true count + Allow-2-pages, item count unchanged)
+   [x] strict-template extraction-order invariant runs green in CI → test/document-extraction-invariant.test.ts
+       (profile + every item.text index-increasing, leadRationale/cut absent)
+   PLUS: the fit ladder actually WORKS in the browser now (C2 e2e chip guard); the §28.6 "what the ATS sees" view
+   + plain-text export (C1c); and the A4 escaped-bug real-PDF content-fidelity e2e (C1c 4a: real download →
+   extract → RESUME_TOKEN+SECOND_TOKEN in order).
+  Merged suite: check 0 / lint clean / build ok / vitest 305/306 (1 = confirmed contention flake) / playwright
+  10/10 non-docker. Docker e2e NOT re-run (phase-close-only per [v3-004]; E7-C is client render/UI + a real-PDF
+  e2e, docker packaging shape unchanged — rests on the prior recorded gate, flagged honestly).
+  TWO ESCAPED BUGS caught this phase (both the Node-only-render-API-in-browser class, invisible to Node-only
+  tests): #1 Download PDF (fixed in-scope by C1c), #2 the fit ladder (repair C2). Root lesson: react-pdf's browser
+  build stubs renderToBuffer — any browser-executed render MUST use pdf().toBlob(); a real-browser e2e is the only
+  guard. Both compensations now live in the suite.
+  ===== CHUNK BOUNDARY — 4 tickets closed this run (E7-C1a/b/c + repair C2) + E7-C phase closed =====
+  Stopping at the phase boundary. NEXT READY: E7-D1 (§28.5 length budget → selection — COARSE, decompose at
+  pickup; KEY-GATED like T014: the keyless half is 'empty budget ⇒ byte-identical user message / fixtures replay
+  unchanged, prompt.ts frozen'; the live 'budget changes selection' half is DEFERRED — no GOOGLE_GENERATIVE_AI_API_KEY).
+
+[v3-029] E7-D1 DECOMPOSED at pickup (coarse placeholder → 2 children). Length budget → selection (§28.5/§28.8-D).
+  Machinery mapped (Explore): buildUserPrompt(jd, context?) at engine.ts:26-30 is the EXACT transport to mirror —
+  budget rides the user `prompt` field, prompt.ts SYSTEM_PROMPT frozen. hashKey(jd, entries) (evalcore.ts:12) excludes
+  context ⇒ budget excluded the same way ⇒ recorded fixtures replay unchanged, T014 flip path undisturbed. cut[] already
+  carries a `reason` string (types.ts:106) — no schema change. validateNoFabrication is entries-only (engine.ts:145) —
+  budget must never reach it. fit.ts/registry.ts are client-only (react-pdf/pdf.js) — budget derivation is a NEW pure
+  server module, no client import. Route seam: applications.ts:216-223 (paper/targetPages/effective-format all in scope).
+  KEY-GATED half is genuinely DEFERRED: no GOOGLE_GENERATIVE_AI/ANTHROPIC/OPENAI key in env (verified). Split:
+   · E7-D1a — KEYLESS machinery (deriveContentBudget + transport + route threading + keyless guards). The substantive,
+     must-pass ticket. Anti-gaming teeth: acceptance requires a 1-page budget to be STRICTLY tighter than 2-page (a
+     derivation that returns ""/constant would pass byte-identical trivially but FAILS the contrast).
+   · E7-D1b — KEY-GATED eval harness (scripts/eval-budget.ts), mirrors scripts/eval.ts: refuses without key, never falls
+     back to fixtures; the live 1-page>2-page cut comparison is DEFERRED/recorded honestly like T014. deps E7-D1a.
+  Dispatching E7-D1a single (sole ready; D1b deps it). Coordinator re-verifies before accepting.
+
+[v3-030] E7-D1a — ACCEPTED (single dispatch; committed). Keyless length-budget machinery (§28.5).
+  INDEPENDENT re-verify green (see backlog evidence): deriveContentBudget is a REAL heuristic — a pure server module
+  (paper size pt + margins + body typography -> approx bullets/words), monotone in targetPages/paper-area/body-size,
+  NOT a constant (the anti-gaming contrast test has teeth: 1-page strictly < 2-page). Budget rides the user `prompt`
+  via buildUserPrompt(jd, context, budget), appended AFTER the context block with the SAME `!budget` early-return ⇒
+  no/empty budget byte-identical to today; hashKey (evalcore.ts) untouched ⇒ FixtureEngine replays recorded fixtures
+  unchanged (0 fixture edits) ⇒ T014 flip path undisturbed (prompt.ts frozen); validate.ts untouched, budget never
+  reaches validateNoFabrication (still entries-only, §6.2). Route derives budget from paper/targetPages/effective-
+  format and threads it as tailor()'s trailing arg. NOTE (expected): production now always derives a budget so the
+  LIVE user message changes — that is the key-gated behavior; keyless suite green because FixtureEngine ignores it.
+  Gates: check 0 / lint clean / build 0 / vitest 45 files 323 tests (serial, dodging the documented contention flake)
+  / playwright 10/10 non-docker. Scope: exactly the 6 declared files. NEXT: E7-D1b (key-gated eval harness, DEFERRED).
+  chunk: 1 closed this run.
+
+[v3-031] E7-D1b — ACCEPTED (single dispatch; committed). Key-gated length-budget eval harness (§28.8-D).
+  scripts/eval-budget.ts mirrors scripts/eval.ts (the T014 harness): key-gate FIRST (no FixtureEngine fallback),
+  ProviderEngine(google/gemini-2.5-flash), builds budget1=deriveContentBudget(...,targetPages:1) and budget2(...:2)
+  over the REAL DEFAULT_FORMAT, runs tailor() twice over SEED_ENTRIES with a fixed platform JD, asserts
+  resume1.cut.length > resume2.cut.length AND every cut.reason non-empty. INDEPENDENT re-verify green: check 0,
+  lint clean, script type-checks against its real import tree (exit 0), refuse-without-key run exits 1 with the
+  clear refusal (coordinator-run), scope = only the new script, zero product-code change. Gaming read clean —
+  real harness, no fabricated result.
+  DEFERRED (honest, like T014): the LIVE 1-page>2-page cut assertion was NOT run — no GOOGLE_GENERATIVE_AI_API_KEY
+  in this env (verified at pickup, [v3-029]). Recorded, not fabricated. The harness runs the moment a key exists.
+
+===== E7-D PHASE COMPLETE (length budget → selection, D1a machinery + D1b eval) =====
+PHASE-CLOSE ORACLE §28.8-D on merged tree (HEAD after D1b commit):
+ [x] KEYLESS — empty budget ⇒ byte-identical user message (fixture-replay guard): buildUserPrompt(jd[,ctx]) with
+     no/null/empty budget is byte-identical to today (engine.test byte-identity block); FixtureEngine keys on
+     hashKey(jd,entries) only (untouched) ⇒ recorded fixtures replay with ZERO edits ⇒ T014 flip path undisturbed
+     (prompt.ts frozen). Merged suite: check 0 / lint clean / build 0 / vitest 45 files 323 tests / playwright 10/10
+     non-docker (all re-run by coordinator at D1a accept; D1b adds no product code).
+ [~] KEY-GATED — a 1-page budget produces MORE cut[] than a 2-page budget, each with a rationale: DEFERRED, harness
+     delivered + runnable (scripts/eval-budget.ts). No provider key in this env — recorded honestly, EXACTLY the
+     epic-wide posture for model-quality claims ([v3-001]; same as E6 context threading). NOT green-washed: the
+     machinery is proven keyless; only the live model-quality claim awaits a key.
+ Docker e2e NOT re-run (phase-close-only per [v3-004]; E7-D is server-side prompt-transport + a script, docker
+ packaging shape unchanged — rests on the prior recorded gate, flagged honestly).
+===== BACKLOG DRAINED — E7-D was the last ready ticket. See final report. =====
+
+[v3-032] E8 INTAKE — template roster + live gallery (user-directed scope, 2026-07-05). The user asked for the
+  "pick a template" experience seen in resume generators; explored options; user chose: MORE TEMPLATES + LIVE
+  mini-render previews + a DEDICATED gallery view, via spec amendment + the loop.
+  Baseline finding: §28.2 already specified 4-6 templates and a gallery — E7-A shipped only 2 of the roster, so
+  most of this is COMPLETING existing spec, not new invention. Spec amendments (user-authorized): §28.2 roster
+  FIXED at 6 (strict, classic, compact, banner single/strict + sidebar-left, sidebar-right good); `previewImage`
+  manifest field SUPERSEDED by live mini-renders of the app's own tailored resume (browser-safe render + pdf.js,
+  lazy/serialized/cached; untailored app ⇒ bundled SAMPLE_RESUME badged "Sample content"); dedicated gallery =
+  full-screen dialog from the Design card (NOT a route — §26 no-orphan-routes; a route has no resume to preview).
+  Oracle: new "Phase 7 / E8" section added (executable checks: parameterized extraction/never-cut invariants over
+  the whole registry, earned-strict order checks, real-browser paint + pixel-diff + primary-color repaint = the
+  anti-stock-image proof, persistence e2e). User-authorized additive change, not a silent semantic amendment.
+  Seeded E8-A1 (classic+compact) -> E8-A2 (banner+sidebar-right) -> E8-B1 (live thumbnails) -> E8-C1 (gallery
+  view) — serial by construction (shared registry.ts/TemplatePicker/e2e files; scheduler confirms 1-ticket
+  batches, no cycles).
+  RED-TEAM (intake pass): cheats found & killed in acceptance — (1) copy-paste template passing presence checks ⇒
+  A1 geometry contrast (classic name centered vs strict left; compact one-row header via y-coords) + A2 mirror
+  proof (sidebar mean-x on opposite halves of the midline); (2) hardcoded banner tint ⇒ two primary values must
+  yield different bytes; (3) stock-image/painted-rect "thumbnails" ⇒ e2e requires pairwise pixel-diff between
+  templates AND a repaint on primary-color change, plus unit proof the render path is usePDF (no renderToBuffer —
+  the E7-C2 class); (4) gallery selection not persisted ⇒ reload round-trip e2e. Residual (accepted, judgment):
+  aesthetic quality of compositions rests on the coordinator gaming read, as with all prior UI tickets.
+  Env preconditions: all keyless; playwright chromium already in the baseline. Dispatching E8-A1.
+
+[v3-033] E8-A1 — ACCEPTED (single dispatch; committed). classic + compact templates (roster 4/6).
+  Independent re-verify green (backlog evidence): check 0 / lint clean / build 0 / vitest 45 files 335 tests
+  (serial) / playwright 10/10 non-docker. Both new templates EARN their strict grade (extraction-order invariant
+  parameterized over all strict templates); never-cut invariant now parameterized over the whole registry; the
+  anti-gaming geometry tests are real pdf.js transform assertions (classic measurably centered, compact measurably
+  one-row) — a manifest-only copy fails. sections.tsx gained the permitted ProfileHeader variant hook (default
+  'left' byte-preserving). FLAGGED residual: compact reuses fit.ts's applyDensity, closing a benign render-time-only
+  import cycle (registry->compact->fit->renderResume->registry) — green everywhere; extract-to-leaf-module is the
+  mechanical repair if it ever bites. Builder also cleared a stale port-8787 dev server (env, not code).
+  NEXT: E8-A2 (banner + sidebar-right). chunk: 1 closed this run (E8 drive).
+
+[v3-034] E8-A2 — ACCEPTED on ATTEMPT 2 (single dispatch + resumed re-dispatch; committed). banner + sidebar-right;
+  ROSTER COMPLETE AT 6 (strict, classic, compact, banner / sidebar-left, sidebar-right).
+  ATTEMPT 1 FAILED the independent re-verify — the exact failure mode the re-verify exists for: the builder
+  self-reported green but had run only `playwright --project=chromium` (8 tests); the FULL run had the
+  applications e2e RED, in isolation too (NOT the contention flake): the new "Sidebar Right" card made the
+  existing bare /Sidebar/ selector ambiguous (strict-mode violation). Judged a real regression of the baseline
+  (a regressing E2E spec fails the baseline exactly like a regressing unit test, [v3-004]) -> attempts[0] logged,
+  e2e spec added to declared files, SAME builder resumed with fixNote. Fix: /^Sidebar ATS/ prefix (2 call sites),
+  assertion semantics untouched. NOT an escaped-bug-rule case: the defect was in the check's own selector
+  hygiene, caught BY the gate, not a product defect that passed a gate.
+  Re-verify round 2 green: check 0 / lint clean / vitest 45 files 347 tests serial / playwright FULL 10/10.
+  Gaming read clean (backlog evidence): live tint (two primaries => different bytes) + luminance contrastInk;
+  genuine mirror (opposite-half mean-x); sidebar-left byte-stable through the renderSidebarComposition extraction;
+  roster shape asserted. NEXT: E8-B1 (live thumbnails). chunk: 2 closed this run (E8 drive).
+
+[v3-035] E8-B1 — ACCEPTED on attempt 2 (committed). LIVE mini-render thumbnails in the TemplatePicker.
+  Unusual drive path, recorded honestly: the builder died twice mid-verification (transient API "usage policy"
+  false-positive, then a session limit) with the implementation COMPLETE in the tree. Coordinator ran the full
+  verification in its stead (the independent re-verify subsumes the builder's self-check), found ONE deterministic
+  e2e red — the builder's own anti-stock-image check (primary-color repaint poll) on the DEFAULT 5s expect timeout
+  while a color change re-renders all six thumbnails through the serialized queue — diagnosed it against
+  playwright.config (no expect block => 5s), logged attempts[0], and resumed the SAME builder post-limit-reset for
+  the one-line fix ({ timeout: 15000 }, assertion unweakened). Builder also hardened pdf.js to bytes-direct
+  getDocument({data}) (no object URL) and landed two EXACT-MATCH console allowlists, both judged legitimate on
+  gaming read (409 scoped pre-login = documented setup->409->login probe; ERR_FILE_NOT_FOUND = react-pdf usePDF's
+  pre-existing internal revoke race, previously download-scoped by E7-C1b, now firing at every swap point under
+  six serialized renders — every step keeps independent positive pixel/byte assertions, so the allowlist cannot
+  hide a real failure).
+  Final-tree re-verify green: check 0 / lint clean / build 0 / vitest 46 files 358 tests serial / playwright FULL
+  10/10. The §28.2 live-preview decision is now PROVEN in-browser: 6 painted per-template canvases of the app's
+  real resume, pairwise pixel-different, repainting on format change; untailored apps show exactly 6 'Sample
+  content' badges (never silently passing sample off as the user's own). RESIDUAL flagged: usePDF's revoke race
+  logs cosmetic console noise (library-internal). NEXT: E8-C1 (dedicated gallery view — last E8 ticket).
+  chunk: 3 closed this run (E8 drive).
+
+[v3-036] E8-C1 — ACCEPTED (single dispatch, first attempt; committed). Dedicated template gallery.
+  Independent re-verify green (backlog evidence): check 0 / lint clean / build 0 / vitest 47 files 363 tests
+  serial / playwright FULL 10/10. A Dialog off the Design card (router untouched, §26 honored); 6 large live
+  previews via TemplateThumbnail (backward-compatible scale prop, folded into the cache key); selection mirrors
+  the picker contract (templateId only — e2e asserts earlier color/font PUTs survive), closes, reflects in the
+  inline picker, persists across reload. The builder pre-empted the A2 strict-mode ambiguity class by scoping
+  paint helpers to the dialog Locator. Gaming read clean; minor cosmetic inefficiency noted (blob cache keyed on
+  scale though bytes are scale-independent).
+
+===== E8 PHASE COMPLETE (template roster + live gallery, A1/A2/B1/C1) =====
+PHASE-CLOSE ORACLE (oracle.md Phase 7/E8) on merged tree, ALL GREEN (in the 363 vitest + 10/10 e2e just run):
+ [x] roster: 6 templates, >=2 single-column strict, both sidebar orientations (asserted, document-templates.test)
+ [x] EVERY template: fixture renders; extraction contains profile + every item; leadRationale/cut absent
+     (parameterized over Object.values(TEMPLATES))
+ [x] every strict template: extraction order strictly index-increasing (§28.6 earned, incl. banner)
+ [x] EVERY template: item count invariant across its density ladder (§28.4 never-cuts, parameterized)
+ [x] effectiveAtsGrade honesty: sidebar-right => good; photo caps at good (asserted)
+ [x] REAL-BROWSER: picker + gallery thumbnails PAINT; two templates differ pixelwise; primary-color change
+     repaints (anti-stock-image); gallery selection persists across reload; untailored app shows exactly 6
+     'Sample content' badges
+ [x] format/template changes never mutate snapshots (standing byte-stability guard, green in suite)
+ Docker e2e NOT re-run (phase-close-only per [v3-004]; E8 is client render/UI + e2e specs — docker packaging
+ shape unchanged; rests on the prior recorded gate, flagged honestly — same posture as the E7-C close).
+===== BACKLOG DRAINED (77 tickets: 70 done, 7 decomposed). E8 was the final epic. =====
