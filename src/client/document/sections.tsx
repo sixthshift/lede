@@ -108,12 +108,21 @@ export function ProfileHeader({
   profile,
   format,
   variant = "left",
+  ink,
 }: {
   profile: Profile;
   format: DocumentFormat;
   variant?: ProfileHeaderVariant;
+  // Optional ink override for the name/contact/link text — used only by
+  // templates that set the header on a filled band (banner, spec.md §28.2)
+  // and need a contrasting color instead of the default colors.text/primary.
+  // Undefined ⇒ identical output to before this prop existed.
+  ink?: string;
 }) {
   const styles = buildStyles(format);
+  const nameStyle = ink ? [styles.name, { color: ink }] : styles.name;
+  const contactItemStyle = ink ? [styles.contactItem, { color: ink }] : styles.contactItem;
+  const linkStyle = ink ? [styles.link, { color: ink }] : styles.link;
   const contactParts = [profile.email, profile.phone, profile.location].filter(
     (part): part is string => Boolean(part),
   );
@@ -121,12 +130,12 @@ export function ProfileHeader({
   const contactItems = (
     <>
       {contactParts.map((part) => (
-        <Text key={part} style={styles.contactItem}>
+        <Text key={part} style={contactItemStyle}>
           {part}
         </Text>
       ))}
       {profile.links.map((link) => (
-        <Link key={link.url} style={styles.link} src={link.url}>
+        <Link key={link.url} style={linkStyle} src={link.url}>
           {link.label}
         </Link>
       ))}
@@ -139,7 +148,7 @@ export function ProfileHeader({
         {showPhoto && profile.photoUrl ? (
           <Image src={profile.photoUrl} style={[styles.photo, styles.photoCenterOverride]} />
         ) : null}
-        <Text style={styles.name}>{profile.name}</Text>
+        <Text style={nameStyle}>{profile.name}</Text>
         <View style={styles.contactLine}>{contactItems}</View>
       </View>
     );
@@ -152,7 +161,7 @@ export function ProfileHeader({
           {showPhoto && profile.photoUrl ? (
             <Image src={profile.photoUrl} style={styles.photo} />
           ) : null}
-          <Text style={styles.name}>{profile.name}</Text>
+          <Text style={nameStyle}>{profile.name}</Text>
         </View>
         <View style={[styles.contactLine, styles.contactLineInline]}>{contactItems}</View>
       </View>
@@ -163,7 +172,7 @@ export function ProfileHeader({
     <View style={styles.header}>
       {showPhoto && profile.photoUrl ? <Image src={profile.photoUrl} style={styles.photo} /> : null}
       <View style={styles.headerText}>
-        <Text style={styles.name}>{profile.name}</Text>
+        <Text style={nameStyle}>{profile.name}</Text>
         <View style={styles.contactLine}>{contactItems}</View>
       </View>
     </View>

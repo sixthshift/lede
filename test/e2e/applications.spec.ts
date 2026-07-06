@@ -224,9 +224,12 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   const applicationPut = (r: import("@playwright/test").Response) =>
     r.url().endsWith(`/api/applications/${applicationId}`) && r.request().method() === "PUT";
 
+  // /^Sidebar ATS/ — accessible-name prefix (card title + ATS badge) that
+  // uniquely matches the sidebar-LEFT card; a bare /Sidebar/ would also match
+  // the "Sidebar Right" card added by E8-A2.
   const [templatePutResponse] = await Promise.all([
     page.waitForResponse(applicationPut),
-    page.getByRole("button", { name: /Sidebar/ }).click(),
+    page.getByRole("button", { name: /^Sidebar ATS/ }).click(),
   ]);
   expect(templatePutResponse.status()).toBe(200);
   expect((await templatePutResponse.json()).format.templateId).toBe("sidebar-left");
@@ -255,7 +258,7 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   // (4c) the format change from (4b) PERSISTS across the reload — the
   // TemplatePicker/DesignPanel controls reflect the saved value, not a
   // client-only draft.
-  await expect(page.getByRole("button", { name: /Sidebar/ })).toHaveAttribute(
+  await expect(page.getByRole("button", { name: /^Sidebar ATS/ })).toHaveAttribute(
     "aria-pressed",
     "true",
   );

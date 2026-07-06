@@ -9,8 +9,10 @@ import type { ReactElement } from "react";
 import type { DocumentFormat, Profile, TailoredResume } from "@shared/types";
 import { StrictTemplate } from "./templates/strict";
 import { SidebarTemplate } from "./templates/sidebar";
+import { SidebarRightTemplate } from "./templates/sidebar-right";
 import { ClassicTemplate } from "./templates/classic";
 import { CompactTemplate } from "./templates/compact";
+import { BannerTemplate } from "./templates/banner";
 
 export type TemplateLayout = "single" | "sidebar-left" | "sidebar-right";
 export type AtsGrade = "strict" | "good";
@@ -84,6 +86,30 @@ export const TEMPLATES = {
     densityLadder: ["comfortable", "standard", "compact"],
     densityMultipliers: { comfortable: 1, standard: 0.94, compact: 0.88 },
     render: SidebarTemplate,
+  },
+  "sidebar-right": {
+    id: "sidebar-right",
+    name: "Sidebar Right",
+    description:
+      "Two-column layout — skills/contact-adjacent sections in a right sidebar, narrative sections in the main column.",
+    layout: "sidebar-right",
+    // Same cap rationale as sidebar-left (§28.2): two-column reads as less
+    // linear to strict-order ATS parsers no matter which side the sidebar is on.
+    atsGrade: "good",
+    densityLadder: ["comfortable", "standard", "compact"],
+    densityMultipliers: { comfortable: 1, standard: 0.94, compact: 0.88 },
+    render: SidebarRightTemplate,
+  },
+  banner: {
+    id: "banner",
+    name: "Banner",
+    description:
+      "Single-column, ATS-strict layout — full-bleed header band tinted with your accent color, name/contact set on the band.",
+    layout: "single",
+    atsGrade: "strict",
+    densityLadder: ["comfortable", "standard", "compact"],
+    densityMultipliers: { comfortable: 1, standard: 0.94, compact: 0.88 },
+    render: BannerTemplate,
   },
 } satisfies Record<string, TemplateManifest>;
 
