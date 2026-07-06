@@ -1,5 +1,8 @@
 # lede
 
+[![ci](https://github.com/sixthshift/lede/actions/workflows/ci.yml/badge.svg)](https://github.com/sixthshift/lede/actions/workflows/ci.yml)
+[![image](https://img.shields.io/badge/ghcr.io-sixthshift%2Flede-blue?logo=docker)](https://github.com/sixthshift/lede/pkgs/container/lede)
+
 A self-hosted resume-tailoring tool. You keep a library of career **entries**
 (experience, projects, education, skills, …); paste a job description; the model
 **selects, orders, and re-frames** the relevant entries into a tailored resume —
@@ -74,6 +77,29 @@ Copy `.env.example` to `.env` and adjust as needed. `.env` is git-ignored and
 optionally loaded by the dev container.
 
 ## Production / self-hosting
+
+### Quickstart — prebuilt image (no clone needed)
+
+CI publishes a multi-arch (amd64/arm64) image to GHCR on every green main
+build: `ghcr.io/sixthshift/lede:latest` (immutable `:sha-*` and semver tags
+also available).
+
+```bash
+docker run -d --name lede \
+  -p 8787:8787 \
+  -e LEDE_MASTER_KEY=$(openssl rand -base64 32) \
+  -e LEDE_SESSION_SECRET=$(openssl rand -base64 48) \
+  -v lede-data:/app/data \
+  ghcr.io/sixthshift/lede:latest
+```
+
+Open **http://localhost:8787**, set your login password, then add your
+provider API key in **Settings** (BYOK — stored encrypted at rest). Note:
+generating `LEDE_MASTER_KEY` inline like this works until you recreate the
+container — for anything long-lived, generate once, store it safely, and pass
+the same value every time (see the warning below).
+
+### Building it yourself
 
 The root `Dockerfile` is a multi-stage build: a Bun stage builds the SPA
 (`bun run build` → `dist/`), and a slim **Node** stage runs the server via
