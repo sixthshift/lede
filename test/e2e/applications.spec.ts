@@ -37,6 +37,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { ensureFirstRunPassword } from "./helpers/session";
 import { CONTRAST_JDS } from "../../src/server/tailor/evalcore";
 import { extractPdfText } from "../../src/client/document/extractText";
+import { TEMPLATES } from "../../src/client/document/registry";
 
 const PASSWORD = "correct horse battery staple e2e applications";
 const JD = CONTRAST_JDS[0]!.jd; // "platform-sdk" scenario
@@ -69,6 +70,52 @@ async function expectCanvasPainted(page: Page): Promise<void> {
     .toBe(true);
 }
 
+const TEMPLATE_IDS = Object.keys(TEMPLATES);
+
+function thumbnailCanvas(page: Page, templateId: string) {
+  return page.locator(`[data-template-id="${templateId}"] canvas`);
+}
+
+// E8-B1: TemplatePicker cards render LIVE mini-renders, never static images
+// (§28.2, decided 2026-07-05) — proof is a painted (non-blank) canvas, same
+// "not just white pixels" oracle expectCanvasPainted already uses for the
+// main preview, applied to a template card's thumbnail canvas instead.
+async function expectThumbnailPainted(page: Page, templateId: string): Promise<void> {
+  const canvas = thumbnailCanvas(page, templateId);
+  await canvas.scrollIntoViewIfNeeded();
+  await expect(canvas).toBeVisible();
+  await expect
+    .poll(
+      () =>
+        canvas.evaluate((el: HTMLCanvasElement) => {
+          // A canvas that's never been drawn to sits at its default 300x150
+          // size with fully TRANSPARENT (alpha=0) pixels — indistinguishable
+          // from "non-white" by color alone (0 !== 255), so dimensions must
+          // have moved off the pdf.js-untouched default AND at least one
+          // pixel must be opaque and non-white.
+          if (el.width === 300 && el.height === 150) return false;
+          const ctx = el.getContext("2d");
+          if (!ctx || el.width === 0 || el.height === 0) return false;
+          const { data } = ctx.getImageData(0, 0, el.width, el.height);
+          for (let i = 0; i < data.length; i += 4) {
+            if (
+              data[i + 3] !== 0 &&
+              (data[i] !== 255 || data[i + 1] !== 255 || data[i + 2] !== 255)
+            ) {
+              return true;
+            }
+          }
+          return false;
+        }),
+      { timeout: 15000 },
+    )
+    .toBe(true);
+}
+
+function thumbnailDataUrl(page: Page, templateId: string): Promise<string> {
+  return thumbnailCanvas(page, templateId).evaluate((el: HTMLCanvasElement) => el.toDataURL());
+}
+
 test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock", async ({
   page,
 }) => {
@@ -77,17 +124,6 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   const pageErrors: unknown[] = [];
   const consoleErrors: string[] = [];
   let loggedIn = false;
-  // Set true only around the (4a) Download PDF click below — DocumentPreview
-  // (src/client/components/DocumentPreview.tsx) runs its OWN concurrent
-  // react-pdf render (usePDF) for the live canvas; racing it against a
-  // SECOND react-pdf render for the download (downloadResumePdf) can
-  // occasionally cause pdf.js's canvas-side blob fetch to lose a revoke race
-  // on react-pdf's internal (not this ticket's) blob url, logging a
-  // same-text net::ERR_FILE_NOT_FOUND — harmless to what's under test here,
-  // since (4a)'s own assertions independently verify the REAL downloaded
-  // PDF's bytes are correct. Scoped tightly (only while true) so a real
-  // regression anywhere else in the flow still fails the test.
-  let downloadInFlight = false;
   page.on("pageerror", (err) => pageErrors.push(err));
   page.on("console", (msg) => {
     if (msg.type() !== "error") return;
@@ -109,9 +145,34 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
     ) {
       return;
     }
-    // EXACT-MATCH allowlist, scoped to the (4a) download window only — see
-    // downloadInFlight's comment above.
-    if (downloadInFlight && msg.text() === "Failed to load resource: net::ERR_FILE_NOT_FOUND") {
+    // EXACT-MATCH allowlist, same pre-sign-in scope: LoginForm is ONE
+    // component for first-run and returning-user login — it discovers which
+    // case it's in by POSTing /api/auth/setup first and falling back to
+    // /api/auth/login when setup 409s (test/e2e/helpers/session.ts). On a
+    // retry (or a reused dev server) the password is already set, so that
+    // probe 409s BY DESIGN — Chromium logs it like any non-2xx fetch. Without
+    // this entry a retry could never pass the final console assertion,
+    // defeating playwright.config.ts's retries-absorb-cold-boot-flake setup.
+    if (
+      !loggedIn &&
+      msg.text() === "Failed to load resource: the server responded with a status of 409 (Conflict)"
+    ) {
+      return;
+    }
+    // EXACT-MATCH allowlist: react-pdf's usePDF revokes the PREVIOUS preview
+    // blob url whenever a new render lands (its own `[state.url]` cleanup
+    // effect), while PdfCanvas's pdf.js fetch of that old url can still be
+    // in flight — pdf.js range-fetches url-backed documents lazily, so the
+    // loser logs exactly this text. New renders land at every fit-ladder
+    // re-run, format change, re-tailor, and download — and E8-B1's six
+    // serialized thumbnail renders add enough contention that the race,
+    // previously occasional (E7-C1b allowlisted it around the download
+    // click only), now fires reliably at those swap points too. Harmless to
+    // everything under test: each step's own painted-canvas/pixel/PDF-byte
+    // assertions independently prove the CURRENT render is real and correct.
+    // This text is specific to a dead blob: url — an asset/API failure logs
+    // a status-code text (like the two above) and still fails the test.
+    if (msg.text() === "Failed to load resource: net::ERR_FILE_NOT_FOUND") {
       return;
     }
     consoleErrors.push(msg.text());
@@ -154,6 +215,12 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   await page.goto(`/applications/${applicationId}`);
   await expect(page.getByRole("button", { name: "Tailor", exact: true })).toBeVisible();
 
+  // (3a) UNTAILORED (E8-B1, §28.2): no tailored resume exists yet, so every
+  // template card falls back to sample content and says so — never silently
+  // passing sample content off as the user's own.
+  await expect(thumbnailCanvas(page, "strict")).toBeVisible();
+  expect(await page.getByText("Sample content").count()).toBe(TEMPLATE_IDS.length);
+
   const [tailorResponse] = await Promise.all([
     page.waitForResponse(
       (r) => r.url().endsWith(`/api/applications/${applicationId}/tailor`) && r.status() === 200,
@@ -170,6 +237,20 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   await expect(page.getByRole("button", { name: "Re-tailor", exact: true })).toBeVisible();
   await expectCanvasPainted(page);
   await expect(page.locator(".reasoning-panel")).toBeVisible();
+
+  // (4·thumb) LIVE MINI-RENDER THUMBNAILS (E8-B1, §28.2) — once tailored,
+  // the sample-content badge disappears, and every one of the six template
+  // cards paints its OWN real render of the actual tailored resume (never a
+  // static image/screenshot). Two different templates' thumbnails must also
+  // differ pixelwise — the anti-stock-image proof that these are genuinely
+  // per-template renders, not the same picture shown six times.
+  expect(await page.getByText("Sample content").count()).toBe(0);
+  for (const templateId of TEMPLATE_IDS) {
+    await expectThumbnailPainted(page, templateId);
+  }
+  const strictThumbnail = await thumbnailDataUrl(page, "strict");
+  const sidebarThumbnail = await thumbnailDataUrl(page, "sidebar-left");
+  expect(strictThumbnail).not.toBe(sidebarThumbnail);
 
   // (4·fit) BROWSER FIT PROOF (E7-C2 escaped-bug guard): fit.ts's page-count
   // measurement used to call renderToBuffer, which @react-pdf/renderer's
@@ -193,7 +274,6 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   // SAME extractPdfText an ATS parser's extraction would use over its actual
   // bytes, asserting the live-tailored RESUME_TOKEN and a second selected
   // item (rank-2, so ORDER is checked too) are both present, in order.
-  downloadInFlight = true;
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "Download PDF" }).click(),
@@ -216,7 +296,6 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   expect(secondIdx, "content order: RESUME_TOKEN must precede the second item").toBeGreaterThan(
     firstIdx,
   );
-  downloadInFlight = false;
 
   // (4b) Design panel (E7-B1e) — change the TEMPLATE and the body FONT; each
   // change PUTs application.format and the preview canvas repaints (§28.3).
@@ -244,10 +323,34 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   expect((await fontPutResponse.json()).format.typography.body.family).toBe("arimo");
   await expectCanvasPainted(page);
 
+  // (4b·color) E8-B1's other anti-stock-image proof: changing the primary
+  // color repaints a thumbnail's actual pixels — a static screenshot
+  // couldn't react to this, only a live render can.
+  const sidebarThumbnailBeforeColor = await thumbnailDataUrl(page, "sidebar-left");
+  // Scoped to the "Primary color" field specifically — the same curated hex
+  // swatches also appear under "Text color", so an unscoped role query would
+  // match both.
+  const primaryColorField = page.getByText("Primary color", { exact: true }).locator("..");
+  const [colorPutResponse] = await Promise.all([
+    page.waitForResponse(applicationPut),
+    primaryColorField.getByRole("button", { name: "#14532d" }).click(),
+  ]);
+  expect(colorPutResponse.status()).toBe(200);
+  expect((await colorPutResponse.json()).format.colors.primary).toBe("#14532d");
+  // Generous timeout, same rationale as expectThumbnailPainted: a color
+  // change invalidates ALL SIX thumbnail cache keys, and the serialized
+  // render queue (+ idle-time deferral per card) repaints them one at a
+  // time — sidebar-left's turn can land well past the default 5s.
+  await thumbnailCanvas(page, "sidebar-left").scrollIntoViewIfNeeded();
+  await expect
+    .poll(() => thumbnailDataUrl(page, "sidebar-left"), { timeout: 15000 })
+    .not.toBe(sidebarThumbnailBeforeColor);
+
   // (5) full reload -> the same content still persists, with NO re-tailor
   // (persistence: genState stays 'tailored', current was persisted by (3),
   // not re-derived on load) — checked against the record itself, since the
-  // canvas has no DOM text to assert a token against.
+  // canvas has no DOM text to assert a token against. The reload tears down
+  // every blob url with the page, closing the design-change race window.
   await page.reload();
   await expect(page.getByRole("button", { name: "Re-tailor", exact: true })).toBeVisible();
   await expectCanvasPainted(page);

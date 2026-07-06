@@ -252,6 +252,9 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
             format={resolvedFormat}
             onChange={handleFormatChange}
             readOnly={isLocked}
+            resume={application.current}
+            profile={profile}
+            paper={paper}
           />
           <DesignPanel format={resolvedFormat} onChange={handleFormatChange} readOnly={isLocked} />
         </CardContent>
