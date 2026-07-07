@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 
 import { useAuthLogout } from "../hooks/queries";
 import { NavTabs } from "./NavTabs";
+import { ThemeToggle } from "./ThemeToggle";
 import { Button } from "./ui/button";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -29,16 +30,19 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="font-serif text-md font-medium tracking-tight">Lede</span>
           </Link>
           <NavTabs />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="ml-auto text-muted-foreground"
-            onClick={() => logout.mutate()}
-          >
-            <LogOut aria-hidden />
-            Log out
-          </Button>
+          <div className="ml-auto flex items-center gap-1">
+            <ThemeToggle />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => logout.mutate()}
+            >
+              <LogOut aria-hidden />
+              Log out
+            </Button>
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-6 py-8">{children}</main>

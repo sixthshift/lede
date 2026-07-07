@@ -58,3 +58,40 @@
   --destructive: var(--danger);
   --destructive-foreground: var(--surface);
 }
+
+/*
+ * Dark theme (class strategy — `.dark` on <html>, set pre-paint by the inline
+ * script in index.html). The shadcn mappings above resolve `var(--…)` at use
+ * time, so dark mode is nothing more than re-pointing the §12 palette: every
+ * derived token follows. Note --primary-foreground/--destructive-foreground
+ * stay `var(--surface)` and thus become the dark surface — a near-black label
+ * on the brightened accent/danger fills, which is exactly what we want.
+ */
+:root.dark {
+  color-scheme: dark;
+
+  --ink: #e8e8ec;
+  --ink-soft: #a0a0ab;
+  --ink-faint: #7a7a8a;
+  --bg: #0e0e11; /* page canvas — cool near-black */
+  --surface: #17171c; /* cards, header, inputs — raised above the canvas */
+  --bg-subtle: #202027; /* muted fills inside a surface */
+  --border: #2a2a32;
+  --border-strong: #3a3a45;
+  --accent: #7089f5; /* brightened so it reads on the dark canvas */
+  --accent-hover: #8ba0f8;
+  --accent-weak: #1e2748; /* tinted fill */
+  --success: #47c97e;
+  --success-soft: #16271d;
+  --warn: #e0a52e;
+  --warn-soft: #291f10;
+  --danger: #f0686b;
+  --danger-soft: #2a1618;
+
+  /* On the dark canvas, depth comes from raised surfaces, not hairline
+     shadows — so darken the shadows enough to still register. */
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 3px rgb(0 0 0 / 0.5);
+  --shadow-md: 0 2px 4px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0 4px 8px rgb(0 0 0 / 0.45), 0 12px 32px rgb(0 0 0 / 0.6);
+}
