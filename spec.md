@@ -827,6 +827,10 @@ Lede grows a real **document design layer** — a template gallery plus a design
 
 ### 28.2 Templates (gallery, code-defined, ATS-graded)
 
+> **⚠ SUPERSEDED by §31 (2026-07-06):** templates-as-code is retired in favor of one
+> parameterized engine + presets. This section remains as the record of the E7/E8 build it
+> governed; new work follows §31.
+
 - A **template registry** (same pattern as §4.3's section registry): each template = a react-pdf Page component + a manifest `{ id, name, description, layout: 'single' | 'sidebar-left' | 'sidebar-right', atsGrade, densityLadder, densityMultipliers }`. Launch with **4–6 templates**: at least two single-column (`strict`) and two sidebar layouts. All templates render every section through **shared section renderers** — they differ in composition (header treatment, sidebar, rules, heading style), never in features (rx-resume's own rule, worth copying).
 - **The launch roster (fixed 2026-07-05):** `strict` (single, left header — shipped E7-A), `classic` (single, centered header, hairline rule under section headings), `compact` (single, one-line header — name left / contact right — tighter section treatment), `banner` (single, full-bleed `primary`-tinted header band), `sidebar-left` (shipped E7-A), `sidebar-right` (mirror). The four single-column templates declare `strict`; both sidebars declare `good`. Every declared `strict` grade is **earned via the 28.6 extraction-order invariant in CI**, never asserted.
 - **Previews are live mini-renders, never static images** (decided 2026-07-05; supersedes the earlier `previewImage` manifest field): each picker card / gallery tile paints page 1 of a **real react-pdf render of this application's tailored resume** under that template — the same browser-safe render + pdf.js path as the main preview (§28.0's "the preview IS the artifact" extends to thumbnails). Thumbnails render lazily (only when the picker/gallery is visible), one at a time, cached per (templateId, format-minus-templateId, paper, resume). An application with no tailored resume previews a bundled `SAMPLE_RESUME`, visibly badged **"Sample content"** — never passed off as the user's own.
@@ -836,6 +840,10 @@ Lede grows a real **document design layer** — a template gallery plus a design
 - **Deliberately rejected:** user-authored templates and arbitrary custom CSS. rx-resume removed raw CSS in v5 in favor of constrained, structured "style rules" — if an escape hatch is ever wanted, that is the model to copy; **deferred**.
 
 ### 28.3 The design panel (bounded overrides)
+
+> **⚠ EXPANDED by §31 (2026-07-06):** the panel grows to FlowCV-class axes (`DocumentFormat`
+> v2). The bounded-overrides philosophy, photo defaults, and locking clause below carry
+> forward unchanged; the axis list is superseded by §31.2.
 
 Grouped the way the field consistently groups it (typography → color → page → structure), persisted **per application** as `format`, with instance defaults in `settings.defaultFormat`:
 
@@ -927,3 +935,199 @@ type DocumentFormat = {
 Each step deep-links to where it's completed; the Applications↔Library loop (§26) brings the user back. The first tailor attempt with no key already routes to Settings (§9's `no_api_key`) — the panel exists so that dead-end is never reached.
 
 **Acceptance shape:** fresh boot (no `LEDE_SEED_DEMO`) → `/api/entries` returns `[]`, Library and Applications show their guided empty states, panel shows steps 2–4 pending → set key → panel updates → import/add an entry → panel updates → create + tailor an application → panel gone, never returns. With `LEDE_SEED_DEMO=1`: current seeded behavior, byte-identical fixtures.
+
+## 31. Design engine v2 — FlowCV-class customization (one engine · presets · graded honesty)
+
+*(Added 2026-07-06, user-directed. Supersedes §28.2's templates-as-code model and §28.3's
+bounded panel — un-deferring §28.2's own escape hatch: "constrained, structured style rules …
+the model to copy." §28.0 (react-pdf only), §28.4 (fit ladder), §28.5 (budget), §28.6
+(extraction honesty) stand unchanged. Parity list grounded in a firsthand inventory of
+FlowCV's live customization panel, 2026-07-06.)*
+
+**The product claim.** Lede = FlowCV-class design freedom + Lede's tailoring + *verified*
+honesty. FlowCV's "templates" are presets over one parameterized engine (confirmed live:
+applying one rewrites panel state; users can mint their own). Lede adopts that architecture —
+**one layout engine, richly parameterized by bounded axes; templates become curated presets**
+— and keeps the thing FlowCV can't offer: every ATS claim is backed by extraction tests, and
+decorative choices *visibly* degrade the earned grade.
+
+### 31.1 Locked architecture decisions
+
+- **One engine.** A single react-pdf composition renders every resume; `DocumentFormat` v2
+  is the only input that varies. The six E7/E8 code templates are RETIRED as code and
+  reborn as the first six **presets** (v2 configs reproducing their look). The E8 gallery,
+  live-thumbnail, cache, and fit-ladder machinery carry over — they already operate on
+  `(resume, format)` pairs.
+- **Bounded axes only, forever.** Every control is an enum, bounded range, or curated list —
+  never raw CSS/HTML, free positioning, or font upload (FlowCV holds this line too). The
+  escape hatch remains structured, per §28.2's original note.
+- **Design only.** Content stays Library-driven (§1, §4). No inline text editing of rendered
+  output; the §6.3 fabrication gate is untouched. The ONE content-schema touch this epic may
+  make: optional `level` metadata on skill/language-class entries (§31.4) — flagged, not smuggled.
+- **Presets, user-savable.** `settings.presets[]`: named snapshots of `DocumentFormat` v2
+  (ship the six + a handful curated from the new axes; "Save current design as preset" in the
+  panel — FlowCV's "Create template", right-sized for single-user).
+- **Graded honesty (§28.6 extended).** A pure function `atsGrade(format) → strict | good`
+  over the whole v2 config, per the classification table (§31.5). CI runs the extraction-order
+  invariant over every shipped preset and over one canonical config per risky axis, so the
+  classification itself is tested, not asserted. The §28.4 never-cut invariant holds for
+  every configuration.
+- **Migration is deterministic and content-preserving.** Stored v1 formats (applications,
+  `settings.defaultFormat`, `lockedFormat` snapshots) migrate v1→v2 by pure function, tested
+  against fixture equality. Stored `TailoredResume` content stays byte-identical (§28.1).
+  Honest deviation, stated: a locked app re-RENDERED under engine v2 may differ in PDF bytes
+  from what v1 produced; the locked content/format *data* is unchanged, and the v2 render of
+  each migrated format must pass the same invariant suite the v1 template passed.
+
+### 31.2 The panel (parity list — axes and exact bounds)
+
+Grouped as the panel groups them. Values are the contract; a build that ships a subset of an
+axis's values is incomplete, one that adds values un-specced is drift.
+
+- **Document** — page format `a4 | letter` (exists) · date format: the 12 FlowCV presets
+  (`MM/DD/YYYY`, `MMM DD, YYYY`, `MMMM Do, YYYY`, `DD/MM/YYYY`, `DD.MM.YYYY`, `DD MMM YYYY`,
+  `Do MMMM YYYY`, `YYYY-MM-DD`, `YYYY.MM.DD`, `YYYY/MM/DD`, `YYYY MMM DD`, `YYYY MMMM DD`);
+  custom format strings **deferred**.
+- **Layout** — columns `one | two | mix` (mix = full-width header band + two-column body) ·
+  header position `top | left | right` (left/right = sidebar) · sidebar width **25–40%**,
+  1% steps (FlowCV allows 1–99; bounded to the range that can't produce a broken page) ·
+  per-section column/position assignment + draggable **manual page-break tokens** — this
+  extends the §13 LayoutEditor (placement/§26 unchanged: resume material lives with the
+  Library; column assignment is per-application format).
+- **Type scale** — base size **9–12pt** (exists) · relative offsets: name **+4..+12**, title
+  **0..+4**, section headings **0..+3**, entry header **0..+2** (pt).
+- **Spacing** — line height **1.15–1.5** · element spacing scale **0–4** · margins in mm,
+  paired L&R **10–28** and T&B **10–28** (per-side margins rejected, matching FlowCV).
+- **Entries** — structure `full-width | columns` · date&location `right | left | split` ·
+  subtitle `same-line | below` · list style `bullet | hyphen` · date&location order ·
+  subtitle/date/location font style each `normal | bold | italic` · body indent toggle.
+- **Headings** — style: **8 treatments** `underline | boxed | outline-short-rule |
+  rules-above-below | accent-bar | plain | thin-underline | tick-marks` · capitalization
+  `capitalize | uppercase` · per-heading icons `none | outline | filled`.
+- **Fonts** — body roster grows from ~12 to a curated **~30 self-hosted OFL faces** across
+  serif/sans/mono groups (keep the §28.3 metric-compatible stand-ins: Arimo, Tinos, Carlito;
+  add the FlowCV-overlap OFL faces: Lora, Source Serif, EB Garamond, Source Sans, Lato,
+  Roboto, Open Sans, IBM Plex Sans/Mono, Work Sans, Fira Sans, Inconsolata, Space Mono, …
+  final roster fixed at intake) · separate **name font** slot: `same-as-body` + ~8 OFL
+  display faces · no uploads, no per-section fonts.
+- **Colors** — the FlowCV subsystem, minus images: **color area** `full-page | header |
+  border` · mode `single | multi` (single = accent over black-on-white; multi = independent
+  `text / background / accent` hexes; curated swatches + free hex, both modes) · header area
+  colors the band or sidebar with auto-contrast ink (the E8 banner logic, generalized) ·
+  border = page frame, size `s | m | l`, per-side toggles · **accent placement**: 9
+  independent toggles — name, title, headings, heading rules, header icons, level indicators,
+  dates, entry subtitles, link icons. **REJECTED: image backgrounds/frames** (Unsplash
+  dependency contradicts self-hosting; extraction-hostile; taste trap — FlowCV forces a dark
+  overlay for a reason).
+- **Header** — alignment `left | center` · details arrangement (3 row layouts) · separator
+  `icon | bullet | bar` · contact icon style: 7 (`none-frame`, circle/rounded/square ×
+  filled/outline) · name & title weight `normal | bold` · title position `same-line | below`.
+- **Photo** — exists (§28.3: hidden default, shape, size, regional note, grade cap). Add
+  crop/zoom at upload. Unchanged otherwise.
+- **Links** — toggles: underline · accent color · link icon; header links styled separately.
+- **Footer** — toggles: page numbers · email · name · custom text (one line, plain text).
+- **Per-section display** — skills/languages: layout `grid | rows | compact | bubble | level`,
+  grid columns **1–4**, level display `text | dots | bar`, 5-step scale with renamable labels
+  (level VALUES require the §31.4 Library addition) · interests: same minus level ·
+  experience: title/employer order + **group-promotions** toggle · summary: as-part-of-header
+  toggle + show-heading toggle · education: degree/school order.
+
+**Explicit deferrals (recorded, not silent):** UI/document localization (24 languages, RTL —
+EN-first product until demanded) · cover letters (FlowCV shares its engine with one; Lede has
+no letter entity — new §-level feature if ever) · custom date format strings · DOCX export
+(already §28.7) · image backgrounds (rejected above, stronger than deferred).
+
+### 31.2b The design view (the experience, not just the axes)
+
+The §31.2 axes at full scale (~15 groups) cannot live in a card on the application page —
+they get FlowCV's editor shell, adapted to Lede's IA:
+
+- **A dedicated full-screen design view per application** — entered from the Design card's
+  "Open designer" (and from the gallery), NOT a new top-level nav tab (§26: it's a mode of an
+  application, like the gallery dialog; route `/applications/:id/design` is acceptable as a
+  child route — it has a parent nav destination, satisfying the no-orphan-routes invariant).
+- **Layout:** live preview pinned right (the real §28.0 pdf.js preview — the artifact, not a
+  DOM approximation), scrolling control panel left with **jump-nav group chips** in FlowCV's
+  proven order: Document · Presets · Layout · Type scale · Spacing · Entries · Headings ·
+  Fonts · Colors · Header · Photo · Links · Footer · Sections. Per-section controls appear
+  only when the section has content (FlowCV's rule — an empty panel group is noise).
+- **Live repaint, honestly:** every change PUTs the format (existing §28.3 persistence) and
+  re-renders the preview **debounced (~300ms)**. Stated plainly: Lede re-renders a real PDF
+  per change (react-pdf + pdf.js), so repaint is hundreds of ms, not FlowCV's instant DOM —
+  the price of "the preview IS the artifact," paid deliberately. Steppers/sliders debounce;
+  discrete picks repaint immediately. A subtle busy indicator on the preview, never a modal.
+- **Locked applications** open the design view read-only (every control disabled, preview
+  live) — same posture as the picker/gallery today.
+- **Narrow viewports:** panel and preview become tabs ("Design" / "Preview") — never a
+  squeezed side-by-side. Desktop-first, but nothing collapses into unusability.
+- **The fit chip and page boundaries stay visible in the preview** (§28.4) — layout knobs
+  change the fit, and the user should watch the ladder respond.
+
+Oracle shape (folds into F1–F5's phases as the view grows controls): the design view opens
+from the Design card, shows the pinned preview, and a knob change (e.g. heading style)
+repaints the preview canvas (pixel-diff, the E8-B1 pattern) AND persists its PUT across
+reload; locked app ⇒ all controls disabled; child route resolves under the application
+(deep-link + refresh works, SPA fallback intact).
+
+### 31.3 What stays sacred (re-stated so no ticket re-litigates)
+
+leadRationale/cut[] never on the document (§11, extraction-gated) · renderer never cuts
+(§28.4; density ladder now scales the v2 type/spacing axes uniformly) · PDFs only via
+react-pdf (§28.0) · budget/context ride the user message (§28.5) · locking freezes the
+resolved v2 format (§28.3's locking clause, unchanged) · §28.1 byte-stability: no format
+change ever mutates a stored `TailoredResume`.
+
+### 31.4 The one content-schema touch: levels
+
+Skill/language **levels are content, not styling** — they don't exist in the Library today.
+The §4.3 registry's skill-class sections gain optional `meta.level: 1–5`; entries without it
+render level-less in every display (the `level` layout falls back to `rows` for unleveled
+entries — never invents a level). Label sets (per-section, 5 renamable strings) are *format*,
+the numeric value is *content*. Tailoring ignores levels (not a §1 scoring signal — the
+tag-scoring tripwire extends: **level-scoring = failed ticket**).
+
+### 31.5 ATS classification (the graded-honesty table)
+
+`strict` requires ALL OF: columns `one` · no photo · heading icons `none` · contact icons —
+any (icons are vector drawings, not text; neutral for extraction, but classification is
+TESTED not assumed) · no full-page/header background (`single` mode over white) · border
+`none` (a frame is a drawing op — provisionally neutral, verify at intake; if extraction
+order survives, borders move to neutral) · level display `text` (dots/bars are drawings —
+neutral for text order, same proviso) · footer anything (text, neutral).
+Anything else ⇒ `good`, surfaced with the same per-cause caveat UI the picker has today.
+The table above is the *starting* classification; intake red-teams it by running the §28.6
+extraction-order invariant against a canonical config per row and PROMOTES/DEMOTES rows to
+match observed behavior — the shipped table must equal the tested table.
+
+### 31.6 Phasing & oracle shape (keyless throughout)
+
+- **F0 — engine core + migration (THE risk, first):** one engine renders six presets
+  reproducing the retired templates. Oracle: v1→v2 migration fixture-exact; every §28.8-A/C
+  invariant (extraction content+order, never-cut across ladder, geometry contrasts: centered
+  classic header, one-row compact header, sidebar mean-x, live banner tint) green over the
+  six presets rendered by the ONE engine; stored snapshots byte-identical; E8 gallery/
+  thumbnails work unchanged over presets.
+- **F1 — design view shell + layout axes:** the §31.2b editor (child route, pinned preview,
+  jump-nav panel — existing §28.3 controls move in; new groups land here from F2 on), plus
+  columns/mix, header position, sidebar width, section placement + manual page breaks.
+  Oracle: the §31.2b view oracle, plus geometry proofs per axis (mix = band + two columns
+  measured; page-break token forces a real page boundary); never-cut holds at every layout.
+- **F2 — type/spacing/entries/headings:** the four groups above. Oracle: each enum value
+  produces measurably distinct output (the E8-A1 contrast-test pattern, parameterized);
+  offsets/margins move measured geometry in the right direction; 8 heading styles pairwise
+  distinct bytes.
+- **F3 — colors/header/links/footer:** the color subsystem. Oracle: accent placement toggles
+  change bytes ONLY in the toggled element class (extraction text unchanged); multi-mode
+  auto-contrast ink verified (the E8-A2 luminance logic, generalized); border sides/size
+  measurable; extraction order invariant across all of it.
+- **F4 — per-section displays + levels:** §31.2 last bullet + §31.4. Oracle: level never
+  invented (unleveled entry renders level-less in `level` layout); grid columns measured;
+  label renames render; tailoring output invariant to levels (anti-scoring control test).
+- **F5 — presets v2 + grade function:** user-saved presets, preset gallery over the new
+  space, `atsGrade(format)` + the tested classification table. Oracle: save→appears→applies
+  round-trip; grade function unit-table equals CI-observed classification; every shipped
+  preset's badge matches its tested grade.
+
+Each phase keeps the full standing baseline green (§25 kill criteria, boot smoke, browser
+e2e); F0 must land before any F1+ ticket is written in fine grain — the engine's real shape
+teaches the axes' implementation.

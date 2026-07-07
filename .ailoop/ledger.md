@@ -1483,3 +1483,24 @@ PHASE-CLOSE ORACLE (oracle.md Phase 7/E8) on merged tree, ALL GREEN (in the 363 
  Docker e2e NOT re-run (phase-close-only per [v3-004]; E8 is client render/UI + e2e specs — docker packaging
  shape unchanged; rests on the prior recorded gate, flagged honestly — same posture as the E7-C close).
 ===== BACKLOG DRAINED (77 tickets: 70 done, 7 decomposed). E8 was the final epic. =====
+
+[v3-037] NEXT-RUN DIRECTIVE (written 2026-07-07, pre-intake). The E8-final "backlog drained" state above is
+  SUPERSEDED: spec §31 "Design engine v2 — FlowCV-class customization" was added 2026-07-06/07 (user-directed;
+  grounded in a firsthand live inventory of FlowCV's customization panel). The next /ailoop invocation must
+  INTAKE §31 as the next epic (E9), not report done:
+   · §31 supersedes §28.2 (templates-as-code -> ONE parameterized engine + presets) and expands §28.3
+     (DocumentFormat v2, FlowCV-class axes, exact enums in §31.2). §28.0/28.4/28.5/28.6 stand.
+   · §31.2b: dedicated design view (child route /applications/:id/design, pinned pdf.js preview, jump-nav
+     panel, ~300ms debounced repaint, locked=read-only, narrow-viewport tabs).
+   · §31.4: the ONE content-schema touch — optional meta.level 1-5 on skill/language entries; level-scoring
+     extends the tag-scoring tripwire (= failed ticket).
+   · §31.5: ATS classification table must be TESTED at intake (extraction invariant per risky axis; shipped
+     table equals observed table).
+   · Phasing F0-F5 (§31.6). Seed F0 FIRST and in fine grain (one engine reproduces the six retired templates
+     as presets; v1->v2 migration fixture-exact; all E7/E8 invariants green over presets-through-one-engine);
+     seed F1-F5 COARSE (decompose at pickup) — F0's real shape teaches the axes, per §31.6's own instruction.
+   · Intake decisions delegated to coordinator by the spec: final ~30-face OFL font roster (§31.2 Fonts);
+     border-neutrality promotion/demotion (§31.5 proviso).
+   · Env: epic is fully keyless; playwright/vitest baselines unchanged ([v3-004] composite; docker = phase-close
+     only). Known operational quirks stand: vitest parallel contention flake (serial fallback), possible
+     session-limit deaths mid-ticket (resume the builder; coordinator may run verification itself, [v3-035]).
