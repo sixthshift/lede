@@ -18,10 +18,17 @@ import type {
   TailoredSection,
 } from "@shared/types";
 import { SECTIONS } from "@shared/sections";
-import type { DateFormatV2, EntryFontStyle } from "@shared/format-v2";
+import type {
+  ContactIconStyle,
+  DateFormatV2,
+  EntryFontStyle,
+  HeaderSeparator,
+} from "@shared/format-v2";
 import type {
   EntriesRenderConfig,
+  HeaderRenderConfig,
   HeadingsRenderConfig,
+  LinksRenderConfig,
   TypeScaleSizes,
 } from "./engine/legacyAdapt";
 import { formatDate, parseHeadingDate } from "./formatDate";
@@ -97,6 +104,38 @@ function resolveEntriesConfig(format: DocumentFormat): EntriesRenderConfig {
   return config ?? DEFAULT_ENTRIES_CONFIG;
 }
 
+// header.* (§31.2, E9-F3c) arrives as an extra property on `format`, same
+// seam as headingsConfig/entriesConfig above (legacyAdapt.ts's
+// toLegacyFormat). Absent falls back to exactly this module's pre-ticket
+// look: one merged, wrapping contact row, no separator glyph, no per-field
+// icon, headline stacked below the name at its unstyled default weight.
+const DEFAULT_HEADER_CONFIG: HeaderRenderConfig = {
+  detailsArrangement: "stacked",
+  separator: "bar",
+  contactIconStyle: "none-frame",
+  titleWeight: 400,
+  titlePosition: "below",
+};
+
+function resolveHeaderConfig(format: DocumentFormat): HeaderRenderConfig {
+  const config = (format as DocumentFormat & { headerConfig?: HeaderRenderConfig }).headerConfig;
+  return config ?? DEFAULT_HEADER_CONFIG;
+}
+
+// links.* (§31.2, E9-F3c) arrives as an extra property on `format`, same
+// seam as headerConfig above. Absent falls back to this module's pre-ticket
+// look: no underline, colors.primary (accentColor true), no icon.
+const DEFAULT_LINKS_CONFIG: LinksRenderConfig = {
+  underline: false,
+  accentColor: true,
+  icon: false,
+};
+
+function resolveLinksConfig(format: DocumentFormat): LinksRenderConfig {
+  const config = (format as DocumentFormat & { linksConfig?: LinksRenderConfig }).linksConfig;
+  return config ?? DEFAULT_LINKS_CONFIG;
+}
+
 // A group's structured date (headingParts.date), re-rendered through the
 // chosen dateFormat preset when parseable — same rule resolveGroupHeadingText
 // used pre-ticket, just extracted so both the fallback string join (none
@@ -115,6 +154,8 @@ function buildStyles(format: DocumentFormat) {
   const photoRadius = photo.shape === "circle" ? photo.size / 2 : photo.shape === "rounded" ? 8 : 0;
   const typeScaleSizes = resolveTypeScaleSizes(format);
   const headingsConfig = resolveHeadingsConfig(format);
+  const headerConfig = resolveHeaderConfig(format);
+  const linksConfig = resolveLinksConfig(format);
   // "plain" (§31.2) means bare text — no accent color, no rule/box/bar
   // decoration at all — so it also drops the accent-colored text every other
   // treatment shares; every other treatment keeps today's colors.primary.
@@ -153,22 +194,81 @@ function buildStyles(format: DocumentFormat) {
     // in the PDF (only in plainText.ts's export) — this ticket gives it a
     // render seam so titleOffset has somewhere to land (format-v2.ts's
     // migration comment: "no distinct 'title' text rendered today").
+    // fontWeight is header.titleWeight (E9-F3c) — resolved independently of
+    // the `name`/heading styles' shared typography.heading.weight above (see
+    // legacyAdapt.ts's resolveHeaderConfig comment for why this is now its
+    // own field rather than a reuse of that one).
     title: {
       fontSize: typeScaleSizes.title,
       fontFamily: typography.body.family,
-      marginTop: 2,
+      fontWeight: headerConfig.titleWeight,
       color: colors.text,
     },
+    // header.titlePosition (E9-F3c): 'same-line' wraps name+title in a row
+    // (nameTitleRow); 'below' keeps the pre-ticket look — a plain column, the
+    // title starting its own line with a small top gap (titleBelowGap, since
+    // that gap doesn't apply when the title instead sits beside the name).
+    nameTitleRow: { flexDirection: "row", alignItems: "baseline" },
+    nameTitleColumn: { flexDirection: "column" },
+    titleSameLineGap: { marginLeft: 6 },
+    titleBelowGap: { marginTop: 2 },
     contactLine: {
       fontSize: typography.body.size - 0.5,
       marginTop: 3,
       flexDirection: "row",
       flexWrap: "wrap",
+      alignItems: "center",
       fontFamily: typography.body.family,
     },
     contactLineInline: { marginTop: 0 },
-    contactItem: { marginRight: 8, color: colors.text },
-    link: { marginRight: 8, color: colors.primary },
+    // header.detailsArrangement 'wrapped' (E9-F3c): the links row, a second
+    // line below contactLine — same base look, its own top gap since it
+    // follows a line rather than the name.
+    linksLine: {
+      fontSize: typography.body.size - 0.5,
+      marginTop: 2,
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      fontFamily: typography.body.family,
+    },
+    // Each contact field is now an icon+text pair (header.contactIconStyle,
+    // E9-F3c), not a bare Text — contactFieldRow is that pair's row
+    // container; contactItem keeps the text run's own look unchanged.
+    contactFieldRow: { flexDirection: "row", alignItems: "center", marginRight: 8 },
+    contactItem: { color: colors.text },
+    // header.separator (E9-F3c): the glyph between adjacent contact fields/
+    // links. separatorText covers bullet ('•') and bar ('|'); separatorDot is
+    // the glyph-free 'icon' value — a small View, same "no font glyph
+    // dependency" reasoning as the section-heading icons below.
+    separatorText: { marginRight: 8, color: colors.text },
+    separatorDot: { width: 3, height: 3, marginRight: 8, backgroundColor: colors.text },
+    // header.contactIconStyle's 7 values (E9-F3c) — View shapes, same
+    // "no font glyph dependency" reasoning as headingIconOutline/Filled below.
+    // "none-frame" renders no View at all (see renderContactIcon).
+    contactIconBase: { width: 7, height: 7, marginRight: 3 },
+    contactIconCircleFilled: { borderRadius: 3.5, backgroundColor: colors.text },
+    contactIconCircleOutline: { borderRadius: 3.5, borderWidth: 0.75, borderColor: colors.text },
+    contactIconRoundedFilled: { borderRadius: 1.5, backgroundColor: colors.text },
+    contactIconRoundedOutline: { borderRadius: 1.5, borderWidth: 0.75, borderColor: colors.text },
+    contactIconSquareFilled: { backgroundColor: colors.text },
+    contactIconSquareOutline: { borderWidth: 0.75, borderColor: colors.text },
+    // links.* (E9-F3c): accentColor picks colors.primary vs colors.text;
+    // underline is applied per-Link (textDecoration) since it composes onto
+    // this base rather than replacing it. linkFieldRow/linkIcon mirror
+    // contactFieldRow/contactIconBase above — links.icon is a small glyph-free
+    // View ahead of the link text, sized distinctly from a contact icon so
+    // the two element classes stay visually (and byte-) distinguishable.
+    linkFieldRow: { flexDirection: "row", alignItems: "center", marginRight: 8 },
+    link: { color: linksConfig.accentColor ? colors.primary : colors.text },
+    linkIcon: {
+      width: 5,
+      height: 5,
+      marginRight: 3,
+      borderRadius: 1,
+      borderWidth: 0.75,
+      borderColor: linksConfig.accentColor ? colors.primary : colors.text,
+    },
     summary: {
       fontSize: typography.body.size,
       marginBottom: page.sectionGap,
@@ -335,6 +435,199 @@ function buildStyles(format: DocumentFormat) {
   });
 }
 
+type SectionStyles = ReturnType<typeof buildStyles>;
+
+// header.titlePosition (§31.2, E9-F3c): 'same-line' puts name+title in one
+// row; 'below' keeps them stacked in a column, the title starting its own
+// line. Both are DIRECT Text siblings of the row/column (the title's own
+// gap — titleSameLineGap/titleBelowGap — is baked into its style by the
+// caller, not a wrapping View here) — react-pdf's row-level baseline
+// alignment only lines up SIBLING Text runs correctly; a Text wrapped in its
+// own View sibling throws that alignment off by a few points (verified
+// against a real render at authoring time). No title (profile.headline
+// unset) ⇒ just the name node, same either way.
+function buildNameTitleNode(
+  nameNode: ReactNode,
+  titleTextNode: ReactNode,
+  titlePosition: HeaderRenderConfig["titlePosition"],
+  styles: SectionStyles,
+): ReactNode {
+  if (!titleTextNode) return nameNode;
+  return (
+    <View style={titlePosition === "same-line" ? styles.nameTitleRow : styles.nameTitleColumn}>
+      {nameNode}
+      {titleTextNode}
+    </View>
+  );
+}
+
+// header.separator's 3 values (§31.2, E9-F3c) — the glyph between adjacent
+// contact fields/links. 'bullet'/'bar' are Text runs (so they show up in
+// extraction text — sentinel-distinct at authoring time); 'icon' is a
+// glyph-free View dot, same "no font glyph dependency" reasoning as the
+// section-heading icons (renderHeadingIcon below).
+function renderSeparator(
+  separator: HeaderSeparator,
+  styles: SectionStyles,
+  ink: string | undefined,
+  key: string,
+): ReactNode {
+  if (separator === "icon") {
+    return (
+      <View
+        key={key}
+        style={ink ? [styles.separatorDot, { backgroundColor: ink }] : styles.separatorDot}
+      />
+    );
+  }
+  const glyph = separator === "bullet" ? "•" : "|";
+  return (
+    <Text key={key} style={ink ? [styles.separatorText, { color: ink }] : styles.separatorText}>
+      {glyph}
+    </Text>
+  );
+}
+
+// header.contactIconStyle's 7 values (§31.2, E9-F3c), one per contact field
+// (email/phone/location) — View shapes, same reasoning as the section-
+// heading icons: never a font-glyph dependency. "none-frame" renders no icon
+// at all, so it stays pairwise-distinct from the other 6 by its absence.
+const CONTACT_ICON_SHAPE_STYLE_KEY = {
+  "circle-filled": "contactIconCircleFilled",
+  "circle-outline": "contactIconCircleOutline",
+  "rounded-filled": "contactIconRoundedFilled",
+  "rounded-outline": "contactIconRoundedOutline",
+  "square-filled": "contactIconSquareFilled",
+  "square-outline": "contactIconSquareOutline",
+} satisfies Record<Exclude<ContactIconStyle, "none-frame">, keyof SectionStyles>;
+
+function renderContactIcon(
+  iconStyle: ContactIconStyle,
+  styles: SectionStyles,
+  ink: string | undefined,
+): ReactNode {
+  if (iconStyle === "none-frame") return null;
+  const shapeStyle = styles[CONTACT_ICON_SHAPE_STYLE_KEY[iconStyle]];
+  const override = ink
+    ? iconStyle.endsWith("filled")
+      ? { backgroundColor: ink }
+      : { borderColor: ink }
+    : null;
+  return (
+    <View
+      style={
+        override
+          ? [styles.contactIconBase, shapeStyle, override]
+          : [styles.contactIconBase, shapeStyle]
+      }
+    />
+  );
+}
+
+// The contact-fields row's children (§31.2 header.contactIconStyle/separator,
+// E9-F3c) — one icon+text pair per email/phone/location, a separator glyph
+// between adjacent pairs. Order (not just presence) is the extraction
+// contract §31.1 already locks for these three fields.
+function buildContactFieldNodes(
+  fields: { key: string; text: string }[],
+  headerConfig: HeaderRenderConfig,
+  styles: SectionStyles,
+  ink: string | undefined,
+): ReactNode[] {
+  const contactItemStyle = ink ? [styles.contactItem, { color: ink }] : styles.contactItem;
+  const nodes: ReactNode[] = [];
+  fields.forEach((field, i) => {
+    if (i > 0)
+      nodes.push(renderSeparator(headerConfig.separator, styles, ink, `sep-field-${field.key}`));
+    nodes.push(
+      <View key={field.key} style={styles.contactFieldRow}>
+        {renderContactIcon(headerConfig.contactIconStyle, styles, ink)}
+        <Text style={contactItemStyle}>{field.text}</Text>
+      </View>,
+    );
+  });
+  return nodes;
+}
+
+// The links row's children (§31.2 links.*, E9-F3c) — links.icon's glyph
+// (linkIcon, a View, same "no font glyph dependency" reasoning) ahead of
+// each Link; links.underline/accentColor style the Link itself (accentColor
+// is already baked into styles.link/styles.linkIcon by buildStyles).
+function buildLinkFieldNodes(
+  links: Profile["links"],
+  headerConfig: HeaderRenderConfig,
+  linksConfig: LinksRenderConfig,
+  styles: SectionStyles,
+  ink: string | undefined,
+): ReactNode[] {
+  const linkStyle = [
+    styles.link,
+    { textDecoration: linksConfig.underline ? "underline" : "none" } as const,
+    ...(ink ? [{ color: ink }] : []),
+  ];
+  const linkIconStyle = ink ? [styles.linkIcon, { borderColor: ink }] : styles.linkIcon;
+  const nodes: ReactNode[] = [];
+  links.forEach((link, i) => {
+    if (i > 0)
+      nodes.push(renderSeparator(headerConfig.separator, styles, ink, `sep-link-${link.url}`));
+    nodes.push(
+      <View key={link.url} style={styles.linkFieldRow}>
+        {linksConfig.icon ? <View style={linkIconStyle} /> : null}
+        <Link style={linkStyle} src={link.url}>
+          {link.label}
+        </Link>
+      </View>,
+    );
+  });
+  return nodes;
+}
+
+// header.detailsArrangement's 3 values (§31.2, E9-F3c). 'wrapped' is
+// genuinely distinct geometry from 'stacked'/'single-row': the contact
+// fields and the links each get their OWN line (contactLine, then linksLine
+// below it) instead of sharing one merged, flowing row — a real y-offset
+// between the two field classes that neither other value produces.
+// 'stacked'/'single-row' differ only in which ProfileHeader variant hosts
+// this one merged row (resolveVariant, document.tsx) — never in the row's
+// own contents, so this function doesn't need to know which of those two it
+// is. `extraRowStyle` threads variant 'inline''s contactLineInline override
+// onto the merged row (the two-row 'wrapped' case never needs it — inline
+// requires detailsArrangement === 'single-row' exactly, see document.tsx's
+// resolveVariant comment).
+function buildContactBlock(
+  fieldNodes: ReactNode[],
+  linkNodes: ReactNode[],
+  headerConfig: HeaderRenderConfig,
+  styles: SectionStyles,
+  ink: string | undefined,
+  extraRowStyle?: SectionStyles["contactLineInline"],
+): ReactNode {
+  if (headerConfig.detailsArrangement === "wrapped") {
+    return (
+      <>
+        <View style={extraRowStyle ? [styles.contactLine, extraRowStyle] : styles.contactLine}>
+          {fieldNodes}
+        </View>
+        {linkNodes.length > 0 ? (
+          <View style={extraRowStyle ? [styles.linksLine, extraRowStyle] : styles.linksLine}>
+            {linkNodes}
+          </View>
+        ) : null}
+      </>
+    );
+  }
+  const rowStyle = extraRowStyle ? [styles.contactLine, extraRowStyle] : styles.contactLine;
+  return (
+    <View style={rowStyle}>
+      {fieldNodes}
+      {fieldNodes.length > 0 && linkNodes.length > 0
+        ? renderSeparator(headerConfig.separator, styles, ink, "sep-fields-links")
+        : null}
+      {linkNodes}
+    </View>
+  );
+}
+
 // 'left' (default, strict/sidebar's header): photo + name-above-contact block,
 // left-anchored. 'centered' (classic): the whole block centered on the page.
 // 'inline' (compact): name and contact share one row. Composition only — the
@@ -366,33 +659,37 @@ export function ProfileHeader({
   nameFontFamily?: string;
 }) {
   const styles = buildStyles(format);
+  const headerConfig = resolveHeaderConfig(format);
+  const linksConfig = resolveLinksConfig(format);
   const nameOverrides: { color?: string; fontFamily?: string } = {};
   if (ink) nameOverrides.color = ink;
   if (nameFontFamily) nameOverrides.fontFamily = nameFontFamily;
   const nameStyle =
     Object.keys(nameOverrides).length > 0 ? [styles.name, nameOverrides] : styles.name;
-  const contactItemStyle = ink ? [styles.contactItem, { color: ink }] : styles.contactItem;
-  const linkStyle = ink ? [styles.link, { color: ink }] : styles.link;
-  const titleStyle = ink ? [styles.title, { color: ink }] : styles.title;
-  const titleNode = profile.headline ? <Text style={titleStyle}>{profile.headline}</Text> : null;
-  const contactParts = [profile.email, profile.phone, profile.location].filter(
-    (part): part is string => Boolean(part),
+  const titleStyle = [
+    styles.title,
+    headerConfig.titlePosition === "same-line" ? styles.titleSameLineGap : styles.titleBelowGap,
+    ...(ink ? [{ color: ink }] : []),
+  ];
+  const nameNode = <Text style={nameStyle}>{profile.name}</Text>;
+  const titleTextNode = profile.headline ? (
+    <Text style={titleStyle}>{profile.headline}</Text>
+  ) : null;
+  const nameTitleNode = buildNameTitleNode(
+    nameNode,
+    titleTextNode,
+    headerConfig.titlePosition,
+    styles,
   );
+
+  const contactFields = [
+    profile.email ? { key: "email", text: profile.email } : null,
+    profile.phone ? { key: "phone", text: profile.phone } : null,
+    profile.location ? { key: "location", text: profile.location } : null,
+  ].filter((field): field is { key: string; text: string } => field !== null);
+  const fieldNodes = buildContactFieldNodes(contactFields, headerConfig, styles, ink);
+  const linkNodes = buildLinkFieldNodes(profile.links, headerConfig, linksConfig, styles, ink);
   const showPhoto = format.photo.hidden === false;
-  const contactItems = (
-    <>
-      {contactParts.map((part) => (
-        <Text key={part} style={contactItemStyle}>
-          {part}
-        </Text>
-      ))}
-      {profile.links.map((link) => (
-        <Link key={link.url} style={linkStyle} src={link.url}>
-          {link.label}
-        </Link>
-      ))}
-    </>
-  );
 
   if (variant === "centered") {
     return (
@@ -400,9 +697,8 @@ export function ProfileHeader({
         {showPhoto && profile.photoUrl ? (
           <Image src={profile.photoUrl} style={[styles.photo, styles.photoCenterOverride]} />
         ) : null}
-        <Text style={nameStyle}>{profile.name}</Text>
-        {titleNode}
-        <View style={styles.contactLine}>{contactItems}</View>
+        {nameTitleNode}
+        {buildContactBlock(fieldNodes, linkNodes, headerConfig, styles, ink)}
       </View>
     );
   }
@@ -414,10 +710,16 @@ export function ProfileHeader({
           {showPhoto && profile.photoUrl ? (
             <Image src={profile.photoUrl} style={styles.photo} />
           ) : null}
-          <Text style={nameStyle}>{profile.name}</Text>
-          {titleNode}
+          {nameTitleNode}
         </View>
-        <View style={[styles.contactLine, styles.contactLineInline]}>{contactItems}</View>
+        {buildContactBlock(
+          fieldNodes,
+          linkNodes,
+          headerConfig,
+          styles,
+          ink,
+          styles.contactLineInline,
+        )}
       </View>
     );
   }
@@ -426,9 +728,8 @@ export function ProfileHeader({
     <View style={styles.header}>
       {showPhoto && profile.photoUrl ? <Image src={profile.photoUrl} style={styles.photo} /> : null}
       <View style={styles.headerText}>
-        <Text style={nameStyle}>{profile.name}</Text>
-        {titleNode}
-        <View style={styles.contactLine}>{contactItems}</View>
+        {nameTitleNode}
+        {buildContactBlock(fieldNodes, linkNodes, headerConfig, styles, ink)}
       </View>
     </View>
   );
@@ -439,8 +740,6 @@ export function SummarySection({ summary, format }: { summary: string; format: D
   const styles = buildStyles(format);
   return <Text style={styles.summary}>{summary}</Text>;
 }
-
-type SectionStyles = ReturnType<typeof buildStyles>;
 
 // entries.listStyle (§31.2) picks the bullet glyph. Only 2 values —
 // this is the one enum-shaped char lookup, never free text (§31.1).

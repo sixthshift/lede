@@ -125,8 +125,21 @@ const LETTER_HEIGHT_PT = 792;
 // text, pdf.js's text-content transform matrix is exactly
 // [fontSizePt, 0, 0, fontSizePt, x, y] (verified against a real render at
 // authoring time: a Text styled fontSize:14 extracts transform[0] === 14),
-// so it's the rendered point size itself, not a derived proxy.
-type TextGeometry = { str: string; x: number; y: number; width: number; fontSize: number };
+// so it's the rendered point size itself, not a derived proxy. `fontName` is
+// pdf.js's own internal resource name for the embedded font program a run
+// used — fonts.ts (E9-F2a) registers a SEPARATE font program per weight for
+// every family, so two runs in the SAME family but different fontWeight
+// resolve to different embedded programs and therefore different fontNames
+// (E9-F3c's titleWeight-independence test below uses this to prove the
+// title's weight changed without the name's).
+type TextGeometry = {
+  str: string;
+  x: number;
+  y: number;
+  width: number;
+  fontSize: number;
+  fontName: string;
+};
 
 async function page1Geometry(
   buffer: Buffer,
@@ -138,8 +151,14 @@ async function page1Geometry(
   const pageWidth = page.view[2] - page.view[0];
   const items = content.items
     .filter(
-      (item): item is typeof item & { str: string; transform: number[]; width: number } =>
-        "str" in item,
+      (
+        item,
+      ): item is typeof item & {
+        str: string;
+        transform: number[];
+        width: number;
+        fontName: string;
+      } => "str" in item,
     )
     .map((item) => ({
       str: item.str,
@@ -147,6 +166,7 @@ async function page1Geometry(
       y: item.transform[5],
       width: item.width,
       fontSize: item.transform[0],
+      fontName: item.fontName,
     }));
   return { items, pageWidth };
 }
@@ -887,6 +907,38 @@ const AXIS_CASES: AxisCase[] = [
     }),
   },
   {
+    name: "header.titleWeight",
+    values: ["normal", "bold"],
+    apply: (v) => ({
+      ...DEFAULT_FORMAT_V2,
+      header: { ...DEFAULT_FORMAT_V2.header, titleWeight: v as never },
+    }),
+  },
+  {
+    name: "links.underline",
+    values: [false, true],
+    apply: (v) => ({
+      ...DEFAULT_FORMAT_V2,
+      links: { ...DEFAULT_FORMAT_V2.links, underline: v as never },
+    }),
+  },
+  {
+    name: "links.accentColor",
+    values: [false, true],
+    apply: (v) => ({
+      ...DEFAULT_FORMAT_V2,
+      links: { ...DEFAULT_FORMAT_V2.links, accentColor: v as never },
+    }),
+  },
+  {
+    name: "links.icon",
+    values: [false, true],
+    apply: (v) => ({
+      ...DEFAULT_FORMAT_V2,
+      links: { ...DEFAULT_FORMAT_V2.links, icon: v as never },
+    }),
+  },
+  {
     name: "photo.shape",
     values: ["circle", "rounded", "square"],
     apply: (v) => ({
@@ -1159,5 +1211,303 @@ describe("spacing axes — measurable geometry change (E9-F2b, §31.2)", () => {
     const shortY = await nameY(10);
     const tallY = await nameY(28);
     expect(tallY).toBeLessThan(shortY);
+  });
+});
+
+// E9-F3c: header.{detailsArrangement,separator,contactIconStyle,
+// titlePosition,titleWeight} + links.{underline,accentColor,icon} — real
+// geometry/byte proofs, same oracle as the axis groups above (the
+// unhandled-axis smoke test only proves these render without throwing).
+describe("header — detailsArrangement/separator/contactIconStyle (E9-F3c, §31.2)", () => {
+  it("detailsArrangement: 'wrapped' drops the links row below the contact-fields row; 'stacked'/'single-row' share one row", async () => {
+    const profile = profileFixture();
+    const resume = resumeFixture();
+
+    async function contactAndLinkY(detailsArrangement: "stacked" | "single-row" | "wrapped") {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        header: { ...DEFAULT_FORMAT_V2.header, detailsArrangement },
+      };
+      const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
+      const { items } = await page1Geometry(buffer);
+      const email = items.find((item) => item.str.includes(profile.email as string));
+      const link = items.find((item) => item.str.includes(profile.links[0].label));
+      expect(email).toBeDefined();
+      expect(link).toBeDefined();
+      return { emailY: (email as TextGeometry).y, linkY: (link as TextGeometry).y };
+    }
+
+    const stacked = await contactAndLinkY("stacked");
+    const singleRow = await contactAndLinkY("single-row");
+    const wrapped = await contactAndLinkY("wrapped");
+
+    expect(stacked.emailY).toBeCloseTo(stacked.linkY, 5);
+    expect(singleRow.emailY).toBeCloseTo(singleRow.linkY, 5);
+    // pdf y grows upward from the page bottom — a link pushed to its OWN
+    // line below the contact fields has a SMALLER y.
+    expect(wrapped.linkY).toBeLessThan(wrapped.emailY);
+
+    const stackedBuffer = await renderEngineToBuffer({
+      resume,
+      profile,
+      paper: "letter",
+      format: {
+        ...DEFAULT_FORMAT_V2,
+        header: { ...DEFAULT_FORMAT_V2.header, detailsArrangement: "stacked" },
+      },
+    });
+    const singleRowBuffer = await renderEngineToBuffer({
+      resume,
+      profile,
+      paper: "letter",
+      format: {
+        ...DEFAULT_FORMAT_V2,
+        header: { ...DEFAULT_FORMAT_V2.header, detailsArrangement: "single-row" },
+      },
+    });
+    const wrappedBuffer = await renderEngineToBuffer({
+      resume,
+      profile,
+      paper: "letter",
+      format: {
+        ...DEFAULT_FORMAT_V2,
+        header: { ...DEFAULT_FORMAT_V2.header, detailsArrangement: "wrapped" },
+      },
+    });
+    expect(Buffer.compare(stackedBuffer, singleRowBuffer)).not.toBe(0);
+    expect(Buffer.compare(stackedBuffer, wrappedBuffer)).not.toBe(0);
+    expect(Buffer.compare(singleRowBuffer, wrappedBuffer)).not.toBe(0);
+  });
+
+  it("separator: bullet/bar/icon are pairwise-distinct bytes, and bullet/bar's own glyph shows up in extraction text", async () => {
+    const profile = profileFixture();
+    const resume = resumeFixture();
+
+    async function render(separator: "icon" | "bullet" | "bar") {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        header: { ...DEFAULT_FORMAT_V2.header, separator },
+      };
+      return renderEngineToBuffer({ resume, profile, paper: "letter", format });
+    }
+
+    const bulletBuffer = await render("bullet");
+    const barBuffer = await render("bar");
+    const iconBuffer = await render("icon");
+
+    expect(Buffer.compare(bulletBuffer, barBuffer)).not.toBe(0);
+    expect(Buffer.compare(bulletBuffer, iconBuffer)).not.toBe(0);
+    expect(Buffer.compare(barBuffer, iconBuffer)).not.toBe(0);
+
+    // "•" also shows up regardless of header.separator — it's
+    // entries.listStyle's default bullet glyph on every item, a DIFFERENT
+    // element class (sections.tsx's BULLET_GLYPHS) — so bullet-vs-icon is
+    // proven on "|" alone (bar's own glyph, never used elsewhere on this
+    // page) rather than "•".
+    const barText = (await extractPdfText(barBuffer)).join(" ");
+    const iconText = (await extractPdfText(iconBuffer)).join(" ");
+    expect(barText).toContain("|");
+    expect(iconText).not.toContain("|");
+  });
+
+  it("contactIconStyle: all 7 values (incl. 'none-frame') are pairwise-distinct bytes", async () => {
+    const profile = profileFixture();
+    const resume = resumeFixture();
+    const buffers = await Promise.all(
+      CONTACT_ICON_STYLES.map((contactIconStyle) => {
+        const format: DocumentFormatV2 = {
+          ...DEFAULT_FORMAT_V2,
+          header: { ...DEFAULT_FORMAT_V2.header, contactIconStyle },
+        };
+        return renderEngineToBuffer({ resume, profile, paper: "letter", format });
+      }),
+    );
+    for (let i = 0; i < buffers.length; i++) {
+      for (let j = i + 1; j < buffers.length; j++) {
+        expect(Buffer.compare(buffers[i], buffers[j])).not.toBe(0);
+      }
+    }
+  });
+});
+
+describe("header — titlePosition/titleWeight (E9-F3c, §31.2)", () => {
+  it("titlePosition: 'same-line' shares the name's row (title starts to its right); 'below' drops it to its own, lower line", async () => {
+    const profile: Profile = { ...profileFixture(), headline: "SENTINEL_HEADLINE" };
+    const resume = resumeFixture();
+
+    async function nameAndTitleGeometry(titlePosition: "same-line" | "below") {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        header: { ...DEFAULT_FORMAT_V2.header, titlePosition },
+      };
+      const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
+      const { items } = await page1Geometry(buffer);
+      const name = items.find((item) => item.str === "Jordan Rivera");
+      const title = items.find((item) => item.str.includes("SENTINEL_HEADLINE"));
+      expect(name).toBeDefined();
+      expect(title).toBeDefined();
+      return {
+        nameY: (name as TextGeometry).y,
+        titleY: (title as TextGeometry).y,
+        nameX: (name as TextGeometry).x,
+        titleX: (title as TextGeometry).x,
+      };
+    }
+
+    const sameLine = await nameAndTitleGeometry("same-line");
+    const below = await nameAndTitleGeometry("below");
+
+    // Baseline-aligned same-size-neighbors would share an exact y, but name
+    // and title render at DIFFERENT font sizes — react-pdf's `alignItems:
+    // "baseline"` approximates the shared baseline off each run's own font
+    // metrics, so the two y's land within a few points of each other
+    // (verified against a real render at authoring time) rather than
+    // exactly equal. That's still tiny next to 'below''s real, much larger
+    // line-break gap (asserted below), so the two arrangements stay
+    // unambiguously distinct.
+    expect(Math.abs(sameLine.nameY - sameLine.titleY)).toBeLessThan(5);
+    expect(sameLine.titleX).toBeGreaterThan(sameLine.nameX);
+    // pdf y grows upward from the page bottom — the title's own, LOWER line
+    // has a SMALLER y than the name's, by more than same-line's baseline
+    // wiggle above.
+    expect(below.nameY - below.titleY).toBeGreaterThan(5);
+  });
+
+  it("titleWeight: independent of nameWeight — the title's embedded font matches the name's only when both weights agree", async () => {
+    const profile: Profile = { ...profileFixture(), headline: "SENTINEL_HEADLINE" };
+    const resume = resumeFixture();
+
+    // Comparing name/title fontName WITHIN one render (rather than across
+    // two separate renders) — pdf.js's fontName is a per-document resource
+    // key, not a stable identity across documents: embedding one extra bold
+    // face (or not) shifts every later resource's key, so name's OWN
+    // fontName can differ between two otherwise-identical documents even
+    // though nameWeight never changed. Within a single document, though,
+    // two runs share a fontName iff they resolved to the SAME embedded font
+    // program — exactly what "independent of nameWeight" needs to prove.
+    async function nameTitleFontsMatch(titleWeight: "normal" | "bold"): Promise<boolean> {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        header: { ...DEFAULT_FORMAT_V2.header, nameWeight: "normal", titleWeight },
+      };
+      const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
+      const { items } = await page1Geometry(buffer);
+      const name = items.find((item) => item.str === "Jordan Rivera");
+      const title = items.find((item) => item.str.includes("SENTINEL_HEADLINE"));
+      expect(name).toBeDefined();
+      expect(title).toBeDefined();
+      return (name as TextGeometry).fontName === (title as TextGeometry).fontName;
+    }
+
+    // nameWeight pinned to 'normal' throughout: titleWeight 'normal' (same
+    // weight as the name) shares the name's font program; titleWeight
+    // 'bold' (independent of the still-'normal' nameWeight) does not.
+    expect(await nameTitleFontsMatch("normal")).toBe(true);
+    expect(await nameTitleFontsMatch("bold")).toBe(false);
+  });
+
+  it("titleWeight: changes the rendered bytes", async () => {
+    const profile: Profile = { ...profileFixture(), headline: "SENTINEL_HEADLINE" };
+    const resume = resumeFixture();
+
+    async function render(titleWeight: "normal" | "bold") {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        header: { ...DEFAULT_FORMAT_V2.header, titleWeight },
+      };
+      return renderEngineToBuffer({ resume, profile, paper: "letter", format });
+    }
+
+    const normalBuffer = await render("normal");
+    const boldBuffer = await render("bold");
+    expect(Buffer.compare(normalBuffer, boldBuffer)).not.toBe(0);
+  });
+});
+
+describe("links — underline/accentColor/icon (E9-F3c, §31.2)", () => {
+  it("underline: toggling changes bytes (a real textDecoration, not a no-op)", async () => {
+    const profile = profileFixture();
+    const resume = resumeFixture();
+
+    async function render(underline: boolean) {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        links: { ...DEFAULT_FORMAT_V2.links, underline },
+      };
+      return renderEngineToBuffer({ resume, profile, paper: "letter", format });
+    }
+
+    const offBuffer = await render(false);
+    const onBuffer = await render(true);
+    expect(Buffer.compare(offBuffer, onBuffer)).not.toBe(0);
+  });
+
+  it("accentColor: true fills the link with colors.accent; false uses colors.text instead", async () => {
+    const profile = profileFixture();
+    const resume = resumeFixture();
+
+    async function linkFillsAccentPresent(accentColor: boolean): Promise<boolean> {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        colors: { ...DEFAULT_FORMAT_V2.colors, accent: "#ff00ff", text: "#111111" },
+        // headings.style 'plain' drops section headings' OWN colors.primary
+        // fill (sections.tsx's headingColor) — the only other page-1 user of
+        // colors.accent as a TEXT fill — so "#ff00ff" showing up in the fill
+        // list is unambiguously the link's.
+        headings: { ...DEFAULT_FORMAT_V2.headings, style: "plain" },
+        links: { ...DEFAULT_FORMAT_V2.links, accentColor },
+      };
+      const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
+      const fills = await page1FillColors(buffer);
+      return fills.includes("#ff00ff");
+    }
+
+    expect(await linkFillsAccentPresent(true)).toBe(true);
+    expect(await linkFillsAccentPresent(false)).toBe(false);
+  });
+
+  it("icon: toggling changes bytes (adds a glyph View) without changing the extracted link label", async () => {
+    const profile = profileFixture();
+    const resume = resumeFixture();
+
+    async function render(icon: boolean) {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        links: { ...DEFAULT_FORMAT_V2.links, icon },
+      };
+      return renderEngineToBuffer({ resume, profile, paper: "letter", format });
+    }
+
+    const offBuffer = await render(false);
+    const onBuffer = await render(true);
+    expect(Buffer.compare(offBuffer, onBuffer)).not.toBe(0);
+
+    const onText = (await extractPdfText(onBuffer)).join(" ");
+    expect(onText).toContain(profile.links[0].label);
+  });
+});
+
+describe("header + links — extraction text is untouched by styling (E9-F3c, §31.2)", () => {
+  it("contact fields + link label survive every header/links axis set to a non-default value", async () => {
+    const profile = profileFixture();
+    const resume = resumeFixture();
+    const format: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      header: {
+        ...DEFAULT_FORMAT_V2.header,
+        detailsArrangement: "wrapped",
+        separator: "icon",
+        contactIconStyle: "circle-filled",
+        titlePosition: "same-line",
+        titleWeight: "bold",
+      },
+      links: { underline: true, accentColor: false, icon: true },
+    };
+    const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
+    const text = (await extractPdfText(buffer)).join(" ");
+    expect(text).toContain(profile.email as string);
+    expect(text).toContain(profile.phone as string);
+    expect(text).toContain(profile.location as string);
+    expect(text).toContain(profile.links[0].label);
   });
 });

@@ -7,12 +7,17 @@
 // yet and why.
 import type { DocumentFormat, FontId } from "@shared/types";
 import type {
+  ContactIconStyle,
   DateFormatV2,
   DocumentFormatV2,
   EntriesV2,
+  HeaderDetailsArrangement,
+  HeaderSeparator,
+  HeaderTitlePosition,
   HeadingCapitalization,
   HeadingIconStyle,
   HeadingStyle,
+  LinksV2,
 } from "@shared/format-v2";
 
 // sections.tsx's fontFamily is just a string handed to react-pdf. §31.2's
@@ -37,12 +42,15 @@ function resolveFont(id: string): FontId {
 // constant for the mm->pt direction it needs.
 const PT_PER_MM = 72 / 25.4;
 
-// header.nameWeight/titleWeight is a 2-value toggle; sections.tsx exposes a
-// single `typography.heading.weight` used for the name AND every heading —
-// there is no seam to give them independent weights without editing the
-// locked renderer, so both toggles collapse onto that one field (nameWeight
-// wins — matches the historical v1 behavior migrateFormat's baseFromV1
-// already derives from a single source weight).
+// header.nameWeight is a 2-value toggle; sections.tsx exposes a single
+// `typography.heading.weight` used for the name AND every section/entry
+// heading (there is no independent per-role weight seam on the legacy
+// `DocumentFormat` shape) — so nameWeight alone drives this one field,
+// matching the historical v1 behavior migrateFormat's baseFromV1 already
+// derives from a single source weight. header.titleWeight is now INDEPENDENT
+// (E9-F3c) — it no longer collapses onto this field; see
+// resolveHeaderConfig's own `titleWeight` below, threaded to sections.tsx's
+// `title` (profile.headline) style alone.
 function resolveWeight(format: DocumentFormatV2): 400 | 700 {
   return format.header.nameWeight === "bold" ? 700 : 400;
 }
@@ -129,11 +137,51 @@ function resolveEntriesConfig(format: DocumentFormatV2): EntriesRenderConfig {
   return { ...format.entries };
 }
 
+// header.{detailsArrangement,separator,contactIconStyle,titlePosition} (§31.2,
+// E9-F3c) resolve 1:1 to sections.tsx's ProfileHeader composition — no
+// derivation, same seam as headingsConfig/entriesConfig above (`headerConfig`,
+// following the same "*Config" naming). titleWeight is the one derived field
+// here: same normal/bold -> 400/700 mapping resolveWeight uses for nameWeight,
+// but resolved INDEPENDENTLY into its own field rather than reusing
+// resolveWeight's single shared `typography.heading.weight` — this is the
+// seam that makes titleWeight and nameWeight genuinely independent (previously
+// both read off that one shared field).
+export type HeaderRenderConfig = {
+  detailsArrangement: HeaderDetailsArrangement;
+  separator: HeaderSeparator;
+  contactIconStyle: ContactIconStyle;
+  titleWeight: 400 | 700;
+  titlePosition: HeaderTitlePosition;
+};
+
+function resolveHeaderConfig(format: DocumentFormatV2): HeaderRenderConfig {
+  const { detailsArrangement, separator, contactIconStyle, titleWeight, titlePosition } =
+    format.header;
+  return {
+    detailsArrangement,
+    separator,
+    contactIconStyle,
+    titleWeight: titleWeight === "bold" ? 700 : 400,
+    titlePosition,
+  };
+}
+
+// links.{underline,accentColor,icon} (§31.2, E9-F3c) resolve 1:1 to
+// sections.tsx's profile-link rendering — no derivation, same seam as
+// headerConfig above (`linksConfig`).
+export type LinksRenderConfig = LinksV2;
+
+function resolveLinksConfig(format: DocumentFormatV2): LinksRenderConfig {
+  return { ...format.links };
+}
+
 export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
   typeScaleSizes: TypeScaleSizes;
   headingsConfig: HeadingsRenderConfig;
   dateFormat: DateFormatV2;
   entriesConfig: EntriesRenderConfig;
+  headerConfig: HeaderRenderConfig;
+  linksConfig: LinksRenderConfig;
 } {
   const bodyFont = resolveFont(format.fonts.body);
   return {
@@ -162,5 +210,7 @@ export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
     headingsConfig: resolveHeadingsConfig(format),
     dateFormat: format.document.dateFormat,
     entriesConfig: resolveEntriesConfig(format),
+    headerConfig: resolveHeaderConfig(format),
+    linksConfig: resolveLinksConfig(format),
   };
 }

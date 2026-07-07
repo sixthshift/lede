@@ -66,6 +66,22 @@
 // land in the render tree or paint order — there is nothing here for
 // extraction order to be perturbed BY. See borderSideStyles below.
 //
+// AXES WIRED THIS TICKET (E9-F3c, sections.tsx's ProfileHeader — see that
+// file's own comments for the render detail): header.detailsArrangement's
+// full 3 values (previously only 'single-row', via resolveVariant's 'inline'
+// below — 'stacked' is that resolver's 'left'/'centered' default, 'wrapped'
+// is new: the contact-fields row and the links row split onto two lines
+// instead of one merged, flowing row); header.separator (a glyph — bullet
+// '•', bar '|', or a glyph-free View dot for 'icon' — between adjacent
+// contact fields/links); header.contactIconStyle (7 View shapes, one per
+// contact field, "none-frame" = none); header.titlePosition (same-line: name
+// + headline share one row; below: headline starts its own line — previously
+// hardcoded to the 'below' look regardless of this field's value);
+// header.titleWeight (now independent of header.nameWeight — see
+// legacyAdapt.ts's resolveHeaderConfig comment); links.{underline,
+// accentColor,icon} (textDecoration, colors.primary-vs-text, and a small
+// glyph View per profile link).
+//
 // AXES NOT YET WIRED (render as sections.tsx's one existing look — never a
 // crash; later tickets land their seam per §31.6's phase list):
 // typeScale.{nameOffset,titleOffset,
@@ -73,11 +89,10 @@
 // heading sizes with no per-field seam), entries.* (structure/date-location/
 // subtitle/list-style/per-field font style/body indent), headings.{style
 // beyond the underline sections.tsx already draws,capitalization,icons},
-// colors.accentPlacement, header.
-// {detailsArrangement 'wrapped',separator,contactIconStyle,titleWeight,
-// titlePosition}, photo.{crop,zoom}, links, footer, per-section display
-// variants, document.{pageFormat is honored via `paper`; dateFormat is not
-// applied to any rendered date}.
+// colors.accentPlacement (the header-icon/link-icon element classes E9-F3c
+// just added are addressable for this, but not yet colored by it), photo.
+// {crop,zoom}, footer, per-section display variants, document.{pageFormat is
+// honored via `paper`; dateFormat is not applied to any rendered date}.
 import { Document, Page, StyleSheet, View } from "@react-pdf/renderer";
 import type { Paper, Profile, TailoredResume, TailoredSection } from "@shared/types";
 import type { BorderSize, DocumentFormatV2 } from "@shared/format-v2";
@@ -191,7 +206,12 @@ function borderSideStyles(format: DocumentFormatV2) {
 // independent v2 axes (alignment, detailsArrangement) into one enum;
 // centered wins over single-row when both are set (an off-diagonal
 // combination the four retired templates never produced) — an unhandled
-// combination, not a crash.
+// combination, not a crash. detailsArrangement's third value ('wrapped',
+// E9-F3c) is deliberately NOT part of this collapse: it never coincides with
+// 'inline' (that variant requires detailsArrangement === 'single-row' exactly)
+// so it always renders through 'left' or 'centered' — ProfileHeader reads
+// header.detailsArrangement directly off `format` to decide the two-row split,
+// independent of which of these three variants it lands in.
 function resolveVariant(format: DocumentFormatV2): ProfileHeaderVariant {
   if (format.header.alignment === "center") return "centered";
   if (format.header.detailsArrangement === "single-row") return "inline";

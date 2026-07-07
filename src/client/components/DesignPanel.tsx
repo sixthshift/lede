@@ -9,9 +9,11 @@
 // §31/E9-F0d1 field map (v1 -> v2, this ticket's cutover): body font ->
 // fonts.body · body size -> typeScale.bodySize · line height ->
 // spacing.lineHeight · heading weight -> header.nameWeight (v2 collapses the
-// old 4-value {400,500,600,700} weight to a 2-value normal/bold toggle — no
-// other weight axis exists on the engine's one composition) · primary/text
-// color -> colors.accent/colors.text · margins -> spacing.marginsMm (v2's
+// old 4-value {400,500,600,700} weight to a 2-value normal/bold toggle,
+// shared by the name and every section/entry heading — the ONE other v2
+// weight axis, header.titleWeight, is a genuinely independent toggle with its
+// own control in the Header group below, E9-F3c) · primary/text color ->
+// colors.accent/colors.text · margins -> spacing.marginsMm (v2's
 // NATIVE unit is mm, not pt — the stepper UI is kept as-is, just relabeled
 // and re-bounded to mm directly; no pt<->mm conversion happens in this
 // component) · section gap -> spacing.elementSpacing (0-4 discrete scale) ·
@@ -32,6 +34,7 @@ import type {
   ColorArea,
   ColorMode,
   ColumnsMode,
+  ContactIconStyle,
   DateFormatV2,
   EntryDateLocationOrder,
   EntryDateLocationPlacement,
@@ -39,14 +42,17 @@ import type {
   EntryListStyle,
   EntryStructure,
   EntrySubtitlePlacement,
+  HeaderDetailsArrangement,
   HeaderPosition,
+  HeaderSeparator,
+  HeaderTitlePosition,
   HeadingCapitalization,
   HeadingIconStyle,
   HeadingStyle,
   NameFontId,
   SectionColumn,
 } from "@shared/format-v2";
-import { DATE_FORMATS, NAME_DISPLAY_FONT_IDS } from "@shared/format-v2";
+import { CONTACT_ICON_STYLES, DATE_FORMATS, NAME_DISPLAY_FONT_IDS } from "@shared/format-v2";
 import { SECTIONS, SECTION_VALUES } from "@shared/sections";
 import type { DocumentFormatV2 } from "@shared/format-v2";
 import { FONT_FACES } from "../document/fonts";
@@ -132,6 +138,36 @@ const HEADING_ICON_OPTIONS: { value: HeadingIconStyle; label: string }[] = [
   { value: "none", label: "None" },
   { value: "outline", label: "Outline" },
   { value: "filled", label: "Filled" },
+];
+// header.* (§31.2, E9-F3c — sections.tsx's ProfileHeader). "Title weight"
+// below is a SEPARATE control from "Heading weight" above (which still
+// moves nameWeight and titleWeight together, its pre-ticket behavior) — it
+// binds header.titleWeight alone, for setting it apart from the name
+// (render-independent either way, see legacyAdapt.ts's resolveHeaderConfig).
+const HEADER_DETAILS_ARRANGEMENT_OPTIONS: { value: HeaderDetailsArrangement; label: string }[] = [
+  { value: "stacked", label: "Stacked (name above one contact row)" },
+  { value: "single-row", label: "Single row (name + contact together)" },
+  { value: "wrapped", label: "Wrapped (contact fields, then links, on their own line)" },
+];
+const HEADER_SEPARATOR_OPTIONS: { value: HeaderSeparator; label: string }[] = [
+  { value: "icon", label: "Dot" },
+  { value: "bullet", label: "Bullet (•)" },
+  { value: "bar", label: "Bar (|)" },
+];
+const CONTACT_ICON_STYLE_LABELS: Record<ContactIconStyle, string> = {
+  "none-frame": "None",
+  "circle-filled": "Circle, filled",
+  "circle-outline": "Circle, outline",
+  "rounded-filled": "Rounded square, filled",
+  "rounded-outline": "Rounded square, outline",
+  "square-filled": "Square, filled",
+  "square-outline": "Square, outline",
+};
+const CONTACT_ICON_STYLE_OPTIONS: { value: ContactIconStyle; label: string }[] =
+  CONTACT_ICON_STYLES.map((value) => ({ value, label: CONTACT_ICON_STYLE_LABELS[value] }));
+const HEADER_TITLE_POSITION_OPTIONS: { value: HeaderTitlePosition; label: string }[] = [
+  { value: "same-line", label: "Same line as name" },
+  { value: "below", label: "Below name" },
 ];
 // document.dateFormat's 12 presets (§31.2) — the pattern string IS the
 // label; each is already the exact shape it renders (formatDate.ts).
@@ -455,6 +491,13 @@ export function DesignPanel({
             onValueChange={(next) =>
               set({
                 ...format,
+                // A bulk convenience control, pre-dating titleWeight's own
+                // independence (E9-F3c): moving this ALSO moves titleWeight
+                // in lockstep, matching this control's pre-ticket behavior
+                // (and this whole app's existing settings round-trip test) —
+                // header.titleWeight has its OWN, independent control in the
+                // Header group below for anyone who wants to set it apart
+                // from the name.
                 header: {
                   ...format.header,
                   nameWeight: next as "normal" | "bold",
@@ -537,6 +580,136 @@ export function DesignPanel({
             }
           />
         </FieldRow>
+      </div>
+
+      {/* ── header — header.{detailsArrangement,separator,contactIconStyle,
+          titlePosition,titleWeight} (§31.2, E9-F3c, sections.tsx's
+          ProfileHeader). "Title weight" here is its own control, separate
+          from "Heading weight" above (which still moves nameWeight and
+          titleWeight together) — see that control's own comment. ── */}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-medium">Header</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FieldRow label="Contact details arrangement" htmlFor="design-header-details-arrangement">
+            <EnumSelect
+              id="design-header-details-arrangement"
+              value={format.header.detailsArrangement}
+              options={HEADER_DETAILS_ARRANGEMENT_OPTIONS}
+              disabled={readOnly}
+              onChange={(detailsArrangement) =>
+                set({ ...format, header: { ...format.header, detailsArrangement } })
+              }
+            />
+          </FieldRow>
+
+          <FieldRow label="Separator" htmlFor="design-header-separator">
+            <EnumSelect
+              id="design-header-separator"
+              value={format.header.separator}
+              options={HEADER_SEPARATOR_OPTIONS}
+              disabled={readOnly}
+              onChange={(separator) => set({ ...format, header: { ...format.header, separator } })}
+            />
+          </FieldRow>
+
+          <FieldRow label="Contact icon style" htmlFor="design-header-contact-icon-style">
+            <EnumSelect
+              id="design-header-contact-icon-style"
+              value={format.header.contactIconStyle}
+              options={CONTACT_ICON_STYLE_OPTIONS}
+              disabled={readOnly}
+              onChange={(contactIconStyle) =>
+                set({ ...format, header: { ...format.header, contactIconStyle } })
+              }
+            />
+          </FieldRow>
+
+          <FieldRow label="Title position" htmlFor="design-header-title-position">
+            <EnumSelect
+              id="design-header-title-position"
+              value={format.header.titlePosition}
+              options={HEADER_TITLE_POSITION_OPTIONS}
+              disabled={readOnly}
+              onChange={(titlePosition) =>
+                set({ ...format, header: { ...format.header, titlePosition } })
+              }
+            />
+          </FieldRow>
+
+          <FieldRow label="Title weight" htmlFor="design-header-title-weight">
+            <Select
+              value={format.header.titleWeight}
+              disabled={readOnly}
+              onValueChange={(next) =>
+                set({
+                  ...format,
+                  header: { ...format.header, titleWeight: next as "normal" | "bold" },
+                })
+              }
+            >
+              <SelectTrigger id="design-header-title-weight" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {NAME_WEIGHT_OPTIONS.map((weight) => (
+                  <SelectItem key={weight} value={weight}>
+                    {weight === "bold" ? "Bold" : "Normal"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FieldRow>
+        </div>
+      </div>
+
+      {/* ── links — links.{underline,accentColor,icon} (§31.2, E9-F3c,
+          sections.tsx's profile-link rendering: textDecoration,
+          colors.primary-vs-text, and a small glyph View per link). ── */}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-medium">Links</p>
+        <div className="flex flex-wrap gap-4">
+          <div className="flex items-center gap-2">
+            <input
+              id="design-links-underline"
+              type="checkbox"
+              checked={format.links.underline}
+              disabled={readOnly}
+              onChange={(e) =>
+                set({ ...format, links: { ...format.links, underline: e.target.checked } })
+              }
+              className="h-4 w-4 rounded border-border"
+            />
+            <Label htmlFor="design-links-underline">Underline links</Label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              id="design-links-accent-color"
+              type="checkbox"
+              checked={format.links.accentColor}
+              disabled={readOnly}
+              onChange={(e) =>
+                set({ ...format, links: { ...format.links, accentColor: e.target.checked } })
+              }
+              className="h-4 w-4 rounded border-border"
+            />
+            <Label htmlFor="design-links-accent-color">Color links with the primary accent</Label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              id="design-links-icon"
+              type="checkbox"
+              checked={format.links.icon}
+              disabled={readOnly}
+              onChange={(e) =>
+                set({ ...format, links: { ...format.links, icon: e.target.checked } })
+              }
+              className="h-4 w-4 rounded border-border"
+            />
+            <Label htmlFor="design-links-icon">Show a link icon</Label>
+          </div>
+        </div>
       </div>
 
       {/* ── section headings — headings.{style,capitalization,icons} (§31.2,
