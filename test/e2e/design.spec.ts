@@ -15,7 +15,14 @@ import { test, expect, type Page } from "@playwright/test";
 import { ensureFirstRunPassword } from "./helpers/session";
 import { CONTRAST_JDS } from "../../src/server/tailor/evalcore";
 
-const PASSWORD = "correct horse battery staple e2e design";
+// MUST match applications.spec.ts's PASSWORD exactly (playwright.config.ts:
+// this spec shares that file's "applications" server/project, and the auth
+// gate's password is a single server-wide secret). Whichever of the two
+// spec files runs first sets it via LoginForm's real first-run flow; the
+// other's identical ensureFirstRunPassword call then hits the SAME
+// setup-409-then-login fallback LoginForm always runs, succeeding because
+// the value matches what's already set.
+const PASSWORD = "correct horse battery staple e2e applications";
 const JD = CONTRAST_JDS[0]!.jd; // "platform-sdk" scenario — same recorded fixture applications.spec.ts uses
 
 const runId = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;

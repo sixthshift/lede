@@ -25,13 +25,16 @@
 // the fixtures' recorded key regardless of what the other two servers' data
 // dirs accumulate.
 //
-// E9-F1a adds a fourth server/project ("design", DESIGN_BASE_URL): same real
-// auth arc + LEDE_TAILOR_ENGINE=fixture as "applications", but its OWN
-// server/DATA_DIR rather than sharing that one — the auth gate's password is
-// a single server-wide secret (this is a single-user app, not multi-tenant),
-// so a second spec sharing the "applications" server would have to know
-// applications.spec.ts's already-set password rather than setting its own
-// via the normal first-run flow.
+// E9-F1a adds design.spec.ts to the "applications" project rather than
+// giving it a fourth server: this container's e2e ceiling is already
+// tight (workers:1 + retries above exist BECAUSE three concurrent real
+// tsx+sqlite+@react-pdf-font-fetching servers already flake under
+// contention) — a fourth measurably pushed even the unrelated,
+// unmodified applications.spec.ts into failure. Sharing costs one
+// coupling: the auth gate's password is a single server-wide secret
+// (single-user app, not multi-tenant), so design.spec.ts logs in with
+// the SAME password applications.spec.ts already set on this server
+// instead of running its own first-run flow.
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -45,9 +48,6 @@ const AUTH_BASE_URL = `http://localhost:${AUTH_PORT}`;
 
 const APPLICATIONS_PORT = String(Number(PORT) + 2);
 const APPLICATIONS_BASE_URL = `http://localhost:${APPLICATIONS_PORT}`;
-
-const DESIGN_PORT = String(Number(PORT) + 3);
-const DESIGN_BASE_URL = `http://localhost:${DESIGN_PORT}`;
 
 // E5-C's docker project runs a real container (helpers/docker.ts globalSetup)
 // instead of a webServer, and is driven by its own `playwright test
@@ -89,13 +89,8 @@ export default defineConfig({
     },
     {
       name: "applications",
-      testMatch: /applications\.spec\.ts/,
+      testMatch: /(applications|design)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
-    },
-    {
-      name: "design",
-      testMatch: /design\.spec\.ts/,
-      use: { ...devices["Desktop Chrome"], baseURL: DESIGN_BASE_URL },
     },
     ...(dockerProject
       ? [
@@ -145,23 +140,9 @@ export default defineConfig({
         DATA_DIR: createTmpDataDir(),
         LEDE_MASTER_KEY: randomBytes(32).toString("base64"),
         LEDE_SESSION_SECRET: "playwright-e2e-applications-session-secret-at-least-32-chars",
-        // No LEDE_AUTH_DISABLED — applications.spec.ts drives the real
-        // first-run set-password -> login arc, same as the "auth" server.
-        LEDE_TAILOR_ENGINE: "fixture",
-      },
-    },
-    {
-      command: "bun run start",
-      url: `${DESIGN_BASE_URL}/api/health`,
-      reuseExistingServer: !process.env.CI,
-      timeout: 60000,
-      env: {
-        PORT: DESIGN_PORT,
-        DATA_DIR: createTmpDataDir(),
-        LEDE_MASTER_KEY: randomBytes(32).toString("base64"),
-        LEDE_SESSION_SECRET: "playwright-e2e-design-session-secret-at-least-32-characters",
-        // No LEDE_AUTH_DISABLED — design.spec.ts drives the real first-run
-        // set-password -> login arc, same as "auth"/"applications".
+        // No LEDE_AUTH_DISABLED — applications.spec.ts (and, since E9-F1a,
+        // design.spec.ts) drives the real first-run set-password -> login
+        // arc, same as the "auth" server.
         LEDE_TAILOR_ENGINE: "fixture",
       },
     },
