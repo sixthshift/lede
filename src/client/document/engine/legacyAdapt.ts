@@ -8,30 +8,19 @@
 import type { DocumentFormat, FontId } from "@shared/types";
 import type { DocumentFormatV2 } from "@shared/format-v2";
 
-// sections.tsx's fontFamily is just a string handed to react-pdf; only these
-// ids have a registered face (src/client/document/fonts.ts) as of this
-// ticket. A v2 body font outside this set falls back to the roster's default
-// face — the "unhandled axis renders as the default look" contract (the
-// other 25 §31.2 body-font ids register in a later ticket, F2).
-//
-// ibm-plex-mono's exclusion is LIFTED (E9-R2): both @fontsource assets this
-// face ever used were individually defective under fontkit (E9-R1's .woff
-// crashed on spaces, its .woff2 replacement crashed on colons — see
-// fonts.ts's PROVENANCE comment). fonts.ts now sources this face from the
-// official IBM `@ibm/plex-mono` package instead, verified clean on
-// punctuation-bearing multi-word text — the exclusion that routed it to the
-// default face is no longer needed.
-const LEGACY_FONT_IDS = new Set<string>([
-  "ibm-plex-sans",
-  "ibm-plex-serif",
-  "ibm-plex-mono",
-  "arimo",
-  "tinos",
-  "carlito",
-]);
-
+// sections.tsx's fontFamily is just a string handed to react-pdf. §31.2's
+// full 31-body/8-name-slot roster now registers a face for every id
+// (src/client/document/fonts.ts, E9-F2a) — so a v2 body font resolves to
+// itself, full stop; there is no longer a "roster face with no registered
+// look" case to fall back from. `id`'s static type is `@shared/types`'s
+// legacy 6-value FontId (this function feeds `DocumentFormat.typography`,
+// whose `family` field is locked to that type) even though the runtime
+// value is one of the roster's 39 ids — the assertion is safe because
+// fonts.ts's Font.register call keys on the SAME string the caller passes
+// in as `family`, so react-pdf resolves the actual registered face
+// regardless of what TypeScript's legacy type says it "should" be.
 function resolveFont(id: string): FontId {
-  return LEGACY_FONT_IDS.has(id) ? (id as FontId) : "ibm-plex-sans";
+  return id as FontId;
 }
 
 // 72pt / 25.4mm, the standard point/millimeter conversion. format-v2.ts
@@ -57,6 +46,19 @@ function resolveWeight(format: DocumentFormatV2): 400 | 700 {
 // filled without reading the v2 format's own identity (locked: the engine
 // never branches on preset identity).
 const ENGINE_TEMPLATE_ID = "engine-v2";
+
+// fonts.name (§31.2) has no seam on the legacy `DocumentFormat` shape this
+// file's return type is locked to (its typography carries one shared
+// `heading.family`, not an independent name slot) — so the name-slot font
+// is resolved here but threaded to the renderer as its own prop
+// (document.tsx -> sections.tsx's ProfileHeader), not through
+// toLegacyFormat's return value. "same-as-body" (the default) defers to the
+// already-resolved body font; any of the 8 §31.2 NAME_DISPLAY_FONT_IDS
+// resolves to itself, same reasoning as resolveFont above.
+export function resolveNameFont(format: DocumentFormatV2): FontId {
+  const { name } = format.fonts;
+  return name === "same-as-body" ? resolveFont(format.fonts.body) : (name as unknown as FontId);
+}
 
 export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat {
   const bodyFont = resolveFont(format.fonts.body);

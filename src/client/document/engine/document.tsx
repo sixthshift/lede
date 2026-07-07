@@ -34,6 +34,15 @@
 // column, per the unhandled-off-diagonal contract below. Never drops/
 // duplicates content (§28.4/§31 NEVER-CUT) — it only adds page boundaries.
 //
+// AXES WIRED THIS TICKET (E9-F2a): fonts.body now resolves to any of §31.2's
+// 31 registered body faces (previously 6 — see fonts.ts). fonts.name gets
+// its own render path: resolved by legacyAdapt's resolveNameFont ("same-as-
+// body" defers to the already-resolved body font; any of the 8 §31.2
+// NAME_DISPLAY_FONT_IDS resolves to itself) and passed to ProfileHeader as
+// a dedicated prop — the name Text renders in it instead of the shared
+// heading family, the only section-heading-vs-name font split this engine
+// makes.
+//
 // AXES NOT YET WIRED (render as sections.tsx's one existing look — never a
 // crash; later tickets land their seam per §31.6's phase list):
 // typeScale.{nameOffset,titleOffset,
@@ -41,7 +50,7 @@
 // heading sizes with no per-field seam), entries.* (structure/date-location/
 // subtitle/list-style/per-field font style/body indent), headings.{style
 // beyond the underline sections.tsx already draws,capitalization,icons},
-// fonts.name (no separate name-font render path), colors.{mode 'multi',
+// colors.{mode 'multi',
 // full-page/border area,border,accentPlacement} (colors.area 'header' is
 // only wired for columns:'one' and for the full-width header block in
 // 'mix' — a 'header' band combined with columns:'two' is an unhandled
@@ -60,7 +69,7 @@ import {
   SummarySection,
 } from "../sections";
 import { applyEngineDensity, type EngineDensity } from "./density";
-import { toLegacyFormat } from "./legacyAdapt";
+import { resolveNameFont, toLegacyFormat } from "./legacyAdapt";
 
 const PAGE_SIZE: Record<Paper, "LETTER" | "A4"> = { letter: "LETTER", a4: "A4" };
 // The gutter between sidebar and main columns — ported from the retired
@@ -234,7 +243,16 @@ export function EngineDocument({
     row: { flexDirection: "row", paddingHorizontal: legacy.page.marginX },
   });
 
-  const header = <ProfileHeader profile={profile} format={legacy} variant={variant} ink={ink} />;
+  const nameFontFamily = resolveNameFont(format);
+  const header = (
+    <ProfileHeader
+      profile={profile}
+      format={legacy}
+      variant={variant}
+      ink={ink}
+      nameFontFamily={nameFontFamily}
+    />
+  );
   const summary = <SummarySection summary={resume.summary} format={legacy} />;
 
   if (!isColumnar) {

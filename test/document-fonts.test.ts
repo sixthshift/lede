@@ -2,21 +2,19 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { createElement } from "react";
 import { Document, Page, Text, renderToBuffer } from "@react-pdf/renderer";
-import { DEFAULT_FORMAT_V2 } from "@shared/format-v2";
-import type { BodyFontId } from "@shared/format-v2";
-import type { FontId, Profile, TailoredResume } from "@shared/types";
+import { BODY_FONT_IDS, DEFAULT_FORMAT_V2, NAME_DISPLAY_FONT_IDS } from "@shared/format-v2";
+import type { BodyFontId, NameFontId } from "@shared/format-v2";
+import type { Profile, TailoredResume } from "@shared/types";
 import { describe, expect, it } from "vitest";
 import { FONT_FACES, registerDocumentFonts } from "../src/client/document/fonts";
+import type { FontId } from "../src/client/document/fonts";
 import { renderResumeToBuffer } from "../src/client/document/renderResume";
 
-const ALL_FONT_IDS: FontId[] = [
-  "ibm-plex-sans",
-  "ibm-plex-serif",
-  "ibm-plex-mono",
-  "arimo",
-  "tinos",
-  "carlito",
-];
+// The full §31.2 roster (§31.6 intake ledger v3-038..040, locked): 31 body
+// faces + 8 name-slot faces, no overlap between the two lists — derived from
+// format-v2.ts's own roster constants rather than hand-duplicated, so this
+// test can't silently drift from the locked list it's asserting against.
+const ALL_FONT_IDS: FontId[] = [...BODY_FONT_IDS, ...NAME_DISPLAY_FONT_IDS];
 
 function fixtureDocument(family: FontId, text: string) {
   return createElement(
@@ -38,8 +36,9 @@ describe("registerDocumentFonts", () => {
     }).not.toThrow();
   });
 
-  it("registers a face for every FontId in the union (no FontId left unregistered)", () => {
+  it("registers a face for every FontId in the union (no FontId left unregistered) — the locked 31-body/8-name, 39-face roster", () => {
     registerDocumentFonts();
+    expect(ALL_FONT_IDS.length).toBe(39);
     for (const fontId of ALL_FONT_IDS) {
       expect(FONT_FACES[fontId]).toBeDefined();
       expect(FONT_FACES[fontId].label.length).toBeGreaterThan(0);
@@ -171,5 +170,48 @@ describe("ibm-plex-mono (E9-R2 fix regression guard)", () => {
     // rendered as itself rather than silently falling back to the default
     // (ibm-plex-sans) face.
     expect(Buffer.compare(monoBuffer, defaultBuffer)).not.toBe(0);
+  });
+});
+
+describe("fonts.name render path (E9-F2a)", () => {
+  it("setting fonts.name to a name-slot face changes PDF bytes vs 'same-as-body'", async () => {
+    registerDocumentFonts();
+    const base = {
+      resume: fontSmokeResumeFixture(),
+      profile: fontSmokeProfileFixture(),
+    };
+    const [sameAsBodyBuffer, playfairBuffer] = await Promise.all([
+      renderResumeToBuffer({
+        ...base,
+        format: {
+          ...DEFAULT_FORMAT_V2,
+          fonts: { ...DEFAULT_FORMAT_V2.fonts, name: "same-as-body" },
+        },
+      }),
+      renderResumeToBuffer({
+        ...base,
+        format: {
+          ...DEFAULT_FORMAT_V2,
+          fonts: { ...DEFAULT_FORMAT_V2.fonts, name: "playfair-display" as NameFontId },
+        },
+      }),
+    ]);
+
+    for (const buffer of [sameAsBodyBuffer, playfairBuffer]) {
+      expect(buffer.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    }
+    expect(Buffer.compare(sameAsBodyBuffer, playfairBuffer)).not.toBe(0);
+  });
+
+  it("every one of the 8 NAME_DISPLAY_FONT_IDS renders as the name font without crashing", async () => {
+    registerDocumentFonts();
+    for (const nameFont of NAME_DISPLAY_FONT_IDS) {
+      const buffer = await renderResumeToBuffer({
+        resume: fontSmokeResumeFixture(),
+        profile: fontSmokeProfileFixture(),
+        format: { ...DEFAULT_FORMAT_V2, fonts: { ...DEFAULT_FORMAT_V2.fonts, name: nameFont } },
+      });
+      expect(buffer.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    }
   });
 });

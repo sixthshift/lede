@@ -21,11 +21,19 @@
 // every other section's columns had no v2 destination (format-v2.ts's
 // migration repair comment explains the same drop). The "Heading font"
 // control is DROPPED: v2 has no independent heading-family axis (the engine
-// always renders headings in the body face; a separate NAME font is
-// fonts.name, unwired until a later ticket lands its render seam) — keeping
-// a control with no observable effect would be a phantom knob.
+// always renders headings in the body face) — keeping a control with no
+// observable effect would be a phantom knob. The NAME font (fonts.name) is
+// its own control below, distinct from both body and heading — it now has a
+// render seam (E9-F2a, engine/document.tsx).
 import type { ReactNode } from "react";
-import type { BodyFontId, ColumnsMode, HeaderPosition, SectionColumn } from "@shared/format-v2";
+import type {
+  BodyFontId,
+  ColumnsMode,
+  HeaderPosition,
+  NameFontId,
+  SectionColumn,
+} from "@shared/format-v2";
+import { NAME_DISPLAY_FONT_IDS } from "@shared/format-v2";
 import { SECTIONS, SECTION_VALUES } from "@shared/sections";
 import type { DocumentFormatV2 } from "@shared/format-v2";
 import { FONT_FACES } from "../document/fonts";
@@ -34,11 +42,15 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
-// FONT_FACES (../document/fonts) registers a curated 6-face subset of v2's
-// full 31-face BODY_FONT_IDS roster (§31.2's other 25 faces land in a later
-// ticket, F2) — the picker only offers faces that actually render distinctly
-// today, never a phantom choice with no visible effect.
+// FONT_FACES (../document/fonts) registers a face for every one of §31.2's
+// full 31-face BODY_FONT_IDS roster (E9-F2a) — the picker offers the whole
+// roster now, matching what actually renders.
 const FONT_IDS = Object.keys(FONT_FACES) as Array<Extract<BodyFontId, keyof typeof FONT_FACES>>;
+// The name-slot picker (fonts.name): "same-as-body" (default) plus §31.2's 8
+// NAME_DISPLAY_FONT_IDS — a materially different list from FONT_IDS (body
+// faces aren't valid name-slot values and vice versa), so it gets its own
+// select rather than reusing FontSelect.
+const NAME_FONT_IDS: readonly NameFontId[] = ["same-as-body", ...NAME_DISPLAY_FONT_IDS];
 const NAME_WEIGHT_OPTIONS = ["normal", "bold"] as const;
 const GRID_COLUMN_OPTIONS = [1, 2, 3, 4] as const;
 const HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
@@ -118,6 +130,37 @@ function FontSelect({
         {FONT_IDS.map((fontId) => (
           <SelectItem key={fontId} value={fontId}>
             {FONT_FACES[fontId].label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function NameFontSelect({
+  id,
+  value,
+  onChange,
+  disabled,
+}: {
+  id: string;
+  value: NameFontId;
+  onChange: (family: NameFontId) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Select
+      value={value}
+      onValueChange={(next) => onChange(next as NameFontId)}
+      disabled={disabled}
+    >
+      <SelectTrigger id={id} className="w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {NAME_FONT_IDS.map((fontId) => (
+          <SelectItem key={fontId} value={fontId}>
+            {fontId === "same-as-body" ? "Same as body" : FONT_FACES[fontId].label}
           </SelectItem>
         ))}
       </SelectContent>
@@ -230,6 +273,15 @@ export function DesignPanel({
             value={format.fonts.body}
             disabled={readOnly}
             onChange={(body) => set({ ...format, fonts: { ...format.fonts, body } })}
+          />
+        </FieldRow>
+
+        <FieldRow label="Name font" htmlFor="design-name-family">
+          <NameFontSelect
+            id="design-name-family"
+            value={format.fonts.name}
+            disabled={readOnly}
+            onChange={(name) => set({ ...format, fonts: { ...format.fonts, name } })}
           />
         </FieldRow>
 

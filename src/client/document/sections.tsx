@@ -109,6 +109,7 @@ export function ProfileHeader({
   format,
   variant = "left",
   ink,
+  nameFontFamily,
 }: {
   profile: Profile;
   format: DocumentFormat;
@@ -118,9 +119,21 @@ export function ProfileHeader({
   // and need a contrasting color instead of the default colors.text/primary.
   // Undefined ⇒ identical output to before this prop existed.
   ink?: string;
+  // §31.2 fonts.name (E9-F2a) — the name-slot font, resolved by the caller
+  // (document.tsx via legacyAdapt's resolveNameFont) independently of
+  // `format.typography.heading.family`. There is no seam for it on the
+  // legacy `DocumentFormat` shape this component's `format` prop is locked
+  // to (typography carries one shared heading family, not a separate name
+  // slot), so it arrives as its own prop instead. Undefined ⇒ falls back to
+  // the heading family, identical to output before this prop existed.
+  nameFontFamily?: string;
 }) {
   const styles = buildStyles(format);
-  const nameStyle = ink ? [styles.name, { color: ink }] : styles.name;
+  const nameOverrides: { color?: string; fontFamily?: string } = {};
+  if (ink) nameOverrides.color = ink;
+  if (nameFontFamily) nameOverrides.fontFamily = nameFontFamily;
+  const nameStyle =
+    Object.keys(nameOverrides).length > 0 ? [styles.name, nameOverrides] : styles.name;
   const contactItemStyle = ink ? [styles.contactItem, { color: ink }] : styles.contactItem;
   const linkStyle = ink ? [styles.link, { color: ink }] : styles.link;
   const contactParts = [profile.email, profile.phone, profile.location].filter(
