@@ -1587,3 +1587,12 @@ PHASE-CLOSE ORACLE (oracle.md Phase 7/E8) on merged tree, ALL GREEN (in the 363 
   Residual (documented in-code, not hidden): columns 'two' + colors.area 'header' renders without the
   band — unhandled off-diagonal, lands with F3's color-area work. NEXT: E9-R1 serial ([v3-044] memory
   judgment), then F0d cutover.
+
+[v3-046] E9-R1 — ACCEPTED (single dispatch, first attempt). Root cause: malformed space-glyph
+  glyf/loca entry in @fontsource/ibm-plex-mono's vendored .woff (every published version 4.5.13-5.2.7);
+  fontkit dies in TTFGlyph._getCBox on any word-wrap layout. Fix: per-face format field, mono uses the
+  package's clean .woff2 (fontkit 2.x decodes natively); both resolution paths threaded. Escaped-bug
+  rule satisfied: parameterized per-face × per-role multi-word render smoke (16 assertions), RED
+  demonstrated on the unfixed asset, GREEN after. Coordinator re-ran the original crash probe: passes.
+  Composite green (554/10-10). Pre-cutover suite floor pinned for F0d: 257 tests / 11 files over the
+  document/engine/fit/format glob. NEXT: E9-F0d (cutover — last F0 ticket; tooBig-eligible).

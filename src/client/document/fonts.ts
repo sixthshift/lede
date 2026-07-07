@@ -4,8 +4,14 @@
 // plus the metric-compatible stand-ins Arimo→Arial, Tinos→Times New Roman,
 // Carlito→Calibri.
 //
-// react-pdf/fontkit only consumes .woff/.ttf (not .woff2), so every face
-// below is the package's latin .woff. The react-pdf `family` string is the
+// react-pdf/fontkit consumes both .woff and .woff2, so every face below is
+// the package's latin .woff by default — except ibm-plex-mono, which uses
+// .woff2. fontkit crashes ("Offset is outside the bounds of the DataView" in
+// TTFGlyph._getCBox) reading the space glyph's glyf/loca entry out of
+// @fontsource/ibm-plex-mono's vendored .woff, at every published version of
+// that package; the sibling .woff2 in the same package decodes cleanly
+// (verified directly against fontkit, independent of react-pdf) and is used
+// for that face only. The react-pdf `family` string is the
 // FontId itself, so a later renderer can pass a document's configured
 // FontId straight through as `style.fontFamily` — no separate lookup table.
 //
@@ -35,15 +41,23 @@ import * as nodeModule from "node:module";
 import { Font } from "@react-pdf/renderer";
 import type { FontId } from "@shared/types";
 
-type FontManifest = { package: string; label: string };
+type FontManifest = { package: string; label: string; format: "woff" | "woff2" };
 
 const FONT_MANIFEST: Record<FontId, FontManifest> = {
-  "ibm-plex-sans": { package: "@fontsource/ibm-plex-sans", label: "IBM Plex Sans" },
-  "ibm-plex-serif": { package: "@fontsource/ibm-plex-serif", label: "IBM Plex Serif" },
-  "ibm-plex-mono": { package: "@fontsource/ibm-plex-mono", label: "IBM Plex Mono" },
-  arimo: { package: "@fontsource/arimo", label: "Arimo (Arial)" },
-  tinos: { package: "@fontsource/tinos", label: "Tinos (Times New Roman)" },
-  carlito: { package: "@fontsource/carlito", label: "Carlito (Calibri)" },
+  "ibm-plex-sans": { package: "@fontsource/ibm-plex-sans", label: "IBM Plex Sans", format: "woff" },
+  "ibm-plex-serif": {
+    package: "@fontsource/ibm-plex-serif",
+    label: "IBM Plex Serif",
+    format: "woff",
+  },
+  "ibm-plex-mono": {
+    package: "@fontsource/ibm-plex-mono",
+    label: "IBM Plex Mono",
+    format: "woff2",
+  },
+  arimo: { package: "@fontsource/arimo", label: "Arimo (Arial)", format: "woff" },
+  tinos: { package: "@fontsource/tinos", label: "Tinos (Times New Roman)", format: "woff" },
+  carlito: { package: "@fontsource/carlito", label: "Carlito (Calibri)", format: "woff" },
 };
 
 export const FONT_FACES: Record<FontId, { label: string }> = Object.fromEntries(
@@ -79,11 +93,11 @@ const BROWSER_FONT_URLS: Record<FontId, { 400: string; 700: string }> = {
   },
   "ibm-plex-mono": {
     400: new URL(
-      "@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff",
+      "@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2",
       import.meta.url,
     ).toString(),
     700: new URL(
-      "@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-700-normal.woff",
+      "@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-700-normal.woff2",
       import.meta.url,
     ).toString(),
   },
@@ -112,7 +126,7 @@ function resolveFontSrc(fontId: FontId, manifest: FontManifest, weight: 400 | 70
     const basename = manifest.package.replace("@fontsource/", "");
     return nodeModule
       .createRequire(import.meta.url)
-      .resolve(`${manifest.package}/files/${basename}-latin-${weight}-normal.woff`);
+      .resolve(`${manifest.package}/files/${basename}-latin-${weight}-normal.${manifest.format}`);
   }
   return BROWSER_FONT_URLS[fontId][weight];
 }
