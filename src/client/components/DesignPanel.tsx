@@ -30,6 +30,12 @@ import type {
   BodyFontId,
   ColumnsMode,
   DateFormatV2,
+  EntryDateLocationOrder,
+  EntryDateLocationPlacement,
+  EntryFontStyle,
+  EntryListStyle,
+  EntryStructure,
+  EntrySubtitlePlacement,
   HeaderPosition,
   HeadingCapitalization,
   HeadingIconStyle,
@@ -101,6 +107,37 @@ const DATE_FORMAT_OPTIONS: { value: DateFormatV2; label: string }[] = DATE_FORMA
   value,
   label: value,
 }));
+
+// entries.* (§31.2, E9-F2e — sections.tsx's per-entry header composition).
+const ENTRY_STRUCTURE_OPTIONS: { value: EntryStructure; label: string }[] = [
+  { value: "full-width", label: "Full width" },
+  { value: "columns", label: "Two columns (date/location aside)" },
+];
+const ENTRY_DATE_LOCATION_PLACEMENT_OPTIONS: {
+  value: EntryDateLocationPlacement;
+  label: string;
+}[] = [
+  { value: "right", label: "Right, inline" },
+  { value: "left", label: "Left, inline" },
+  { value: "split", label: "Split to the far edge" },
+];
+const ENTRY_DATE_LOCATION_ORDER_OPTIONS: { value: EntryDateLocationOrder; label: string }[] = [
+  { value: "date-first", label: "Date first" },
+  { value: "location-first", label: "Location first" },
+];
+const ENTRY_SUBTITLE_PLACEMENT_OPTIONS: { value: EntrySubtitlePlacement; label: string }[] = [
+  { value: "same-line", label: "Same line as title" },
+  { value: "below", label: "Below title" },
+];
+const ENTRY_LIST_STYLE_OPTIONS: { value: EntryListStyle; label: string }[] = [
+  { value: "bullet", label: "Bullet (•)" },
+  { value: "hyphen", label: "Hyphen (-)" },
+];
+const ENTRY_FONT_STYLE_OPTIONS: { value: EntryFontStyle; label: string }[] = [
+  { value: "normal", label: "Normal" },
+  { value: "bold", label: "Bold" },
+  { value: "italic", label: "Italic" },
+];
 
 // A curated set, not an open picker — every swatch here is already a valid
 // formatV2Schema hex; the text input next to it is the escape hatch for
@@ -275,6 +312,40 @@ function ColorField({
         }}
       />
     </div>
+  );
+}
+
+// A generic bounded-enum picker — entries.* alone needs 6 of these (structure,
+// placement, order, subtitle placement, list style, ×3 font styles), so this
+// factors the Select/SelectTrigger/SelectContent boilerplate every other
+// group above hand-rolls per axis; existing groups are left as-is (not this
+// ticket's scope).
+function EnumSelect<T extends string>({
+  id,
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  value: T;
+  options: { value: T; label: string }[];
+  disabled?: boolean;
+  onChange: (next: T) => void;
+}) {
+  return (
+    <Select value={value} disabled={disabled} onValueChange={(next) => onChange(next as T)}>
+      <SelectTrigger id={id} className="w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value}>
+            {opt.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -544,6 +615,128 @@ export function DesignPanel({
             </SelectContent>
           </Select>
         </FieldRow>
+      </div>
+
+      {/* ── entries — entries.* (§31.2, E9-F2e). The per-ENTRY internal
+          header layout (title/subtitle/date/location + item list), distinct
+          from the Layout group below (page-level columns/section
+          placement) — see legacyAdapt.ts's EntriesRenderConfig comment. ── */}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-medium">Entries</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FieldRow label="Entry structure" htmlFor="design-entries-structure">
+            <EnumSelect
+              id="design-entries-structure"
+              value={format.entries.structure}
+              options={ENTRY_STRUCTURE_OPTIONS}
+              disabled={readOnly}
+              onChange={(structure) =>
+                set({ ...format, entries: { ...format.entries, structure } })
+              }
+            />
+          </FieldRow>
+
+          <FieldRow
+            label="Date/location placement"
+            htmlFor="design-entries-date-location-placement"
+          >
+            <EnumSelect
+              id="design-entries-date-location-placement"
+              value={format.entries.dateLocationPlacement}
+              options={ENTRY_DATE_LOCATION_PLACEMENT_OPTIONS}
+              disabled={readOnly}
+              onChange={(dateLocationPlacement) =>
+                set({ ...format, entries: { ...format.entries, dateLocationPlacement } })
+              }
+            />
+          </FieldRow>
+
+          <FieldRow label="Date/location order" htmlFor="design-entries-date-location-order">
+            <EnumSelect
+              id="design-entries-date-location-order"
+              value={format.entries.dateLocationOrder}
+              options={ENTRY_DATE_LOCATION_ORDER_OPTIONS}
+              disabled={readOnly}
+              onChange={(dateLocationOrder) =>
+                set({ ...format, entries: { ...format.entries, dateLocationOrder } })
+              }
+            />
+          </FieldRow>
+
+          <FieldRow label="Subtitle placement" htmlFor="design-entries-subtitle-placement">
+            <EnumSelect
+              id="design-entries-subtitle-placement"
+              value={format.entries.subtitlePlacement}
+              options={ENTRY_SUBTITLE_PLACEMENT_OPTIONS}
+              disabled={readOnly}
+              onChange={(subtitlePlacement) =>
+                set({ ...format, entries: { ...format.entries, subtitlePlacement } })
+              }
+            />
+          </FieldRow>
+
+          <FieldRow label="List style" htmlFor="design-entries-list-style">
+            <EnumSelect
+              id="design-entries-list-style"
+              value={format.entries.listStyle}
+              options={ENTRY_LIST_STYLE_OPTIONS}
+              disabled={readOnly}
+              onChange={(listStyle) =>
+                set({ ...format, entries: { ...format.entries, listStyle } })
+              }
+            />
+          </FieldRow>
+
+          <FieldRow label="Subtitle font style" htmlFor="design-entries-subtitle-font-style">
+            <EnumSelect
+              id="design-entries-subtitle-font-style"
+              value={format.entries.subtitleFontStyle}
+              options={ENTRY_FONT_STYLE_OPTIONS}
+              disabled={readOnly}
+              onChange={(subtitleFontStyle) =>
+                set({ ...format, entries: { ...format.entries, subtitleFontStyle } })
+              }
+            />
+          </FieldRow>
+
+          <FieldRow label="Date font style" htmlFor="design-entries-date-font-style">
+            <EnumSelect
+              id="design-entries-date-font-style"
+              value={format.entries.dateFontStyle}
+              options={ENTRY_FONT_STYLE_OPTIONS}
+              disabled={readOnly}
+              onChange={(dateFontStyle) =>
+                set({ ...format, entries: { ...format.entries, dateFontStyle } })
+              }
+            />
+          </FieldRow>
+
+          <FieldRow label="Location font style" htmlFor="design-entries-location-font-style">
+            <EnumSelect
+              id="design-entries-location-font-style"
+              value={format.entries.locationFontStyle}
+              options={ENTRY_FONT_STYLE_OPTIONS}
+              disabled={readOnly}
+              onChange={(locationFontStyle) =>
+                set({ ...format, entries: { ...format.entries, locationFontStyle } })
+              }
+            />
+          </FieldRow>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            id="design-entries-body-indent"
+            type="checkbox"
+            checked={format.entries.bodyIndent}
+            disabled={readOnly}
+            onChange={(e) =>
+              set({ ...format, entries: { ...format.entries, bodyIndent: e.target.checked } })
+            }
+            className="h-4 w-4 rounded border-border"
+          />
+          <Label htmlFor="design-entries-body-indent">Indent bullet body text</Label>
+        </div>
       </div>
 
       {/* ── color ── */}

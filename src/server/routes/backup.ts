@@ -48,6 +48,9 @@ const tailoredResumeZ = z.object({
               title: z.string(),
               subtitle: z.string().optional(),
               date: z.string().optional(),
+              // location (E9-F2e) — same "unknown keys are stripped" hazard
+              // as date/subtitle above; must be declared here too.
+              location: z.string().optional(),
             })
             .optional(),
           leadRationale: z.string().optional(),

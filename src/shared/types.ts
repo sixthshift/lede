@@ -121,7 +121,16 @@ export type TailoredItem = { entryId: string; text: string };
 // stays the string every existing renderer/consumer already reads; a
 // snapshot from before this ticket has no `headingParts` and still renders
 // via the `heading` fallback (src/client/document/sections.tsx).
-export type TailoredGroupHeadingParts = { title: string; subtitle?: string; date?: string };
+export type TailoredGroupHeadingParts = {
+  title: string;
+  subtitle?: string;
+  date?: string;
+  // location (E9-F2e): the entry's own meta.location, same provenance rule as
+  // title/subtitle/date — only experience/education carry a location field
+  // on EntryMeta; project/other groupable sections have none, so it stays
+  // undefined there.
+  location?: string;
+};
 export type TailoredGroup = {
   heading?: string;
   headingParts?: TailoredGroupHeadingParts;

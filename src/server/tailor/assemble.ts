@@ -147,10 +147,22 @@ function headingPartsFromMeta(meta: EntryMeta | undefined): TailoredGroupHeading
   if (!meta) return undefined;
   switch (meta.section) {
     case "experience":
-      return { title: meta.role, subtitle: meta.company, date: meta.period };
+      return {
+        title: meta.role,
+        subtitle: meta.company,
+        date: meta.period,
+        location: meta.location,
+      };
     case "education":
-      return { title: meta.degree, subtitle: meta.school, date: meta.period };
+      return {
+        title: meta.degree,
+        subtitle: meta.school,
+        date: meta.period,
+        location: meta.location,
+      };
     case "project":
+      // project's EntryMeta carries no location field — always undefined,
+      // same "no v2 destination" reasoning as every other absent field here.
       return { title: meta.name, subtitle: meta.role, date: meta.period };
     default:
       return undefined;

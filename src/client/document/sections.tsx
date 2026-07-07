@@ -7,17 +7,23 @@
 // CRITICAL: leadRationale and cut[] are reasoning UI (§11) and must NEVER be
 // rendered here — only profile, summary, and sections/groups/items, in order.
 
+import type { ReactNode } from "react";
 import { Image, Link, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type {
   DocumentFormat,
   Profile,
   TailoredGroup,
+  TailoredGroupHeadingParts,
   TailoredItem,
   TailoredSection,
 } from "@shared/types";
 import { SECTIONS } from "@shared/sections";
-import type { DateFormatV2 } from "@shared/format-v2";
-import type { HeadingsRenderConfig, TypeScaleSizes } from "./engine/legacyAdapt";
+import type { DateFormatV2, EntryFontStyle } from "@shared/format-v2";
+import type {
+  EntriesRenderConfig,
+  HeadingsRenderConfig,
+  TypeScaleSizes,
+} from "./engine/legacyAdapt";
 import { formatDate, parseHeadingDate } from "./formatDate";
 
 // §31.2 typeScale's 4 offsets (nameOffset/titleOffset/sectionHeadingOffset/
@@ -68,18 +74,40 @@ function resolveDateFormat(format: DocumentFormat): DateFormatV2 {
   return dateFormat ?? DEFAULT_DATE_FORMAT;
 }
 
-// §31.2's structured group header (E9-F2d): a fixture/snapshot with no
-// `headingParts` (every stored TailoredResume from before this ticket, or a
-// test fixture built by hand) renders exactly `heading`, unchanged — the
-// byte-stability guarantee this ticket must not break. Only when
-// `headingParts` is present does the date re-render through the chosen
-// dateFormat preset instead of the raw meta string it was assembled from.
-function resolveGroupHeadingText(group: TailoredGroup, format: DocumentFormat): string | undefined {
-  const parts = group.headingParts;
-  if (!parts) return group.heading;
+// entries.* (§31.2, E9-F2e) arrives as an extra property on `format`, same
+// seam as headingsConfig/dateFormat above (legacyAdapt.ts's toLegacyFormat).
+// Absent (a plain DocumentFormat built directly) falls back to exactly this
+// module's pre-ticket look: right-placed date-first bullet list, no font
+// styling, no body indent — see format-v2.ts's baseFromV1 `entries` value,
+// which this mirrors 1:1.
+const DEFAULT_ENTRIES_CONFIG: EntriesRenderConfig = {
+  structure: "full-width",
+  dateLocationPlacement: "right",
+  dateLocationOrder: "date-first",
+  subtitlePlacement: "same-line",
+  listStyle: "bullet",
+  subtitleFontStyle: "normal",
+  dateFontStyle: "normal",
+  locationFontStyle: "normal",
+  bodyIndent: false,
+};
+
+function resolveEntriesConfig(format: DocumentFormat): EntriesRenderConfig {
+  const config = (format as DocumentFormat & { entriesConfig?: EntriesRenderConfig }).entriesConfig;
+  return config ?? DEFAULT_ENTRIES_CONFIG;
+}
+
+// A group's structured date (headingParts.date), re-rendered through the
+// chosen dateFormat preset when parseable — same rule resolveGroupHeadingText
+// used pre-ticket, just extracted so both the fallback string join (none
+// left, see below) and the split title/subtitle/date/location elements this
+// ticket introduces share one implementation.
+function resolveFormattedDate(
+  parts: TailoredGroupHeadingParts,
+  format: DocumentFormat,
+): string | undefined {
   const parsedDate = parseHeadingDate(parts.date);
-  const date = parsedDate ? formatDate(parsedDate, resolveDateFormat(format)) : parts.date;
-  return [parts.title, parts.subtitle, date].filter(Boolean).join(" · ");
+  return parsedDate ? formatDate(parsedDate, resolveDateFormat(format)) : parts.date;
 }
 
 function buildStyles(format: DocumentFormat) {
@@ -223,11 +251,71 @@ function buildStyles(format: DocumentFormat) {
     },
     headingIconFilled: { width: 8, height: 8, marginRight: 5, backgroundColor: colors.primary },
     group: { marginBottom: 6 },
+    // groupHeading: the pre-F2e joined-string look, kept ONLY for the
+    // `headingParts`-less fallback (a group with a bare `heading`, e.g. a
+    // pre-E9-F2d stored snapshot) — every group WITH headingParts renders
+    // through the split entryTitle/entrySubtitle/entryDate/entryLocation
+    // elements below instead (§31.2 entries.* needs separate elements to
+    // apply placement/order/font-style independently; one joined string
+    // can't carry that).
     groupHeading: {
       fontSize: typeScaleSizes.entryHeader,
       fontFamily: typography.heading.family,
       fontWeight: typography.heading.weight,
       marginBottom: 2,
+      color: colors.text,
+    },
+    // entries.dateLocationPlacement's 3 rows (§31.2, E9-F2e). 'right'/'left'
+    // are one flowing row — the date/location cluster sits immediately
+    // beside the title cluster, wherever that ends up. 'split' pins the
+    // date/location cluster to the row's far end via space-between — the
+    // one placement value with genuinely different x geometry from the
+    // other two regardless of title length.
+    entryHeaderRow: { flexDirection: "row", alignItems: "baseline", marginBottom: 2 },
+    entryHeaderRowSplit: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      justifyContent: "space-between",
+      marginBottom: 2,
+    },
+    // entries.structure 'columns' (§31.2): a fixed-width meta column (date/
+    // location) beside a flexible main column (title/subtitle + items) —
+    // real geometry distinct from 'full-width', where title/date/location
+    // all share one row spanning the group's own width.
+    entryColumnsRow: { flexDirection: "row" },
+    entryMetaColumn: { width: "25%" },
+    entryMainColumn: { flex: 1, marginLeft: 8 },
+    entryTitleCluster: { flexDirection: "column" },
+    // entries.subtitlePlacement (§31.2): 'same-line' keeps the row direction
+    // here (subtitle appended right after the title text); 'below' switches
+    // GroupBlock to render the subtitle as a second child of
+    // entryTitleCluster instead — a real y-offset, not just a style tweak.
+    entryTitleRow: { flexDirection: "row", alignItems: "baseline" },
+    entryTitle: {
+      fontSize: typeScaleSizes.entryHeader,
+      fontFamily: typography.heading.family,
+      fontWeight: typography.heading.weight,
+      color: colors.text,
+    },
+    entrySubtitle: {
+      fontSize: typography.body.size,
+      fontFamily: typography.body.family,
+      marginLeft: 4,
+      color: colors.text,
+    },
+    // Overrides entrySubtitle's inline marginLeft when subtitlePlacement is
+    // 'below' — the subtitle starts its own line, flush with the title.
+    entrySubtitleBelow: { marginLeft: 0, marginTop: 1 },
+    entryDateLocationCluster: { flexDirection: "row", marginLeft: 6 },
+    entryDate: {
+      fontSize: typography.body.size,
+      fontFamily: typography.body.family,
+      color: colors.text,
+    },
+    entryLocation: {
+      fontSize: typography.body.size,
+      fontFamily: typography.body.family,
+      marginLeft: 4,
       color: colors.text,
     },
     items: { flexDirection: "column" },
@@ -240,6 +328,10 @@ function buildStyles(format: DocumentFormat) {
     },
     bullet: { width: 10, color: colors.text },
     itemText: { flex: 1, lineHeight: typography.body.lineHeight, color: colors.text },
+    // entries.bodyIndent (§31.2): shifts the item's own text run right,
+    // independent of the bullet glyph's position — a real x-offset on the
+    // body only, never the bullet.
+    itemTextIndent: { marginLeft: 10 },
   });
 }
 
@@ -348,6 +440,33 @@ export function SummarySection({ summary, format }: { summary: string; format: D
   return <Text style={styles.summary}>{summary}</Text>;
 }
 
+type SectionStyles = ReturnType<typeof buildStyles>;
+
+// entries.listStyle (§31.2) picks the bullet glyph. Only 2 values —
+// this is the one enum-shaped char lookup, never free text (§31.1).
+const BULLET_GLYPHS: Record<EntriesRenderConfig["listStyle"], string> = {
+  bullet: "•",
+  hyphen: "-",
+};
+
+// entries.{subtitle,date,location}FontStyle (§31.2) each independently pick
+// normal/bold/italic for their own Text run — a style ARRAY entry, not a
+// derived style key, since it composes onto the field's own base style
+// (entrySubtitle/entryDate/entryLocation) rather than replacing it.
+// 'italic' renders as a synthetic skew, not react-pdf's native `fontStyle:
+// "italic"`: fonts.ts's registered roster (E9-F2a) carries only regular/bold
+// weights for every one of its 39 faces, no italic source for any of
+// them — react-pdf's FontFamily.resolve hard-errors ("Could not resolve
+// font…fontStyle italic") rather than faux-italicizing on a missing face,
+// and this file's contract can't touch fonts.ts to add one. A CSS skew
+// transform is a real, independent style axis (@react-pdf/stylesheet
+// supports `transform` on Text) that needs no font asset at all.
+function fontStyleOverride(style: EntryFontStyle): { fontWeight?: 700; transform?: string } {
+  if (style === "bold") return { fontWeight: 700 };
+  if (style === "italic") return { transform: "skewX(-12deg)" };
+  return {};
+}
+
 export function ItemRow({
   item,
   format,
@@ -358,11 +477,119 @@ export function ItemRow({
   columns: number;
 }) {
   const styles = buildStyles(format);
+  const entriesConfig = resolveEntriesConfig(format);
   const width = columns > 1 ? { width: `${100 / columns}%` } : {};
+  const bodyStyle = entriesConfig.bodyIndent
+    ? [styles.itemText, styles.itemTextIndent]
+    : styles.itemText;
   return (
     <View style={[styles.item, width]}>
-      <Text style={styles.bullet}>{"•"}</Text>
-      <Text style={styles.itemText}>{item.text}</Text>
+      <Text style={styles.bullet}>{BULLET_GLYPHS[entriesConfig.listStyle]}</Text>
+      <Text style={bodyStyle}>{item.text}</Text>
+    </View>
+  );
+}
+
+// entries.subtitlePlacement (§31.2): the subtitle Text run, styled per
+// subtitleFontStyle either way — 'below' additionally drops the inline
+// marginLeft (entrySubtitleBelow) since it now starts its own line.
+function buildSubtitleNode(
+  parts: TailoredGroupHeadingParts,
+  entriesConfig: EntriesRenderConfig,
+  styles: SectionStyles,
+): ReactNode {
+  if (!parts.subtitle) return null;
+  const style = [
+    styles.entrySubtitle,
+    fontStyleOverride(entriesConfig.subtitleFontStyle),
+    ...(entriesConfig.subtitlePlacement === "below" ? [styles.entrySubtitleBelow] : []),
+  ];
+  return <Text style={style}>{parts.subtitle}</Text>;
+}
+
+// The title + subtitle cluster — entries.subtitlePlacement decides whether
+// the subtitle is the title row's second child (same-line) or
+// entryTitleCluster's second child (below, its own line — a real y-offset).
+function buildTitleCluster(
+  parts: TailoredGroupHeadingParts,
+  entriesConfig: EntriesRenderConfig,
+  styles: SectionStyles,
+): ReactNode {
+  const subtitleNode = buildSubtitleNode(parts, entriesConfig, styles);
+  const sameLine = entriesConfig.subtitlePlacement === "same-line";
+  return (
+    <View style={styles.entryTitleCluster}>
+      <View style={styles.entryTitleRow}>
+        <Text style={styles.entryTitle}>{parts.title}</Text>
+        {sameLine ? subtitleNode : null}
+      </View>
+      {sameLine ? null : subtitleNode}
+    </View>
+  );
+}
+
+// The date + location cluster, ordered per entries.dateLocationOrder —
+// independent of dateLocationPlacement, which only decides where this
+// cluster sits relative to the title cluster (buildEntryHeaderRow) or
+// whether it renders in its own column at all (GroupBlock's 'columns'
+// structure branch).
+function buildDateLocationCluster(
+  parts: TailoredGroupHeadingParts,
+  format: DocumentFormat,
+  entriesConfig: EntriesRenderConfig,
+  styles: SectionStyles,
+): ReactNode {
+  const date = resolveFormattedDate(parts, format);
+  const dateNode = date ? (
+    <Text key="date" style={[styles.entryDate, fontStyleOverride(entriesConfig.dateFontStyle)]}>
+      {date}
+    </Text>
+  ) : null;
+  const locationNode = parts.location ? (
+    <Text
+      key="location"
+      style={[styles.entryLocation, fontStyleOverride(entriesConfig.locationFontStyle)]}
+    >
+      {parts.location}
+    </Text>
+  ) : null;
+  const ordered =
+    entriesConfig.dateLocationOrder === "location-first"
+      ? [locationNode, dateNode]
+      : [dateNode, locationNode];
+  if (!ordered.some(Boolean)) return null;
+  return <View style={styles.entryDateLocationCluster}>{ordered}</View>;
+}
+
+// entries.dateLocationPlacement's 'left'/'right' (§31.2): one flowing row,
+// the date/location cluster before or after the title cluster. 'split' pins
+// it to the row's far end instead (entryHeaderRowSplit's justifyContent) —
+// see that style's comment for why this is the one placement with genuinely
+// different geometry from the other two regardless of title length.
+function buildEntryHeaderRow(
+  parts: TailoredGroupHeadingParts,
+  format: DocumentFormat,
+  entriesConfig: EntriesRenderConfig,
+  styles: SectionStyles,
+): ReactNode {
+  const titleCluster = buildTitleCluster(parts, entriesConfig, styles);
+  const dateLocationCluster = buildDateLocationCluster(parts, format, entriesConfig, styles);
+  const rowStyle =
+    entriesConfig.dateLocationPlacement === "split"
+      ? styles.entryHeaderRowSplit
+      : styles.entryHeaderRow;
+  if (entriesConfig.dateLocationPlacement === "left") {
+    return (
+      <View style={rowStyle}>
+        {dateLocationCluster}
+        {titleCluster}
+      </View>
+    );
+  }
+  return (
+    <View style={rowStyle}>
+      {titleCluster}
+      {dateLocationCluster}
     </View>
   );
 }
@@ -377,20 +604,57 @@ export function GroupBlock({
   columns?: number;
 }) {
   const styles = buildStyles(format);
-  const headingText = resolveGroupHeadingText(group, format);
+  const entriesConfig = resolveEntriesConfig(format);
+  const parts = group.headingParts;
+  const itemsBlock = (
+    <View style={columns > 1 ? styles.itemsGrid : styles.items}>
+      {group.items.map((item) => (
+        <ItemRow key={item.entryId} item={item} format={format} columns={columns} />
+      ))}
+    </View>
+  );
+
+  // Back-compat (§31.1): a group with no headingParts (every snapshot from
+  // before E9-F2d, or a hand-built fixture) renders exactly its raw
+  // `heading` string, untouched — entries.* has nothing structured to apply
+  // to.
+  if (!parts) {
+    return (
+      <View style={styles.group}>
+        {group.heading ? <Text style={styles.groupHeading}>{group.heading}</Text> : null}
+        {itemsBlock}
+      </View>
+    );
+  }
+
+  // entries.structure 'columns' (§31.2): the date/location cluster moves
+  // into its own fixed-width column beside title+items — dateLocationPlacement
+  // has nothing to decide here (there is no shared row to place it within),
+  // an unhandled off-diagonal rather than a crash, same convention as every
+  // other engine axis combination this codebase doesn't wire.
+  if (entriesConfig.structure === "columns") {
+    return (
+      <View style={styles.group}>
+        <View style={styles.entryColumnsRow}>
+          <View style={styles.entryMetaColumn}>
+            {buildDateLocationCluster(parts, format, entriesConfig, styles)}
+          </View>
+          <View style={styles.entryMainColumn}>
+            {buildTitleCluster(parts, entriesConfig, styles)}
+            {itemsBlock}
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.group}>
-      {headingText ? <Text style={styles.groupHeading}>{headingText}</Text> : null}
-      <View style={columns > 1 ? styles.itemsGrid : styles.items}>
-        {group.items.map((item) => (
-          <ItemRow key={item.entryId} item={item} format={format} columns={columns} />
-        ))}
-      </View>
+      {buildEntryHeaderRow(parts, format, entriesConfig, styles)}
+      {itemsBlock}
     </View>
   );
 }
-
-type SectionStyles = ReturnType<typeof buildStyles>;
 
 // §31.2 headings.icons's outline/filled render as a small geometric square (a
 // View, not a font glyph) so the adornment never depends on the chosen

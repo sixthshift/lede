@@ -9,6 +9,7 @@ import type { DocumentFormat, FontId } from "@shared/types";
 import type {
   DateFormatV2,
   DocumentFormatV2,
+  EntriesV2,
   HeadingCapitalization,
   HeadingIconStyle,
   HeadingStyle,
@@ -116,10 +117,23 @@ function resolveHeadingsConfig(format: DocumentFormatV2): HeadingsRenderConfig {
 // preset argument — no derivation needed, same as headingsConfig above. It
 // rides the same extra-property seam (`dateFormat`) because the legacy
 // `DocumentFormat` shape this file returns has no date-format field at all.
+//
+// entries.* (§31.2, E9-F2e) resolves 1:1 to sections.tsx's entry-header
+// composition — no derivation, same as headingsConfig/dateFormat above. Named
+// `entriesConfig` (not `entries`) to avoid colliding with the legacy shape's
+// OWN `sections` field name and to keep the "*Config" naming this seam
+// already uses for direct 1:1 passthroughs.
+export type EntriesRenderConfig = EntriesV2;
+
+function resolveEntriesConfig(format: DocumentFormatV2): EntriesRenderConfig {
+  return { ...format.entries };
+}
+
 export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
   typeScaleSizes: TypeScaleSizes;
   headingsConfig: HeadingsRenderConfig;
   dateFormat: DateFormatV2;
+  entriesConfig: EntriesRenderConfig;
 } {
   const bodyFont = resolveFont(format.fonts.body);
   return {
@@ -147,5 +161,6 @@ export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
     typeScaleSizes: resolveTypeScaleSizes(format),
     headingsConfig: resolveHeadingsConfig(format),
     dateFormat: format.document.dateFormat,
+    entriesConfig: resolveEntriesConfig(format),
   };
 }
