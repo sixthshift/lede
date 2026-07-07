@@ -169,3 +169,8 @@ export type Application = {
   createdAt: number;
   updatedAt: number;
 };
+
+// ── DocumentFormat v2 (spec.md §31.2, epic E9) — additive; re-exported here
+// so consumers can keep importing document-format types from one place. The
+// v1 `DocumentFormat` above is unchanged; see src/shared/format-v2.ts. ──
+export type { DocumentFormatV2 } from "@shared/format-v2";

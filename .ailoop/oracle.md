@@ -351,6 +351,91 @@ Executable checks (merged tree, keyless):
 - [ ] format/template changes never mutate stored snapshots (§28.1 — existing byte-stability guard
       stays green)
 
+### Phase 8 / E9 — design engine v2: one engine · presets · graded honesty (§31) — added 2026-07-07
+
+Intake decisions (ledger [v3-038..040], delegated to coordinator by §31):
+- **ATS classification table (§31.5), TESTED at intake** via `.ailoop/probe-ats-drawing-ops.mts`
+  (react-pdf render + pdf.js extraction over 8 decoration variants, all extraction-order
+  neutral). Shipped `strict` row per the proviso outcomes: columns `one` · no photo ·
+  heading icons `none` · no full-page/header background (`single` mode over white) ·
+  **border: ANY (PROMOTED to neutral — frame drawn first AND last leaves order intact)** ·
+  **level display: ANY (PROMOTED — dots and bars neutral)** · contact icons any · footer any.
+  Backgrounds/photo/columns/heading-icons keep the spec's rows (not under the proviso).
+  F3/F4 must land the per-axis CI extraction tests; shipped table must equal CI-observed.
+- **Font roster (§31.2 Fonts) FIXED — all verified on @fontsource (OFL), 31 body + 8 name:**
+  sans: ibm-plex-sans, arimo, carlito, source-sans-3, lato, roboto, open-sans, work-sans,
+  fira-sans, inter, nunito-sans, mulish, karla, manrope ·
+  serif: ibm-plex-serif, tinos, lora, source-serif-4, eb-garamond, merriweather,
+  libre-baskerville, crimson-pro, spectral, bitter, zilla-slab, noto-serif ·
+  mono: ibm-plex-mono, inconsolata, space-mono, jetbrains-mono, source-code-pro ·
+  name slot (`same-as-body` +): playfair-display, dm-serif-display, oswald, bebas-neue,
+  archivo-black, space-grotesk, abril-fatface, cormorant-garamond.
+  An unavailable/broken face at build time → mechanical amendment (swap + ledger entry).
+- **Group→phase assignment for axes §31.6 leaves implicit:** Document date formats + Fonts
+  land in F2 (formatting axes); Photo crop/zoom lands in F3 (with header/colors).
+
+Locked (§31.1, §31.3 — additive to the E7 locks above):
+- **ONE engine.** A single react-pdf composition renders every resume; `DocumentFormat` v2 is
+  the only varying input. The six E7/E8 templates are RETIRED as code, reborn as the first six
+  presets. A ticket adding a second render composition path = failed ticket.
+- **Bounded axes only, forever** — enum / bounded range / curated list; never raw CSS/HTML,
+  free positioning, or font upload.
+- **Design only.** Content stays Library-driven. ONE schema touch allowed: optional
+  `meta.level: 1–5` on skill-class entries (§31.4). **Level-scoring = failed ticket**
+  (extends the tag-scoring tripwire; anti-scoring control test required in F4).
+- **Migration deterministic + content-preserving:** v1→v2 by pure function, fixture-exact;
+  stored `TailoredResume` snapshots stay byte-identical. Honest deviation (spec-stated): a
+  locked app re-rendered under v2 may differ in PDF bytes; the locked *data* is unchanged.
+- Axis values are the contract: shipping a subset of an axis's §31.2 values = incomplete;
+  adding un-specced values = drift.
+
+Scope tripwire additions (§31.2 deferrals/rejections — building any = halt):
+- **Image backgrounds/frames REJECTED** (stronger than deferred).
+- Deferred, not silent: custom date format strings · UI/document localization/RTL ·
+  cover letters · DOCX export (§28.7 stands).
+
+Executable checks (merged tree, keyless throughout — §31.6):
+- [ ] **F0 — engine core + migration (THE risk, first):** v1→v2 migration fixture-exact over
+      all six v1 template configs + `settings.defaultFormat` + `lockedFormat` (pure function,
+      idempotent); the ONE engine renders six presets reproducing the retired templates —
+      every §28.8-A/C + E8 invariant green over presets-through-one-engine (extraction
+      content+order per strict preset, never-cut across every ladder, geometry contrasts:
+      centered classic header, one-row compact header, sidebar mean-x both sides, live banner
+      tint); `src/client/document/templates/` deleted; stored snapshots byte-identical across
+      any v2 format change; E8 gallery/thumbnails/e2e green unchanged over presets.
+- [ ] **F1 — design view shell + layout axes:** child route `/applications/:id/design` opens
+      from the Design card AND gallery (deep-link + refresh via SPA fallback); pinned pdf.js
+      preview repaints on a knob change (pixel-diff, E8-B1 pattern) debounced ~300ms, PUT
+      persists across reload; locked app ⇒ every control disabled, preview live; narrow
+      viewport ⇒ Design/Preview tabs; fit chip + page boundaries visible. Layout axes:
+      columns `one|two|mix` (mix = measured full-width band + two columns), header position
+      `top|left|right`, sidebar width 25–40% (geometry moves with the value), per-section
+      column/position assignment, manual page-break token forces a real page boundary;
+      never-cut at every layout.
+- [ ] **F2 — type/spacing/entries/headings/fonts/dates:** every enum value measurably
+      distinct (E8-A1 contrast pattern, parameterized); offsets/margins/line-height move
+      measured geometry in the stated direction and honor §31.2 bounds; 8 heading styles
+      pairwise-distinct bytes; the fixed 31+8 font roster registers and renders (self-hosted,
+      no CDN); 12 date formats each render a fixture date distinctly.
+- [ ] **F3 — colors/header/links/footer/photo-crop:** each of the 9 accent-placement toggles
+      changes bytes ONLY in its element class (extraction text unchanged); multi-mode
+      auto-contrast ink verified (E8-A2 luminance logic generalized); border sides/size
+      measurable + extraction-order invariant (the promoted row's CI test); header band /
+      full-page background keep extraction green; footer text renders (and page numbers
+      paginate).
+- [ ] **F4 — per-section displays + levels:** unleveled entry in `level` layout renders
+      level-less via `rows` fallback (level NEVER invented); grid columns 1–4 measured;
+      renamed labels render; level dots/bars extraction-neutral (promoted row's CI test);
+      **anti-scoring control:** tailoring output invariant to level values (two libraries
+      identical except levels ⇒ identical selection/order).
+- [ ] **F5 — presets v2 + grade function:** save-current-as-preset → appears in gallery →
+      applies → round-trips reload; the six migrated presets + curated new-axis presets ship;
+      pure `atsGrade(format)` unit table EQUALS the CI-observed classification (same fixtures
+      as the F3/F4 axis tests); every shipped preset's badge matches its tested grade;
+      per-cause caveat UI (picker pattern) surfaces each `good` cause.
+- [ ] Every phase: full standing baseline + cross-cutting invariants green (§25 kill
+      criteria, boot smoke, browser e2e); docker e2e at phase close per [v3-004].
+
 ## Browser acceptance ([v2-036] semantic amendment) — added 2026-07-03
 
 Escalated to the human because per-phase acceptance was passing on servers that

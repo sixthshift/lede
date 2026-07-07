@@ -1504,3 +1504,62 @@ PHASE-CLOSE ORACLE (oracle.md Phase 7/E8) on merged tree, ALL GREEN (in the 363 
    · Env: epic is fully keyless; playwright/vitest baselines unchanged ([v3-004] composite; docker = phase-close
      only). Known operational quirks stand: vitest parallel contention flake (serial fallback), possible
      session-limit deaths mid-ticket (resume the builder; coordinator may run verification itself, [v3-035]).
+
+===== RUN 2026-07-07 (E9 intake + F0 drive) — caps: maxAttempts 3 · thrash 2 · chunk 30 =====
+
+[v3-038] E9 INTAKE — spec §31 "Design engine v2" (per directive [v3-037]). Oracle Phase 8 written
+  (F0-F5 executable checks, §31.1/§31.3 locks, §31.2 deferral tripwires: image backgrounds REJECTED;
+  localization/cover letters/custom date strings/DOCX deferred-not-silent). Backlog seeded: F0 FINE
+  (E9-F0a shared v2+migration → E9-F0b engine core single-column → E9-F0c two-column → E9-F0d cutover;
+  serial by design — each builds on the previous layer; F0d pre-flagged tooBig-eligible with a suggested
+  split seam), F1-F5 COARSE (decompose at pickup, per §31.6's own instruction — F0's real shape teaches
+  the axes). Scheduler clean: 9 todo, ready=[E9-F0a].
+
+[v3-039] INTAKE DECISION — §31.5 classification table TESTED at intake, as the spec demands. Probe
+  `.ailoop/probe-ats-drawing-ops.mts` (react-pdf renderToBuffer + pdf.js extraction, the repo's own
+  harness pattern): 8 variants — border frame drawn first AND last, level dots, level bar, header band,
+  heading icons, full-page background — ALL extraction-order neutral (7 markers index-exact, zero stray
+  text items). Per the spec's proviso: **border → PROMOTED to neutral; level display dots/bars →
+  PROMOTED to neutral** in the shipped strict row. Backgrounds/photo/columns/heading-icons keep the
+  spec's stricter rows (not under the proviso — their demotion rationale is not order-based). F3/F4
+  must land the same probes as standing CI tests; F5's shipped table must equal CI-observed. Probe kept
+  in .ailoop/ as the record of how the table was earned.
+
+[v3-040] INTAKE DECISION — §31.2 font roster FIXED (delegated to coordinator by spec). 31 body faces
+  (sans: ibm-plex-sans arimo carlito source-sans-3 lato roboto open-sans work-sans fira-sans inter
+  nunito-sans mulish karla manrope · serif: ibm-plex-serif tinos lora source-serif-4 eb-garamond
+  merriweather libre-baskerville crimson-pro spectral bitter zilla-slab noto-serif · mono:
+  ibm-plex-mono inconsolata space-mono jetbrains-mono source-code-pro) + 8 name-slot display faces
+  (playfair-display dm-serif-display oswald bebas-neue archivo-black space-grotesk abril-fatface
+  cormorant-garamond). Every package EXISTS on @fontsource (npm view verified, all 42 candidates
+  resolve); OFL per Google Fonts (Roboto/Open Sans relicensed OFL — and the spec itself names them as
+  the FlowCV-overlap OFL set). Unavailable/broken face at build time = mechanical swap + ledger entry.
+  Also assigned: date formats + Fonts → F2; photo crop/zoom → F3 (§31.6 leaves these implicit).
+
+[v3-041] Env preconditions (Stage 1.3): epic fully keyless per §31.6; toolchain unchanged ([v3-004]
+  composite baseline; docker = phase-close only); git repo clean at f2f34f5. Red-team of F0 acceptances
+  dispatched pre-build (Stage 1.5) — findings logged next entry.
+
+[v3-042] RED-TEAM (Stage 1.5, pre-build) — 9 findings, ALL folded into F0 acceptances: (1) engine-as-
+  template-dispatcher ("trenchcoat") → engine/ grep guards + OFF-DIAGONAL composition test (strict preset
+  + colors.area:'header' — a six-look switch cannot produce it; survives cutover as standing guard);
+  (2) vacuous never-cut → fixture must resolve 'compact' + page count must shrink, invariance per forced
+  density; (3) hollow v2 type → EVERY enum axis pinned by literal-set test + per-group zod rejection;
+  (4) migration-fixture circularity → named-literal anchors traced to template source constants;
+  (5) F0d suite lobotomy → vitest count floor + no new .skip/.only/.todo + must-survive assertions
+  ENUMERATED; (6) fake pre-E9 rows → F0c commits test/fixtures/pre-e9-formats/ from the CURRENT schema,
+  F0d forbidden to touch it (diff guard); (7) engine tests bypassing engine → import guards on the test
+  files; (8) unhandled-axis crash → every-enum-value render smoke; (9) sidebar-width delta → magnitude
+  bound ±25% of 0.15×content-width. FLAG resolved: presetId is UI provenance only, optional on v2, engine
+  forbidden to read it (grep-guarded). Noted, accepted: F0b's presets===migrateFormat toEqual is
+  tautological by construction — real parity rests on the geometry-contrast anchors (finding 4).
+
+[v3-043] E9-F0a — ACCEPTED (single dispatch, first attempt). DocumentFormatV2 (13 groups, every §31.2
+  axis literal-pinned) + zod bounds + migrateFormat/isFormatV2 + TEMPLATE_V2_OVERLAYS anchored to
+  template sources; 104 new tests. Independent re-verify green (evidence on ticket). MECHANICAL
+  AMENDMENT: `bun run build` SIGKILLed by the host OOM killer on clean HEAD too (MemAvailable ~1.8GB;
+  pre-exists this diff, reproduced by coordinator via git stash) — baseline build in this environment
+  runs `NODE_OPTIONS=--max-old-space-size=1024 bun run build` (bounded heap forces GC under the
+  threshold; 12s green). No change to what counts as done. Judgment endorsed: presetId not stamped by
+  migrateFormat (a customized v1 format is not a preset); F0b's presets.ts self-identifies — F0b
+  context/acceptance amended to match. NEXT: E9-F0b (engine core, single-column).

@@ -1578,6 +1578,181 @@
       "acceptance": "BASELINE (oracle.md): `bun run check` exit 0; `bun run lint` clean; `bun run build` exit 0; `bunx vitest run --passWithNoTests` green; `bunx playwright test` (chromium, non-docker) green. Do NOT run the docker e2e.\nNEW TESTS (all green):\n1. Unit (jsdom): gallery renders one card per registry template (6) with name + effectiveAtsGrade badge (sidebar cards show 'good' + caveat); selecting calls onChange({...format, templateId: id}) with every other format field untouched (deep-equal); readOnly blocks selection.\n2. E2E (real browser): 'Browse templates' opens the gallery; all 6 cards show painted (non-blank) canvases; selecting sidebar-right closes the gallery, updates the inline picker selection AND the main document preview; after a page reload the application still has templateId 'sidebar-right' (persisted via the format API).\n3. Locked application: gallery opens read-only, selection has no effect (e2e or unit).\n4. No new route added (client router untouched — the no-orphan-routes §26 invariant stays green); existing picker/design-panel tests unchanged.",
       "attempts": [],
       "evidence": "INDEPENDENT re-verify (coordinator, final tree) — all green: check 0; lint clean (171 files); build 0; vitest SERIAL 47 files / 363 tests (5 new gallery unit tests: 6 cards + badges/caveat, sample fallback, onChange {...format, templateId} deep-equal others-untouched, readOnly no-op); playwright FULL non-docker 10/10.\nE2E (4d) gallery scenario: Browse templates opens a dialog; all 6 cards painted (paint helper scoped to the dialog Locator — pre-empting the inline-picker data-template-id ambiguity, the exact strict-mode class that bit E8-A2); selecting Sidebar Right PUTs templateId==='sidebar-right' with earlier (4b) color (#14532d) and font (arimo) fields asserted UNTOUCHED; gallery closes; inline picker aria-pressed reflects it; persists across reload. Slotted after (4b)/(4c) and before template-agnostic re-tailor/lock so it disturbs nothing.\nGAMING READ clean: gallery is a Dialog (router untouched — §26 no-orphan-routes); reuses TemplateThumbnail with a backward-compatible scale prop correctly folded into the cache key; no renderToBuffer call sites; no weakened assertions/allowlists; TemplatePicker untouched (gallery owns its trigger).\nMINOR inefficiency noted (not a defect): the blob cache keys on scale though PDF bytes are scale-independent — two scales re-render the same PDF once each. Cosmetic.\ncommitted: E8-C1 (see git log)."
+    },
+    {
+      "id": "E9-F0a",
+      "title": "DocumentFormat v2 (all §31.2 axes) + v1→v2 migration, additive shared layer",
+      "status": "done",
+      "depends_on": [],
+      "files": [
+        "src/shared/format-v2.ts",
+        "src/shared/types.ts",
+        "test/format-v2.test.ts"
+      ],
+      "origin": "spec §31.1/§31.2/§31.6 F0 (E9 intake [v3-038])",
+      "context": "Epic E9 (spec §31, read it in full — /workspace/spec.md lines 939-1133) retires the six code templates for ONE parameterized engine; DocumentFormat v2 is the only varying input. THIS ticket is the pure shared layer, ADDITIVE ONLY — do not change the existing DocumentFormat type or any consumer; the cutover is E9-F0d. Create src/shared/format-v2.ts exporting: (1) type DocumentFormatV2 covering EVERY §31.2 axis with the EXACT enums/bounds (Document: pageFormat a4|letter, dateFormat = the 12 listed presets; Layout: columns one|two|mix, headerPosition top|left|right, sidebarWidthPct 25-40, per-section column/position assignment, manual page-break tokens; Type scale: bodySize 9-12 + name +4..+12 / title 0..+4 / sectionHeading 0..+3 / entryHeader 0..+2 offsets; Spacing: lineHeight 1.15-1.5, elementSpacing 0-4, marginsMm {x:10-28, y:10-28}; Entries; Headings: 8 styles + capitalize|uppercase + icons none|outline|filled; Fonts: body FontId + name slot 'same-as-body'|display FontId; Colors: area full-page|header|border, mode single|multi {text,background,accent}, border {size s|m|l, sides}, accentPlacement 9 boolean toggles; Header; Photo (carry v1 + crop/zoom fields); Links; Footer; Per-section display per §31.2 last bullet incl. level display text|dots|bar + 5 renamable labels — labels are FORMAT, level values are CONTENT and NOT in this type). Field naming is yours; values/bounds are the spec's contract — no extra values, no omissions. (2) zod schema formatV2Schema enforcing every bound (parse rejects out-of-range). (3) DEFAULT_FORMAT_V2 (migration of today's DEFAULT_FORMAT). (4) migrateFormat(v1: DocumentFormat): DocumentFormatV2 — pure, deterministic, idempotent-safe via isFormatV2() discriminator; maps each of the six templateIds (strict/classic/compact/banner/sidebar-left/sidebar-right — read src/client/document/templates/*.tsx + registry.ts for their actual look) to the v2 axis values reproducing that template's look (e.g. classic ⇒ headerAlignment center + heading underline-rule; banner ⇒ colors.area header; sidebar-left ⇒ columns two + headerPosition left + sidebarWidthPct matching the current template's width; compact ⇒ one-row header). marginX/marginY pt → mm (1pt=0.352778mm, round 1dp, clamp 10-28). Preserve typography/colors/photo/sections. Also migrate templateId → presetId string. Keep pt-vs-mm and every conversion in ONE table-like place so F0b can import the same constants. Frozen (oracle.md 'Phase 8' locks): bounded axes only; level VALUES excluded from format; §31.2 deferrals (custom date strings etc.) NOT typed in. RED-TEAM SHARPENING ([v3-042]): presetId is PROVENANCE, not a render input — DocumentFormatV2 may carry an optional presetId?: string used ONLY by UI to highlight which preset the current axes came from; the engine must never read it (F0b enforces by grep) and no axis behavior may key on it. Migration fixtures must NOT be authored by pasting migrateFormat output (circularity): anchor load-bearing values to the template sources.",
+      "acceptance": "- bun run check → 0\n- bun run lint → 0\n- bun run build → 0\n- vitest run --passWithNoTests green (serial fallback if parallel contention flakes)\n- playwright test (chromium) green — full suite, no skips introduced\n- test/format-v2.test.ts: fixture-EXACT migration — for each of the six v1 template default configs (templateId + DEFAULT_FORMAT fields), migrateFormat returns the exact expected v2 object (toEqual on full literal fixtures, not spot fields)\n- idempotence: isFormatV2 discriminates; migrating an already-v2 value is a no-op or type-rejected (state which, test it)\n- zod bounds: for EVERY numeric axis a parse just-inside passes and just-outside fails (sidebarWidthPct 24/25/40/41, bodySize 8/9/12/13, lineHeight 1.14/1.5/1.51, marginsMm 9/10/28/29, elementSpacing -1/0/4/5, offsets at each stated bound); every enum axis rejects an un-specced value (e.g. dateFormat 'DD-MM-YYYY', headingStyle 'shadow')\n- dateFormat enum has EXACTLY the 12 spec values, headingStyle EXACTLY the 8, accentPlacement EXACTLY 9 toggles (test asserts counts + literal sets)\n- existing suite untouched and green (additive ticket — zero existing-file behavior change; types.ts may only re-export)\n- EVERY enum axis pinned by literal-set test (not just the three): entries structure(2), date&location placement(3) + order, subtitle(2), listStyle(2), per-element font styles(3 each), heading capitalization(2), heading icons(3), color area(3), color mode(2), border size(3), header alignment(2), details arrangements(3), separator(3), contact icon styles(7), name/title weight(2), title position(2), section layout(5: grid|rows|compact|bubble|level), level display(3), grid columns 1-4 — counts AND literal values asserted\n- zod parse REJECTS an object missing each top-level group (one test per group, loop is fine)\n- migration anchor assertions as NAMED LITERALS traceable to template source (independent of the full-object fixtures): sidebar presets' sidebarWidthPct equals the width constant in templates/sidebar.tsx; classic ⇒ headerAlignment 'center'; compact ⇒ the one-row header value; banner ⇒ colors.area 'header'",
+      "attempts": [],
+      "evidence": "Independent re-verify 2026-07-07: check 0 · lint 0 (biome 173 files) · build 0 (NODE_OPTIONS=--max-old-space-size=1024; unbounded build SIGKILLs on clean HEAD too — env OOM, mechanical amendment [v3-043]) · vitest 48 files/467 tests green (+104 new, 363 pre-existing intact) · scope: git diff = exactly {format-v2.ts new, types.ts +5 re-export, format-v2.test.ts new} · gaming read clean: fixtures hand-authored with per-field source-line comments (not migrateFormat output), all enum axes literal-set pinned, v1 FontId roster (6) verified subset of BODY_FONT_IDS. Judgment: migrateFormat intentionally does NOT stamp presetId (customized v1 formats are not presets); presets.ts self-identifies in F0b."
+    },
+    {
+      "id": "E9-F0b",
+      "title": "Engine core: one composition renders the four single-column presets (strict/classic/compact/banner)",
+      "status": "todo",
+      "depends_on": [
+        "E9-F0a"
+      ],
+      "files": [
+        "src/client/document/engine/",
+        "src/client/document/presets.ts",
+        "test/engine-single-column.test.ts"
+      ],
+      "origin": "spec §31.1/§31.6 F0 (E9 intake [v3-038])",
+      "context": "THE epic risk (spec §31.6 F0): ONE react-pdf composition, parameterized by DocumentFormatV2 (E9-F0a, done — src/shared/format-v2.ts), must reproduce the retired templates' looks. This ticket: the engine core + the four SINGLE-COLUMN presets. Build src/client/document/engine/ (new dir, your structure — e.g. index.tsx composing header/body from format) rendering a full react-pdf Document from { resume, profile, paper, format: DocumentFormatV2 }, consuming the v2 axes needed for single-column parity: headerAlignment/one-row header, heading treatments used by the four looks, colors.area header (banner band with auto-contrast ink — port the luminance logic from templates/banner.tsx), type scale, spacing, margins. Reuse the SHARED section renderers (src/client/document/sections.tsx) — the engine composes, sections render (registry pattern, oracle.md E7 locks). Axes the four presets don't exercise (two-column, borders, footers, per-section displays...) may be unimplemented BUT must not crash: unhandled axis values render as the default look for now (F1-F4 land them); document which in a code comment at the engine entry. src/client/document/presets.ts: export the six preset v2 configs = migrateFormat over each v1 template default (import the fn; do NOT hand-author drifted copies); this ticket TESTS the four single-column ones. ADDITIVE: templates/*.tsx and registry.ts stay untouched (cutover is E9-F0d); the engine ships alongside. Density ladder: apply the existing fit.ts multipliers to the v2 type/spacing axes uniformly (§31.3: ladder scales v2 axes). Frozen: react-pdf only; renderer never cuts; leadRationale/cut never rendered; one engine — no per-preset render functions, presets are DATA. RED-TEAM SHARPENING ([v3-042]): the engine must be a genuine parameterization, NOT a dispatcher over the six looks — no imports of templates/ or registry.ts inside engine/, no reading of format.presetId, and off-diagonal axis combinations must work (that is what distinguishes an engine from six templates in a trenchcoat). COORDINATOR NOTE post-F0a ([v3-043]): migrateFormat deliberately does not stamp presetId; presets.ts must set presetId on each of its six configs itself (they genuinely ARE presets). Reuse F0a exports: TEMPLATE_V2_OVERLAYS, DEFAULT_FORMAT_V2, the conversion-constants table, formatV2Schema.",
+      "acceptance": "- bun run check → 0\n- bun run lint → 0\n- bun run build → 0\n- vitest run --passWithNoTests green (serial fallback if parallel contention flakes)\n- playwright test (chromium) green — full suite, no skips introduced\n- test/engine-single-column.test.ts, patterned on test/document-extraction-invariant.test.ts + document-templates.test.ts (read both first):\n- for EACH of the 4 presets rendered BY THE ENGINE: pdf.js extraction contains profile header + every item.text in strict index-increasing order; SENTINEL leadRationale/cut strings absent\n- geometry contrasts THROUGH THE ENGINE: classic-preset name mean-x ≈ page horizontal center while strict-preset name is left-anchored (assert both, contrast not existence); compact-preset name and first contact fragment share a text-line y while strict's do not; banner-preset render includes a header-band paint with the format's accent + contrast ink (port/adapt the existing banner tint assertion)\n- never-cut: for each of the 4 presets, item count in extraction is invariant across the full density ladder on a growing fixture\n- presets.ts: six configs exist, EACH deep-equals { ...migrateFormat(<its v1 default>), presetId: <id> } (toEqual — presets are migrations plus self-identity, not forks)\n- engine is one composition: grep-style assertion or structural test that presets carry NO render functions (data only)\n- existing suite (old templates) untouched and green\n- grep guards: `grep -rn \"templates/\\|registry\" src/client/document/engine/` → 0 hits; `grep -rn \"presetId\" src/client/document/engine/` → 0 hits\n- OFF-DIAGONAL composition test: strict preset with ONLY colors.area flipped to 'header' → band paint present AND name still left-anchored AND extraction order still index-increasing (a six-look dispatcher cannot produce this combination)\n- density is REAL, not vacuous: the growing fixture actually exercises the ladder (fitToPages resolves 'compact' for the large fixture — fit.test.ts lines 62-84 pattern) AND page count at forced 'compact' < at 'comfortable'; item-count invariance asserted at EACH forced density\n- unhandled-axis smoke: for every enum axis of DocumentFormatV2, each value applied over DEFAULT_FORMAT_V2 renders to a nonempty PDF buffer (no throw)\n- test/engine-single-column.test.ts imports the engine (src/client/document/engine/) and has ZERO imports of registry.ts or templates/ (renders must go through the engine, not the old path)",
+      "attempts": [],
+      "evidence": null
+    },
+    {
+      "id": "E9-F0c",
+      "title": "Engine two-column: sidebar left/right presets + sidebar width axis",
+      "status": "todo",
+      "depends_on": [
+        "E9-F0b"
+      ],
+      "files": [
+        "src/client/document/engine/",
+        "src/client/document/presets.ts",
+        "test/engine-two-column.test.ts",
+        "test/fixtures/pre-e9-formats/"
+      ],
+      "origin": "spec §31.1/§31.6 F0 (E9 intake [v3-038])",
+      "context": "Extend the E9-F0b engine (src/client/document/engine/) with two-column layout: columns 'two', headerPosition 'left'|'right' (sidebar side), sidebarWidthPct 25-40 honored as real geometry. Reproduce the retired sidebar templates' look (read templates/sidebar.tsx + sidebar-right.tsx: which sections go sidebar vs main, contact placement, width) so the sidebar-left and sidebar-right presets in src/client/document/presets.ts render at parity through the ONE engine. Column assignment: derive the same section split the v1 templates used, expressed via the v2 per-section placement axis with a sensible default (spec §31.2 Layout: per-section column assignment; the presets pin the v1 split). 'mix' (band + two columns) is F1, NOT here — but don't paint yourself into a corner: the column machinery should not assume the header always spans a column. Still ADDITIVE (templates/registry untouched; cutover is E9-F0d). Frozen: one engine (no separate two-column composition function forked from the single-column path — parameterize); never cuts; react-pdf only. RED-TEAM SHARPENING ([v3-042]): also CAPTURE the pre-cutover ground truth for F0d — commit test/fixtures/pre-e9-formats/: for each of the six templates, the v1 format JSON exactly as today's code would store it (serialized through the CURRENT zod/API shape), plus one lockedFormat wrapper object and one settings.defaultFormat value. These are the REAL pre-E9 row shapes F0d's migration test must consume; F0d is forbidden from editing them.",
+      "acceptance": "- bun run check → 0\n- bun run lint → 0\n- bun run build → 0\n- vitest run --passWithNoTests green (serial fallback if parallel contention flakes)\n- playwright test (chromium) green — full suite, no skips introduced\n- test/engine-two-column.test.ts:\n- sidebar-left preset via engine: mean-x of sidebar-section text < mean-x of main-section text; sidebar-right preset: the inequality FLIPS (the E8 sidebar mean-x contrast, now through one engine)\n- sidebarWidthPct is real geometry: same preset at 25 vs 40 moves the main-column left edge in the stated direction by a measured amount (assert direction + nonzero delta, not exact pt)\n- extraction over both sidebar presets contains profile + EVERY selected item.text (presence for two-column; order not required — they are not strict)\n- never-cut across the full ladder for both presets\n- both presets === migrateFormat(<their v1 defaults>) (extends the F0b toEqual test to all six)\n- existing suite untouched and green\n- test/fixtures/pre-e9-formats/ committed, produced via the CURRENT (pre-cutover) format schema — six template defaults + a lockedFormat wrapper + a settings.defaultFormat, each parsing under today's zod schema (asserted in a test)\n- sidebar width delta magnitude: the 25%→40% main-column edge shift is within ±25% of the expected 0.15 × content-width in pt (not merely nonzero)\n- density non-vacuous for both sidebar presets (same fitToPages-resolves-compact + page-count-shrinks pattern as F0b)\n- test/engine-two-column.test.ts imports the engine only (zero registry/templates imports)",
+      "attempts": [],
+      "evidence": null
+    },
+    {
+      "id": "E9-F0d",
+      "title": "Cutover: presets-through-one-engine replace templates; stored v1 formats migrate",
+      "status": "todo",
+      "depends_on": [
+        "E9-F0c"
+      ],
+      "files": [
+        "src/shared/types.ts",
+        "src/shared/format.ts",
+        "src/shared/format-v2.ts",
+        "src/shared/schema.ts",
+        "src/client/document/",
+        "src/client/components/DesignPanel.tsx",
+        "src/client/components/TemplatePicker.tsx",
+        "src/client/components/TemplateGallery.tsx",
+        "src/client/components/AtsView.tsx",
+        "src/client/components/DocumentPreview.tsx",
+        "src/client/components/ApplicationDetail.tsx",
+        "src/client/components/LayoutEditor.tsx",
+        "src/server/",
+        "test/",
+        "drizzle/"
+      ],
+      "origin": "spec §31.1 migration + §31.6 F0 close (E9 intake [v3-038])",
+      "context": "The F0 cutover, LARGE AND FLAGGED: if this exceeds one session return tooBig with a proposed split (suggested seam: (1) client render-path cutover + template deletion + test reparameterization, (2) server/API stored-format migration + e2e) rather than half-building. Goal: DocumentFormatV2 becomes THE DocumentFormat everywhere; the engine (src/client/document/engine/, done E9-F0b/c) is the ONLY render path; src/client/document/templates/ is DELETED; registry.ts becomes a PRESET registry (six presets from presets.ts with id/name/description/layout/atsGrade metadata — keep the declared-grade fields and effectiveAtsGrade semantics; the pure atsGrade(format) function is F5, do NOT build it here). renderResume/thumbnail/fit/download/plainText/AtsView/picker/gallery/DesignPanel operate on (resume, profile, paper, formatV2) with UNCHANGED user-facing behavior (picker still lists six choices with live thumbnails + badges; gallery unchanged; §28.3 panel knobs map onto v2 fields). STORED DATA: applications.format, applications.lockedFormat.format, settings.defaultFormat hold v1 JSON — migrate via migrateFormat at the persistence boundary (choose: lazy on read OR one-shot boot migration; state the choice and test it), idempotent, so a pre-E9 database round-trips to valid v2 with look preserved; locked apps stay LOCKED (migrating lockedFormat does not unlock or mutate locked TailoredResume snapshots — §28.1 byte-stability). Rename outward-facing 'template' vocabulary to 'preset' where cheap (registry API, picker labels) but do NOT churn routes/DB columns for naming alone. Retire test/document-templates.test.ts etc. by REPARAMETERIZING over Object.values(PRESETS) — the E7/E8 invariant suite must survive, not be deleted (oracle.md Phase 7 checks all still apply, now over presets-through-one-engine). Frozen: react-pdf only; one engine; never cuts; §28.1 byte-stability; §26 IA (no new top-level routes). RED-TEAM SHARPENING ([v3-042]): reparameterization must not weaken the suite — record the pre-cutover vitest test count for the document/fit/extraction suites and hold it as a floor; the must-survive assertions are ENUMERATED (below), not implied; migration tests consume the E9-F0c-committed test/fixtures/pre-e9-formats/ VERBATIM (your diff must not touch that directory). The F0b off-diagonal composition test must survive the cutover (it is the standing anti-trenchcoat guard).",
+      "acceptance": "- bun run check → 0\n- bun run lint → 0\n- bun run build → 0\n- vitest run --passWithNoTests green (serial fallback if parallel contention flakes)\n- playwright test (chromium) green — full suite, no skips introduced\n- grep guards: src/client/document/templates/ does not exist; zero imports of it; zero references to the old per-template render functions\n- the FULL reparameterized invariant suite green: for every preset — extraction contains profile + every item (strict presets: index-increasing order), sentinels absent, never-cut across ladder; effectiveAtsGrade honesty (sidebar-right ⇒ good, photo shown ⇒ good) — i.e. every oracle.md Phase-7/E8 check now passes over PRESETS\n- migration: a fixture pre-E9 sqlite row (v1 format JSON in applications.format + lockedFormat + settings.defaultFormat) reads back as schema-valid v2 with the mapped preset look; migration is idempotent (second read/run identical); locked TailoredResume snapshot bytes UNCHANGED by migration and by any subsequent v2 format PUT\n- format PUT round-trip: API accepts v2 (zod), rejects out-of-bounds (one 400 case tested), persists across restart\n- playwright e2e: full existing suite 10/10 green (gallery: 6 painted pairwise-different thumbnails, selection persists, sample badges — unchanged behavior over presets)\n- §28.1 byte-stability guard green (format change never mutates stored TailoredResume)\n- suite floor: vitest test count over test/{document-*,engine-*,fit*,format*}.test.ts AFTER cutover ≥ the pre-cutover count (record both numbers in evidence; --reporter=json or the summary line)\n- grep guard: no new .skip/.only/.todo anywhere under test/ (diff-scoped)\n- must-survive assertions enumerated, each present and green post-cutover: centered-classic mean-x, one-row-compact shared y, sidebar mean-x contrast BOTH sides, banner tint + contrast ink, sentinel absence, strict extraction order, never-cut per preset, OFF-DIAGONAL composition (F0b), §28.1 byte-stability\n- migration test consumes test/fixtures/pre-e9-formats/ files unchanged (git diff for E9-F0d touches zero paths under test/fixtures/pre-e9-formats/)",
+      "attempts": [],
+      "evidence": null
+    },
+    {
+      "id": "E9-F1",
+      "title": "COARSE (decompose at pickup): design view shell (§31.2b) + layout axes",
+      "status": "todo",
+      "depends_on": [
+        "E9-F0d"
+      ],
+      "files": [
+        "src/client/",
+        "test/"
+      ],
+      "origin": "spec §31.2b + §31.2 Layout + §31.6 F1",
+      "context": "COARSE EPIC — the coordinator decomposes this at pickup into fine tickets; do not dispatch as-is. Scope: the dedicated design view (child route /applications/:id/design entered from Design card + gallery, pinned pdf.js live preview right / scrolling jump-nav panel left in FlowCV group order, ~300ms debounced repaint with busy indicator, locked apps read-only, narrow-viewport Design/Preview tabs, fit chip + page boundaries visible; existing §28.3 controls move in) PLUS the Layout group axes: columns one|two|mix (mix = full-width header band + two-column body), header position, sidebar width slider, per-section column/position assignment (extends LayoutEditor per §13), draggable manual page-break tokens. Oracle: oracle.md Phase 8 F1 line.",
+      "acceptance": "oracle.md Phase 8 'F1' checks + full baseline. Decompose before dispatch.",
+      "attempts": [],
+      "evidence": null
+    },
+    {
+      "id": "E9-F2",
+      "title": "COARSE (decompose at pickup): type scale · spacing · entries · headings · fonts roster · date formats",
+      "status": "todo",
+      "depends_on": [
+        "E9-F1"
+      ],
+      "files": [
+        "src/client/",
+        "src/shared/",
+        "test/",
+        "package.json"
+      ],
+      "origin": "spec §31.2 (Type/Spacing/Entries/Headings/Fonts/Document-dates) + §31.6 F2",
+      "context": "COARSE EPIC — decompose at pickup. Scope: type-scale offsets (name/title/heading/entry-header, exact §31.2 bounds), spacing (line height, element spacing 0-4, paired mm margins), Entries group (structure, date&location right|left|split + order, subtitle line, list style bullet|hyphen, per-element font styles, body indent), Headings (8 treatments + capitalization + per-heading icons none|outline|filled), the LOCKED font roster (oracle.md Phase 8 intake decisions: 31 body + 8 name-slot @fontsource OFL faces, name slot 'same-as-body' default, self-hosted only), and the 12 date-format presets applied by the shared section renderers. Every control lands in the F1 design view's matching group. Oracle: Phase 8 F2 line.",
+      "acceptance": "oracle.md Phase 8 'F2' checks + full baseline. Decompose before dispatch.",
+      "attempts": [],
+      "evidence": null
+    },
+    {
+      "id": "E9-F3",
+      "title": "COARSE (decompose at pickup): colors subsystem · header group · links · footer · photo crop",
+      "status": "todo",
+      "depends_on": [
+        "E9-F2"
+      ],
+      "files": [
+        "src/client/",
+        "test/"
+      ],
+      "origin": "spec §31.2 (Colors/Header/Links/Footer/Photo) + §31.6 F3",
+      "context": "COARSE EPIC — decompose at pickup. Scope: color area full-page|header|border, mode single|multi (text/background/accent hexes, curated swatches + free hex), auto-contrast ink generalized from the banner logic, border page-frame (size s|m|l, per-side toggles — extraction-neutrality CI test REQUIRED, the [v3-038] promoted row), 9 accent-placement toggles, Header group (alignment, 3 detail arrangements, separator icon|bullet|bar, 7 contact icon styles, name/title weight + position), Links toggles, Footer toggles (page numbers/email/name/custom line), photo crop/zoom at upload. IMAGE BACKGROUNDS ARE REJECTED (scope tripwire). Oracle: Phase 8 F3 line.",
+      "acceptance": "oracle.md Phase 8 'F3' checks + full baseline. Decompose before dispatch.",
+      "attempts": [],
+      "evidence": null
+    },
+    {
+      "id": "E9-F4",
+      "title": "COARSE (decompose at pickup): per-section displays + skill/language levels (§31.4)",
+      "status": "todo",
+      "depends_on": [
+        "E9-F3"
+      ],
+      "files": [
+        "src/client/",
+        "src/shared/",
+        "src/server/",
+        "test/",
+        "drizzle/"
+      ],
+      "origin": "spec §31.2 last bullet + §31.4 + §31.6 F4",
+      "context": "COARSE EPIC — decompose at pickup. Scope: per-section display axes (skills/languages layout grid|rows|compact|bubble|level, grid columns 1-4, level display text|dots|bar with 5 renamable labels; interests same minus level; experience title/employer order + group-promotions toggle; summary in-header + show-heading; education degree/school order) PLUS the ONE schema touch: optional meta.level 1-5 on skill-class Library entries (§4.3 registry + EntryEditor + zod), levels are CONTENT (values) vs FORMAT (labels), unleveled entries fall back to rows — level NEVER invented. TRIPWIRE: level-scoring = failed ticket; the anti-scoring control test (tailoring invariant to level values) is REQUIRED. Level dots/bars extraction-neutrality CI test required ([v3-038] promoted row). Oracle: Phase 8 F4 line.",
+      "acceptance": "oracle.md Phase 8 'F4' checks + full baseline. Decompose before dispatch.",
+      "attempts": [],
+      "evidence": null
+    },
+    {
+      "id": "E9-F5",
+      "title": "COARSE (decompose at pickup): user presets + atsGrade(format) + tested classification table",
+      "status": "todo",
+      "depends_on": [
+        "E9-F4"
+      ],
+      "files": [
+        "src/client/",
+        "src/shared/",
+        "src/server/",
+        "test/"
+      ],
+      "origin": "spec §31.1 presets + §31.5 + §31.6 F5",
+      "context": "COARSE EPIC — decompose at pickup. Scope: settings.presets[] (named DocumentFormatV2 snapshots), 'Save current design as preset' in the design view, preset gallery over the full v2 space (six migrated + a handful curated from the new axes), pure atsGrade(format) → strict|good implementing the TESTED classification table (oracle.md Phase 8 intake decisions [v3-038]: border ANY + level display ANY are NEUTRAL — promoted by probe; strict still requires columns one, no photo, heading icons none, single-mode-over-white). The grade function's unit table must EQUAL the CI-observed classification from the F3/F4 axis extraction tests; every shipped preset's badge matches its tested grade; per-cause caveat UI. Oracle: Phase 8 F5 line.",
+      "acceptance": "oracle.md Phase 8 'F5' checks + full baseline. Decompose before dispatch.",
+      "attempts": [],
+      "evidence": null
     }
   ]
 }
