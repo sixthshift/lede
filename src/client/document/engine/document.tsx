@@ -25,9 +25,18 @@
 // resolveColumnGeometry), layout.sectionPlacement (per-section column
 // assignment; unset ⇒ 'main', matching migrateFormat's own fallback).
 //
+// AXES WIRED THIS TICKET (E9-F1c): layout.manualPageBreaks — a real react-pdf
+// `break` on the wrapper View of any section named in the list, applied
+// identically in every column mode (one/two/mix). In columnar modes the
+// break is local to whichever column flow (sidebar or main) the section
+// landed in via sectionPlacement — it pushes that column's own subsequent
+// sections to the next page without assuming anything about the other
+// column, per the unhandled-off-diagonal contract below. Never drops/
+// duplicates content (§28.4/§31 NEVER-CUT) — it only adds page boundaries.
+//
 // AXES NOT YET WIRED (render as sections.tsx's one existing look — never a
 // crash; later tickets land their seam per §31.6's phase list):
-// layout.manualPageBreaks, typeScale.{nameOffset,titleOffset,
+// typeScale.{nameOffset,titleOffset,
 // sectionHeadingOffset,entryHeaderOffset} (sections.tsx hardcodes name/
 // heading sizes with no per-field seam), entries.* (structure/date-location/
 // subtitle/list-style/per-field font style/body indent), headings.{style
@@ -106,6 +115,41 @@ function splitSectionsByColumn(
     (column === "sidebar" ? sidebar : main).push(section);
   }
   return { sidebar, main };
+}
+
+// layout.manualPageBreaks (§31.2) names sections that force a real page
+// break immediately before them — a plain lookup, not a layout decision;
+// the caller wraps the section's own View in `break={…}` wherever it renders
+// (one/two/mix all route through this one predicate).
+function breaksBeforeSection(format: DocumentFormatV2, section: TailoredSection): boolean {
+  return format.layout.manualPageBreaks.includes(section.section);
+}
+
+// react-pdf's pagination only re-examines a subtree for a `break` prop when
+// that subtree's own parent already needs splitting (@react-pdf/layout's
+// splitNodes walks a container's children looking for overflow OR `break`,
+// but only recurses into grandchildren once a container is found to
+// overflow the page) — a `break` set three levels deep inside a two-column
+// row that itself fits on one page is silently never seen. So for columnar
+// modes, a manual break can't be a prop on a nested section View (that
+// works for the single-column case, whose sections ARE direct Page
+// children); it has to be a NEW row that is itself a direct Page child.
+// This splits the ordered section list into contiguous segments at every
+// manualPageBreaks boundary, one row per segment, `break` on every row
+// after the first — the same "section and everything after it moves"
+// semantics as the single-column wrapper, reconstructed at row grain.
+function splitIntoBreakSegments(
+  format: DocumentFormatV2,
+  sections: TailoredSection[],
+): TailoredSection[][] {
+  const segments: TailoredSection[][] = [[]];
+  for (const section of sections) {
+    const isNewSegment = format.layout.manualPageBreaks.includes(section.section);
+    const current = segments[segments.length - 1];
+    if (isNewSegment && current.length > 0) segments.push([]);
+    segments[segments.length - 1].push(section);
+  }
+  return segments;
 }
 
 // headerPosition 'left'/'right' names which side the sidebar sits on;
@@ -198,7 +242,9 @@ export function EngineDocument({
       <>
         {summary}
         {resume.sections.map((section) => (
-          <SectionBlock key={section.section} section={section} format={legacy} />
+          <View key={section.section} break={breaksBeforeSection(format, section)}>
+            <SectionBlock section={section} format={legacy} />
+          </View>
         ))}
       </>
     );
@@ -228,7 +274,6 @@ export function EngineDocument({
   // (band + two-column body, §31.2) renders the header full-width above the
   // columns instead — the column machinery itself never assumes the header
   // spans a column.
-  const { sidebar, main } = splitSectionsByColumn(format, resume.sections);
   const { side, sidebarWidthPercent, mainWidthPercent } = resolveColumnGeometry(format);
   const columnStyles = StyleSheet.create({
     sidebar:
@@ -241,37 +286,45 @@ export function EngineDocument({
         : { width: mainWidthPercent, paddingRight: COLUMN_GUTTER_PT },
   });
 
-  const sidebarColumn = (
-    <View style={columnStyles.sidebar}>
-      {sidebar.map((section) => (
-        <SectionBlock key={section.section} section={section} format={legacy} />
-      ))}
-    </View>
-  );
-  const mainColumn = (
-    <View style={columnStyles.main}>
-      {columnsMode === "two" ? header : null}
-      {columnsMode === "two" ? summary : null}
-      {main.map((section) => (
-        <SectionBlock key={section.section} section={section} format={legacy} />
-      ))}
-    </View>
-  );
-  const columnsRow = (
-    <View style={styles.row}>
-      {side === "left" ? (
-        <>
-          {sidebarColumn}
-          {mainColumn}
-        </>
-      ) : (
-        <>
-          {mainColumn}
-          {sidebarColumn}
-        </>
-      )}
-    </View>
-  );
+  // One row per manualPageBreaks segment (see splitIntoBreakSegments) — the
+  // no-break case is a single segment, i.e. exactly the one row this engine
+  // rendered before this ticket. Header/summary ('two' only; 'mix' renders
+  // its header above the rows) belong to the first row alone.
+  const segments = splitIntoBreakSegments(format, resume.sections);
+  const rows = segments.map((segmentSections, index) => {
+    const { sidebar, main } = splitSectionsByColumn(format, segmentSections);
+    const sidebarColumn = (
+      <View style={columnStyles.sidebar}>
+        {sidebar.map((section) => (
+          <SectionBlock key={section.section} section={section} format={legacy} />
+        ))}
+      </View>
+    );
+    const mainColumn = (
+      <View style={columnStyles.main}>
+        {index === 0 && columnsMode === "two" ? header : null}
+        {index === 0 && columnsMode === "two" ? summary : null}
+        {main.map((section) => (
+          <SectionBlock key={section.section} section={section} format={legacy} />
+        ))}
+      </View>
+    );
+    return (
+      <View key={segmentSections[0]?.section ?? index} break={index > 0} style={styles.row}>
+        {side === "left" ? (
+          <>
+            {sidebarColumn}
+            {mainColumn}
+          </>
+        ) : (
+          <>
+            {mainColumn}
+            {sidebarColumn}
+          </>
+        )}
+      </View>
+    );
+  });
 
   return (
     <Document title={profile.name} author={profile.name}>
@@ -289,7 +342,7 @@ export function EngineDocument({
             </View>
           )
         ) : null}
-        {columnsRow}
+        {rows}
       </Page>
     </Document>
   );

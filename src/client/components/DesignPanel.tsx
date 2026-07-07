@@ -542,6 +542,44 @@ export function DesignPanel({
             </div>
           </div>
         ) : null}
+
+        {/* ── page breaks — layout.manualPageBreaks (§31.2/E9-F1c). The one
+            F1 layout axis the engine renders as a real react-pdf page
+            boundary rather than a style; applies in every column mode, so
+            unlike sidebar width/section placement above it is never gated
+            on isColumnar. ── */}
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-medium">Page breaks</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {SECTION_VALUES.map((section) => {
+              const id = `design-layout-page-break-${section}`;
+              const checked = format.layout.manualPageBreaks.includes(section);
+              return (
+                <div key={section} className="flex items-center gap-2">
+                  <input
+                    id={id}
+                    type="checkbox"
+                    checked={checked}
+                    disabled={readOnly}
+                    onChange={(e) =>
+                      set({
+                        ...format,
+                        layout: {
+                          ...format.layout,
+                          manualPageBreaks: e.target.checked
+                            ? [...format.layout.manualPageBreaks, section]
+                            : format.layout.manualPageBreaks.filter((s) => s !== section),
+                        },
+                      })
+                    }
+                    className="h-4 w-4 rounded border-border"
+                  />
+                  <Label htmlFor={id}>{`Page break before ${SECTIONS[section].label}`}</Label>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );

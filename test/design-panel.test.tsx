@@ -209,6 +209,75 @@ describe("DesignPanel — Layout group", () => {
   });
 });
 
+describe("DesignPanel — Page breaks (layout.manualPageBreaks, E9-F1c)", () => {
+  it("renders a 'Page breaks' group with one toggle per section, unchecked by default", () => {
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={vi.fn()} />);
+
+    expect(DEFAULT_FORMAT_V2.layout.manualPageBreaks).toEqual([]);
+    expect(screen.getByText("Page breaks")).toBeInTheDocument();
+    const toggle = screen.getByLabelText(
+      `Page break before ${SECTIONS.experience.label}`,
+    ) as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+  });
+
+  it("checking a section's toggle adds it to layout.manualPageBreaks", () => {
+    const onChange = vi.fn();
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} />);
+
+    fireEvent.click(screen.getByLabelText(`Page break before ${SECTIONS.experience.label}`));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as DocumentFormatV2;
+    expect(next.layout.manualPageBreaks).toEqual(["experience"]);
+  });
+
+  it("unchecking an already-set section's toggle removes it from layout.manualPageBreaks", () => {
+    const format: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      layout: { ...DEFAULT_FORMAT_V2.layout, manualPageBreaks: ["experience", "education"] },
+    };
+    const onChange = vi.fn();
+    render(<DesignPanel format={format} onChange={onChange} />);
+
+    const toggle = screen.getByLabelText(
+      `Page break before ${SECTIONS.experience.label}`,
+    ) as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+
+    fireEvent.click(toggle);
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as DocumentFormatV2;
+    expect(next.layout.manualPageBreaks).toEqual(["education"]);
+  });
+
+  it("applies regardless of columns mode: the toggle is present and functional at columns:'one'", () => {
+    expect(DEFAULT_FORMAT_V2.layout.columns).toBe("one");
+    const onChange = vi.fn();
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} />);
+
+    fireEvent.click(screen.getByLabelText(`Page break before ${SECTIONS.education.label}`));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as DocumentFormatV2;
+    expect(next.layout.manualPageBreaks).toEqual(["education"]);
+  });
+
+  it("readOnly: no onChange fires and the toggle is disabled", () => {
+    const onChange = vi.fn();
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} readOnly />);
+
+    const toggle = screen.getByLabelText(
+      `Page break before ${SECTIONS.experience.label}`,
+    ) as HTMLInputElement;
+    expect(toggle).toBeDisabled();
+
+    fireEvent.click(toggle);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
 describe("TemplatePicker — ATS badge CONTRAST (effectiveAtsGrade)", () => {
   it("the default strict/no-photo/single-column format shows 'ATS: strict' with no Workday/Taleo caveat", () => {
     render(<TemplatePicker format={DEFAULT_FORMAT_V2} onChange={vi.fn()} />);
