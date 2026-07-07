@@ -1,19 +1,37 @@
 // Self-hosted font registry (spec.md §28.3): a curated ~12-face set via
 // react-pdf's Font.register, never a runtime CDN and never free-form input.
-// Every face is vendored through @fontsource — IBM Plex (sans/serif/mono)
-// plus the metric-compatible stand-ins Arimo→Arial, Tinos→Times New Roman,
-// Carlito→Calibri.
+// Every face is vendored through @fontsource — IBM Plex (sans/serif) plus the
+// metric-compatible stand-ins Arimo→Arial, Tinos→Times New Roman,
+// Carlito→Calibri — except ibm-plex-mono (see PROVENANCE below). The
+// react-pdf `family` string is the FontId itself, so a later renderer can
+// pass a document's configured FontId straight through as `style.fontFamily`
+// — no separate lookup table.
 //
-// react-pdf/fontkit consumes both .woff and .woff2, so every face below is
-// the package's latin .woff by default — except ibm-plex-mono, which uses
-// .woff2. fontkit crashes ("Offset is outside the bounds of the DataView" in
-// TTFGlyph._getCBox) reading the space glyph's glyf/loca entry out of
-// @fontsource/ibm-plex-mono's vendored .woff, at every published version of
-// that package; the sibling .woff2 in the same package decodes cleanly
-// (verified directly against fontkit, independent of react-pdf) and is used
-// for that face only. The react-pdf `family` string is the
-// FontId itself, so a later renderer can pass a document's configured
-// FontId straight through as `style.fontFamily` — no separate lookup table.
+// PROVENANCE — ibm-plex-mono (E9-R2): BOTH assets @fontsource ever vendored
+// for this face are individually defective under fontkit (the engine used by
+// react-pdf), with complementary triggers. @fontsource/ibm-plex-mono's latin
+// .woff (every published version) crashes fontkit ("Offset is outside the
+// bounds of the DataView" in TTFGlyph._getCBox) reading the space glyph on
+// ANY multi-word text (E9-R1). The same package's .woff2 (5.2.7, latest
+// published — no newer release exists) renders spaces fine but crashes
+// identically on a bare colon (E9-F0d1) — ordinary resume content (dates,
+// ratios, labels). Neither vendored @fontsource asset is safe for resume
+// prose. Fix: source the face from the official IBM `@ibm/plex-mono` npm
+// package instead (OFL-1.1, same upstream font project as @fontsource's
+// build, pinned exact at 2.5.0 — see package.json). Verified directly against
+// fontkit (bypassing react-pdf) AND through a full react-pdf renderToBuffer,
+// with punctuation-bearing multi-word text (colons, parens, %, &, digits,
+// hyphen, em dash, slash) at both weights: the package's
+// fonts/complete/woff/IBMPlexMono-{Regular,Bold}.woff render clean with no
+// crash. (The complete/woff2 build renders clean too but bloats react-pdf's
+// embedded subset ~140x vs the reference `ibm-plex-sans` woff render for the
+// same fixture — an unexplained subsetting inefficiency specific to that
+// asset's woff2 encoding — so .woff is the one wired here, matching every
+// other face's format.) No TTF ships in the published npm package (only in
+// `files`-restricted woff/woff2 dirs), so unlike every other face this one
+// resolves through a package-specific complete/woff/<Weight>.woff path
+// rather than the @fontsource `<pkg>/files/<basename>-latin-<weight>-normal.
+// <format>` naming convention — see `manifest.files` below.
 //
 // DUAL ENVIRONMENT: this module registers fonts for BOTH a Node render
 // (renderResumeToBuffer, under vitest/SSR) and a browser render
@@ -41,7 +59,17 @@ import * as nodeModule from "node:module";
 import { Font } from "@react-pdf/renderer";
 import type { FontId } from "@shared/types";
 
-type FontManifest = { package: string; label: string; format: "woff" | "woff2" };
+type FontManifest = {
+  package: string;
+  label: string;
+  format: "woff" | "woff2";
+  // Packages whose weight files don't follow the @fontsource
+  // `<pkg>/files/<basename>-latin-<weight>-normal.<format>` convention (see
+  // the ibm-plex-mono PROVENANCE note above) list their exact per-weight
+  // subpaths here instead; `resolveFontSrc` prefers this over the convention
+  // when present.
+  files?: { 400: string; 700: string };
+};
 
 const FONT_MANIFEST: Record<FontId, FontManifest> = {
   "ibm-plex-sans": { package: "@fontsource/ibm-plex-sans", label: "IBM Plex Sans", format: "woff" },
@@ -51,9 +79,13 @@ const FONT_MANIFEST: Record<FontId, FontManifest> = {
     format: "woff",
   },
   "ibm-plex-mono": {
-    package: "@fontsource/ibm-plex-mono",
+    package: "@ibm/plex-mono",
     label: "IBM Plex Mono",
-    format: "woff2",
+    format: "woff",
+    files: {
+      400: "fonts/complete/woff/IBMPlexMono-Regular.woff",
+      700: "fonts/complete/woff/IBMPlexMono-Bold.woff",
+    },
   },
   arimo: { package: "@fontsource/arimo", label: "Arimo (Arial)", format: "woff" },
   tinos: { package: "@fontsource/tinos", label: "Tinos (Times New Roman)", format: "woff" },
@@ -93,11 +125,11 @@ const BROWSER_FONT_URLS: Record<FontId, { 400: string; 700: string }> = {
   },
   "ibm-plex-mono": {
     400: new URL(
-      "@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2",
+      "@ibm/plex-mono/fonts/complete/woff/IBMPlexMono-Regular.woff",
       import.meta.url,
     ).toString(),
     700: new URL(
-      "@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-700-normal.woff2",
+      "@ibm/plex-mono/fonts/complete/woff/IBMPlexMono-Bold.woff",
       import.meta.url,
     ).toString(),
   },
@@ -123,10 +155,10 @@ const BROWSER_FONT_URLS: Record<FontId, { 400: string; 700: string }> = {
 
 function resolveFontSrc(fontId: FontId, manifest: FontManifest, weight: 400 | 700): string {
   if (import.meta.env.SSR) {
-    const basename = manifest.package.replace("@fontsource/", "");
-    return nodeModule
-      .createRequire(import.meta.url)
-      .resolve(`${manifest.package}/files/${basename}-latin-${weight}-normal.${manifest.format}`);
+    const subpath =
+      manifest.files?.[weight] ??
+      `files/${manifest.package.replace("@fontsource/", "")}-latin-${weight}-normal.${manifest.format}`;
+    return nodeModule.createRequire(import.meta.url).resolve(`${manifest.package}/${subpath}`);
   }
   return BROWSER_FONT_URLS[fontId][weight];
 }

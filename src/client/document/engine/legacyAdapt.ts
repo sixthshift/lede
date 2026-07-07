@@ -14,30 +14,17 @@ import type { DocumentFormatV2 } from "@shared/format-v2";
 // face — the "unhandled axis renders as the default look" contract (the
 // other 25 §31.2 body-font ids register in a later ticket, F2).
 //
-// "ibm-plex-mono" stays EXCLUDED — RE-VERIFIED this ticket, deviating from
-// this ticket's brief ("REMOVE legacyAdapt.ts's temporary ibm-plex-mono
-// exclusion — the per-face render smoke protects it"). E9-R1 swapped the
-// vendored asset from .woff to .woff2 because the .woff crashed fontkit
-// ("Offset is outside the bounds of the DataView") on ANY multi-word text —
-// the .woff2 genuinely fixes THAT trigger (confirmed directly against
-// fontkit: "Acme Engineer", "a b" now render clean). But removing the
-// exclusion this ticket re-exposed a SECOND, narrower trigger the existing
-// per-face smoke never happened to contain: @fontsource/ibm-plex-mono
-// 5.2.7's .woff2 (latest published version — no newer release exists)
-// crashes fontkit on a bare colon (":"), reproduced isolated from this
-// engine (single Text node, "test-woff2" family, content ":") and NOT
-// present in the ORIGINAL .woff (which is fine with ":" but crashes on
-// spaces) — i.e. the two vendored assets have complementary defects, no
-// single one of the two is safe for general resume prose (colons are
-// ordinary resume content — dates, labels, ratios). No fontkit patch or
-// alternate published version was available to try within this ticket's
-// scope (fonts.ts, the file that would own such a fix, only vendors
-// woff/woff2 — no ttf exists in the package to fall back to either).
-// Falling back to the default face keeps the axis from crashing; unexcluding
-// ibm-plex-mono is a follow-up ticket's job once a clean asset/patch exists.
+// ibm-plex-mono's exclusion is LIFTED (E9-R2): both @fontsource assets this
+// face ever used were individually defective under fontkit (E9-R1's .woff
+// crashed on spaces, its .woff2 replacement crashed on colons — see
+// fonts.ts's PROVENANCE comment). fonts.ts now sources this face from the
+// official IBM `@ibm/plex-mono` package instead, verified clean on
+// punctuation-bearing multi-word text — the exclusion that routed it to the
+// default face is no longer needed.
 const LEGACY_FONT_IDS = new Set<string>([
   "ibm-plex-sans",
   "ibm-plex-serif",
+  "ibm-plex-mono",
   "arimo",
   "tinos",
   "carlito",

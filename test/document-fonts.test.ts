@@ -68,19 +68,28 @@ describe("registerDocumentFonts", () => {
   });
 });
 
-// Escaped-bug regression (E9-R1 + re-verified E9-F0d1): ibm-plex-mono's
+// Escaped-bug regression, twice over (E9-R1, then E9-F0d1): ibm-plex-mono's
 // vendored @fontsource .woff crashed fontkit ("Offset is outside the bounds
 // of the DataView") as soon as multi-word text forced word-wrap layout —
 // every other face was fine, so the bug shipped unnoticed. E9-R1 swapped the
-// vendored asset to .woff2, which genuinely fixes THAT trigger. E9-F0d1
-// (this ticket) tried removing legacyAdapt.ts's ibm-plex-mono exclusion per
-// its brief and found a SECOND, narrower crash the original smoke fixture
-// never contained: @fontsource/ibm-plex-mono 5.2.7's .woff2 (latest
-// published — no newer version exists) crashes fontkit on a bare colon
-// (":"), which the ORIGINAL .woff does NOT (the two vendored assets have
-// complementary defects — neither is safe alone). The fixture below is
-// strengthened with a colon (this ticket) so this class of gap can't recur
-// silently; the exclusion in legacyAdapt.ts stays, verified below.
+// vendored asset to .woff2, which fixed THAT trigger but the smoke fixture
+// still only carried a single colon — so E9-F0d1 escaped a SECOND, narrower
+// crash the same package's .woff2 hit on a bare colon. Root cause both
+// times: the fixture wasn't hostile enough. E9-R2 (this ticket) fixes the
+// asset (fonts.ts now sources ibm-plex-mono from the official IBM
+// `@ibm/plex-mono` package — see its PROVENANCE comment) AND closes the
+// fixture gap for good: every face's smoke text below carries the full set
+// of realistic resume punctuation — colon, comma, hyphen, en/em dash,
+// parentheses, slash, digits, ampersand, percent — at BOTH the body role
+// (summary/item text, weight 400) and the heading role (group heading,
+// weight 700), so a defect confined to one weight's glyph table can't hide
+// in an under-tested role again.
+const PUNCTUATION_BODY_SUMMARY =
+  "Skills: Python, Go, Rust (2019-2023) — shipped 3 services at 40% capacity & cut latency 2x, cost/perf ratio improved";
+const PUNCTUATION_HEADING =
+  "Acme Corp: Senior Engineer (2019-2023), 40% growth & 2x scale — ops/infra";
+const PUNCTUATION_BODY_ITEM =
+  "Shipped: backend systems (Go, Python) across 3 teams — cut costs 40% & latency 2x, 2019-2023, ops/infra";
 
 function fontSmokeProfileFixture(): Profile {
   return {
@@ -92,20 +101,18 @@ function fontSmokeProfileFixture(): Profile {
   };
 }
 
-// "Skills:" (colon) is the E9-F0d1 escaped-gap capture — ordinary resume
-// content (labels, ratios, dates) routinely carries a colon.
 function fontSmokeResumeFixture(): TailoredResume {
   return {
     signals: { roleLevel: "senior", weights: [], hardRequirements: [] },
-    summary: "Skills: a proven track record of shipping backend systems at scale",
+    summary: PUNCTUATION_BODY_SUMMARY,
     sections: [
       {
         section: "experience",
         groups: [
           {
-            heading: "Acme Corp Senior Engineer",
+            heading: PUNCTUATION_HEADING,
             leadRationale: "led the platform migration",
-            items: [{ entryId: "e1", text: "shipped several backend systems across many teams" }],
+            items: [{ entryId: "e1", text: PUNCTUATION_BODY_ITEM }],
           },
         ],
       },
@@ -115,7 +122,7 @@ function fontSmokeResumeFixture(): TailoredResume {
 }
 
 describe.each(Object.keys(FONT_FACES) as FontId[])("render smoke: %s", (fontId) => {
-  it("renders multi-word, colon-bearing text through the fallback-safe engine path without crashing", async () => {
+  it("renders punctuation-bearing body AND heading text through the engine path without crashing", async () => {
     const buffer = await renderResumeToBuffer({
       resume: fontSmokeResumeFixture(),
       profile: fontSmokeProfileFixture(),
@@ -130,23 +137,39 @@ describe.each(Object.keys(FONT_FACES) as FontId[])("render smoke: %s", (fontId) 
   });
 });
 
-describe("ibm-plex-mono known limitation (§ document-fonts.test.ts escaped-gap capture)", () => {
-  it("the REGISTERED FACE ITSELF still crashes fontkit on a bare colon (tracked, not fixed here)", async () => {
+describe("ibm-plex-mono (E9-R2 fix regression guard)", () => {
+  it("the registered face itself renders a bare colon cleanly (was: crashed fontkit, both prior vendored assets)", async () => {
     registerDocumentFonts();
-    await expect(renderFixture("ibm-plex-mono", ":")).rejects.toThrow(
-      /Offset is outside the bounds of the DataView/,
-    );
+    const buffer = await renderFixture("ibm-plex-mono", ":");
+    expect(buffer.subarray(0, 5).toString("latin1")).toBe("%PDF-");
   });
 
-  it("but the ENGINE PATH never hits it: legacyAdapt.ts's exclusion routes fonts.body:'ibm-plex-mono' to the default face", async () => {
-    const buffer = await renderResumeToBuffer({
-      resume: fontSmokeResumeFixture(),
-      profile: fontSmokeProfileFixture(),
-      format: {
-        ...DEFAULT_FORMAT_V2,
-        fonts: { ...DEFAULT_FORMAT_V2.fonts, body: "ibm-plex-mono" },
-      },
-    });
-    expect(buffer.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+  it("legacyAdapt.ts no longer excludes ibm-plex-mono: it renders as itself, not the default fallback face", async () => {
+    registerDocumentFonts();
+    const [monoBuffer, defaultBuffer] = await Promise.all([
+      renderResumeToBuffer({
+        resume: fontSmokeResumeFixture(),
+        profile: fontSmokeProfileFixture(),
+        format: {
+          ...DEFAULT_FORMAT_V2,
+          fonts: { ...DEFAULT_FORMAT_V2.fonts, body: "ibm-plex-mono" },
+        },
+      }),
+      renderResumeToBuffer({
+        resume: fontSmokeResumeFixture(),
+        profile: fontSmokeProfileFixture(),
+        format: {
+          ...DEFAULT_FORMAT_V2,
+          fonts: { ...DEFAULT_FORMAT_V2.fonts, body: "ibm-plex-sans" },
+        },
+      }),
+    ]);
+
+    expect(monoBuffer.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    // A monospace face lays out identically-worded text differently from a
+    // proportional one, so distinct PDF bytes confirm ibm-plex-mono actually
+    // rendered as itself rather than silently falling back to the default
+    // (ibm-plex-sans) face.
+    expect(Buffer.compare(monoBuffer, defaultBuffer)).not.toBe(0);
   });
 });

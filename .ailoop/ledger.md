@@ -1658,3 +1658,13 @@ composite just run (52 files/584 vitest + playwright 10/10):
  crash-safe, visibly wrong face; NEXT ticket) · engine off-diagonal 'two'+header-band renders bandless
  (F3 wires it) · fit.ts density duplication engine-vs-legacy consolidated at cutover (resolved) ·
  §31.1 honest deviation stands: locked apps re-RENDER under v2 with unchanged data.
+
+[v3-051] E9-R2 — ACCEPTED (single dispatch, first attempt). ibm-plex-mono sourced from official IBM
+  @ibm/plex-mono@2.5.0 (OFL-1.1, pinned exact) complete/woff Regular+Bold; @fontsource/ibm-plex-mono
+  fully removed (both assets defective: woff→spaces, woff2→colons, complementary). legacyAdapt exclusion
+  DELETED — mono renders as itself (byte-diff guard). Escaped-bug rule (2nd escape of the class) closed:
+  per-face smoke now carries full resume punctuation at body+heading roles, parameterized over
+  FONT_FACES; RED-then-GREEN demonstrated. Independent re-verify green (coordinator crash probe +
+  license check + dep-removal confirm). One applications-e2e contention flake in the concurrent run,
+  cleared by isolated + full re-run (known [v3-041] host flake). Manifest gained an optional per-weight
+  `files` override for the one face that doesn't follow @fontsource naming — minimal, documented.
