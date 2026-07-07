@@ -19,6 +19,7 @@ import type {
   HeadingIconStyle,
   HeadingStyle,
   LinksV2,
+  PhotoV2,
 } from "@shared/format-v2";
 
 // sections.tsx's fontFamily is just a string handed to react-pdf. §31.2's
@@ -185,6 +186,20 @@ function resolveAccentPlacementConfig(format: DocumentFormatV2): AccentPlacement
   return { ...format.colors.accentPlacement };
 }
 
+// photo.{crop,zoom} (§31.2, E9-F3f) arrive as an extra property on `format`,
+// same seam as linksConfig/accentPlacementConfig above — NOT folded into the
+// `photo` field below, because that field's static type is the legacy
+// `DocumentFormat["photo"]` shape ({hidden,size,shape}, src/shared/types.ts),
+// which this ticket's scope contract doesn't extend. size/shape stay on
+// `photo` (unchanged since before this ticket); crop/zoom ride the same
+// "*Config" passthrough sections.tsx already reads headerConfig/linksConfig
+// through.
+export type PhotoRenderConfig = Pick<PhotoV2, "crop" | "zoom">;
+
+function resolvePhotoConfig(format: DocumentFormatV2): PhotoRenderConfig {
+  return { crop: { ...format.photo.crop }, zoom: format.photo.zoom };
+}
+
 export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
   typeScaleSizes: TypeScaleSizes;
   headingsConfig: HeadingsRenderConfig;
@@ -193,6 +208,7 @@ export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
   headerConfig: HeaderRenderConfig;
   linksConfig: LinksRenderConfig;
   accentPlacementConfig: AccentPlacementRenderConfig;
+  photoConfig: PhotoRenderConfig;
 } {
   const bodyFont = resolveFont(format.fonts.body);
   return {
@@ -224,5 +240,6 @@ export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
     headerConfig: resolveHeaderConfig(format),
     linksConfig: resolveLinksConfig(format),
     accentPlacementConfig: resolveAccentPlacementConfig(format),
+    photoConfig: resolvePhotoConfig(format),
   };
 }

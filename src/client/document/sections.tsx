@@ -30,6 +30,7 @@ import type {
   HeaderRenderConfig,
   HeadingsRenderConfig,
   LinksRenderConfig,
+  PhotoRenderConfig,
   TypeScaleSizes,
 } from "./engine/legacyAdapt";
 import { formatDate, parseHeadingDate } from "./formatDate";
@@ -166,6 +167,18 @@ function resolveAccentPlacement(format: DocumentFormat): AccentPlacementRenderCo
   return config ?? DEFAULT_ACCENT_PLACEMENT;
 }
 
+// photo.{crop,zoom} (§31.2, E9-F3f) arrive as an extra property on `format`,
+// same seam as accentPlacementConfig above (legacyAdapt.ts's toLegacyFormat /
+// PhotoRenderConfig) — size/shape stay on format.photo directly (unchanged
+// since before this ticket). Absent falls back to a centered, unzoomed crop:
+// identical to this module's pre-ticket look (a plain cover-fit photo).
+const DEFAULT_PHOTO_CONFIG: PhotoRenderConfig = { crop: { x: 50, y: 50 }, zoom: 1 };
+
+function resolvePhotoConfig(format: DocumentFormat): PhotoRenderConfig {
+  const config = (format as DocumentFormat & { photoConfig?: PhotoRenderConfig }).photoConfig;
+  return config ?? DEFAULT_PHOTO_CONFIG;
+}
+
 // Every gated element class below reduces to this: colors.primary when its
 // own accentPlacement flag is on, colors.text otherwise. One helper so the
 // 8 call sites (name/title/headings/headingRules/headerIcons/dates/
@@ -224,11 +237,16 @@ function buildStyles(format: DocumentFormat) {
       justifyContent: "space-between",
     },
     headerInlineLeft: { flexDirection: "row", alignItems: "center" },
+    // The clipping frame: fixed size + shape's radius + overflow:hidden, so
+    // the (possibly zoom-enlarged, see photoImageStyle below) image inside
+    // never draws outside the size/shape the user picked.
     photo: {
+      position: "relative",
       width: photo.size,
       height: photo.size,
       marginRight: 12,
       borderRadius: photoRadius,
+      overflow: "hidden",
     },
     photoCenterOverride: { marginRight: 0, marginBottom: 8 },
     headerText: { flex: 1 },
@@ -500,6 +518,48 @@ function buildStyles(format: DocumentFormat) {
 
 type SectionStyles = ReturnType<typeof buildStyles>;
 
+// photo.zoom (§31.2, E9-F3f): the image itself renders BIGGER than the
+// styles.photo frame it sits in (frame stays fixed at photo.size, clipped by
+// its own borderRadius+overflow:hidden) — negative margins re-center the
+// oversized image so the frame's clip crops evenly on every side, the same
+// "enlarge, then clip" a CSS `transform: scale()` inside `overflow: hidden`
+// would produce. photo.crop.{x,y} rides react-pdf's own objectFit:'cover' +
+// objectPosition — a no-op when the source image's aspect ratio matches the
+// (square) frame exactly, and the focal point otherwise.
+function buildPhotoImageStyle(size: number, photoConfig: PhotoRenderConfig) {
+  const zoomedSize = size * photoConfig.zoom;
+  const centeringOffset = (zoomedSize - size) / 2;
+  return {
+    position: "absolute" as const,
+    top: -centeringOffset,
+    left: -centeringOffset,
+    width: zoomedSize,
+    height: zoomedSize,
+    objectFit: "cover" as const,
+    objectPosition: `${photoConfig.crop.x}% ${photoConfig.crop.y}%`,
+  };
+}
+
+// The one seam all three ProfileHeader variants (default/centered/inline)
+// render the photo through — hidden/no-photoUrl (§28.3) is a single gate
+// here rather than three copies of the same `showPhoto && profile.photoUrl`
+// check.
+function buildPhotoNode(
+  profile: Profile,
+  format: DocumentFormat,
+  styles: SectionStyles,
+  frameOverride?: SectionStyles["photoCenterOverride"],
+): ReactNode {
+  if (format.photo.hidden || !profile.photoUrl) return null;
+  const photoConfig = resolvePhotoConfig(format);
+  const frameStyle = frameOverride ? [styles.photo, frameOverride] : styles.photo;
+  return (
+    <View style={frameStyle}>
+      <Image src={profile.photoUrl} style={buildPhotoImageStyle(format.photo.size, photoConfig)} />
+    </View>
+  );
+}
+
 // header.titlePosition (§31.2, E9-F3c): 'same-line' puts name+title in one
 // row; 'below' keeps them stacked in a column, the title starting its own
 // line. Both are DIRECT Text siblings of the row/column (the title's own
@@ -752,14 +812,11 @@ export function ProfileHeader({
   ].filter((field): field is { key: string; text: string } => field !== null);
   const fieldNodes = buildContactFieldNodes(contactFields, headerConfig, styles, ink);
   const linkNodes = buildLinkFieldNodes(profile.links, headerConfig, linksConfig, styles, ink);
-  const showPhoto = format.photo.hidden === false;
 
   if (variant === "centered") {
     return (
       <View style={styles.headerCentered}>
-        {showPhoto && profile.photoUrl ? (
-          <Image src={profile.photoUrl} style={[styles.photo, styles.photoCenterOverride]} />
-        ) : null}
+        {buildPhotoNode(profile, format, styles, styles.photoCenterOverride)}
         {nameTitleNode}
         {buildContactBlock(fieldNodes, linkNodes, headerConfig, styles, ink)}
       </View>
@@ -770,9 +827,7 @@ export function ProfileHeader({
     return (
       <View style={styles.headerInline}>
         <View style={styles.headerInlineLeft}>
-          {showPhoto && profile.photoUrl ? (
-            <Image src={profile.photoUrl} style={styles.photo} />
-          ) : null}
+          {buildPhotoNode(profile, format, styles)}
           {nameTitleNode}
         </View>
         {buildContactBlock(
@@ -789,7 +844,7 @@ export function ProfileHeader({
 
   return (
     <View style={styles.header}>
-      {showPhoto && profile.photoUrl ? <Image src={profile.photoUrl} style={styles.photo} /> : null}
+      {buildPhotoNode(profile, format, styles)}
       <View style={styles.headerText}>
         {nameTitleNode}
         {buildContactBlock(fieldNodes, linkNodes, headerConfig, styles, ink)}

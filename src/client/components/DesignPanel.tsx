@@ -51,6 +51,7 @@ import type {
   HeadingIconStyle,
   HeadingStyle,
   NameFontId,
+  PhotoShape,
   SectionColumn,
 } from "@shared/format-v2";
 import { CONTACT_ICON_STYLES, DATE_FORMATS, NAME_DISPLAY_FONT_IDS } from "@shared/format-v2";
@@ -88,6 +89,13 @@ const HEADER_POSITION_OPTIONS: { value: HeaderPosition; label: string }[] = [
 const SECTION_COLUMN_OPTIONS: { value: SectionColumn; label: string }[] = [
   { value: "main", label: "Main" },
   { value: "sidebar", label: "Sidebar" },
+];
+// photo.shape (§31.2, sections.tsx's photoRadius: circle -> size/2, rounded
+// -> 8pt, square -> 0).
+const PHOTO_SHAPE_OPTIONS: { value: PhotoShape; label: string }[] = [
+  { value: "circle", label: "Circle" },
+  { value: "rounded", label: "Rounded square" },
+  { value: "square", label: "Square" },
 ];
 // colors.area/mode (§31.2/E9-F3a, engine/document.tsx): area picks WHERE a
 // filled surface appears (full-page background, header band, or — ahead of
@@ -1152,12 +1160,91 @@ export function DesignPanel({
           <Label htmlFor="design-photo-shown">Show photo on resume</Label>
         </div>
         {showPhoto ? (
-          <Alert>
-            <AlertDescription>
-              Photos are expected on DACH/JP CVs, but discouraged for US/UK resumes — check the
-              norms for your target market before enabling this.
-            </AlertDescription>
-          </Alert>
+          <>
+            <Alert>
+              <AlertDescription>
+                Photos are expected on DACH/JP CVs, but discouraged for US/UK resumes — check the
+                norms for your target market before enabling this.
+              </AlertDescription>
+            </Alert>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FieldRow label="Size (pt)" htmlFor="design-photo-size">
+                <NumberStepper
+                  id="design-photo-size"
+                  value={format.photo.size}
+                  min={32}
+                  max={160}
+                  step={1}
+                  disabled={readOnly}
+                  onChange={(size) => set({ ...format, photo: { ...format.photo, size } })}
+                />
+              </FieldRow>
+              <FieldRow label="Shape" htmlFor="design-photo-shape">
+                <Select
+                  value={format.photo.shape}
+                  disabled={readOnly}
+                  onValueChange={(next) =>
+                    set({ ...format, photo: { ...format.photo, shape: next as PhotoShape } })
+                  }
+                >
+                  <SelectTrigger id="design-photo-shape" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PHOTO_SHAPE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FieldRow>
+              <FieldRow label="Zoom" htmlFor="design-photo-zoom">
+                <NumberStepper
+                  id="design-photo-zoom"
+                  value={format.photo.zoom}
+                  min={1}
+                  max={2}
+                  step={0.1}
+                  disabled={readOnly}
+                  onChange={(zoom) => set({ ...format, photo: { ...format.photo, zoom } })}
+                />
+              </FieldRow>
+              <div />
+              <FieldRow label="Focal point — horizontal (%)" htmlFor="design-photo-crop-x">
+                <NumberStepper
+                  id="design-photo-crop-x"
+                  value={format.photo.crop.x}
+                  min={0}
+                  max={100}
+                  step={1}
+                  disabled={readOnly}
+                  onChange={(x) =>
+                    set({
+                      ...format,
+                      photo: { ...format.photo, crop: { ...format.photo.crop, x } },
+                    })
+                  }
+                />
+              </FieldRow>
+              <FieldRow label="Focal point — vertical (%)" htmlFor="design-photo-crop-y">
+                <NumberStepper
+                  id="design-photo-crop-y"
+                  value={format.photo.crop.y}
+                  min={0}
+                  max={100}
+                  step={1}
+                  disabled={readOnly}
+                  onChange={(y) =>
+                    set({
+                      ...format,
+                      photo: { ...format.photo, crop: { ...format.photo.crop, y } },
+                    })
+                  }
+                />
+              </FieldRow>
+            </div>
+          </>
         ) : null}
       </div>
 

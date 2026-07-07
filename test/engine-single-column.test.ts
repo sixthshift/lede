@@ -40,6 +40,33 @@ function profileFixture(): Profile {
   };
 }
 
+// A tiny (78-byte) 4x2 RGB PNG, half red / half blue — E9-F3f's crop.{x,y}
+// tests need a NON-square source: @react-pdf/render's objectFit:'cover'
+// offsets by (containerSize - scaledImageSize) * cropPercent, which is
+// exactly 0 for every crop value once source and container share the same
+// aspect ratio (both square, this fixture's own square 1x1 sibling in
+// test/document-format-render.test.ts included) — so crop couldn't move a
+// single byte against a square source, regardless of whether the render
+// path actually reads it.
+const RECT_PNG_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAIAAADwyuo0AAAAFUlEQVR4nGO4o6FxR0MDTNxhQOYAAHn6CWFyrusXAAAAAElFTkSuQmCC";
+
+function profileWithPhotoFixture(): Profile {
+  return { ...profileFixture(), photoUrl: RECT_PNG_DATA_URL };
+}
+
+// A tall (79-byte) 2x4 RGB PNG, half red / half blue — RECT_PNG_DATA_URL's
+// wide source has zero VERTICAL crop slack once cover-fit into a square
+// frame (its height already fills the frame exactly, so crop.y never moves
+// anything for that fixture); this sibling has zero horizontal slack
+// instead, so crop.y's test needs this one, not RECT_PNG_DATA_URL.
+const TALL_PNG_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAAECAIAAAArjXluAAAAFklEQVR4nGO4o6FxR0ODAUqByTtQCgCDXAlhk/ZPVAAAAABJRU5ErkJggg==";
+
+function profileWithTallPhotoFixture(): Profile {
+  return { ...profileFixture(), photoUrl: TALL_PNG_DATA_URL };
+}
+
 function resumeFixture(): TailoredResume {
   return {
     signals: { roleLevel: "senior", weights: [], hardRequirements: [] },
@@ -188,6 +215,55 @@ async function page1FillColors(buffer: Buffer): Promise<string[]> {
     if (opList.fnArray[i] === OPS.setFillRGBColor) fills.push(opList.argsArray[i][0]);
   }
   return fills;
+}
+
+// E9-F3f: a profile photo image never surfaces as a pdf.js text item (per
+// the ticket's own test-harness note) — presence/geometry has to come from
+// the operator list instead. paintImageXObject is the one op an <Image>
+// element ever emits (@react-pdf/render's renderImage), so its mere presence
+// answers "did an image render at all" (photo.hidden's own gate).
+async function hasImage(buffer: Buffer): Promise<boolean> {
+  const { getDocument, OPS } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await getDocument({ data: new Uint8Array(buffer) }).promise;
+  const page = await doc.getPage(1);
+  const opList = await page.getOperatorList();
+  return opList.fnArray.includes(OPS.paintImageXObject);
+}
+
+// sections.tsx's photo frame (the styles.photo View: fixed width/height,
+// borderRadius, overflow:'hidden') is the FIRST clip @react-pdf/render emits
+// for this file's fixtures — nothing else in the header clips a shape. Its
+// constructPath call's bounding-box arg is [minX, minY, maxX, maxY] in
+// absolute page points (verified against a real render at authoring time),
+// so maxX-minX is exactly format.photo.size — unaffected by zoom, which
+// enlarges the IMAGE inside this frame, never the frame itself (E9-F3f).
+async function photoFrameSize(buffer: Buffer): Promise<number> {
+  const { getDocument, OPS } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await getDocument({ data: new Uint8Array(buffer) }).promise;
+  const page = await doc.getPage(1);
+  const opList = await page.getOperatorList();
+  const clipIdx = opList.fnArray.indexOf(OPS.clip);
+  const bbox = opList.argsArray[clipIdx + 1][2] as number[];
+  return bbox[2] - bbox[0];
+}
+
+// The `transform` op immediately preceding the image draw carries
+// @react-pdf/render's resolveObjectFit output — width/height/xOffset/yOffset
+// computed from container size, source aspect, objectFit, and
+// objectPositionX/Y (@react-pdf/render/lib/index.js's applyCoverObjectFit) —
+// so crop.{x,y} and zoom (which both feed that computation, sections.tsx's
+// buildPhotoImageStyle) show up here as a changed matrix, even though
+// there's no text item for pdf.js to extract.
+async function photoDrawTransform(buffer: Buffer): Promise<number[]> {
+  const { getDocument, OPS } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await getDocument({ data: new Uint8Array(buffer) }).promise;
+  const page = await doc.getPage(1);
+  const opList = await page.getOperatorList();
+  const imgIdx = opList.fnArray.indexOf(OPS.paintImageXObject);
+  for (let i = imgIdx - 1; i >= 0; i--) {
+    if (opList.fnArray[i] === OPS.transform) return opList.argsArray[i] as number[];
+  }
+  throw new Error("no transform op precedes paintImageXObject");
 }
 
 // A View's `borderColor` (no `backgroundColor`) paints via a STROKE, not a
@@ -1791,5 +1867,142 @@ describe("footer — pageNumbers/email/name/customText (E9-F3e, §31.2)", () => 
     const withoutFooter = await itemsPresent(false);
     expect(withFooter).toEqual(expectedItems);
     expect(withoutFooter).toEqual(expectedItems);
+  });
+});
+
+describe("photo — crop/zoom/size/shape (E9-F3f, §31.2)", () => {
+  it("photo.hidden === true renders no image, even with a photoUrl set", async () => {
+    const buffer = await renderEngineToBuffer({
+      resume: resumeFixture(),
+      profile: profileWithPhotoFixture(),
+      paper: "letter",
+      format: DEFAULT_FORMAT_V2,
+    });
+    expect(DEFAULT_FORMAT_V2.photo.hidden).toBe(true);
+    expect(await hasImage(buffer)).toBe(false);
+  });
+
+  it("photo.hidden === false renders an image", async () => {
+    const format: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      photo: { ...DEFAULT_FORMAT_V2.photo, hidden: false },
+    };
+    const buffer = await renderEngineToBuffer({
+      resume: resumeFixture(),
+      profile: profileWithPhotoFixture(),
+      paper: "letter",
+      format,
+    });
+    expect(await hasImage(buffer)).toBe(true);
+  });
+
+  it("size changes the measured photo frame dimensions", async () => {
+    async function frameSize(size: number): Promise<number> {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        photo: { ...DEFAULT_FORMAT_V2.photo, hidden: false, size },
+      };
+      const buffer = await renderEngineToBuffer({
+        resume: resumeFixture(),
+        profile: profileWithPhotoFixture(),
+        paper: "letter",
+        format,
+      });
+      return photoFrameSize(buffer);
+    }
+
+    expect(await frameSize(40)).toBe(40);
+    expect(await frameSize(120)).toBe(120);
+  });
+
+  it("each shape (circle/rounded/square) renders distinct bytes", async () => {
+    async function render(shape: DocumentFormatV2["photo"]["shape"]): Promise<Buffer> {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        photo: { ...DEFAULT_FORMAT_V2.photo, hidden: false, shape },
+      };
+      return renderEngineToBuffer({
+        resume: resumeFixture(),
+        profile: profileWithPhotoFixture(),
+        paper: "letter",
+        format,
+      });
+    }
+
+    const circle = await render("circle");
+    const rounded = await render("rounded");
+    const square = await render("square");
+    expect(Buffer.compare(circle, rounded)).not.toBe(0);
+    expect(Buffer.compare(rounded, square)).not.toBe(0);
+    expect(Buffer.compare(circle, square)).not.toBe(0);
+  });
+
+  it("crop.x/crop.y each move the drawn image's objectPosition (distinct draw transform)", async () => {
+    async function drawTransform(
+      profile: Profile,
+      crop: { x: number; y: number },
+    ): Promise<number[]> {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        photo: { ...DEFAULT_FORMAT_V2.photo, hidden: false, crop },
+      };
+      const buffer = await renderEngineToBuffer({
+        resume: resumeFixture(),
+        profile,
+        paper: "letter",
+        format,
+      });
+      return photoDrawTransform(buffer);
+    }
+
+    // A wide source has horizontal cover-crop slack (RECT_PNG_DATA_URL).
+    const leftFocus = await drawTransform(profileWithPhotoFixture(), { x: 0, y: 50 });
+    const rightFocus = await drawTransform(profileWithPhotoFixture(), { x: 100, y: 50 });
+    expect(leftFocus).not.toEqual(rightFocus);
+
+    // A tall source has vertical cover-crop slack instead (TALL_PNG_DATA_URL).
+    const topFocus = await drawTransform(profileWithTallPhotoFixture(), { x: 50, y: 0 });
+    const bottomFocus = await drawTransform(profileWithTallPhotoFixture(), { x: 50, y: 100 });
+    expect(topFocus).not.toEqual(bottomFocus);
+  });
+
+  it("zoom 1 vs 2 renders distinct bytes", async () => {
+    async function render(zoom: number): Promise<Buffer> {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        photo: { ...DEFAULT_FORMAT_V2.photo, hidden: false, zoom },
+      };
+      return renderEngineToBuffer({
+        resume: resumeFixture(),
+        profile: profileWithPhotoFixture(),
+        paper: "letter",
+        format,
+      });
+    }
+
+    const zoomedOut = await render(1);
+    const zoomedIn = await render(2);
+    expect(Buffer.compare(zoomedOut, zoomedIn)).not.toBe(0);
+  });
+
+  it("NEVER-CUT: photo on vs off never changes extracted text", async () => {
+    const profile = profileWithPhotoFixture();
+    const resume = resumeFixture();
+
+    async function extracted(hidden: boolean): Promise<string> {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        photo: { ...DEFAULT_FORMAT_V2.photo, hidden },
+      };
+      const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
+      return (await extractPdfText(buffer)).join(" ");
+    }
+
+    const hiddenText = await extracted(true);
+    const shownText = await extracted(false);
+    for (const marker of ORDERED_MARKERS) {
+      expect(hiddenText).toContain(marker);
+      expect(shownText).toContain(marker);
+    }
   });
 });
