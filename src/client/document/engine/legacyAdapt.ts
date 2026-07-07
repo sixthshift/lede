@@ -7,6 +7,7 @@
 // yet and why.
 import type { DocumentFormat, FontId } from "@shared/types";
 import type {
+  DateFormatV2,
   DocumentFormatV2,
   HeadingCapitalization,
   HeadingIconStyle,
@@ -111,9 +112,14 @@ function resolveHeadingsConfig(format: DocumentFormatV2): HeadingsRenderConfig {
   return { ...format.headings };
 }
 
+// document.dateFormat (§31.2) resolves 1:1 to sections.tsx's formatDate
+// preset argument — no derivation needed, same as headingsConfig above. It
+// rides the same extra-property seam (`dateFormat`) because the legacy
+// `DocumentFormat` shape this file returns has no date-format field at all.
 export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
   typeScaleSizes: TypeScaleSizes;
   headingsConfig: HeadingsRenderConfig;
+  dateFormat: DateFormatV2;
 } {
   const bodyFont = resolveFont(format.fonts.body);
   return {
@@ -140,5 +146,6 @@ export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
     sections: {},
     typeScaleSizes: resolveTypeScaleSizes(format),
     headingsConfig: resolveHeadingsConfig(format),
+    dateFormat: format.document.dateFormat,
   };
 }

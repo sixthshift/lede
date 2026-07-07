@@ -38,6 +38,18 @@ const tailoredResumeZ = z.object({
       groups: z.array(
         z.object({
           heading: z.string().optional(),
+          // TailoredGroup.headingParts (E9-F2d) — the structured group header
+          // (date-format axis). Optional, mirroring @shared/types; a plain
+          // z.object strips unknown keys, so it must be declared here or a
+          // backup restore silently degrades the date axis to the `heading`
+          // fallback (§27 "snapshots round-trip intact").
+          headingParts: z
+            .object({
+              title: z.string(),
+              subtitle: z.string().optional(),
+              date: z.string().optional(),
+            })
+            .optional(),
           leadRationale: z.string().optional(),
           items: z.array(z.object({ entryId: z.string(), text: z.string() })),
         }),

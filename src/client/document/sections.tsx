@@ -16,7 +16,9 @@ import type {
   TailoredSection,
 } from "@shared/types";
 import { SECTIONS } from "@shared/sections";
+import type { DateFormatV2 } from "@shared/format-v2";
 import type { HeadingsRenderConfig, TypeScaleSizes } from "./engine/legacyAdapt";
+import { formatDate, parseHeadingDate } from "./formatDate";
 
 // §31.2 typeScale's 4 offsets (nameOffset/titleOffset/sectionHeadingOffset/
 // entryHeaderOffset) arrive as an extra property on `format` rather than a
@@ -52,6 +54,32 @@ function resolveHeadingsConfig(format: DocumentFormat): HeadingsRenderConfig {
   const config = (format as DocumentFormat & { headingsConfig?: HeadingsRenderConfig })
     .headingsConfig;
   return config ?? DEFAULT_HEADINGS_CONFIG;
+}
+
+// document.dateFormat (§31.2) arrives as an extra property on `format`, same
+// seam as headingsConfig/typeScaleSizes above (legacyAdapt.ts's
+// toLegacyFormat). Absent (a plain DocumentFormat, or a stored TailoredGroup
+// with no headingParts to format) falls back to this module's pre-ticket
+// look: the group's raw `heading` string, untouched.
+const DEFAULT_DATE_FORMAT: DateFormatV2 = "MM/DD/YYYY";
+
+function resolveDateFormat(format: DocumentFormat): DateFormatV2 {
+  const dateFormat = (format as DocumentFormat & { dateFormat?: DateFormatV2 }).dateFormat;
+  return dateFormat ?? DEFAULT_DATE_FORMAT;
+}
+
+// §31.2's structured group header (E9-F2d): a fixture/snapshot with no
+// `headingParts` (every stored TailoredResume from before this ticket, or a
+// test fixture built by hand) renders exactly `heading`, unchanged — the
+// byte-stability guarantee this ticket must not break. Only when
+// `headingParts` is present does the date re-render through the chosen
+// dateFormat preset instead of the raw meta string it was assembled from.
+function resolveGroupHeadingText(group: TailoredGroup, format: DocumentFormat): string | undefined {
+  const parts = group.headingParts;
+  if (!parts) return group.heading;
+  const parsedDate = parseHeadingDate(parts.date);
+  const date = parsedDate ? formatDate(parsedDate, resolveDateFormat(format)) : parts.date;
+  return [parts.title, parts.subtitle, date].filter(Boolean).join(" · ");
 }
 
 function buildStyles(format: DocumentFormat) {
@@ -349,9 +377,10 @@ export function GroupBlock({
   columns?: number;
 }) {
   const styles = buildStyles(format);
+  const headingText = resolveGroupHeadingText(group, format);
   return (
     <View style={styles.group}>
-      {group.heading ? <Text style={styles.groupHeading}>{group.heading}</Text> : null}
+      {headingText ? <Text style={styles.groupHeading}>{headingText}</Text> : null}
       <View style={columns > 1 ? styles.itemsGrid : styles.items}>
         {group.items.map((item) => (
           <ItemRow key={item.entryId} item={item} format={format} columns={columns} />

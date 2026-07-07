@@ -154,6 +154,63 @@ describe("RED-TEAM #3: round-trip is non-vacuous — export, wipe, import, re-ex
     expect(afterImport.applications[0].locked).toEqual(lockedResume);
   });
 
+  // E9-F2d: the structured group header (headingParts, the date-format axis)
+  // must survive export -> import, not be silently stripped by tailoredResumeZ
+  // (a plain z.object drops unknown keys) — §27 "snapshots round-trip intact".
+  it("a snapshot's headingParts survives export -> import intact (not stripped by the import validator)", async () => {
+    const structuredResume: TailoredResume = {
+      signals: { roleLevel: "staff", weights: [], hardRequirements: [] },
+      summary: "Structured-header snapshot.",
+      sections: [
+        {
+          section: "experience",
+          groups: [
+            {
+              heading: "Acme · Engineer · 2021-06-15",
+              headingParts: { title: "Engineer", subtitle: "Acme", date: "2021-06-15" },
+              items: [{ entryId: "exp-acme", text: "Built widgets at scale." }],
+            },
+          ],
+        },
+      ],
+      cut: [],
+    };
+
+    const sourceDir = freshDataDir();
+    const { db: sourceDb } = initDb(sourceDir);
+    sourceDb
+      .insert(applications)
+      .values({ ...seededApplication(), current: structuredResume, locked: structuredResume })
+      .run();
+    const sourceApp = buildApp(sourceDb);
+    await sourceApp.inject({
+      method: "PUT",
+      url: "/api/profile",
+      payload: { name: "Ada Lovelace", email: "ada@example.com", links: [] },
+    });
+    const backup = (await sourceApp.inject({ method: "GET", url: "/api/export" })).json();
+    expect(backup.applications[0].current).toEqual(structuredResume);
+
+    const targetApp = appOn(freshDataDir());
+    const importRes = await targetApp.inject({
+      method: "POST",
+      url: "/api/import",
+      payload: backup,
+    });
+    expect(importRes.statusCode).toBe(200);
+
+    const restored = (
+      await targetApp.inject({ method: "GET", url: "/api/applications/app-round-trip" })
+    ).json();
+    const restoredGroup = restored.current.sections[0].groups[0];
+    expect(restoredGroup.headingParts).toEqual({
+      title: "Engineer",
+      subtitle: "Acme",
+      date: "2021-06-15",
+    });
+    expect(restored.current).toEqual(structuredResume);
+  });
+
   it("a malformed application (missing jobDescription) -> 4xx, not 500", async () => {
     const app = appOn(freshDataDir());
     const res = await app.inject({

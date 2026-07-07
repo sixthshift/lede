@@ -5,7 +5,7 @@
 // test/document-render.test.ts already owns that invariant and stays green.
 import { describe, expect, it } from "vitest";
 import type { Profile, TailoredResume } from "@shared/types";
-import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
+import { DATE_FORMATS, DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
 import { effectiveAtsGrade, PRESET_MANIFESTS } from "../src/client/document/registry";
 import { PRESETS } from "../src/client/document/presets";
 import { renderResumeToBuffer } from "../src/client/document/renderResume";
@@ -42,6 +42,31 @@ function resumeFixture(): TailoredResume {
               { entryId: "e1", text: "EXPERIENCE_ITEM_ONE" },
               { entryId: "e2", text: "EXPERIENCE_ITEM_TWO" },
             ],
+          },
+        ],
+      },
+    ],
+    cut: [],
+  };
+}
+
+// A group with a structured header (E9-F2d's headingParts) and a
+// single-date, parseable `period` — per the ticket's HARD CONSTRAINT,
+// freeform period is fine as long as the fixture's own value is parseable;
+// a real assemble() output would carry the identical shape for an
+// experience entry (headingPartsFromMeta in assemble.ts).
+function dateHeadingFixture(): TailoredResume {
+  return {
+    signals: { roleLevel: "senior", weights: [], hardRequirements: [] },
+    summary: "",
+    sections: [
+      {
+        section: "experience",
+        groups: [
+          {
+            heading: "Acme · Engineer · 2021-06-15",
+            headingParts: { title: "Engineer", subtitle: "Acme", date: "2021-06-15" },
+            items: [{ entryId: "e1", text: "EXPERIENCE_ITEM_ONE" }],
           },
         ],
       },
@@ -123,6 +148,50 @@ describe("renderer obeys DocumentFormatV2 (§28.3/§31)", () => {
     // formatting must never change WHAT is extracted, only how it looks
     expect(await extractText(customBuffer)).toContain("EXPERIENCE_ITEM_ONE");
     expect(await extractText(customBuffer)).toContain("EXPERIENCE_ITEM_TWO");
+  });
+
+  it("DATE FORMAT: a group's structured date renders 12 mutually distinct extracted texts across the 12 presets (§31.2 DATE_FORMATS)", async () => {
+    const resume = dateHeadingFixture();
+    const profile = profileFixture();
+    expect(DATE_FORMATS).toHaveLength(12);
+
+    const texts = new Set<string>();
+    for (const dateFormat of DATE_FORMATS) {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        document: { ...DEFAULT_FORMAT_V2.document, dateFormat },
+      };
+      const buffer = await renderResumeToBuffer({ resume, profile, format });
+      const text = await extractText(buffer);
+      expect(text).toContain("EXPERIENCE_ITEM_ONE"); // §28.4: the renderer never cuts
+      texts.add(text);
+    }
+    expect(texts.size).toBe(12);
+  });
+
+  it("SNAPSHOT STABILITY: rendering under different dateFormat presets never mutates the stored TailoredResume (§28.1/§31.1)", async () => {
+    const resume = dateHeadingFixture();
+    const before = JSON.stringify(resume);
+    const profile = profileFixture();
+
+    await renderResumeToBuffer({
+      resume,
+      profile,
+      format: {
+        ...DEFAULT_FORMAT_V2,
+        document: { ...DEFAULT_FORMAT_V2.document, dateFormat: "YYYY-MM-DD" },
+      },
+    });
+    await renderResumeToBuffer({
+      resume,
+      profile,
+      format: {
+        ...DEFAULT_FORMAT_V2,
+        document: { ...DEFAULT_FORMAT_V2.document, dateFormat: "Do MMMM YYYY" },
+      },
+    });
+
+    expect(JSON.stringify(resume)).toBe(before);
   });
 
   it("PHOTO: appears only when format.photo.hidden is false", async () => {

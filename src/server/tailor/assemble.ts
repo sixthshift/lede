@@ -9,6 +9,7 @@ import type {
   Section,
   TailorDecision,
   TailoredGroup,
+  TailoredGroupHeadingParts,
   TailoredItem,
   TailoredResume,
 } from "@shared/types";
@@ -125,7 +126,35 @@ function toGroup(
     text: coerceText(r, rule),
   }));
   const leadRationale = ordered[0]?.item.leadRationale;
-  return { heading, leadRationale, items };
+  // heading is undefined for flat (non-grouped) sections — headingParts
+  // mirrors that: no groupBy means no group header to structure (§4.3's
+  // ungrouped sections render no heading today; this ticket doesn't change
+  // that). When grouped, every member shares the groupBy key by
+  // construction, so the group's own structured parts come from any one
+  // member's meta — ordered[0], same entry the group already reads
+  // leadRationale from.
+  const headingParts =
+    heading !== undefined ? headingPartsFromMeta(ordered[0]?.entry.meta) : undefined;
+  return { heading, headingParts, leadRationale, items };
+}
+
+// Structured header parts (E9-F2d), derived from the SAME entry.meta fields
+// `heading` already stringifies via each section's groupBy (see sections.ts)
+// — never a new content field. Only experience/project/education carry a
+// meaningful title/subtitle/date triple; every other groupable section
+// (skill's category grouping) has no per-group date, so it stays undefined.
+function headingPartsFromMeta(meta: EntryMeta | undefined): TailoredGroupHeadingParts | undefined {
+  if (!meta) return undefined;
+  switch (meta.section) {
+    case "experience":
+      return { title: meta.role, subtitle: meta.company, date: meta.period };
+    case "education":
+      return { title: meta.degree, subtitle: meta.school, date: meta.period };
+    case "project":
+      return { title: meta.name, subtitle: meta.role, date: meta.period };
+    default:
+      return undefined;
+  }
 }
 
 // rephrase:'none' sections never carry model-composed text — the server

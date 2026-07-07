@@ -29,6 +29,7 @@ import type { ReactNode } from "react";
 import type {
   BodyFontId,
   ColumnsMode,
+  DateFormatV2,
   HeaderPosition,
   HeadingCapitalization,
   HeadingIconStyle,
@@ -36,7 +37,7 @@ import type {
   NameFontId,
   SectionColumn,
 } from "@shared/format-v2";
-import { NAME_DISPLAY_FONT_IDS } from "@shared/format-v2";
+import { DATE_FORMATS, NAME_DISPLAY_FONT_IDS } from "@shared/format-v2";
 import { SECTIONS, SECTION_VALUES } from "@shared/sections";
 import type { DocumentFormatV2 } from "@shared/format-v2";
 import { FONT_FACES } from "../document/fonts";
@@ -94,6 +95,12 @@ const HEADING_ICON_OPTIONS: { value: HeadingIconStyle; label: string }[] = [
   { value: "outline", label: "Outline" },
   { value: "filled", label: "Filled" },
 ];
+// document.dateFormat's 12 presets (§31.2) — the pattern string IS the
+// label; each is already the exact shape it renders (formatDate.ts).
+const DATE_FORMAT_OPTIONS: { value: DateFormatV2; label: string }[] = DATE_FORMATS.map((value) => ({
+  value,
+  label: value,
+}));
 
 // A curated set, not an open picker — every swatch here is already a valid
 // formatV2Schema hex; the text input next to it is the escape hatch for
@@ -506,6 +513,37 @@ export function DesignPanel({
             </Select>
           </FieldRow>
         </div>
+      </div>
+
+      {/* ── dates — document.dateFormat (§31.2, E9-F2d). A group's own
+          date (assemble()'s structured headingParts, sections.tsx's
+          resolveGroupHeadingText) re-renders through this preset; a group
+          with no structured date falls back to its raw heading string. ── */}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-medium">Dates</p>
+        <FieldRow label="Date format" htmlFor="design-date-format">
+          <Select
+            value={format.document.dateFormat}
+            disabled={readOnly}
+            onValueChange={(next) =>
+              set({
+                ...format,
+                document: { ...format.document, dateFormat: next as DateFormatV2 },
+              })
+            }
+          >
+            <SelectTrigger id="design-date-format" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DATE_FORMAT_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FieldRow>
       </div>
 
       {/* ── color ── */}

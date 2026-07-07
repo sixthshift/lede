@@ -114,7 +114,20 @@ export type TailorDecision = {
 
 // ── what the SERVER assembles and the UI renders ──
 export type TailoredItem = { entryId: string; text: string };
-export type TailoredGroup = { heading?: string; leadRationale?: string; items: TailoredItem[] }; // e.g. one job
+// headingParts (E9-F2d): the SAME provenance as `heading` (assemble()'s
+// groupBy key), just not yet joined into one string — title/subtitle are
+// always the entry's own meta fields (e.g. role/company), `date` is the
+// entry's own freeform period/date string, unformatted. ADDITIVE: `heading`
+// stays the string every existing renderer/consumer already reads; a
+// snapshot from before this ticket has no `headingParts` and still renders
+// via the `heading` fallback (src/client/document/sections.tsx).
+export type TailoredGroupHeadingParts = { title: string; subtitle?: string; date?: string };
+export type TailoredGroup = {
+  heading?: string;
+  headingParts?: TailoredGroupHeadingParts;
+  leadRationale?: string;
+  items: TailoredItem[];
+}; // e.g. one job
 export type TailoredSection = { section: Section; groups: TailoredGroup[] };
 export type TailoredResume = {
   signals: JDSignals;
