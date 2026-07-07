@@ -1355,6 +1355,75 @@ export function DesignPanel({
           </div>
         </div>
       </div>
+
+      {/* ── footer — footer.{pageNumbers,email,name,customText} (§31.2,
+          E9-F3e). Fixed chrome (engine/document.tsx's renderFooter): it never
+          consumes item space, so there is no never-cut interaction to gate
+          here. customText enforces the same no-newline/200-char bound
+          formatV2Schema parses (@shared/format-v2) client-side too — a
+          newline is stripped rather than rejected, since a single-line text
+          input can't produce one on its own except via paste. ── */}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-medium">Footer</p>
+        <div className="flex flex-wrap gap-4">
+          <div className="flex items-center gap-2">
+            <input
+              id="design-footer-page-numbers"
+              type="checkbox"
+              checked={format.footer.pageNumbers}
+              disabled={readOnly}
+              onChange={(e) =>
+                set({ ...format, footer: { ...format.footer, pageNumbers: e.target.checked } })
+              }
+              className="h-4 w-4 rounded border-border"
+            />
+            <Label htmlFor="design-footer-page-numbers">Page numbers</Label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              id="design-footer-email"
+              type="checkbox"
+              checked={format.footer.email}
+              disabled={readOnly}
+              onChange={(e) =>
+                set({ ...format, footer: { ...format.footer, email: e.target.checked } })
+              }
+              className="h-4 w-4 rounded border-border"
+            />
+            <Label htmlFor="design-footer-email">Email</Label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              id="design-footer-name"
+              type="checkbox"
+              checked={format.footer.name}
+              disabled={readOnly}
+              onChange={(e) =>
+                set({ ...format, footer: { ...format.footer, name: e.target.checked } })
+              }
+              className="h-4 w-4 rounded border-border"
+            />
+            <Label htmlFor="design-footer-name">Name</Label>
+          </div>
+        </div>
+
+        <FieldRow label="Custom text" htmlFor="design-footer-custom-text">
+          <Input
+            id="design-footer-custom-text"
+            value={format.footer.customText}
+            disabled={readOnly}
+            maxLength={200}
+            onChange={(e) =>
+              set({
+                ...format,
+                footer: { ...format.footer, customText: e.target.value.replace(/[\r\n]/g, "") },
+              })
+            }
+          />
+        </FieldRow>
+      </div>
     </div>
   );
 }

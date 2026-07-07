@@ -1672,3 +1672,124 @@ describe("colors.accentPlacement — 8 of the 9 gates, each its own element clas
     });
   });
 });
+
+// footer.{pageNumbers,email,name,customText} (§31.2, E9-F3e) — a real
+// react-pdf fixed footer (engine/document.tsx's renderFooter), never present
+// in the flow content SectionBlock/ProfileHeader render, so its own
+// extractor reads a single page's text directly (extractPdfText's own
+// per-page walk, keeping page boundaries this time instead of flattening
+// them — see extractText.ts's own loop this mirrors).
+async function pageText(buffer: Buffer, pageNumber: number): Promise<string> {
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await getDocument({ data: new Uint8Array(buffer) }).promise;
+  const page = await doc.getPage(pageNumber);
+  const content = await page.getTextContent();
+  return content.items
+    .filter((item): item is { str: string } => "str" in item)
+    .map((item) => item.str)
+    .join(" ");
+}
+
+function countOccurrences(haystack: string, needle: string): number {
+  return haystack.split(needle).length - 1;
+}
+
+describe("footer — pageNumbers/email/name/customText (E9-F3e, §31.2)", () => {
+  it("no page-number marker when the whole footer is off (DEFAULT_FORMAT_V2's own default)", async () => {
+    const profile = profileFixture();
+    const buffer = await renderEngineToBuffer({
+      resume: resumeFixture(),
+      profile,
+      paper: "letter",
+      format: DEFAULT_FORMAT_V2,
+    });
+    const text = await pageText(buffer, 1);
+    expect(text).not.toContain("1 / ");
+  });
+
+  it("email/name each add ONE extra occurrence over the header's own when enabled (profile.name/email already render in the header, independent of the footer)", async () => {
+    const profile = profileFixture();
+    const resume = resumeFixture();
+
+    async function render(footer: Partial<DocumentFormatV2["footer"]>) {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        footer: { ...DEFAULT_FORMAT_V2.footer, ...footer },
+      };
+      const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
+      return pageText(buffer, 1);
+    }
+
+    const baseline = await render({});
+    const emailOn = await render({ email: true });
+    const nameOn = await render({ name: true });
+
+    expect(countOccurrences(emailOn, profile.email)).toBe(
+      countOccurrences(baseline, profile.email) + 1,
+    );
+    expect(countOccurrences(nameOn, profile.name)).toBe(
+      countOccurrences(baseline, profile.name) + 1,
+    );
+  });
+
+  it("customText renders verbatim when set, and is absent when empty (no toggle needed — presence IS the flag)", async () => {
+    const profile = profileFixture();
+    const resume = resumeFixture();
+    const CUSTOM_TEXT = "SENTINEL_FOOTER_CUSTOM_TEXT";
+
+    async function render(customText: string) {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        footer: { ...DEFAULT_FORMAT_V2.footer, customText },
+      };
+      const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
+      return pageText(buffer, 1);
+    }
+
+    expect(await render(CUSTOM_TEXT)).toContain(CUSTOM_TEXT);
+    expect(await render("")).not.toContain(CUSTOM_TEXT);
+  });
+
+  it("PAGINATES: pageNumbers reads N / totalPages, with N incrementing per physical page on a genuinely multi-page fixture", async () => {
+    const profile = profileFixture();
+    // Same growing fixture the NEVER-CUT describe block above calibrates
+    // against comfortable density's strict-preset 2-page result.
+    const resume = growingResumeFixture(24);
+    const format: DocumentFormatV2 = {
+      ...PRESETS.strict,
+      footer: { ...PRESETS.strict.footer, pageNumbers: true },
+    };
+    const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
+    const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const totalPages = (await getDocument({ data: new Uint8Array(buffer) }).promise).numPages;
+    expect(totalPages).toBeGreaterThan(1);
+
+    for (let pageNumber = 1; pageNumber <= totalPages; pageNumber++) {
+      const text = await pageText(buffer, pageNumber);
+      expect(text).toContain(`${pageNumber} / ${totalPages}`);
+    }
+  });
+
+  it("NEVER-CUT: item count is identical with the footer fully on vs off", async () => {
+    const profile = profileFixture();
+    const resume = growingResumeFixture(24);
+    const expectedItems = resume.sections[0].groups[0].items.map((item) => item.text);
+
+    async function itemsPresent(footerOn: boolean): Promise<string[]> {
+      const format: DocumentFormatV2 = {
+        ...PRESETS.strict,
+        footer: footerOn
+          ? { pageNumbers: true, email: true, name: true, customText: "Confidential" }
+          : PRESETS.strict.footer,
+      };
+      const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
+      const text = (await extractPdfText(buffer)).join(" ");
+      return expectedItems.filter((marker) => text.includes(marker));
+    }
+
+    const withFooter = await itemsPresent(true);
+    const withoutFooter = await itemsPresent(false);
+    expect(withFooter).toEqual(expectedItems);
+    expect(withoutFooter).toEqual(expectedItems);
+  });
+});

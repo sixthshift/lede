@@ -91,9 +91,21 @@
 // beyond the underline sections.tsx already draws,capitalization,icons},
 // colors.accentPlacement (the header-icon/link-icon element classes E9-F3c
 // just added are addressable for this, but not yet colored by it), photo.
-// {crop,zoom}, footer, per-section display variants, document.{pageFormat is
+// {crop,zoom}, per-section display variants, document.{pageFormat is
 // honored via `paper`; dateFormat is not applied to any rendered date}.
-import { Document, Page, StyleSheet, View } from "@react-pdf/renderer";
+//
+// AXES WIRED THIS TICKET (E9-F3e): footer.{pageNumbers,email,name,customText}
+// — a real react-pdf fixed footer (see resolveFooterParts/renderFooter below),
+// composed from whichever parts are enabled and centered in the page's own
+// bottom margin. It is `fixed` + `position: absolute`, so — per the §28.4
+// NEVER-CUT contract — it is chrome laid over already-reserved margin
+// whitespace, never a flow child that could push or cut a section/item; the
+// same footer element (unconditionally present in both column-mode branches
+// below) renders once per physical page, so layout.manualPageBreaks and the
+// two-column row-per-segment split (splitIntoBreakSegments) both get it for
+// free without any per-branch footer logic. Absent entirely (no element
+// rendered) when every part is disabled/empty.
+import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { Paper, Profile, TailoredResume, TailoredSection } from "@shared/types";
 import type { BorderSize, DocumentFormatV2 } from "@shared/format-v2";
 import {
@@ -294,6 +306,67 @@ function resolveColumnGeometry(format: DocumentFormatV2) {
   };
 }
 
+// footer.{pageNumbers,email,name,customText} (§31.2, E9-F3e) — every enabled
+// part, in the field's declared order, joined into one line. `pageNumbers`
+// resolves through react-pdf's own per-instance `render` callback rather
+// than a plain string: react-pdf calls this once per physical page with
+// that page's real pageNumber/totalPages, which is what makes the footer
+// PAGINATE instead of repeating page 1's numbers on every page.
+const FOOTER_SEPARATOR = "   ·   ";
+const FOOTER_BOTTOM_PT = 12;
+const FOOTER_FONT_SIZE_PT = 8;
+
+function resolveFooterParts(
+  format: DocumentFormatV2,
+  profile: Profile,
+  pageNumber: number,
+  totalPages: number,
+): string[] {
+  const parts: string[] = [];
+  if (format.footer.pageNumbers) parts.push(`${pageNumber} / ${totalPages}`);
+  if (format.footer.email) parts.push(profile.email);
+  if (format.footer.name) parts.push(profile.name);
+  if (format.footer.customText) parts.push(format.footer.customText);
+  return parts;
+}
+
+function hasFooterContent(format: DocumentFormatV2): boolean {
+  return (
+    format.footer.pageNumbers ||
+    format.footer.email ||
+    format.footer.name ||
+    format.footer.customText.length > 0
+  );
+}
+
+// `fixed` + `position: absolute` (§28.4 NEVER-CUT): the footer is chrome
+// painted over the page's own already-reserved bottom margin whitespace —
+// never a flow child, so it can neither push a section down nor cut an item
+// to make room for itself. Absent entirely (not an empty Text) when nothing
+// is enabled, so a no-footer render stays byte-identical to what this engine
+// produced before this ticket (every existing preset's default footer is
+// all-off/empty).
+function renderFooter(format: DocumentFormatV2, profile: Profile, ink: string) {
+  if (!hasFooterContent(format)) return null;
+  return (
+    <Text
+      fixed
+      style={{
+        position: "absolute",
+        bottom: FOOTER_BOTTOM_PT,
+        left: 0,
+        right: 0,
+        textAlign: "center",
+        fontSize: FOOTER_FONT_SIZE_PT,
+        color: ink,
+      }}
+      render={({ pageNumber, totalPages }) =>
+        resolveFooterParts(format, profile, pageNumber, totalPages).join(FOOTER_SEPARATOR)
+      }
+    />
+  );
+}
+
 export type EngineDocumentProps = {
   resume: TailoredResume;
   profile: Profile;
@@ -381,6 +454,7 @@ export function EngineDocument({
   });
 
   const borderSides = borderSideStyles(format);
+  const footer = renderFooter(format, profile, documentInk ?? format.colors.text);
   const nameFontFamily = resolveNameFont(format);
   const header = (
     <ProfileHeader
@@ -421,6 +495,7 @@ export function EngineDocument({
           {borderSides.map(({ side, style }) => (
             <View key={side} style={style} />
           ))}
+          {footer}
         </Page>
       </Document>
     );
@@ -518,6 +593,7 @@ export function EngineDocument({
         {borderSides.map(({ side, style }) => (
           <View key={side} style={style} />
         ))}
+        {footer}
       </Page>
     </Document>
   );
