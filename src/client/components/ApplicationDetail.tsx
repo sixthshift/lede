@@ -48,7 +48,10 @@ function formatStaleDate(at: number): string {
 // so a broken render can't hide behind the same blank state overflow never
 // produces (that swallow is exactly how this feature went silently broken in
 // the browser once already).
-function useFit(args: {
+// Exported so DesignView (E9-F1a) can drive the SAME fit-ladder walk off
+// its own resolvedFormat/paper/targetPages — the chip/preview on that view
+// must agree with this one, not run a second, possibly-diverging copy.
+export function useFit(args: {
   resume: TailoredResume | null;
   profile: Profile | undefined;
   format: DocumentFormatV2;
@@ -242,12 +245,19 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-md">Design</CardTitle>
-          <CardDescription>
-            {isLocked
-              ? "Locked — this reflects the look frozen at lock time. Unlock to edit."
-              : "Template and formatting for this application's document. Changes repaint the preview live."}
-          </CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-md">Design</CardTitle>
+              <CardDescription>
+                {isLocked
+                  ? "Locked — this reflects the look frozen at lock time. Unlock to edit."
+                  : "Template and formatting for this application's document. Changes repaint the preview live."}
+              </CardDescription>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link to={`/applications/${applicationId}/design`}>Open design view</Link>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
           <div className="flex flex-col gap-3">
@@ -259,6 +269,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
                 resume={application.current}
                 profile={profile}
                 paper={paper}
+                applicationId={applicationId}
               />
             </div>
             <TemplatePicker

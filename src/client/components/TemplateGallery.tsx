@@ -14,6 +14,7 @@
 // choice immediately.
 
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { cn } from "../lib/utils";
 import { PRESET_MANIFESTS, effectiveAtsGrade } from "../document/registry";
 import { applyPreset } from "../document/presets";
@@ -45,6 +46,7 @@ export function TemplateGallery({
   resume = null,
   profile,
   paper = "letter",
+  applicationId,
 }: {
   format: DocumentFormatV2;
   onChange: (next: DocumentFormatV2) => void;
@@ -52,6 +54,11 @@ export function TemplateGallery({
   resume?: TailoredResume | null;
   profile?: Profile;
   paper?: Paper;
+  // When provided, the dialog offers a way into the E9-F1a design view (a
+  // bigger surface than this dialog) — omitted wherever the gallery is used
+  // with no application to navigate to (e.g. SettingsView's default-format
+  // editor has no /applications/:id to point at).
+  applicationId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const isSample = !resume;
@@ -66,7 +73,18 @@ export function TemplateGallery({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Browse templates</DialogTitle>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <DialogTitle>Browse templates</DialogTitle>
+              {applicationId ? (
+                <Link
+                  to={`/applications/${applicationId}/design`}
+                  onClick={() => setOpen(false)}
+                  className="text-sm text-primary underline-offset-4 hover:underline"
+                >
+                  Open design view
+                </Link>
+              ) : null}
+            </div>
             <DialogDescription>
               {readOnly
                 ? "Locked — this application's look is frozen. Unlock to change templates."

@@ -5,6 +5,7 @@ import { createBrowserRouter, RouterProvider, Navigate, useParams } from "react-
 import { App } from "./App";
 import { ApplicationsView } from "./components/ApplicationsView";
 import { ApplicationDetail } from "./components/ApplicationDetail";
+import { DesignView } from "./components/DesignView";
 import { LibraryView } from "./components/LibraryView";
 import "./styles/app.css";
 
@@ -21,6 +22,15 @@ function ApplicationDetailRoute() {
   return <ApplicationDetail applicationId={id} />;
 }
 
+// A real route (not a client-only view swap) so a deep-link AND a browser
+// refresh at this URL both resolve to the SAME design view via the SPA
+// fallback below — never the catch-all's redirect to /applications (E9-F1a).
+function DesignViewRoute() {
+  const { id } = useParams<{ id: string }>();
+  if (!id) throw new Error("DesignViewRoute rendered without an :id param");
+  return <DesignView applicationId={id} />;
+}
+
 const queryClient = new QueryClient();
 
 const router = createBrowserRouter([
@@ -31,6 +41,7 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to="/applications" replace /> },
       { path: "applications", element: <ApplicationsView /> },
       { path: "applications/:id", element: <ApplicationDetailRoute /> },
+      { path: "applications/:id/design", element: <DesignViewRoute /> },
       { path: "library", element: <LibraryView /> },
       { path: "settings", element: <SettingsView /> },
       // Unknown paths land on a known destination (§26) — never a blank/404

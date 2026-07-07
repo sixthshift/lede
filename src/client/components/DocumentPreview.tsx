@@ -61,18 +61,85 @@ function PdfCanvas({ url }: { url: string }) {
   return <canvas ref={canvasRef} className="document-preview__canvas" />;
 }
 
+// Every page, not just page 1 (E9-F1a's design view: a resume that overflows
+// its target still needs every overflow page visible, not just a first-page
+// crop). Canvases are built and painted off-DOM, then appended to the
+// container in order — appending only once a page is fully painted means the
+// container never shows a half-drawn canvas, and sidesteps the ref-timing
+// problem of asking React to hand back N refs for a page count pdf.js hasn't
+// reported yet.
+async function renderAllPagesInto(
+  url: string,
+  container: HTMLDivElement,
+  isCancelled: () => boolean,
+): Promise<void> {
+  const pdfjs = await import("pdfjs-dist");
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.mjs",
+    import.meta.url,
+  ).toString();
+
+  const doc = await pdfjs.getDocument({ url }).promise;
+  for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber++) {
+    if (isCancelled()) return;
+    const page = await doc.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: 1.5 });
+    const canvas = document.createElement("canvas");
+    canvas.className = "document-preview__canvas";
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const context = canvas.getContext("2d");
+    if (!context) continue;
+    await page.render({ canvas, canvasContext: context, viewport }).promise;
+    if (isCancelled()) return;
+    container.appendChild(canvas);
+  }
+}
+
+// Visible gap + border between stacked pages (className, not app.css: this
+// component owns its own presentation) so a multi-page render never reads as
+// one long, ambiguous strip.
+function PdfPages({ url }: { url: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const container = containerRef.current;
+    if (!container) return;
+    container.replaceChildren();
+
+    renderAllPagesInto(url, container, () => cancelled).catch(() => {
+      // Same browser-only caveat as PdfCanvas — a failure here leaves
+      // whatever pages already painted in place rather than crashing.
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [url]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="document-preview__pages flex flex-col items-center gap-6 [&>canvas]:rounded-sm [&>canvas]:border [&>canvas]:border-border [&>canvas]:shadow-md"
+    />
+  );
+}
+
 function RenderedPreview({
   resume,
   profile,
   paper,
   format,
   density,
+  allPages,
 }: {
   resume: TailoredResume;
   profile: Profile;
   paper: Paper;
   format: DocumentFormatV2;
   density?: EngineDensity;
+  allPages?: boolean;
 }) {
   const [instance] = usePDF({
     document: renderResumeDocument({ resume, profile, paper, format, density }),
@@ -88,17 +155,22 @@ function RenderedPreview({
   if (instance.loading || !instance.url) {
     return <p className="document-preview__loading">Rendering preview…</p>;
   }
-  return <PdfCanvas url={instance.url} />;
+  return allPages ? <PdfPages url={instance.url} /> : <PdfCanvas url={instance.url} />;
 }
 
 export function DocumentPreview({
   resume,
   format = DEFAULT_FORMAT_V2,
   density,
+  allPages = false,
 }: {
   resume: TailoredResume;
   format?: DocumentFormatV2;
   density?: EngineDensity;
+  // Every page instead of just the first (E9-F1a's design view, where an
+  // overflowing resume needs every page visible) — default false keeps
+  // every existing single-page caller (ResultView/AtsView) unchanged.
+  allPages?: boolean;
 }) {
   const { data: profile } = useProfile();
   const { data: settings } = useSettings();
@@ -114,6 +186,7 @@ export function DocumentPreview({
           paper={settings.paper}
           format={format}
           density={density}
+          allPages={allPages}
         />
       ) : (
         <p className="document-preview__loading">Loading preview…</p>
