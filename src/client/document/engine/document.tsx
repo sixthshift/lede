@@ -53,6 +53,19 @@
 // wired for columns:'two' (previously an unhandled off-diagonal — folded into
 // the main column with no band); 'one'/'mix' unchanged.
 //
+// AXES WIRED THIS TICKET (E9-F3b): colors.border — a page-frame, one filled
+// rect per colors.border.sides.{top,right,bottom,left}, thickness from
+// colors.border.size, colored by colors.accent. Each rect is absolutely
+// positioned against the Page's own physical edges (verified against a real
+// render at authoring time: position:'absolute' + top/right/bottom/left:0
+// resolves to the page's box, ignoring the page's own padding — so the frame
+// hugs the true page edge regardless of margins). [v3-038] (intake decision,
+// ledger) promoted border to ATS-neutral because "a frame drawn first AND
+// last leaves extraction order intact": these rects carry no Text child, so
+// they contribute zero items to pdf.js text extraction NO MATTER where they
+// land in the render tree or paint order — there is nothing here for
+// extraction order to be perturbed BY. See borderSideStyles below.
+//
 // AXES NOT YET WIRED (render as sections.tsx's one existing look — never a
 // crash; later tickets land their seam per §31.6's phase list):
 // typeScale.{nameOffset,titleOffset,
@@ -60,14 +73,14 @@
 // heading sizes with no per-field seam), entries.* (structure/date-location/
 // subtitle/list-style/per-field font style/body indent), headings.{style
 // beyond the underline sections.tsx already draws,capitalization,icons},
-// colors.{border the drawn frame itself,accentPlacement}, header.
+// colors.accentPlacement, header.
 // {detailsArrangement 'wrapped',separator,contactIconStyle,titleWeight,
 // titlePosition}, photo.{crop,zoom}, links, footer, per-section display
 // variants, document.{pageFormat is honored via `paper`; dateFormat is not
 // applied to any rendered date}.
 import { Document, Page, StyleSheet, View } from "@react-pdf/renderer";
 import type { Paper, Profile, TailoredResume, TailoredSection } from "@shared/types";
-import type { DocumentFormatV2 } from "@shared/format-v2";
+import type { BorderSize, DocumentFormatV2 } from "@shared/format-v2";
 import {
   ProfileHeader,
   type ProfileHeaderVariant,
@@ -121,6 +134,57 @@ function resolvePageBackground(format: DocumentFormatV2): string | undefined {
   return format.colors.area === "full-page" || format.colors.area === "border"
     ? format.colors.background
     : undefined;
+}
+
+// colors.border.size (§31.2) is a curated 3-value scale, not a raw pt input
+// (§31.1) — s/m/l map to 0.5/1/2pt, a coarse-to-fine ladder chosen so 'l' is
+// unmistakably heavier than 's' at any page size while staying a hairline
+// relative to the page (2pt on a 612pt-wide letter page).
+const BORDER_WIDTH_PT: Record<BorderSize, number> = { s: 0.5, m: 1, l: 2 };
+
+// colors.border (§31.2): one plain filled rect per enabled side, pinned to
+// that edge of the Page's own box (position:'absolute' resolves against the
+// page's physical edges, not its padding — verified against a real render at
+// authoring time), thickness from size, color from colors.accent. A filled
+// rect (not a stroked border box) so its geometry is exactly the requested
+// thickness with no stroke-centering half-width offset to reason about, and
+// so detecting it in a rendered PDF is the SAME setFillRGBColor + fill-rect-
+// bounds read the header band already uses (page1FillColors) — no new
+// extraction machinery for a different paint primitive. Independent per-side
+// booleans, so 0-4 rects; empty array when every side is off.
+function borderSideStyles(format: DocumentFormatV2) {
+  const { size, sides } = format.colors.border;
+  const width = BORDER_WIDTH_PT[size];
+  const backgroundColor = format.colors.accent;
+  const styles: {
+    side: "top" | "right" | "bottom" | "left";
+    style: Record<string, string | number>;
+  }[] = [];
+  if (sides.top) {
+    styles.push({
+      side: "top",
+      style: { position: "absolute", top: 0, left: 0, right: 0, height: width, backgroundColor },
+    });
+  }
+  if (sides.right) {
+    styles.push({
+      side: "right",
+      style: { position: "absolute", top: 0, bottom: 0, right: 0, width, backgroundColor },
+    });
+  }
+  if (sides.bottom) {
+    styles.push({
+      side: "bottom",
+      style: { position: "absolute", bottom: 0, left: 0, right: 0, height: width, backgroundColor },
+    });
+  }
+  if (sides.left) {
+    styles.push({
+      side: "left",
+      style: { position: "absolute", top: 0, bottom: 0, left: 0, width, backgroundColor },
+    });
+  }
+  return styles;
 }
 
 // The three ProfileHeader variants sections.tsx exposes collapse two
@@ -296,6 +360,7 @@ export function EngineDocument({
     row: { flexDirection: "row", paddingHorizontal: legacy.page.marginX },
   });
 
+  const borderSides = borderSideStyles(format);
   const nameFontFamily = resolveNameFont(format);
   const header = (
     <ProfileHeader
@@ -333,6 +398,9 @@ export function EngineDocument({
               {content}
             </>
           )}
+          {borderSides.map(({ side, style }) => (
+            <View key={side} style={style} />
+          ))}
         </Page>
       </Document>
     );
@@ -427,6 +495,9 @@ export function EngineDocument({
           )
         ) : null}
         {rows}
+        {borderSides.map(({ side, style }) => (
+          <View key={side} style={style} />
+        ))}
       </Page>
     </Document>
   );

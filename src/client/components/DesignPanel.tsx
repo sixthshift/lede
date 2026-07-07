@@ -28,6 +28,7 @@
 import type { ReactNode } from "react";
 import type {
   BodyFontId,
+  BorderSize,
   ColorArea,
   ColorMode,
   ColumnsMode,
@@ -96,6 +97,20 @@ const COLOR_MODE_OPTIONS: { value: ColorMode; label: string }[] = [
   { value: "single", label: "Single (accent over black-on-white)" },
   { value: "multi", label: "Multi (independent colors)" },
 ];
+// colors.border (§31.2/E9-F3b, engine/document.tsx): a page-frame stroke,
+// independent of area/mode above — size picks stroke thickness (s/m/l ->
+// 0.5/1/2pt in the engine), the four side toggles pick which edges draw.
+const BORDER_SIZE_OPTIONS: { value: BorderSize; label: string }[] = [
+  { value: "s", label: "Thin" },
+  { value: "m", label: "Medium" },
+  { value: "l", label: "Thick" },
+];
+const BORDER_SIDES = [
+  { key: "top", label: "Top" },
+  { key: "right", label: "Right" },
+  { key: "bottom", label: "Bottom" },
+  { key: "left", label: "Left" },
+] as const;
 // headings.style's 8 treatments (§31.2, sections.tsx's renderSectionHeading)
 // — distinct from the "Heading weight" control below, which binds
 // header.nameWeight/titleWeight (the PROFILE header), not this axis.
@@ -803,6 +818,50 @@ export function DesignPanel({
             disabled={readOnly}
             onChange={(background) => set({ ...format, colors: { ...format.colors, background } })}
           />
+        </FieldRow>
+
+        <FieldRow label="Border size" htmlFor="design-border-size">
+          <EnumSelect
+            id="design-border-size"
+            value={format.colors.border.size}
+            options={BORDER_SIZE_OPTIONS}
+            disabled={readOnly}
+            onChange={(size) =>
+              set({
+                ...format,
+                colors: { ...format.colors, border: { ...format.colors.border, size } },
+              })
+            }
+          />
+        </FieldRow>
+
+        <FieldRow label="Border sides" htmlFor="design-border-side-top">
+          <div className="flex flex-wrap gap-3">
+            {BORDER_SIDES.map(({ key, label }) => (
+              <div key={key} className="flex items-center gap-2">
+                <input
+                  id={`design-border-side-${key}`}
+                  type="checkbox"
+                  checked={format.colors.border.sides[key]}
+                  disabled={readOnly}
+                  onChange={(e) =>
+                    set({
+                      ...format,
+                      colors: {
+                        ...format.colors,
+                        border: {
+                          ...format.colors.border,
+                          sides: { ...format.colors.border.sides, [key]: e.target.checked },
+                        },
+                      },
+                    })
+                  }
+                  className="h-4 w-4 rounded border-border"
+                />
+                <Label htmlFor={`design-border-side-${key}`}>{label}</Label>
+              </div>
+            ))}
+          </div>
         </FieldRow>
       </div>
 

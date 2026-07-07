@@ -115,6 +115,11 @@ const SENTINELS = [
   "SENTINEL_CUT_ONE",
   "SENTINEL_CUT_TWO",
 ];
+// Letter page dimensions in points (test/engine-two-column.test.ts's own
+// copy of the same physical width constant) — paper is pinned to "letter"
+// throughout this file's renderEngineToBuffer calls.
+const LETTER_WIDTH_PT = 612;
+const LETTER_HEIGHT_PT = 792;
 
 // `fontSize` is item.transform[0] — for this engine's unrotated horizontal
 // text, pdf.js's text-content transform matrix is exactly
@@ -438,6 +443,217 @@ describe("colors.area 'full-page' + colors.mode — generalized auto-contrast in
     expect(fills).not.toContain(DARK_BACKGROUND);
     expect(fills).not.toContain(expectedInk(DARK_BACKGROUND));
     expect(fills).toContain(format.colors.text);
+  });
+});
+
+// page1FillColors (above) only reports WHICH colors got filled, not the
+// filled rects' geometry — border needs geometry too (size changes a rect's
+// thickness, not its color). Same op-stream read, one more field kept: the
+// bounding box (pdf.js's constructPath argsArray[2], already exercised by
+// page1Geometry's transform reads above) of every rect immediately preceded
+// by a setFillRGBColor matching `hexColor`.
+async function page1FillRects(
+  buffer: Buffer,
+  hexColor: string,
+): Promise<Array<{ minX: number; minY: number; maxX: number; maxY: number }>> {
+  const { getDocument, OPS } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await getDocument({ data: new Uint8Array(buffer) }).promise;
+  const page = await doc.getPage(1);
+  const opList = await page.getOperatorList();
+  const rects: Array<{ minX: number; minY: number; maxX: number; maxY: number }> = [];
+  let currentFill: string | null = null;
+  for (let i = 0; i < opList.fnArray.length; i++) {
+    if (opList.fnArray[i] === OPS.setFillRGBColor) currentFill = opList.argsArray[i][0];
+    if (opList.fnArray[i] === OPS.constructPath && currentFill === hexColor) {
+      const [minX, minY, maxX, maxY] = opList.argsArray[i][2];
+      rects.push({ minX, minY, maxX, maxY });
+      currentFill = null; // one rect consumes one fill color; don't double-count the next path
+    }
+  }
+  return rects;
+}
+
+// colors.accent already tints OTHER same-colored fills sections.tsx draws
+// (heading underlines/rules/accent bars, §31.2 headings.*) — none of those
+// span a full page edge, so filtering page1FillRects down to rects that span
+// (nearly) the ENTIRE page width or height isolates the page-frame rects
+// specifically, independent of whatever heading/accent decoration a given
+// preset/format also happens to paint in the same color.
+function isFrameRect(rect: { minX: number; minY: number; maxX: number; maxY: number }): boolean {
+  const spansWidth = rect.minX <= 1 && rect.maxX >= LETTER_WIDTH_PT - 1;
+  const spansHeight = rect.minY <= 1 && rect.maxY >= LETTER_HEIGHT_PT - 1;
+  return spansWidth || spansHeight;
+}
+
+async function page1BorderFrameRects(buffer: Buffer, hexColor: string) {
+  return (await page1FillRects(buffer, hexColor)).filter(isFrameRect);
+}
+
+describe("colors.border — page frame (E9-F3b, §31.2)", () => {
+  const NO_BORDER = {
+    size: "s" as const,
+    sides: { top: false, right: false, bottom: false, left: false },
+  };
+
+  it("no side enabled: no accent-colored rect is painted", async () => {
+    const profile = profileFixture();
+    const format: DocumentFormatV2 = {
+      ...PRESETS.strict,
+      colors: { ...PRESETS.strict.colors, border: NO_BORDER },
+    };
+    const buffer = await renderEngineToBuffer({
+      resume: resumeFixture(),
+      profile,
+      paper: "letter",
+      format,
+    });
+    const rects = await page1BorderFrameRects(buffer, format.colors.accent);
+    expect(rects).toHaveLength(0);
+  });
+
+  it("top side enabled: exactly one full-width accent rect pinned to the page's top edge", async () => {
+    const profile = profileFixture();
+    const format: DocumentFormatV2 = {
+      ...PRESETS.strict,
+      colors: {
+        ...PRESETS.strict.colors,
+        border: { size: "s", sides: { top: true, right: false, bottom: false, left: false } },
+      },
+    };
+    const buffer = await renderEngineToBuffer({
+      resume: resumeFixture(),
+      profile,
+      paper: "letter",
+      format,
+    });
+    const rects = await page1BorderFrameRects(buffer, format.colors.accent);
+    expect(rects).toHaveLength(1);
+    expect(rects[0].minX).toBe(0);
+    expect(rects[0].minY).toBe(0);
+    expect(rects[0].maxX).toBeCloseTo(LETTER_WIDTH_PT, 0);
+  });
+
+  it("adding a side changes the measured fill count: 1 side -> 2 sides -> 4 sides", async () => {
+    const profile = profileFixture();
+    const bufferFor = async (sides: {
+      top: boolean;
+      right: boolean;
+      bottom: boolean;
+      left: boolean;
+    }) => {
+      const format: DocumentFormatV2 = {
+        ...PRESETS.strict,
+        colors: { ...PRESETS.strict.colors, border: { size: "m", sides } },
+      };
+      return {
+        format,
+        buffer: await renderEngineToBuffer({
+          resume: resumeFixture(),
+          profile,
+          paper: "letter",
+          format,
+        }),
+      };
+    };
+    const one = await bufferFor({ top: true, right: false, bottom: false, left: false });
+    const two = await bufferFor({ top: true, right: false, bottom: false, left: true });
+    const four = await bufferFor({ top: true, right: true, bottom: true, left: true });
+
+    expect((await page1BorderFrameRects(one.buffer, one.format.colors.accent)).length).toBe(1);
+    expect((await page1BorderFrameRects(two.buffer, two.format.colors.accent)).length).toBe(2);
+    expect((await page1BorderFrameRects(four.buffer, four.format.colors.accent)).length).toBe(4);
+  });
+
+  it("size 's' vs 'l' (same single side): a wider size measurably thickens the rect", async () => {
+    const profile = profileFixture();
+    const sides = { top: true, right: false, bottom: false, left: false };
+    const thin: DocumentFormatV2 = {
+      ...PRESETS.strict,
+      colors: { ...PRESETS.strict.colors, border: { size: "s", sides } },
+    };
+    const thick: DocumentFormatV2 = {
+      ...PRESETS.strict,
+      colors: { ...PRESETS.strict.colors, border: { size: "l", sides } },
+    };
+    const thinBuffer = await renderEngineToBuffer({
+      resume: resumeFixture(),
+      profile,
+      paper: "letter",
+      format: thin,
+    });
+    const thickBuffer = await renderEngineToBuffer({
+      resume: resumeFixture(),
+      profile,
+      paper: "letter",
+      format: thick,
+    });
+    const thinRect = (await page1BorderFrameRects(thinBuffer, thin.colors.accent))[0];
+    const thickRect = (await page1BorderFrameRects(thickBuffer, thick.colors.accent))[0];
+    const thinThickness = thinRect.maxY - thinRect.minY;
+    const thickThickness = thickRect.maxY - thickRect.minY;
+    expect(thickThickness).toBeGreaterThan(thinThickness);
+  });
+
+  // [v3-038] (intake decision, ledger): border was PROMOTED to ATS-neutral
+  // because a frame this shape (no Text content) leaves extraction order
+  // intact. THE promoted-row test: a full 4-side, max-size border must not
+  // perturb pdf.js text extraction relative to the no-border render — same
+  // markers, same index-increasing order, same absent sentinels.
+  it("EXTRACTION-ORDER INVARIANT: full 4-side max-size ('l') border is index-increasing and content-identical to the no-border render", async () => {
+    const profile = profileFixture();
+    const resume = resumeFixture();
+    const noBorderFormat: DocumentFormatV2 = {
+      ...PRESETS.strict,
+      colors: { ...PRESETS.strict.colors, border: NO_BORDER },
+    };
+    const borderedFormat: DocumentFormatV2 = {
+      ...PRESETS.strict,
+      colors: {
+        ...PRESETS.strict.colors,
+        border: { size: "l", sides: { top: true, right: true, bottom: true, left: true } },
+      },
+    };
+
+    const noBorderBuffer = await renderEngineToBuffer({
+      resume,
+      profile,
+      paper: "letter",
+      format: noBorderFormat,
+    });
+    const borderedBuffer = await renderEngineToBuffer({
+      resume,
+      profile,
+      paper: "letter",
+      format: borderedFormat,
+    });
+
+    const noBorderText = (await extractPdfText(noBorderBuffer)).join(" ");
+    const borderedText = (await extractPdfText(borderedBuffer)).join(" ");
+
+    // content-identical
+    expect(borderedText).toBe(noBorderText);
+
+    // index-increasing, both renders
+    for (const text of [noBorderText, borderedText]) {
+      expect(text).toContain(profile.name);
+      expect(text).toContain(profile.email);
+      expect(text).toContain("SUMMARY_TEXT");
+      let lastIdx = -1;
+      for (const marker of ORDERED_MARKERS) {
+        const idx = text.indexOf(marker);
+        expect(idx).toBeGreaterThan(-1);
+        expect(idx).toBeGreaterThan(lastIdx);
+        lastIdx = idx;
+      }
+      for (const sentinel of SENTINELS) {
+        expect(text).not.toContain(sentinel);
+      }
+    }
+
+    // the border rects themselves are present in the bordered render (i.e.
+    // this is genuinely a 4-side render, not a no-op)
+    const rects = await page1BorderFrameRects(borderedBuffer, borderedFormat.colors.accent);
+    expect(rects).toHaveLength(4);
   });
 });
 
