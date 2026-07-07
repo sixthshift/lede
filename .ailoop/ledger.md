@@ -1578,3 +1578,12 @@ PHASE-CLOSE ORACLE (oracle.md Phase 7/E8) on merged tree, ALL GREEN (in the 363 
   SCHEDULING JUDGMENT: E9-R1 is file-disjoint from E9-F0c (scheduler would batch them), but this host
   has already OOM-killed two builds — parallel full-suite builders are a flake factory here; running
   SERIAL (F0c → R1 → F0d), a deliberate deviation from the batch hint, not from correctness.
+
+[v3-045] E9-F0c — ACCEPTED (single dispatch, first attempt). Two-column engine (columns two/mix,
+  headerPosition side, sidebarWidthPct as real content-width geometry, sectionPlacement split) as an
+  in-place branch of the ONE composition; sidebar presets at parity (mean-x contrast both sides);
+  pre-E9 fixture ground truth committed (10 files, parse under today's v1 zod, incl. the [v3-044]
+  non-empty-sections + non-default-photo cases). Independent re-verify green (evidence on ticket).
+  Residual (documented in-code, not hidden): columns 'two' + colors.area 'header' renders without the
+  band — unhandled off-diagonal, lands with F3's color-area work. NEXT: E9-R1 serial ([v3-044] memory
+  judgment), then F0d cutover.

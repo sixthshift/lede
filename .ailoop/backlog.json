@@ -1616,7 +1616,7 @@
     {
       "id": "E9-F0c",
       "title": "Engine two-column: sidebar left/right presets + sidebar width axis",
-      "status": "todo",
+      "status": "done",
       "depends_on": [
         "E9-F0b"
       ],
@@ -1630,7 +1630,7 @@
       "context": "Extend the E9-F0b engine (src/client/document/engine/) with two-column layout: columns 'two', headerPosition 'left'|'right' (sidebar side), sidebarWidthPct 25-40 honored as real geometry. Reproduce the retired sidebar templates' look (read templates/sidebar.tsx + sidebar-right.tsx: which sections go sidebar vs main, contact placement, width) so the sidebar-left and sidebar-right presets in src/client/document/presets.ts render at parity through the ONE engine. Column assignment: derive the same section split the v1 templates used, expressed via the v2 per-section placement axis with a sensible default (spec §31.2 Layout: per-section column assignment; the presets pin the v1 split). 'mix' (band + two columns) is F1, NOT here — but don't paint yourself into a corner: the column machinery should not assume the header always spans a column. Still ADDITIVE (templates/registry untouched; cutover is E9-F0d). Frozen: one engine (no separate two-column composition function forked from the single-column path — parameterize); never cuts; react-pdf only. RED-TEAM SHARPENING ([v3-042]): also CAPTURE the pre-cutover ground truth for F0d — commit test/fixtures/pre-e9-formats/: for each of the six templates, the v1 format JSON exactly as today's code would store it (serialized through the CURRENT zod/API shape), plus one lockedFormat wrapper object and one settings.defaultFormat value. These are the REAL pre-E9 row shapes F0d's migration test must consume; F0d is forbidden from editing them. ESCAPED-GAP ADDITION ([v3-044]): the committed pre-e9 fixture set MUST include at least one v1 format with NON-EMPTY sections (e.g. { skill: { columns: 2 } }) and one with a non-default photo config — F0a's migrateFormat currently ignores v1 sections.columns (all its fixtures had sections: {}), and F0d's migration work must be forced to face that by real fixtures.",
       "acceptance": "- bun run check → 0\n- bun run lint → 0\n- bun run build → 0\n- vitest run --passWithNoTests green (serial fallback if parallel contention flakes)\n- playwright test (chromium) green — full suite, no skips introduced\n- test/engine-two-column.test.ts:\n- sidebar-left preset via engine: mean-x of sidebar-section text < mean-x of main-section text; sidebar-right preset: the inequality FLIPS (the E8 sidebar mean-x contrast, now through one engine)\n- sidebarWidthPct is real geometry: same preset at 25 vs 40 moves the main-column left edge in the stated direction by a measured amount (assert direction + nonzero delta, not exact pt)\n- extraction over both sidebar presets contains profile + EVERY selected item.text (presence for two-column; order not required — they are not strict)\n- never-cut across the full ladder for both presets\n- both presets === migrateFormat(<their v1 defaults>) (extends the F0b toEqual test to all six)\n- existing suite untouched and green\n- test/fixtures/pre-e9-formats/ committed, produced via the CURRENT (pre-cutover) format schema — six template defaults + a lockedFormat wrapper + a settings.defaultFormat, each parsing under today's zod schema (asserted in a test)\n- sidebar width delta magnitude: the 25%→40% main-column edge shift is within ±25% of the expected 0.15 × content-width in pt (not merely nonzero)\n- density non-vacuous for both sidebar presets (same fitToPages-resolves-compact + page-count-shrinks pattern as F0b)\n- test/engine-two-column.test.ts imports the engine only (zero registry/templates imports)",
       "attempts": [],
-      "evidence": null
+      "evidence": "Independent re-verify 2026-07-07: composite chain exit 0 — check 0 · lint 0 (191 files) · build 0 (bounded heap) · vitest green (50 files/542 per builder, chain exit 0) · playwright 10/10 · scope: exactly engine/document.tsx + test/engine-two-column.test.ts + test/fixtures/pre-e9-formats/ (10 files) · gaming read: in-place columns branch of the ONE composition (no fork), sidebarWidthPct = content-width geometry with ±25% magnitude bound, mean-x contrast flips left/right, fixtures parse under TODAY'S documentFormatZ incl. non-empty-sections {skill:{columns:2}} + non-default-photo. Honest gap documented in-code: columns two + header band renders bandless (unhandled off-diagonal, F3 wires it)."
     },
     {
       "id": "E9-F0d",
@@ -1757,7 +1757,7 @@
     {
       "id": "E9-R1",
       "title": "Repair: ibm-plex-mono vendored font crashes fontkit on multi-word text (latent since E7) + per-face render smoke",
-      "status": "todo",
+      "status": "in-progress",
       "depends_on": [],
       "files": [
         "src/client/document/fonts.ts",
