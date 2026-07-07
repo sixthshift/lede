@@ -37,7 +37,7 @@ import { test, expect, type Page, type Locator } from "@playwright/test";
 import { ensureFirstRunPassword } from "./helpers/session";
 import { CONTRAST_JDS } from "../../src/server/tailor/evalcore";
 import { extractPdfText } from "../../src/client/document/extractText";
-import { TEMPLATES } from "../../src/client/document/registry";
+import { PRESET_MANIFESTS } from "../../src/client/document/registry";
 
 const PASSWORD = "correct horse battery staple e2e applications";
 const JD = CONTRAST_JDS[0]!.jd; // "platform-sdk" scenario
@@ -70,7 +70,7 @@ async function expectCanvasPainted(page: Page): Promise<void> {
     .toBe(true);
 }
 
-const TEMPLATE_IDS = Object.keys(TEMPLATES);
+const TEMPLATE_IDS = Object.keys(PRESET_MANIFESTS);
 
 // Scope defaults to the page, but the E8-C1 gallery dialog renders its OWN
 // set of `data-template-id` cards (one large preview each) ON TOP of the
@@ -316,7 +316,7 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
     page.getByRole("button", { name: /^Sidebar ATS/ }).click(),
   ]);
   expect(templatePutResponse.status()).toBe(200);
-  expect((await templatePutResponse.json()).format.templateId).toBe("sidebar-left");
+  expect((await templatePutResponse.json()).format.presetId).toBe("sidebar-left");
   await expectCanvasPainted(page);
 
   await page.getByRole("combobox", { name: "Body font" }).click();
@@ -325,7 +325,7 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
     page.getByRole("option", { name: "Arimo (Arial)" }).click(),
   ]);
   expect(fontPutResponse.status()).toBe(200);
-  expect((await fontPutResponse.json()).format.typography.body.family).toBe("arimo");
+  expect((await fontPutResponse.json()).format.fonts.body).toBe("arimo");
   await expectCanvasPainted(page);
 
   // (4b·color) E8-B1's other anti-stock-image proof: changing the primary
@@ -341,7 +341,7 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
     primaryColorField.getByRole("button", { name: "#14532d" }).click(),
   ]);
   expect(colorPutResponse.status()).toBe(200);
-  expect((await colorPutResponse.json()).format.colors.primary).toBe("#14532d");
+  expect((await colorPutResponse.json()).format.colors.accent).toBe("#14532d");
   // Generous timeout, same rationale as expectThumbnailPainted: a color
   // change invalidates ALL SIX thumbnail cache keys, and the serialized
   // render queue (+ idle-time deferral per card) repaints them one at a
@@ -388,17 +388,18 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
     await expectThumbnailPainted(gallery, templateId);
   }
 
-  // Selecting a card sets format.templateId ONLY (mirrors TemplatePicker's
-  // onChange contract) — the (4b) color/font PUTs must survive untouched.
+  // Selecting a card applies that preset's composition (applyPreset) — the
+  // (4b) color/font PUTs (stylistic axes, untouched by preset choice) must
+  // survive.
   const [galleryPutResponse] = await Promise.all([
     page.waitForResponse(applicationPut),
     gallery.getByRole("button", { name: /^Sidebar Right/ }).click(),
   ]);
   expect(galleryPutResponse.status()).toBe(200);
   const galleryPutFormat = (await galleryPutResponse.json()).format;
-  expect(galleryPutFormat.templateId).toBe("sidebar-right");
-  expect(galleryPutFormat.colors.primary).toBe("#14532d");
-  expect(galleryPutFormat.typography.body.family).toBe("arimo");
+  expect(galleryPutFormat.presetId).toBe("sidebar-right");
+  expect(galleryPutFormat.colors.accent).toBe("#14532d");
+  expect(galleryPutFormat.fonts.body).toBe("arimo");
 
   // Selecting closes the gallery; the inline picker + preview reflect the
   // new choice immediately.

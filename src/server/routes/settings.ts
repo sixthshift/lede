@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { settingsInput, documentFormatZ } from "@shared/schema";
+import { resolveStoredFormat } from "@shared/format-v2";
 import type { Db } from "../db";
 import { settings, secrets } from "../db/schema";
 import { encrypt } from "../crypto";
@@ -30,7 +31,7 @@ function currentSettings(db: Db) {
     baseUrl: row.baseUrl,
     layout: row.layout,
     paper: row.paper,
-    defaultFormat: row.defaultFormat,
+    defaultFormat: resolveStoredFormat(row.defaultFormat),
   };
 }
 

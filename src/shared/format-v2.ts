@@ -440,10 +440,11 @@ const PT_TO_MM = 0.352778;
 const MARGIN_MM_MIN = 10;
 const MARGIN_MM_MAX = 28;
 const ELEMENT_SPACING_PT_STEP = 6; // page.sectionGap (0-24pt) -> elementSpacing (0-4)
-// src/client/document/templates/sidebar.tsx: `styles.sidebar` is `width: "32%"`
-// for both orientations (renderSidebarComposition is shared).
+// The retired v1 sidebar composition (deleted this ticket, E9-F0d1 —
+// src/client/document/registry.ts): its shared `styles.sidebar` was
+// `width: "32%"` for both orientations (one composition function, shared).
 const SIDEBAR_WIDTH_PCT = 32;
-// src/client/document/templates/sidebar.tsx SIDEBAR_SECTIONS — the sections
+// The retired v1 sidebar composition's own SIDEBAR_SECTIONS — the sections
 // sidebar-left/right route into the sidebar column.
 const SIDEBAR_SECTIONS: Section[] = ["skill", "language", "interest", "certification"];
 // sections.tsx buildStyles: name.fontWeight === typography.heading.weight;
@@ -567,9 +568,10 @@ const sidebarSectionPlacement = (): Partial<Record<Section, { column: SectionCol
   return placement;
 };
 
-// One entry per retired template id (src/client/document/templates/*.tsx +
-// registry.ts) — each overlay reproduces exactly the composition delta that
-// template's code introduces over the shared baseline above.
+// One entry per retired v1 template id (the per-look composition files under
+// src/client/document/, deleted E9-F0d1, + registry.ts's old lookup) — each
+// overlay reproduces exactly the composition delta that template's code
+// introduced over the shared baseline above.
 export const TEMPLATE_V2_OVERLAYS: Record<string, TemplateOverlay> = {
   strict: (base) => base,
   // classic.tsx: ProfileHeader variant="centered".
@@ -605,11 +607,67 @@ export const TEMPLATE_V2_OVERLAYS: Record<string, TemplateOverlay> = {
   banner: (base) => ({ ...base, colors: { ...base.colors, area: "header" } }),
 };
 
+// [v3-044] escaped-gap repair: v1's per-section `{columns: N>1}` had a seam
+// for ANY section, but v2's grid axis only exists on two display groups —
+// skillsLanguages (merging the v1 skill/language sections into one display
+// concept) and interests. Every OTHER section's v1 columns value (experience,
+// project, education, award, certification, publication, reference) has NO
+// v2 axis to land on and is dropped here — honestly, not silently: there is
+// no "narrative section grid" concept in §31.2, so a v1 config that set
+// e.g. `sections.experience.columns` loses that value on migration, same as
+// any other v1-only knob §31.2 doesn't carry forward.
+function skillsLanguagesGridFromV1(v1: DocumentFormat): Partial<SkillsLanguagesDisplayV2> {
+  // skill wins over language when both set (arbitrary but deterministic) —
+  // v1 never let these two disagree in practice (one shared design-panel
+  // control drove both via the same per-section selector).
+  const columns = v1.sections.skill?.columns ?? v1.sections.language?.columns;
+  if (!columns || columns <= 1) return {};
+  return { layout: "grid", gridColumns: columns };
+}
+
+function interestsGridFromV1(v1: DocumentFormat): Partial<InterestsDisplayV2> {
+  const columns = v1.sections.interest?.columns;
+  if (!columns || columns <= 1) return {};
+  return { layout: "grid", gridColumns: columns };
+}
+
+function repairSectionColumns(v1: DocumentFormat, v2: DocumentFormatV2): DocumentFormatV2 {
+  const skillsLanguagesPatch = skillsLanguagesGridFromV1(v1);
+  const interestsPatch = interestsGridFromV1(v1);
+  if (Object.keys(skillsLanguagesPatch).length === 0 && Object.keys(interestsPatch).length === 0) {
+    return v2; // no v1 columns set — v2 unchanged, still reference-stable
+  }
+  return {
+    ...v2,
+    sectionDisplay: {
+      ...v2.sectionDisplay,
+      skillsLanguages: { ...v2.sectionDisplay.skillsLanguages, ...skillsLanguagesPatch },
+      interests: { ...v2.sectionDisplay.interests, ...interestsPatch },
+    },
+  };
+}
+
 export function migrateFormat(v1: DocumentFormat): DocumentFormatV2 {
   if (isFormatV2(v1)) return v1; // idempotent no-op: already v2, never re-migrated
   const base = baseFromV1(v1);
   const overlay = TEMPLATE_V2_OVERLAYS[v1.templateId];
-  return overlay ? overlay(base) : base;
+  const overlaid = overlay ? overlay(base) : base;
+  return repairSectionColumns(v1, overlaid);
 }
 
 export const DEFAULT_FORMAT_V2: DocumentFormatV2 = migrateFormat(DEFAULT_FORMAT);
+
+// Read-time gate for a JSON column typed `DocumentFormatV2` (settings.
+// defaultFormat, src/server/db/schema.ts) that may still hold a v1-shaped
+// VALUE: the column's SQL-level DEFAULT is frozen at v1 JSON in an already-
+// shipped migration (drizzle/0003_typical_malice.sql) — editing a past
+// migration is out of this ticket's file contract, and a real data migration
+// for already-written rows is explicitly the NEXT ticket's job (§31.1's
+// "migration is deterministic" clause; every OTHER JSON column that can
+// carry a DocumentFormat — application.format — only ever receives a value
+// through the v2-only `formatV2Schema` PUT validator, so it needs no gate).
+// Idempotent: a genuine v2 value passes through unchanged via migrateFormat's
+// own isFormatV2 short-circuit.
+export function resolveStoredFormat(value: unknown): DocumentFormatV2 {
+  return isFormatV2(value) ? value : migrateFormat(value as DocumentFormat);
+}

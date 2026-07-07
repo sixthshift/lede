@@ -1596,3 +1596,25 @@ PHASE-CLOSE ORACLE (oracle.md Phase 7/E8) on merged tree, ALL GREEN (in the 363 
   demonstrated on the unfixed asset, GREEN after. Coordinator re-ran the original crash probe: passes.
   Composite green (554/10-10). Pre-cutover suite floor pinned for F0d: 257 tests / 11 files over the
   document/engine/fit/format glob. NEXT: E9-F0d (cutover — last F0 ticket; tooBig-eligible).
+
+[v3-047] E9-F0d — tooBig at pickup, DECOMPOSED (healthy, pre-flagged at intake). Builder recon (no
+  code touched): renderResume/fit still registry-bound; 7 components on the legacy shape; the v1 zod
+  + DB $type mean a client-only cutover can't round-trip the live app — so the schema swap must travel
+  WITH the client cutover, refining the intake seam. Accepted split: E9-F0d1 (client + live-schema
+  cutover; carries the [v3-044] migrateFormat gap repair + R1 exclusion lift + suite floor 257 + must-
+  survive list; may treat DB as freshly-v2) → E9-F0d2 (old-data migration at the read boundary,
+  fixture-verbatim suite, locked-bytes-unchanged). E9-F1 dependency repointed E9-F0d → E9-F0d2.
+  F0 PHASE ORACLE runs only after F0d2 (between the two children a pre-existing user DB would 500 on
+  old rows — acceptable mid-phase state, NOT a shippable point; flagged honestly). F0d1 dispatched.
+
+[v3-048] E9-F0d1 — ACCEPTED (builder hit session limit after completing the work, before its final
+  confirmation run; coordinator ran the full independent verification itself, [v3-035] precedent).
+  Cutover live: templates/ deleted, registry = preset display-metadata (no render fns), engine is the
+  ONLY render path, app speaks v2 end-to-end (zod + DB $type swapped), suite floor 258>=257, 10/10 e2e
+  with E8 behavior preserved. [v3-044] migrateFormat gap repaired + fixture-verbatim tested.
+  DEVIATION ACCEPTED after coordinator verification: ibm-plex-mono exclusion STAYS — R1's woff2 fix is
+  INCOMPLETE (woff crashes on spaces; woff2 crashes on ':' — complementary asset defects, both
+  reproduced isolated). Second escape of the same defect class (R1's smoke lacked punctuation) →
+  E9-R2 seeded (clean asset + punctuation-bearing smoke, red-then-green), depends_on F0d2 (serial,
+  [v3-044] memory judgment). Endorsed: gallery preset-apply preserves stylistic axes (E8 contract);
+  F5 owns preset-apply semantics if the spec's rewrite-panel-state reading should win later.

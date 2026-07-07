@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Profile, TailoredResume } from "@shared/types";
-import { TEMPLATES } from "../src/client/document/registry";
+import { PRESET_MANIFESTS } from "../src/client/document/registry";
 import { renderResumeToBuffer } from "../src/client/document/renderResume";
 
 function profileFixture(): Profile {
@@ -60,10 +60,10 @@ async function extractText(buffer: Buffer): Promise<string> {
   return content.items.map((item) => ("str" in item ? item.str : "")).join(" ");
 }
 
-describe("template registry", () => {
-  it("registers the strict template with atsGrade:'strict', layout:'single'", () => {
-    expect(TEMPLATES.strict.atsGrade).toBe("strict");
-    expect(TEMPLATES.strict.layout).toBe("single");
+describe("preset registry", () => {
+  it("registers the strict preset with atsGrade:'strict', layout:'single'", () => {
+    expect(PRESET_MANIFESTS.strict.atsGrade).toBe("strict");
+    expect(PRESET_MANIFESTS.strict.layout).toBe("single");
   });
 });
 

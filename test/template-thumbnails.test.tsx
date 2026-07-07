@@ -1,15 +1,17 @@
 // @vitest-environment jsdom
-// E8-B1 — live mini-render thumbnails in the TemplatePicker (spec.md §28.2,
-// decided 2026-07-05: previews are LIVE renders of this application's
-// tailored resume, never static images). jsdom cannot paint pdf.js (no real
-// canvas/worker) — that proof lives in the applications e2e. This file
-// covers the PURE parts: the cache-key derivation, the render queue's
-// one-at-a-time serialization, and the sample-content fallback wiring.
+// E8-B1 — live mini-render thumbnails in the TemplatePicker (spec.md
+// §28.2/§31, decided 2026-07-05: previews are LIVE renders of this
+// application's tailored resume, never static images). jsdom cannot paint
+// pdf.js (no real canvas/worker) — that proof lives in the applications e2e.
+// This file covers the PURE parts: the cache-key derivation, the render
+// queue's one-at-a-time serialization, and the sample-content fallback
+// wiring.
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import type { DocumentFormat, Profile, TailoredResume } from "@shared/types";
-import { DEFAULT_FORMAT } from "../src/shared/format";
+import type { Profile, TailoredResume } from "@shared/types";
+import { DEFAULT_FORMAT_V2 } from "../src/shared/format-v2";
+import type { DocumentFormatV2 } from "../src/shared/format-v2";
 import { thumbnailCacheKey, enqueueThumbnailRender } from "../src/client/document/thumbnail";
 import { TemplatePicker } from "../src/client/components/TemplatePicker";
 
@@ -42,37 +44,37 @@ function profileFixture(): Profile {
 }
 
 describe("thumbnailCacheKey", () => {
-  it("two templateIds for the same (format, paper, resume) produce two distinct keys", () => {
+  it("two presetIds for the same (format, paper, resume) produce two distinct keys", () => {
     const resume = resumeFixture();
     const a = thumbnailCacheKey({
-      templateId: "strict",
-      format: DEFAULT_FORMAT,
+      presetId: "strict",
+      format: DEFAULT_FORMAT_V2,
       paper: "letter",
       resume,
     });
     const b = thumbnailCacheKey({
-      templateId: "classic",
-      format: DEFAULT_FORMAT,
+      presetId: "classic",
+      format: DEFAULT_FORMAT_V2,
       paper: "letter",
       resume,
     });
     expect(a).not.toBe(b);
   });
 
-  it("changing colors.primary changes the key", () => {
+  it("changing colors.accent changes the key", () => {
     const resume = resumeFixture();
     const a = thumbnailCacheKey({
-      templateId: "strict",
-      format: DEFAULT_FORMAT,
+      presetId: "strict",
+      format: DEFAULT_FORMAT_V2,
       paper: "letter",
       resume,
     });
-    const recolored: DocumentFormat = {
-      ...DEFAULT_FORMAT,
-      colors: { ...DEFAULT_FORMAT.colors, primary: "#ff0000" },
+    const recolored: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      colors: { ...DEFAULT_FORMAT_V2.colors, accent: "#ff0000" },
     };
     const b = thumbnailCacheKey({
-      templateId: "strict",
+      presetId: "strict",
       format: recolored,
       paper: "letter",
       resume,
@@ -83,14 +85,14 @@ describe("thumbnailCacheKey", () => {
   it("identical inputs produce identical keys", () => {
     const resume = resumeFixture();
     const a = thumbnailCacheKey({
-      templateId: "strict",
-      format: DEFAULT_FORMAT,
+      presetId: "strict",
+      format: DEFAULT_FORMAT_V2,
       paper: "letter",
       resume,
     });
     const b = thumbnailCacheKey({
-      templateId: "strict",
-      format: { ...DEFAULT_FORMAT },
+      presetId: "strict",
+      format: { ...DEFAULT_FORMAT_V2 },
       paper: "letter",
       resume: resumeFixture(),
     });
@@ -99,14 +101,14 @@ describe("thumbnailCacheKey", () => {
 
   it("a different resume (content) changes the key", () => {
     const a = thumbnailCacheKey({
-      templateId: "strict",
-      format: DEFAULT_FORMAT,
+      presetId: "strict",
+      format: DEFAULT_FORMAT_V2,
       paper: "letter",
       resume: resumeFixture("SUMMARY_A"),
     });
     const b = thumbnailCacheKey({
-      templateId: "strict",
-      format: DEFAULT_FORMAT,
+      presetId: "strict",
+      format: DEFAULT_FORMAT_V2,
       paper: "letter",
       resume: resumeFixture("SUMMARY_B"),
     });
@@ -116,36 +118,36 @@ describe("thumbnailCacheKey", () => {
   it("a different paper changes the key", () => {
     const resume = resumeFixture();
     const a = thumbnailCacheKey({
-      templateId: "strict",
-      format: DEFAULT_FORMAT,
+      presetId: "strict",
+      format: DEFAULT_FORMAT_V2,
       paper: "letter",
       resume,
     });
     const b = thumbnailCacheKey({
-      templateId: "strict",
-      format: DEFAULT_FORMAT,
+      presetId: "strict",
+      format: DEFAULT_FORMAT_V2,
       paper: "a4",
       resume,
     });
     expect(a).not.toBe(b);
   });
 
-  it("templateId embedded in the format object is EXCLUDED from the format part — only the explicit prop drives the key", () => {
+  it("presetId embedded in the format object is EXCLUDED from the format part — only the explicit prop drives the key", () => {
     const resume = resumeFixture();
-    const formatWithStrict: DocumentFormat = { ...DEFAULT_FORMAT, templateId: "strict" };
-    const formatWithClassic: DocumentFormat = { ...DEFAULT_FORMAT, templateId: "classic" };
+    const formatWithStrict: DocumentFormatV2 = { ...DEFAULT_FORMAT_V2, presetId: "strict" };
+    const formatWithClassic: DocumentFormatV2 = { ...DEFAULT_FORMAT_V2, presetId: "classic" };
 
-    // Same explicit templateId prop ("banner"), different format.templateId
-    // (irrelevant, since a card previews a template regardless of which one
+    // Same explicit presetId prop ("banner"), different format.presetId
+    // (irrelevant, since a card previews a preset regardless of which one
     // is currently selected) — the keys must match.
     const a = thumbnailCacheKey({
-      templateId: "banner",
+      presetId: "banner",
       format: formatWithStrict,
       paper: "letter",
       resume,
     });
     const b = thumbnailCacheKey({
-      templateId: "banner",
+      presetId: "banner",
       format: formatWithClassic,
       paper: "letter",
       resume,
@@ -203,17 +205,17 @@ describe("enqueueThumbnailRender — module-level serialization", () => {
 
 describe("TemplatePicker — sample content fallback", () => {
   it("with resume=null, every card renders SAMPLE content and shows the 'Sample content' badge", () => {
-    render(<TemplatePicker format={DEFAULT_FORMAT} onChange={vi.fn()} resume={null} />);
+    render(<TemplatePicker format={DEFAULT_FORMAT_V2} onChange={vi.fn()} resume={null} />);
 
     const badges = screen.getAllByText("Sample content");
-    // one per template card
+    // one per preset card
     expect(badges.length).toBeGreaterThanOrEqual(6);
   });
 
   it("with a real resume, no 'Sample content' badge appears anywhere", () => {
     render(
       <TemplatePicker
-        format={DEFAULT_FORMAT}
+        format={DEFAULT_FORMAT_V2}
         onChange={vi.fn()}
         resume={resumeFixture()}
         profile={profileFixture()}
@@ -224,7 +226,7 @@ describe("TemplatePicker — sample content fallback", () => {
   });
 
   it("readOnly still disables every card's selection button", () => {
-    render(<TemplatePicker format={DEFAULT_FORMAT} onChange={vi.fn()} readOnly resume={null} />);
+    render(<TemplatePicker format={DEFAULT_FORMAT_V2} onChange={vi.fn()} readOnly resume={null} />);
 
     for (const button of screen.getAllByRole("button", { name: /ATS:/ })) {
       expect(button).toBeDisabled();

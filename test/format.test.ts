@@ -1,78 +1,73 @@
-// DocumentFormat foundation — spec.md §28.3. Pure shared type/zod/defaults;
-// no rendering, no DB. See src/shared/types.ts (DocumentFormat/FontId),
-// src/shared/schema.ts (documentFormatZ), src/shared/format.ts (DEFAULT_FORMAT).
+// DocumentFormat foundation — spec.md §28.3/§31. Pure shared type/zod/
+// defaults; no rendering, no DB. See src/shared/types.ts (DocumentFormat/
+// FontId — the v1 legacy shape migrateFormat still consumes),
+// src/shared/schema.ts (documentFormatZ, aliased to formatV2Schema since
+// E9-F0d1's API-boundary cutover), src/shared/format.ts (DEFAULT_FORMAT, the
+// v1 default migrateFormat/presets.ts still read).
 import { describe, it, expect } from "vitest";
 import { documentFormatZ } from "@shared/schema";
+import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
 import { DEFAULT_FORMAT } from "@shared/format";
-import type { DocumentFormat, FontId, Profile } from "@shared/types";
+import type { FontId, Profile } from "@shared/types";
 
-function validFormat(): DocumentFormat {
-  return {
-    templateId: "strict",
-    typography: {
-      body: { family: "ibm-plex-sans", size: 10, lineHeight: 1.4 },
-      heading: { family: "ibm-plex-sans", weight: 600 },
-    },
-    colors: { primary: "#1a1a2e", text: "#111111" },
-    page: { marginX: 40, marginY: 36, sectionGap: 8 },
-    photo: { hidden: true, size: 64, shape: "circle" },
-    sections: { skill: { columns: 2 } },
-  };
+function withMutation(mutate: (f: DocumentFormatV2) => void): DocumentFormatV2 {
+  const next = structuredClone(DEFAULT_FORMAT_V2);
+  mutate(next);
+  return next;
 }
 
+// documentFormatZ is now formatV2Schema (§31/E9-F0d1) — the numeric-bounds/
+// enum-set exhaustiveness is test/format-v2.test.ts's job; this suite keeps
+// its ORIGINAL 9-case shape (reparameterized 1:1 onto v2 fields) as a
+// second, independent proof at the name the API boundary actually imports.
 describe("documentFormatZ", () => {
   it("accepts a fully-populated valid format", () => {
-    expect(documentFormatZ.safeParse(validFormat()).success).toBe(true);
+    expect(documentFormatZ.safeParse(DEFAULT_FORMAT_V2).success).toBe(true);
   });
 
-  it("accepts DEFAULT_FORMAT", () => {
-    expect(documentFormatZ.safeParse(DEFAULT_FORMAT).success).toBe(true);
+  it("accepts DEFAULT_FORMAT_V2", () => {
+    expect(documentFormatZ.safeParse(DEFAULT_FORMAT_V2).success).toBe(true);
   });
 
-  it("rejects body.size below the 9pt floor (8)", () => {
-    const bad = validFormat();
-    bad.typography.body.size = 8;
+  it("rejects bodySize below the 9pt floor (8)", () => {
+    const bad = withMutation((f) => (f.typeScale.bodySize = 8));
     expect(documentFormatZ.safeParse(bad).success).toBe(false);
   });
 
-  it("rejects body.size above the 12pt ceiling (13)", () => {
-    const bad = validFormat();
-    bad.typography.body.size = 13;
+  it("rejects bodySize above the 12pt ceiling (13)", () => {
+    const bad = withMutation((f) => (f.typeScale.bodySize = 13));
     expect(documentFormatZ.safeParse(bad).success).toBe(false);
   });
 
-  it("rejects a heading.weight not in {400,500,600,700} (550)", () => {
-    const bad = validFormat();
-    (bad.typography.heading as unknown as { weight: number }).weight = 550;
+  it("rejects a header.nameWeight not in {normal,bold} ('semibold')", () => {
+    const bad = withMutation(
+      (f) => ((f.header as unknown as { nameWeight: string }).nameWeight = "semibold"),
+    );
     expect(documentFormatZ.safeParse(bad).success).toBe(false);
   });
 
-  it("rejects colors.primary as a malformed hex ('#zzz')", () => {
-    const bad = validFormat();
-    bad.colors.primary = "#zzz";
+  it("rejects colors.accent as a malformed hex ('#zzz')", () => {
+    const bad = withMutation((f) => (f.colors.accent = "#zzz"));
     expect(documentFormatZ.safeParse(bad).success).toBe(false);
   });
 
-  it("rejects colors.primary as a CSS keyword ('red')", () => {
-    const bad = validFormat();
-    bad.colors.primary = "red";
+  it("rejects colors.accent as a CSS keyword ('red')", () => {
+    const bad = withMutation((f) => (f.colors.accent = "red"));
     expect(documentFormatZ.safeParse(bad).success).toBe(false);
   });
 
-  it("rejects a sections.columns value outside 1|2|3 (4)", () => {
-    const bad = validFormat();
-    (bad.sections.skill as unknown as { columns: number }).columns = 4;
+  it("rejects a sectionDisplay.skillsLanguages.gridColumns value outside 1-4 (5)", () => {
+    const bad = withMutation((f) => (f.sectionDisplay.skillsLanguages.gridColumns = 5));
     expect(documentFormatZ.safeParse(bad).success).toBe(false);
   });
 
-  it("rejects an empty templateId", () => {
-    const bad = validFormat();
-    bad.templateId = "";
+  it("rejects an empty presetId", () => {
+    const bad = withMutation((f) => (f.presetId = ""));
     expect(documentFormatZ.safeParse(bad).success).toBe(false);
   });
 });
 
-describe("DEFAULT_FORMAT", () => {
+describe("DEFAULT_FORMAT (v1, still consumed by migrateFormat/presets.ts)", () => {
   it("hides the photo by default (§28.3)", () => {
     expect(DEFAULT_FORMAT.photo.hidden).toBe(true);
   });

@@ -1635,7 +1635,7 @@
     {
       "id": "E9-F0d",
       "title": "Cutover: presets-through-one-engine replace templates; stored v1 formats migrate",
-      "status": "in-progress",
+      "status": "decomposed",
       "depends_on": [
         "E9-F0c"
       ],
@@ -1660,14 +1660,14 @@
       "context": "The F0 cutover, LARGE AND FLAGGED: if this exceeds one session return tooBig with a proposed split (suggested seam: (1) client render-path cutover + template deletion + test reparameterization, (2) server/API stored-format migration + e2e) rather than half-building. Goal: DocumentFormatV2 becomes THE DocumentFormat everywhere; the engine (src/client/document/engine/, done E9-F0b/c) is the ONLY render path; src/client/document/templates/ is DELETED; registry.ts becomes a PRESET registry (six presets from presets.ts with id/name/description/layout/atsGrade metadata — keep the declared-grade fields and effectiveAtsGrade semantics; the pure atsGrade(format) function is F5, do NOT build it here). renderResume/thumbnail/fit/download/plainText/AtsView/picker/gallery/DesignPanel operate on (resume, profile, paper, formatV2) with UNCHANGED user-facing behavior (picker still lists six choices with live thumbnails + badges; gallery unchanged; §28.3 panel knobs map onto v2 fields). STORED DATA: applications.format, applications.lockedFormat.format, settings.defaultFormat hold v1 JSON — migrate via migrateFormat at the persistence boundary (choose: lazy on read OR one-shot boot migration; state the choice and test it), idempotent, so a pre-E9 database round-trips to valid v2 with look preserved; locked apps stay LOCKED (migrating lockedFormat does not unlock or mutate locked TailoredResume snapshots — §28.1 byte-stability). Rename outward-facing 'template' vocabulary to 'preset' where cheap (registry API, picker labels) but do NOT churn routes/DB columns for naming alone. Retire test/document-templates.test.ts etc. by REPARAMETERIZING over Object.values(PRESETS) — the E7/E8 invariant suite must survive, not be deleted (oracle.md Phase 7 checks all still apply, now over presets-through-one-engine). Frozen: react-pdf only; one engine; never cuts; §28.1 byte-stability; §26 IA (no new top-level routes). RED-TEAM SHARPENING ([v3-042]): reparameterization must not weaken the suite — record the pre-cutover vitest test count for the document/fit/extraction suites and hold it as a floor; the must-survive assertions are ENUMERATED (below), not implied; migration tests consume the E9-F0c-committed test/fixtures/pre-e9-formats/ VERBATIM (your diff must not touch that directory). The F0b off-diagonal composition test must survive the cutover (it is the standing anti-trenchcoat guard). ESCAPED-GAP REPAIR ([v3-044], escaped-bug rule): E9-F0a's migrateFormat drops v1 sections.columns (a stored v1 format with skills in 2 columns migrates to gridColumns 1 — look NOT preserved). F0d must extend migrateFormat: v1 sections {<section>: {columns: N>1}} → sectionDisplay skillsLanguages/interests { layout: 'grid', gridColumns: N } (skill/language/interest sections; other sections' columns have no v2 axis — document the drop honestly if any) AND strengthen format-v2.test.ts with non-empty-sections fixtures (the check that let it escape). Also: if E9-R1 (ibm-plex-mono repair) is done by pickup, delete legacyAdapt.ts's temporary mono exclusion so the full registered roster passes through; its per-face render smoke protects this. PRE-CUTOVER SUITE FLOOR (pinned by coordinator 2026-07-07, post-R1): the document/engine/fit/format suites (test/document-*.test.ts, test/engine-*.test.ts, test/fit.test.ts, test/format.test.ts, test/format-v2.test.ts, test/page-model.test.ts) = 11 files / 257 tests on the pre-cutover tree. Post-cutover count over the same glob must be >= 257.",
       "acceptance": "- bun run check → 0\n- bun run lint → 0\n- bun run build → 0\n- vitest run --passWithNoTests green (serial fallback if parallel contention flakes)\n- playwright test (chromium) green — full suite, no skips introduced\n- grep guards: src/client/document/templates/ does not exist; zero imports of it; zero references to the old per-template render functions\n- the FULL reparameterized invariant suite green: for every preset — extraction contains profile + every item (strict presets: index-increasing order), sentinels absent, never-cut across ladder; effectiveAtsGrade honesty (sidebar-right ⇒ good, photo shown ⇒ good) — i.e. every oracle.md Phase-7/E8 check now passes over PRESETS\n- migration: a fixture pre-E9 sqlite row (v1 format JSON in applications.format + lockedFormat + settings.defaultFormat) reads back as schema-valid v2 with the mapped preset look; migration is idempotent (second read/run identical); locked TailoredResume snapshot bytes UNCHANGED by migration and by any subsequent v2 format PUT\n- format PUT round-trip: API accepts v2 (zod), rejects out-of-bounds (one 400 case tested), persists across restart\n- playwright e2e: full existing suite 10/10 green (gallery: 6 painted pairwise-different thumbnails, selection persists, sample badges — unchanged behavior over presets)\n- §28.1 byte-stability guard green (format change never mutates stored TailoredResume)\n- suite floor: vitest test count over test/{document-*,engine-*,fit*,format*}.test.ts AFTER cutover ≥ the pre-cutover count (record both numbers in evidence; --reporter=json or the summary line)\n- grep guard: no new .skip/.only/.todo anywhere under test/ (diff-scoped)\n- must-survive assertions enumerated, each present and green post-cutover: centered-classic mean-x, one-row-compact shared y, sidebar mean-x contrast BOTH sides, banner tint + contrast ink, sentinel absence, strict extraction order, never-cut per preset, OFF-DIAGONAL composition (F0b), §28.1 byte-stability\n- migration test consumes test/fixtures/pre-e9-formats/ files unchanged (git diff for E9-F0d touches zero paths under test/fixtures/pre-e9-formats/)",
       "attempts": [],
-      "evidence": null
+      "evidence": "tooBig at pickup (no code touched): renderResume/fit still dispatch through registry on legacy format; 7 components consume legacy shape; documentFormatZ + DB $type v1-shaped so a client-only cutover cannot round-trip the live app/e2e. Split refined: schema/zod/DB-type swap travels with the client cutover (F0d-1); old-data migration + fixture suite separate (F0d-2). Coordinator accepted [v3-047]."
     },
     {
       "id": "E9-F1",
       "title": "COARSE (decompose at pickup): design view shell (§31.2b) + layout axes",
       "status": "todo",
       "depends_on": [
-        "E9-F0d"
+        "E9-F0d2"
       ],
       "files": [
         "src/client/",
@@ -1770,6 +1770,75 @@
       "acceptance": "- bun run check → 0; bun run lint → 0; NODE_OPTIONS=--max-old-space-size=1024 bun run build → 0\n- bunx vitest run --passWithNoTests green; npx playwright test green (10/10)\n- new per-face render smoke covers EVERY id in FONT_FACES (parameterized, not hand-listed) with multi-word body + heading text; demonstrated red on the unfixed asset, green after\n- ibm-plex-mono renders a real multi-word PDF (the coordinator's probe scenario passes)\n- no face removed from the roster; no engine/ changes",
       "attempts": [],
       "evidence": "Independent re-verify 2026-07-07: coordinator's original crash probe (mono + multi-word via v1 strict) PASSES post-fix · check 0 · lint 0 · build 0 (11 mono woff2 assets bundled) · vitest 50 files/554 · playwright 10/10 · scope: exactly fonts.ts + document-fonts.test.ts · diff read: principled format field on FontManifest threaded through BOTH resolution paths (createRequire + Vite URL), stale woff2 comment corrected; per-face smoke is parameterized over FONT_FACES keys × body/heading roles; builder demonstrated red-then-green (woff crash stack captured pre-fix). Root cause: malformed space-glyph glyf/loca in @fontsource/ibm-plex-mono woff (all published versions); sibling woff2 clean."
+    },
+    {
+      "id": "E9-F0d1",
+      "title": "Cutover: presets-through-one-engine replace templates (client + live schema)",
+      "status": "done",
+      "depends_on": [],
+      "files": [
+        "src/shared/types.ts",
+        "src/shared/format.ts",
+        "src/shared/format-v2.ts",
+        "src/shared/schema.ts",
+        "src/client/document/",
+        "src/client/components/DesignPanel.tsx",
+        "src/client/components/TemplatePicker.tsx",
+        "src/client/components/TemplateGallery.tsx",
+        "src/client/components/AtsView.tsx",
+        "src/client/components/DocumentPreview.tsx",
+        "src/client/components/ApplicationDetail.tsx",
+        "src/client/components/LayoutEditor.tsx",
+        "src/server/db/schema.ts",
+        "src/server/routes/",
+        "test/",
+        "package.json",
+        "bun.lock"
+      ],
+      "origin": "decomposed from E9-F0d (spec §31.1/§31.6 F0 close)",
+      "context": "PART 1 of the F0 cutover (E9-F0d split, coordinator-accepted [v3-047]). The engine (src/client/document/engine/, E9-F0b/c) already composes single+two-column v2 axes; this ticket makes it THE ONLY render path and makes the live app speak DocumentFormatV2 end-to-end. registry.ts is currently the six-template lookup (TEMPLATES/getTemplate/render fns); renderResume.ts and fit.ts dispatch through it on legacy DocumentFormat; thumbnail.tsx/download.ts/plainText.ts and 7 components (DesignPanel 435 lines, TemplatePicker, TemplateGallery, AtsView, DocumentPreview, ApplicationDetail 370, LayoutEditor) consume the legacy shape. src/shared/schema.ts documentFormatZ and src/server/db/schema.ts $type<DocumentFormat> are v1-shaped and MUST move to v2 in lockstep (validator + compile-time type swap only — NO drizzle data-migration file; old-row migration is E9-F0d2's job: this ticket may gate reads via isFormatV2 or treat the DB as freshly-v2; e2e boots a fresh DB so this verifies end-to-end). registry.ts becomes a PRESET registry: six presets (from presets.ts) with id/name/description/layout/atsGrade metadata; effectiveAtsGrade adapted to v2 (photo.hidden===false || layout.columns!=='one' ⇒ good); the pure atsGrade(format) over the whole config is F5 — do NOT build it. renderResume/fit/thumbnail/download/plainText operate on v2 via the engine; the 7 components operate on v2 fields with UNCHANGED user-facing behavior (picker still 6 choices + live thumbnails + badges; §28.3 panel knobs map onto v2 fields: body font/size/lineHeight, accent/text colors, margins pt→mm UI, sectionGap→elementSpacing, photo, per-section columns→sectionDisplay). Delete src/client/document/templates/. ALSO ON THIS RENDER PATH (do here): (a) [v3-044] escaped-gap repair — migrateFormat maps v1 sections {<s>:{columns:N>1}} → sectionDisplay skillsLanguages/interests {layout:'grid', gridColumns:N} for skill/language/interest (other sections' columns have no v2 axis — comment the drop honestly), strengthened format-v2.test.ts consuming test/fixtures/pre-e9-formats/non-empty-sections.json VERBATIM; (b) E9-R1 landed — remove legacyAdapt.ts's temporary ibm-plex-mono exclusion (per-face render smoke protects it); you own sections.tsx now — keep the adapter seam or teach sections.tsx v2 directly, whichever is cleaner, but ONE composition + one shared renderer set stands. Rename outward-facing 'template' vocabulary to 'preset' where cheap; do NOT churn routes/DB columns for naming. SUITE REPARAMETERIZATION (anti-lobotomy [v3-042]): the E7/E8 invariant suite SURVIVES over Object.values(PRESETS) through the engine. FORBIDDEN: test/fixtures/pre-e9-formats/ (zero diff there), .ailoop/, spec.md, drizzle/ migration files. Frozen: react-pdf only; ONE engine; never cuts; §28.1 byte-stability; §26 IA; leadRationale/cut never rendered.",
+      "acceptance": "- bun run check → 0; bun run lint → 0; NODE_OPTIONS=--max-old-space-size=1024 bun run build → 0\n- bunx vitest run --passWithNoTests green (serial fallback if contention flakes); npx playwright test → 10/10 green\n- grep guards (outputs in evidence): src/client/document/templates/ deleted; `grep -rn \"templates/\" src/ test/` → 0; zero refs to StrictTemplate/SidebarTemplate/SidebarRightTemplate/ClassicTemplate/CompactTemplate/BannerTemplate; no new .skip/.only/.todo under test/ (diff-scoped)\n- suite floor: post-cutover count over test/document-*.test.ts + test/engine-*.test.ts + test/fit.test.ts + test/format.test.ts + test/format-v2.test.ts + test/page-model.test.ts >= 257 (pre-cutover pin; report the number)\n- MUST-SURVIVE assertions present and green: centered-classic mean-x; one-row-compact shared y; sidebar mean-x contrast both sides; banner tint + contrast ink; sentinel absence; strict extraction order per strict preset; never-cut across ladder per preset; off-diagonal composition guard; §28.1 byte-stability guard\n- documentFormatZ → formatV2Schema at the API boundary; DB $type → DocumentFormatV2; format PUT accepts v2 and rejects >=1 out-of-bounds case (400 tested)\n- [v3-044] repair: non-empty-sections.json fixture (verbatim) migrates to skillsLanguages {layout:'grid', gridColumns:2} (tested); non-default-photo.json migrates photo-preserved (tested)\n- ibm-plex-mono exclusion gone from engine font resolution; per-face smoke still green\n- effectiveAtsGrade honesty: sidebar presets ⇒ good; any preset + shown photo ⇒ good\n- playwright e2e UNCHANGED behavior: gallery 6 painted pairwise-different thumbnails, selection persists across reload, sample badges, color-change repaint\n- cross-cutting invariants green (no orphan routes; not-a-tracker grep; context-not-facts)",
+      "attempts": [],
+      "evidence": "Independent re-verify 2026-07-07 (builder died at session limit post-build, pre-final-confirmation; coordinator ran verification per [v3-035] precedent): check 0 · lint 0 · build 0 (bounded heap) · vitest 50 files/555 · playwright 10/10 · grep guards: templates/ deleted, 0 refs to old render fns, 0 new skips · pre-e9 fixtures 0 diff · SUITE FLOOR 258 >= 257 · must-survive verified by diff-read (document-templates reparameterized over PRESETS with contrast blocks intact; engine-single-column untouched so the off-diagonal guard stands; e2e adapted shape-only, assertions intact) · [v3-044] repair tested on verbatim fixtures (skill columns:2 -> skillsLanguages grid/2) · registry = display metadata only, no render fns. DEVIATION ACCEPTED (verified true by coordinator probes): ibm-plex-mono exclusion STAYS — @fontsource woff crashes on spaces, woff2 crashes on colon (complementary defects; both reproduced isolated) -> E9-R1 incomplete, E9-R2 seeded. Judgment endorsed: gallery preset-selection preserves stylistic axes (keeps E8's user-facing contract; F5 owns preset-apply semantics)."
+    },
+    {
+      "id": "E9-F0d2",
+      "title": "Stored v1 format migration (old data) + migration test suite",
+      "status": "todo",
+      "depends_on": [
+        "E9-F0d1"
+      ],
+      "files": [
+        "src/server/",
+        "src/shared/format-v2.ts",
+        "test/",
+        "drizzle/"
+      ],
+      "origin": "decomposed from E9-F0d (spec §31.1 migration)",
+      "context": "PART 2 of the F0 cutover (E9-F0d split [v3-047]). After E9-F0d1 the live app speaks v2 end-to-end, but pre-existing DB rows (applications.format, applications.lockedFormat.format, settings.defaultFormat) may hold v1 JSON written before the cutover. Wire migrateFormat (src/shared/format-v2.ts — migration wiring only, no new axis logic) into the persistence boundary. RECOMMENDED: lazy-on-read (migrateFormat applied when a row loads; idempotent via isFormatV2; no boot-time table rewrite) — state your choice and why in evidence. Migration tests consume test/fixtures/pre-e9-formats/ VERBATIM (your diff must not touch that directory). Locked applications stay LOCKED: migrating lockedFormat does not unlock or mutate locked TailoredResume snapshot bytes (§28.1). Frozen: react-pdf only; ONE engine; §28.1 byte-stability.",
+      "acceptance": "- bun run check → 0; bun run lint → 0; NODE_OPTIONS=--max-old-space-size=1024 bun run build → 0\n- bunx vitest run --passWithNoTests green (serial fallback if contention flakes); npx playwright test → 10/10 green\n- every file under test/fixtures/pre-e9-formats/ (VERBATIM — git status shows zero changes there) migrates to schema-valid v2 preserving look: six template defaults → their preset configs (toEqual vs presets.ts modulo presetId), non-empty-sections → skillsLanguages grid/2, non-default-photo → photo preserved shown/square/size, lockedFormat wrapper + settings.defaultFormat cases covered\n- idempotence: second migration pass identical\n- integration: a pre-E9 sqlite row (v1 JSON in applications.format + lockedFormat + settings.defaultFormat, inserted raw) reads back through the API as schema-valid v2; locked TailoredResume snapshot bytes UNCHANGED by migration and by a subsequent v2 format PUT\n- format PUT round-trip persists across server restart\n- cross-cutting invariants + full baseline green",
+      "attempts": [],
+      "evidence": null
+    },
+    {
+      "id": "E9-R2",
+      "title": "Repair: ibm-plex-mono asset — BOTH vendored @fontsource files are defective (woff: spaces, woff2: colon); source a clean asset + punctuation-bearing per-face smoke",
+      "status": "todo",
+      "depends_on": [
+        "E9-F0d2"
+      ],
+      "files": [
+        "src/client/document/fonts.ts",
+        "src/client/document/engine/legacyAdapt.ts",
+        "test/document-fonts.test.ts",
+        "package.json",
+        "bun.lock"
+      ],
+      "origin": "repair: E9-R1 incomplete — colon-crash escaped its smoke (coordinator-verified during E9-F0d1 re-verify)",
+      "context": "CONFIRMED (coordinator probes 2026-07-07, isolated react-pdf/fontkit renders): @fontsource/ibm-plex-mono latin-400 .woff crashes fontkit ('Offset is outside the bounds of the DataView') on ANY multi-word text (space glyph, the E9-R1 finding); the SAME package's .woff2 (5.2.7, latest) renders spaces fine but crashes on a bare colon ':'. Complementary defects — no vendored @fontsource asset for this face is safe for resume prose. The engine currently fail-safes by excluding ibm-plex-mono in src/client/document/engine/legacyAdapt.ts (falls back to the default face — the picker offers Mono but renders Sans: crash-safe, dishonest). FIX FOR REAL: source a clean IBM Plex Mono asset — preferred: the official IBM '@ibm/plex-mono' npm package (OFL, TTF/woff/woff2 variants; verify whichever variant you register renders spaces AND colons AND full resume prose through fontkit BEFORE wiring); alternatives: another @fontsource major version, or vendoring the TTF from IBM's GitHub release into the repo (document provenance + license). Wire it through fonts.ts's per-face manifest (the R1 'format' field generalizes to a per-face source override if needed) for BOTH the createRequire (node) and Vite URL (browser) paths, then DELETE the legacyAdapt.ts exclusion so Mono genuinely renders. ESCAPED-BUG RULE (second escape of the same class — the R1 smoke lacked ordinary punctuation): the per-face render smoke fixture text must include realistic resume punctuation for EVERY face — at minimum colon, comma, hyphen, parentheses, slash, digits, ampersand (e.g. 'Led team: shipped 3 services (2019-2023), cut costs 40% & latency 2x — a/b tested'), at body AND heading roles. Demonstrate the strengthened smoke RED on the current woff2 asset (colon) before your fix, GREEN after.",
+      "acceptance": "- bun run check → 0; bun run lint → 0; NODE_OPTIONS=--max-old-space-size=1024 bun run build → 0 (mono assets present in dist)\n- bunx vitest run --passWithNoTests green; npx playwright test 10/10\n- strengthened per-face smoke (punctuation fixture, parameterized over the registry, body + heading roles) demonstrated RED on the unfixed woff2 (colon crash captured), GREEN after\n- ibm-plex-mono exclusion DELETED from legacyAdapt.ts; a resume with spaces + colons + digits renders through the engine with fonts.body 'ibm-plex-mono' (tested)\n- new dependency (if any) is OFL and pinned; provenance documented in fonts.ts\n- no face removed; existing tests untouched and green",
+      "attempts": [],
+      "evidence": null
     }
   ]
 }

@@ -1,4 +1,4 @@
-// Dedicated template gallery — spec.md §28.2, decided 2026-07-05: a
+// Dedicated preset gallery — spec.md §28.2/§31, decided 2026-07-05: a
 // full-screen BROWSE surface alongside TemplatePicker's inline grid, not a
 // replacement for it. A dialog, not a route (§26 no-orphan-routes: a gallery
 // route would have no resume to preview and nothing else links to it).
@@ -9,22 +9,24 @@
 // TemplatePicker shows for the identical card — the gallery is a bigger
 // window onto the same decision, never a second source of truth for it.
 // Selecting a card mirrors TemplatePicker's onChange contract exactly:
-// onChange({...format, templateId}) — every other format field untouched —
+// onChange(applyPreset(format, presetId)) — every stylistic axis untouched —
 // and then closes the gallery so the inline picker + preview reflect the
 // choice immediately.
 
 import { useState } from "react";
 import { cn } from "../lib/utils";
-import { TEMPLATES, effectiveAtsGrade } from "../document/registry";
+import { PRESET_MANIFESTS, effectiveAtsGrade } from "../document/registry";
+import { applyPreset } from "../document/presets";
 import { SAMPLE_PROFILE, SAMPLE_RESUME } from "../document/sampleResume";
 import { TemplateThumbnail } from "../document/thumbnail";
-import type { DocumentFormat, Paper, Profile, TailoredResume } from "@shared/types";
+import type { Paper, Profile, TailoredResume } from "@shared/types";
+import type { DocumentFormatV2 } from "@shared/format-v2";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 
-// Large enough to actually read as "one big preview per template" (vs. the
+// Large enough to actually read as "one big preview per preset" (vs. the
 // inline picker's card-grid thumbnail) while staying well under a full-page
 // render — the gallery still shows six of these at once.
 const GALLERY_SCALE = 0.6;
@@ -44,8 +46,8 @@ export function TemplateGallery({
   profile,
   paper = "letter",
 }: {
-  format: DocumentFormat;
-  onChange: (next: DocumentFormat) => void;
+  format: DocumentFormatV2;
+  onChange: (next: DocumentFormatV2) => void;
   readOnly?: boolean;
   resume?: TailoredResume | null;
   profile?: Profile;
@@ -72,9 +74,11 @@ export function TemplateGallery({
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
-            {Object.values(TEMPLATES).map((manifest) => {
-              const grade = effectiveAtsGrade(manifest, format);
-              const selected = format.templateId === manifest.id;
+            {Object.values(PRESET_MANIFESTS).map((manifest) => {
+              // See TemplatePicker.tsx's identical comment: graded on the
+              // prospective per-card format, not the live selection's format.
+              const grade = effectiveAtsGrade(manifest, applyPreset(format, manifest.id));
+              const selected = format.presetId === manifest.id;
 
               return (
                 <button
@@ -84,7 +88,7 @@ export function TemplateGallery({
                   aria-pressed={selected}
                   data-template-id={manifest.id}
                   onClick={() => {
-                    onChange({ ...format, templateId: manifest.id });
+                    onChange(applyPreset(format, manifest.id));
                     setOpen(false);
                   }}
                   className={cn(

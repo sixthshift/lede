@@ -30,3 +30,33 @@ export const PRESETS: Record<PresetId, DocumentFormatV2> = Object.fromEntries(
 ) as Record<PresetId, DocumentFormatV2>;
 
 export const SINGLE_COLUMN_PRESET_IDS = ["strict", "classic", "compact", "banner"] as const;
+
+export function isPresetId(id: string): id is PresetId {
+  return (PRESET_IDS as readonly string[]).includes(id);
+}
+
+// Applying a preset (spec.md §31.1: "applying one rewrites panel state") means
+// adopting that preset's COMPOSITION — the axes TEMPLATE_V2_OVERLAYS (format-v2.ts)
+// vary per retired template — while preserving every stylistic axis the user
+// already dialed in (fonts, colors, spacing, photo, …), exactly like v1's
+// templateId switch left typography/colors/page untouched. `layout` is taken
+// wholesale (columns/headerPosition/sidebarWidthPct/sectionPlacement are one
+// coupled composition, never mixed-and-matched across presets); header.
+// alignment/detailsArrangement and colors.area are the other composition-only
+// fields TEMPLATE_V2_OVERLAYS sets — picked individually off the target
+// preset rather than merging its whole `header`/`colors` group, so the user's
+// header.nameWeight / colors.accent / colors.text survive the switch.
+export function applyPreset(current: DocumentFormatV2, presetId: PresetId): DocumentFormatV2 {
+  const preset = PRESETS[presetId];
+  return {
+    ...current,
+    presetId,
+    layout: preset.layout,
+    header: {
+      ...current.header,
+      alignment: preset.header.alignment,
+      detailsArrangement: preset.header.detailsArrangement,
+    },
+    colors: { ...current.colors, area: preset.colors.area },
+  };
+}

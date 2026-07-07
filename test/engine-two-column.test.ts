@@ -8,9 +8,9 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { SECTION_VALUES } from "@shared/sections";
 import type { Profile, TailoredResume } from "@shared/types";
 import { migrateFormat, type DocumentFormatV2 } from "@shared/format-v2";
-import { documentFormatZ } from "@shared/schema";
 import { DEFAULT_FORMAT } from "@shared/format";
 import { extractPdfText } from "../src/client/document/extractText";
 import {
@@ -328,12 +328,56 @@ describe("MIX composition — does not crash, renders all content (not pixel-gra
   });
 });
 
+// The v1 zod object @shared/schema's `documentFormatZ` used to BE, kept here
+// verbatim (not imported — E9-F0d1 flipped that name to formatV2Schema at
+// the production API boundary, and this describe block exists specifically
+// to prove these fixtures are genuinely v1-shaped, which a v2 validator
+// can no longer attest to).
+const FONT_IDS = [
+  "ibm-plex-sans",
+  "ibm-plex-serif",
+  "ibm-plex-mono",
+  "arimo",
+  "tinos",
+  "carlito",
+] as const;
+const hexColorZ = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const legacyDocumentFormatZ = z.object({
+  templateId: z.string().min(1),
+  typography: z.object({
+    body: z.object({
+      family: z.enum(FONT_IDS),
+      size: z.number().min(9).max(12),
+      lineHeight: z.number().min(1).max(1.8),
+    }),
+    heading: z.object({
+      family: z.enum(FONT_IDS),
+      weight: z.union([z.literal(400), z.literal(500), z.literal(600), z.literal(700)]),
+    }),
+  }),
+  colors: z.object({ primary: hexColorZ, text: hexColorZ }),
+  page: z.object({
+    marginX: z.number().min(18).max(72),
+    marginY: z.number().min(18).max(72),
+    sectionGap: z.number().min(0).max(24),
+  }),
+  photo: z.object({
+    hidden: z.boolean(),
+    size: z.number().min(32).max(160),
+    shape: z.enum(["circle", "rounded", "square"]),
+  }),
+  sections: z.partialRecord(
+    z.enum(SECTION_VALUES),
+    z.object({ columns: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional() }),
+  ),
+});
+
 describe("pre-E9 fixtures parse under today's v1 schema (§31.6 F0c escaped-gap capture)", () => {
   const fixturesDir = path.join(process.cwd(), "test/fixtures/pre-e9-formats");
   const files = readdirSync(fixturesDir).filter((f) => f.endsWith(".json"));
 
   const lockedFormatZ = z.object({
-    format: documentFormatZ,
+    format: legacyDocumentFormatZ,
     resolvedDensity: z.enum(["comfortable", "standard", "compact"]),
     paper: z.enum(["letter", "a4"]),
   });
@@ -360,18 +404,18 @@ describe("pre-E9 fixtures parse under today's v1 schema (§31.6 F0c escaped-gap 
     if (file === "locked-format.json") {
       expect(() => lockedFormatZ.parse(raw)).not.toThrow();
     } else {
-      expect(() => documentFormatZ.parse(raw)).not.toThrow();
+      expect(() => legacyDocumentFormatZ.parse(raw)).not.toThrow();
     }
   });
 
   it("non-empty-sections fixture actually has a non-empty sections map", () => {
     const raw = JSON.parse(readFileSync(path.join(fixturesDir, "non-empty-sections.json"), "utf8"));
-    expect(Object.keys(documentFormatZ.parse(raw).sections).length).toBeGreaterThan(0);
+    expect(Object.keys(legacyDocumentFormatZ.parse(raw).sections).length).toBeGreaterThan(0);
   });
 
   it("non-default-photo fixture is shown, square, and size !== 64", () => {
     const raw = JSON.parse(readFileSync(path.join(fixturesDir, "non-default-photo.json"), "utf8"));
-    const parsed = documentFormatZ.parse(raw);
+    const parsed = legacyDocumentFormatZ.parse(raw);
     expect(parsed.photo.hidden).toBe(false);
     expect(parsed.photo.shape).toBe("square");
     expect(parsed.photo.size).not.toBe(64);

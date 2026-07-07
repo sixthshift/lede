@@ -7,10 +7,11 @@
 
 import { useEffect, useRef } from "react";
 import { usePDF } from "@react-pdf/renderer";
-import { DEFAULT_FORMAT } from "@shared/format";
-import type { DocumentFormat, Profile, TailoredResume } from "@shared/types";
+import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
+import type { Profile, TailoredResume } from "@shared/types";
 import type { Paper } from "../document";
 import { renderResumeDocument } from "../document";
+import type { EngineDensity } from "../document/engine";
 import { useProfile, useSettings } from "../hooks/queries";
 
 // pdf.js touches browser-only globals (DOMMatrix, Worker) at module-init —
@@ -65,14 +66,16 @@ function RenderedPreview({
   profile,
   paper,
   format,
+  density,
 }: {
   resume: TailoredResume;
   profile: Profile;
   paper: Paper;
-  format: DocumentFormat;
+  format: DocumentFormatV2;
+  density?: EngineDensity;
 }) {
   const [instance] = usePDF({
-    document: renderResumeDocument({ resume, profile, paper, format }),
+    document: renderResumeDocument({ resume, profile, paper, format, density }),
   });
 
   if (instance.error) {
@@ -90,10 +93,12 @@ function RenderedPreview({
 
 export function DocumentPreview({
   resume,
-  format = DEFAULT_FORMAT,
+  format = DEFAULT_FORMAT_V2,
+  density,
 }: {
   resume: TailoredResume;
-  format?: DocumentFormat;
+  format?: DocumentFormatV2;
+  density?: EngineDensity;
 }) {
   const { data: profile } = useProfile();
   const { data: settings } = useSettings();
@@ -103,7 +108,13 @@ export function DocumentPreview({
   return (
     <div className="document-preview">
       {profile && settings ? (
-        <RenderedPreview resume={resume} profile={profile} paper={settings.paper} format={format} />
+        <RenderedPreview
+          resume={resume}
+          profile={profile}
+          paper={settings.paper}
+          format={format}
+          density={density}
+        />
       ) : (
         <p className="document-preview__loading">Loading preview…</p>
       )}

@@ -1,8 +1,8 @@
-// Live mini-render template thumbnails (spec.md §28.2, decided 2026-07-05:
+// Live mini-render preset thumbnails (spec.md §28.2/§31, decided 2026-07-05:
 // previews are LIVE renders of THIS application's tailored resume, never
-// static images or per-template screenshots). Mirrors DocumentPreview's
+// static images or per-preset screenshots). Mirrors DocumentPreview's
 // render path — the same react-pdf bytes, painted onto a canvas via
-// pdf.js — scaled down and multiplied by six (one per template in the
+// pdf.js — scaled down and multiplied by six (one per preset in the
 // registry), which is why this file adds two things DocumentPreview doesn't
 // need: a CACHE (repeated opens repaint instantly, keyed on the exact inputs
 // that could change the pixels) and a QUEUE (six cards mounting at once must
@@ -16,8 +16,10 @@
 // decorative, never load-bearing.
 
 import { useEffect, useMemo, useRef } from "react";
-import type { DocumentFormat, Paper, Profile, TailoredResume } from "@shared/types";
+import type { Paper, Profile, TailoredResume } from "@shared/types";
+import type { DocumentFormatV2 } from "@shared/format-v2";
 import { renderResumeToBlob } from "./renderResume";
+import { applyPreset, type PresetId } from "./presets";
 
 const THUMBNAIL_SCALE = 0.35;
 
@@ -33,27 +35,27 @@ function hashString(input: string): string {
 }
 
 // The cache key mirrors exactly what changes the rendered pixels: the
-// template being previewed (the explicit prop, NOT format.templateId — a
-// card previews a template regardless of which one is currently selected),
-// every other format field, the paper size, the resume's content, and the
-// render scale (the gallery, §28.2, renders the SAME component at a larger
-// scale than the inline picker — a bigger raster is different pixels, so it
-// needs its own cache entry). profile is deliberately excluded (spec'd) — it
+// preset being previewed (the explicit prop, NOT format.presetId — a card
+// previews a preset regardless of which one is currently selected), every
+// other format field, the paper size, the resume's content, and the render
+// scale (the gallery, §28.2, renders the SAME component at a larger scale
+// than the inline picker — a bigger raster is different pixels, so it needs
+// its own cache entry). profile is deliberately excluded (spec'd) — it
 // rarely changes within a picker's lifetime, and isn't worth widening the
 // key for. scale defaults to THUMBNAIL_SCALE so callers that never pass it
 // (every call site before the gallery) are unaffected.
 export function thumbnailCacheKey(args: {
-  templateId: string;
-  format: DocumentFormat;
+  presetId: string;
+  format: DocumentFormatV2;
   paper: Paper;
   resume: TailoredResume;
   scale?: number;
 }): string {
-  const { templateId, format, paper, resume, scale = THUMBNAIL_SCALE } = args;
-  const { templateId: _formatTemplateId, ...formatRest } = format;
+  const { presetId, format, paper, resume, scale = THUMBNAIL_SCALE } = args;
+  const { presetId: _formatPresetId, ...formatRest } = format;
   const formatKey = hashString(JSON.stringify(formatRest));
   const resumeKey = hashString(JSON.stringify(resume));
-  return `${templateId}::${paper}::${formatKey}::${resumeKey}::${scale}`;
+  return `${presetId}::${paper}::${formatKey}::${resumeKey}::${scale}`;
 }
 
 // Module-level (app-wide) render queue — six cards mounting together must
@@ -144,16 +146,24 @@ export function TemplateThumbnail({
   resume: TailoredResume;
   profile: Profile;
   paper: Paper;
-  format: DocumentFormat;
-  templateId: string;
+  format: DocumentFormatV2;
+  // Named templateId (not presetId) for minimal call-site churn — every
+  // caller (TemplatePicker/TemplateGallery) already threads a preset id
+  // through this prop name from before the v2 cutover.
+  templateId: PresetId;
   // Larger for the dedicated gallery (§28.2) than the inline picker's card —
   // same component, same render/paint path, just a bigger pdf.js viewport.
   scale?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // A card previews what SELECTING this preset would actually produce:
+  // the preset's own composition (layout/header/colors.area) layered over
+  // the caller's current stylistic choices (fonts/colors/margins/…) — the
+  // same merge applyPreset performs on click (presets.ts).
+  const previewFormat = useMemo(() => applyPreset(format, templateId), [format, templateId]);
   const cacheKey = useMemo(
-    () => thumbnailCacheKey({ templateId, format, paper, resume, scale }),
-    [templateId, format, paper, resume, scale],
+    () => thumbnailCacheKey({ presetId: templateId, format: previewFormat, paper, resume, scale }),
+    [templateId, previewFormat, paper, resume, scale],
   );
 
   useEffect(() => {
@@ -167,8 +177,7 @@ export function TemplateThumbnail({
           resume,
           profile,
           paper,
-          templateId,
-          format: { ...format, templateId },
+          format: previewFormat,
         }),
       )
         .then((blob) => {
@@ -209,7 +218,7 @@ export function TemplateThumbnail({
       cancelled = true;
       observer.disconnect();
     };
-  }, [cacheKey, resume, profile, paper, format, templateId, scale]);
+  }, [cacheKey, resume, profile, paper, previewFormat, scale]);
 
   return <canvas ref={canvasRef} className="template-thumbnail__canvas" aria-hidden />;
 }

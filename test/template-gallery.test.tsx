@@ -1,17 +1,18 @@
 // @vitest-environment jsdom
-// E8-C1 — dedicated template gallery (spec.md §28.2, decided 2026-07-05).
-// jsdom cannot paint pdf.js (no real canvas/worker) — that proof lives in the
-// applications e2e (expectThumbnailPainted, scoped to the open dialog). This
-// file covers the PURE/DOM parts: one card per registry template with the
-// same ATS badge/caveat convention TemplatePicker uses, the onChange
-// contract (mirrors TemplatePicker's exactly — only templateId changes), and
+// E8-C1 — dedicated template gallery (spec.md §28.2/§31, decided
+// 2026-07-05). jsdom cannot paint pdf.js (no real canvas/worker) — that
+// proof lives in the applications e2e (expectThumbnailPainted, scoped to the
+// open dialog). This file covers the PURE/DOM parts: one card per registry
+// preset with the same ATS badge/caveat convention TemplatePicker uses, the
+// onChange contract (mirrors TemplatePicker's exactly — applyPreset), and
 // readOnly blocking selection.
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import type { Profile, TailoredResume } from "@shared/types";
-import { DEFAULT_FORMAT } from "../src/shared/format";
-import { TEMPLATES } from "../src/client/document/registry";
+import { DEFAULT_FORMAT_V2 } from "../src/shared/format-v2";
+import { PRESET_MANIFESTS } from "../src/client/document/registry";
+import { applyPreset } from "../src/client/document/presets";
 import { TemplateGallery } from "../src/client/components/TemplateGallery";
 
 afterEach(() => {
@@ -47,10 +48,10 @@ function openGallery() {
 }
 
 describe("TemplateGallery", () => {
-  it("lists one card per registry template, each with its name and effectiveAtsGrade badge", () => {
+  it("lists one card per registry preset, each with its name and effectiveAtsGrade badge", () => {
     render(
       <TemplateGallery
-        format={DEFAULT_FORMAT}
+        format={DEFAULT_FORMAT_V2}
         onChange={vi.fn()}
         resume={resumeFixture()}
         profile={profileFixture()}
@@ -58,14 +59,14 @@ describe("TemplateGallery", () => {
     );
     openGallery();
 
-    const templateIds = Object.keys(TEMPLATES);
-    expect(templateIds.length).toBe(6);
+    const presetIds = Object.keys(PRESET_MANIFESTS);
+    expect(presetIds.length).toBe(6);
 
-    for (const manifest of Object.values(TEMPLATES)) {
+    for (const manifest of Object.values(PRESET_MANIFESTS)) {
       expect(screen.getByText(manifest.name)).toBeInTheDocument();
     }
 
-    // The sidebar templates are single-column-incapable (§28.2) so they cap
+    // The sidebar presets are single-column-incapable (§28.2) so they cap
     // at 'good' and carry the Workday/Taleo caveat — same convention as
     // TemplatePicker (test/template-thumbnails.test.tsx doesn't cover this,
     // TemplatePicker's own render does).
@@ -76,7 +77,7 @@ describe("TemplateGallery", () => {
   });
 
   it("with resume=null, every card falls back to sample content and shows the badge", () => {
-    render(<TemplateGallery format={DEFAULT_FORMAT} onChange={vi.fn()} resume={null} />);
+    render(<TemplateGallery format={DEFAULT_FORMAT_V2} onChange={vi.fn()} resume={null} />);
     openGallery();
 
     expect(screen.getAllByText("Sample content").length).toBe(6);
@@ -85,7 +86,7 @@ describe("TemplateGallery", () => {
   it("with a real resume, no 'Sample content' badge appears", () => {
     render(
       <TemplateGallery
-        format={DEFAULT_FORMAT}
+        format={DEFAULT_FORMAT_V2}
         onChange={vi.fn()}
         resume={resumeFixture()}
         profile={profileFixture()}
@@ -96,15 +97,12 @@ describe("TemplateGallery", () => {
     expect(screen.queryByText("Sample content")).not.toBeInTheDocument();
   });
 
-  it("clicking a card calls onChange with {...format, templateId} — every other field untouched — and closes the gallery", () => {
+  it("clicking a card calls onChange with applyPreset(format, presetId) and closes the gallery", () => {
     const onChange = vi.fn();
     const format = {
-      ...DEFAULT_FORMAT,
-      colors: { ...DEFAULT_FORMAT.colors, primary: "#14532d" },
-      typography: {
-        ...DEFAULT_FORMAT.typography,
-        body: { ...DEFAULT_FORMAT.typography.body, family: "arimo" as const },
-      },
+      ...DEFAULT_FORMAT_V2,
+      colors: { ...DEFAULT_FORMAT_V2.colors, accent: "#14532d" },
+      fonts: { ...DEFAULT_FORMAT_V2.fonts, body: "arimo" as const },
     };
     render(
       <TemplateGallery
@@ -119,7 +117,7 @@ describe("TemplateGallery", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Sidebar Right/ }));
 
     expect(onChange).toHaveBeenCalledTimes(1);
-    expect(onChange).toHaveBeenCalledWith({ ...format, templateId: "sidebar-right" });
+    expect(onChange).toHaveBeenCalledWith(applyPreset(format, "sidebar-right"));
 
     // The dialog closes on selection (Radix unmounts DialogContent when closed).
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -129,7 +127,7 @@ describe("TemplateGallery", () => {
     const onChange = vi.fn();
     render(
       <TemplateGallery
-        format={DEFAULT_FORMAT}
+        format={DEFAULT_FORMAT_V2}
         onChange={onChange}
         readOnly
         resume={resumeFixture()}

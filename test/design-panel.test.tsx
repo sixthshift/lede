@@ -1,19 +1,25 @@
 // @vitest-environment jsdom
-// DesignPanel + TemplatePicker — ticket E7-B1e, spec.md §28.3. Controls are
-// bounded (select/stepper/palette-swatch), never free-form text; the ATS
+// DesignPanel + TemplatePicker — ticket E7-B1e, spec.md §28.3/§31. Controls
+// are bounded (select/stepper/palette-swatch), never free-form text; the ATS
 // badge on TemplatePicker is effectiveAtsGrade(manifest, format)
-// (../src/client/document/registry.ts) — a sidebar layout OR a shown photo
-// caps every template's grade at 'good' and surfaces the Workday/Taleo
+// (../src/client/document/registry.ts) — a two-column layout OR a shown
+// photo caps every preset's grade at 'good' and surfaces the Workday/Taleo
 // left-to-right caveat, never the other way around.
+//
+// §31/E9-F0d1: reparameterized onto DocumentFormatV2 + presets.ts's
+// applyPreset (see DesignPanel.tsx's/TemplatePicker.tsx's module comments for
+// the v1->v2 field map and the "selecting a preset applies its composition,
+// preserves the user's stylistic choices" contract this ticket establishes).
 import "@testing-library/jest-dom/vitest";
 import { useState } from "react";
 import { describe, it, expect, afterEach, beforeAll, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-import { DEFAULT_FORMAT } from "../src/shared/format";
-import type { DocumentFormat } from "../src/shared/types";
+import { DEFAULT_FORMAT_V2 } from "../src/shared/format-v2";
+import type { DocumentFormatV2 } from "../src/shared/format-v2";
 import { FONT_FACES } from "../src/client/document/fonts";
+import { applyPreset } from "../src/client/document/presets";
 import { DesignPanel } from "../src/client/components/DesignPanel";
 import { TemplatePicker } from "../src/client/components/TemplatePicker";
 import { SettingsView } from "../src/client/components/SettingsView";
@@ -52,17 +58,16 @@ afterEach(() => {
 // (checked/value always derive from the `format` prop), so a test that wants
 // to observe a click's effect needs something that actually re-renders it
 // with the next format, the same way ApplicationDetail/SettingsView do.
-function ControlledDesignPanel({ initial }: { initial: DocumentFormat }) {
+function ControlledDesignPanel({ initial }: { initial: DocumentFormatV2 }) {
   const [format, setFormat] = useState(initial);
   return <DesignPanel format={format} onChange={setFormat} />;
 }
 
 describe("DesignPanel — controls are bounded, never free-form", () => {
-  it("font family is a Select sourced from FONT_FACES; no free-form text input names a family/font field", async () => {
-    render(<DesignPanel format={DEFAULT_FORMAT} onChange={vi.fn()} />);
+  it("body font is a Select sourced from FONT_FACES; no free-form text input names a family/font field", async () => {
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={vi.fn()} />);
 
     const bodyFont = await screen.findByRole("combobox", { name: "Body font" });
-    expect(screen.getByRole("combobox", { name: "Heading font" })).toBeInTheDocument();
 
     fireEvent.click(bodyFont);
     for (const face of Object.values(FONT_FACES)) {
@@ -80,7 +85,7 @@ describe("DesignPanel — controls are bounded, never free-form", () => {
 
 describe("DesignPanel — photo toggle", () => {
   it("defaults to hidden; enabling it reveals the regional-norms note", () => {
-    render(<ControlledDesignPanel initial={DEFAULT_FORMAT} />);
+    render(<ControlledDesignPanel initial={DEFAULT_FORMAT_V2} />);
 
     const toggle = screen.getByLabelText("Show photo on resume") as HTMLInputElement;
     expect(toggle.checked).toBe(false);
@@ -94,16 +99,16 @@ describe("DesignPanel — photo toggle", () => {
 });
 
 describe("TemplatePicker — ATS badge CONTRAST (effectiveAtsGrade)", () => {
-  it("the default strict/no-photo format shows 'ATS: strict' with no Workday/Taleo caveat", () => {
-    render(<TemplatePicker format={DEFAULT_FORMAT} onChange={vi.fn()} />);
+  it("the default strict/no-photo/single-column format shows 'ATS: strict' with no Workday/Taleo caveat", () => {
+    render(<TemplatePicker format={DEFAULT_FORMAT_V2} onChange={vi.fn()} />);
 
     const strictCard = screen.getByText("Strict").closest("button") as HTMLElement;
     expect(within(strictCard).getByText("ATS: strict")).toBeInTheDocument();
     expect(within(strictCard).queryByText(/Workday|Taleo/)).not.toBeInTheDocument();
   });
 
-  it("a sidebar template shows 'ATS: good' + the Workday/Taleo caveat, even with the photo hidden", () => {
-    const format: DocumentFormat = { ...DEFAULT_FORMAT, templateId: "sidebar-left" };
+  it("a two-column (sidebar) format shows 'ATS: good' + the Workday/Taleo caveat, even with the photo hidden", () => {
+    const format = applyPreset(DEFAULT_FORMAT_V2, "sidebar-left");
     render(<TemplatePicker format={format} onChange={vi.fn()} />);
 
     const sidebarCard = screen.getByText("Sidebar").closest("button") as HTMLElement;
@@ -116,10 +121,10 @@ describe("TemplatePicker — ATS badge CONTRAST (effectiveAtsGrade)", () => {
     expect(within(strictCard).getByText("ATS: strict")).toBeInTheDocument();
   });
 
-  it("a shown photo caps every template (including strict/single-column) at 'ATS: good' + the caveat", () => {
-    const format: DocumentFormat = {
-      ...DEFAULT_FORMAT,
-      photo: { ...DEFAULT_FORMAT.photo, hidden: false },
+  it("a shown photo caps every preset (including strict/single-column) at 'ATS: good' + the caveat", () => {
+    const format: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      photo: { ...DEFAULT_FORMAT_V2.photo, hidden: false },
     };
     render(<TemplatePicker format={format} onChange={vi.fn()} />);
 
@@ -128,13 +133,13 @@ describe("TemplatePicker — ATS badge CONTRAST (effectiveAtsGrade)", () => {
     expect(within(strictCard).getByText(/Workday/)).toBeInTheDocument();
   });
 
-  it("selecting a card fires onChange with only templateId changed", () => {
+  it("selecting a card fires onChange with applyPreset(format, presetId) — the preset's composition applied, stylistic axes preserved", () => {
     const onChange = vi.fn();
-    render(<TemplatePicker format={DEFAULT_FORMAT} onChange={onChange} />);
+    render(<TemplatePicker format={DEFAULT_FORMAT_V2} onChange={onChange} />);
 
     fireEvent.click(screen.getByText("Sidebar").closest("button") as HTMLElement);
 
-    expect(onChange).toHaveBeenCalledWith({ ...DEFAULT_FORMAT, templateId: "sidebar-left" });
+    expect(onChange).toHaveBeenCalledWith(applyPreset(DEFAULT_FORMAT_V2, "sidebar-left"));
   });
 });
 
@@ -146,7 +151,7 @@ describe("SettingsView — settings.defaultFormat is editable and round-trips", 
     baseUrl: string | null;
     layout: unknown[];
     paper: "letter" | "a4";
-    defaultFormat: DocumentFormat;
+    defaultFormat: DocumentFormatV2;
   };
 
   function mockFetch(initial: SettingsState) {
@@ -190,16 +195,19 @@ describe("SettingsView — settings.defaultFormat is editable and round-trips", 
       baseUrl: null,
       layout: [],
       paper: "letter",
-      defaultFormat: DEFAULT_FORMAT,
+      defaultFormat: DEFAULT_FORMAT_V2,
     });
 
     render(withClient(<SettingsView />));
 
+    // DEFAULT_FORMAT_V2.header.nameWeight is "bold" — migrateFormat's
+    // baseFromV1 derives it from v1 DEFAULT_FORMAT.typography.heading.weight
+    // (600), which the BOLD_WEIGHT_THRESHOLD (>=600) maps to "bold".
     const weightSelect = await screen.findByRole("combobox", { name: "Heading weight" });
-    expect(weightSelect).toHaveTextContent("600");
+    expect(weightSelect).toHaveTextContent("Bold");
 
     fireEvent.click(weightSelect);
-    fireEvent.click(await screen.findByRole("option", { name: "700" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Normal" }));
 
     await waitFor(() => {
       const putCall = fetchMock.mock.calls.find(
@@ -211,10 +219,11 @@ describe("SettingsView — settings.defaultFormat is editable and round-trips", 
       ([u, i]) => u === "/api/settings" && (i as RequestInit | undefined)?.method === "PUT",
     )!;
     const body = JSON.parse(String((putInit as RequestInit).body));
-    expect(body.defaultFormat.typography.heading.weight).toBe(700);
+    expect(body.defaultFormat.header.nameWeight).toBe("normal");
+    expect(body.defaultFormat.header.titleWeight).toBe("normal");
 
     await waitFor(() =>
-      expect(screen.getByRole("combobox", { name: "Heading weight" })).toHaveTextContent("700"),
+      expect(screen.getByRole("combobox", { name: "Heading weight" })).toHaveTextContent("Normal"),
     );
   });
 });

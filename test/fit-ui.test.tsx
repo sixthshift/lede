@@ -16,30 +16,41 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
-import type { Application, DocumentFormat, Profile, TailoredResume } from "@shared/types";
-import { DEFAULT_FORMAT } from "@shared/format";
+import type { Application, Profile, TailoredResume } from "@shared/types";
+import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
+import type { EngineDensity } from "../src/client/document/engine";
 
 import { FitChip } from "../src/client/components/FitChip";
 import { fitToPages } from "../src/client/document/fit";
 import type { SettingsResponse } from "../src/client/api";
 
-const previewProps: { format: DocumentFormat | null; resume: TailoredResume | null } = {
+const previewProps: {
+  format: DocumentFormatV2 | null;
+  resume: TailoredResume | null;
+  density: EngineDensity | undefined;
+} = {
   format: null,
   resume: null,
+  density: undefined,
 };
-const downloadCalls: Array<{ format?: DocumentFormat }> = [];
+const downloadCalls: Array<{ format?: DocumentFormatV2; density?: EngineDensity }> = [];
 
 vi.mock("../src/client/components/ResultView", () => ({
-  ResultView: (props: { resume: TailoredResume; format?: DocumentFormat }) => {
+  ResultView: (props: {
+    resume: TailoredResume;
+    format?: DocumentFormatV2;
+    density?: EngineDensity;
+  }) => {
     previewProps.format = props.format ?? null;
     previewProps.resume = props.resume;
+    previewProps.density = props.density;
     return <div data-testid="result-view-stub" />;
   },
 }));
 
 vi.mock("../src/client/document/download", () => ({
-  downloadResumePdf: vi.fn(async (args: { format?: DocumentFormat }) => {
-    downloadCalls.push({ format: args.format });
+  downloadResumePdf: vi.fn(async (args: { format?: DocumentFormatV2; density?: EngineDensity }) => {
+    downloadCalls.push({ format: args.format, density: args.density });
   }),
 }));
 
@@ -93,7 +104,7 @@ function settingsFixture(): SettingsResponse {
     baseUrl: null,
     layout: [],
     paper: "letter",
-    defaultFormat: DEFAULT_FORMAT,
+    defaultFormat: DEFAULT_FORMAT_V2,
   };
 }
 
@@ -205,7 +216,7 @@ describe("ApplicationDetail fit wiring (§28.4)", () => {
     const expected = await fitToPages({
       resume,
       profile,
-      format: DEFAULT_FORMAT,
+      format: DEFAULT_FORMAT_V2,
       paper: "letter",
       targetPages: 1,
     });
@@ -217,13 +228,19 @@ describe("ApplicationDetail fit wiring (§28.4)", () => {
       `Fits ${expected.pageCount} page${expected.pageCount === 1 ? "" : "s"} · ${expected.density}`,
     );
 
-    // preview and download used the exact same fitted format
+    // preview and download used the exact same format AND density (§31/
+    // E9-F0d1: the engine takes density as a sibling render prop rather than
+    // a pre-scaled copy of format — see ApplicationDetail.tsx's module
+    // comment — so "the same fit result drove both" is now a same-format
+    // AND same-density claim, not just same-format).
     expect(previewProps.format).toEqual(downloadCalls[0]?.format ?? previewProps.format);
+    expect(previewProps.density).toBe(expected.density);
     expect(previewProps.resume).toEqual(resume); // never truncated
 
     fireEvent.click(await screen.findByRole("button", { name: "Download PDF" }));
     await waitFor(() => expect(downloadCalls.length).toBeGreaterThan(0));
     expect(downloadCalls[0]?.format).toEqual(previewProps.format);
+    expect(downloadCalls[0]?.density).toBe(previewProps.density);
 
     // no density control anywhere
     expect(screen.queryByRole("combobox", { name: /density/i })).not.toBeInTheDocument();
@@ -239,7 +256,7 @@ describe("ApplicationDetail fit wiring (§28.4)", () => {
     const expected = await fitToPages({
       resume,
       profile,
-      format: DEFAULT_FORMAT,
+      format: DEFAULT_FORMAT_V2,
       paper: "letter",
       targetPages: 1,
     });

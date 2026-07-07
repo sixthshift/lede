@@ -6,7 +6,12 @@
 // stay entries-only) and must never import the client fit ladder — fit.ts
 // and registry.ts pull in @react-pdf/renderer/pdf.js, which is not safely
 // importable from src/server.
-import type { DocumentFormat, Paper } from "@shared/types";
+//
+// §31/E9-F0d1: `format` moved from the v1 `DocumentFormat` to `DocumentFormatV2`
+// (application.format/settings.defaultFormat are v2 now) — reads typeScale/
+// spacing directly rather than importing the client-only legacyAdapt seam.
+import type { Paper } from "@shared/types";
+import type { DocumentFormatV2 } from "@shared/format-v2";
 
 // Points are standard PDF units (72pt = 1in) — the same values
 // @react-pdf/renderer's <Page size="LETTER"|"A4"> uses internally, duplicated
@@ -15,6 +20,14 @@ const PAPER_SIZE_PT: Record<Paper, { width: number; height: number }> = {
   letter: { width: 612, height: 792 },
   a4: { width: 595.28, height: 841.89 },
 };
+
+// 72pt / 25.4mm — v2 stores margins in mm (§31.2); duplicated rather than
+// imported for the same react-pdf-free reason as PAPER_SIZE_PT above (also
+// duplicated, for the same reason, in src/client/document/engine/legacyAdapt.ts).
+const PT_PER_MM = 72 / 25.4;
+// v2's elementSpacing is a discrete 0-4 scale; 6pt/step matches
+// legacyAdapt.ts's/format-v2.ts's own ELEMENT_SPACING_PT_STEP.
+const ELEMENT_SPACING_PT_STEP = 6;
 
 // Local heuristic constants, deliberately rough:
 // - AVG_CHAR_WIDTH_RATIO: a proportional body font's average glyph advance
@@ -36,19 +49,22 @@ export function deriveContentBudget({
 }: {
   paper: Paper;
   targetPages: 1 | 2;
-  format: DocumentFormat;
+  format: DocumentFormatV2;
 }): string {
   const { width, height } = PAPER_SIZE_PT[paper];
-  const { body } = format.typography;
-  const { marginX, marginY, sectionGap } = format.page;
+  const bodySize = format.typeScale.bodySize;
+  const lineHeight = format.spacing.lineHeight;
+  const marginX = format.spacing.marginsMm.x * PT_PER_MM;
+  const marginY = format.spacing.marginsMm.y * PT_PER_MM;
+  const sectionGap = format.spacing.elementSpacing * ELEMENT_SPACING_PT_STEP;
 
   const usableWidth = Math.max(width - 2 * marginX, 1);
   const usableHeight = Math.max(height - 2 * marginY, 1);
 
-  const lineHeightPt = body.size * body.lineHeight;
+  const lineHeightPt = bodySize * lineHeight;
   const rowPt = lineHeightPt + sectionGap / 8; // sectionGap amortized across many lines, not charged per-line
   const linesPerPage = usableHeight / rowPt;
-  const charsPerLine = usableWidth / (body.size * AVG_CHAR_WIDTH_RATIO);
+  const charsPerLine = usableWidth / (bodySize * AVG_CHAR_WIDTH_RATIO);
 
   const totalChars =
     linesPerPage * charsPerLine * targetPages * CONTENT_FRACTION_AT_STANDARD_DENSITY;

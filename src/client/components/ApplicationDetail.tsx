@@ -6,11 +6,10 @@
 import { ArrowLeft, BookOpen, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { DEFAULT_FORMAT } from "@shared/format";
-import type { DocumentFormat, Paper, Profile, TailoredResume } from "@shared/types";
+import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
+import type { Paper, Profile, TailoredResume } from "@shared/types";
 import { downloadResumePdf, downloadResumeText } from "../document/download";
-import { applyDensity, fitToPages, type FitResult } from "../document/fit";
-import { getTemplate } from "../document/registry";
+import { fitToPages, type FitResult } from "../document/fit";
 import { useProfile, useSettings } from "../hooks/queries";
 import {
   useApplication,
@@ -52,7 +51,7 @@ function formatStaleDate(at: number): string {
 function useFit(args: {
   resume: TailoredResume | null;
   profile: Profile | undefined;
-  format: DocumentFormat;
+  format: DocumentFormatV2;
   paper: Paper;
   targetPages: number;
 }): { fit: FitResult | null; fitError: boolean } {
@@ -96,8 +95,8 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   const updateApplication = useUpdateApplication();
 
   // Preview vs "what the ATS sees" (§28.6) — a view toggle, not a route:
-  // both read the SAME current resume + fittedFormat computed below, so
-  // switching never re-tailors or re-fits.
+  // both read the SAME current resume + resolvedFormat/density computed
+  // below, so switching never re-tailors or re-fits.
   const [view, setView] = useState<"preview" | "ats">("preview");
 
   // Locked freezes the look along with the resume — editing a locked app's
@@ -107,9 +106,9 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   // isLoading/isError early returns below so useFit (a hook) is never called
   // conditionally.
   const isLocked = Boolean(application?.locked);
-  const resolvedFormat: DocumentFormat = isLocked
-    ? (application?.lockedFormat?.format ?? DEFAULT_FORMAT)
-    : (application?.format ?? settings?.defaultFormat ?? DEFAULT_FORMAT);
+  const resolvedFormat: DocumentFormatV2 = isLocked
+    ? (application?.lockedFormat?.format ?? DEFAULT_FORMAT_V2)
+    : (application?.format ?? settings?.defaultFormat ?? DEFAULT_FORMAT_V2);
   const paper: Paper = isLocked
     ? (application?.lockedFormat?.paper ?? settings?.paper ?? "letter")
     : (settings?.paper ?? "letter");
@@ -117,7 +116,10 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
 
   // Fit once, here — the SAME FitResult drives the chip, the preview, and
   // the download, so the density the chip claims is the density the file
-  // actually renders at (§28.4).
+  // actually renders at (§28.4). Unlike v1 (applyDensity pre-scaled a COPY of
+  // format), the engine takes density as a sibling prop of format and applies
+  // the ladder itself (EngineDocument) — so `resolvedFormat` rides unscaled
+  // to every renderer, with `fit?.density` threaded alongside it.
   const { fit, fitError } = useFit({
     resume: application?.current ?? null,
     profile,
@@ -125,10 +127,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
     paper,
     targetPages,
   });
-  const { densityMultipliers } = getTemplate(resolvedFormat.templateId);
-  const fittedFormat = fit
-    ? applyDensity(resolvedFormat, fit.density, densityMultipliers)
-    : resolvedFormat;
+  const density = fit?.density;
 
   if (isLoading) {
     return (
@@ -149,7 +148,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   const isTailoring = tailorApplication.isPending || application.genState === "tailoring";
   const tailorLabel = application.genState === "untailored" ? "Tailor" : "Re-tailor";
 
-  const handleFormatChange = (next: DocumentFormat) => {
+  const handleFormatChange = (next: DocumentFormatV2) => {
     if (isLocked) return;
     updateApplication.mutate({ id: applicationId, input: { format: next } });
   };
@@ -211,7 +210,9 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
                   profile,
                   company: application.company,
                   role: application.role,
-                  format: fittedFormat,
+                  format: resolvedFormat,
+                  paper,
+                  density,
                 })
               }
             >
@@ -344,11 +345,12 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
             <AtsView
               resume={application.current}
               profile={profile}
-              format={fittedFormat}
+              format={resolvedFormat}
               paper={paper}
+              density={density}
             />
           ) : (
-            <ResultView resume={application.current} format={fittedFormat} />
+            <ResultView resume={application.current} format={resolvedFormat} density={density} />
           )}
         </div>
       ) : (

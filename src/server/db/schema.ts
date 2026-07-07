@@ -5,20 +5,17 @@
 import { sqliteTable, text, integer, check } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
-import type {
-  DocumentFormat,
-  EntryMeta,
-  Paper,
-  ProviderId,
-  Section,
-  TailoredResume,
-} from "@shared/types";
-import { DEFAULT_FORMAT } from "@shared/format";
+import type { EntryMeta, Paper, ProviderId, Section, TailoredResume } from "@shared/types";
+import type { DocumentFormatV2 } from "@shared/format-v2";
+import { DEFAULT_FORMAT_V2 } from "@shared/format-v2";
 
 // ── frozen at lock time alongside the resume snapshot (§28.3) — the fit
-// ladder is a later epic, so resolvedDensity is 'as-set' = 'comfortable' until then ──
+// ladder is a later epic, so resolvedDensity is 'as-set' = 'comfortable' until
+// then. §31/E9-F0d1: format moved v1 -> DocumentFormatV2 (compile-time $type
+// swap only — no drizzle data migration in this ticket; old v1 rows are the
+// next ticket's job, per this ticket's file contract) ──
 type LockedFormat = {
-  format: DocumentFormat;
+  format: DocumentFormatV2;
   resolvedDensity: "comfortable" | "standard" | "compact";
   paper: Paper;
 };
@@ -72,8 +69,8 @@ export const settings = sqliteTable(
     paper: text("paper").notNull().default("letter").$type<Paper>(), // page size, global (§28.1)
     defaultFormat: text("default_format", { mode: "json" })
       .notNull()
-      .$type<DocumentFormat>()
-      .default(DEFAULT_FORMAT), // instance-level fallback for application.format (§28.3)
+      .$type<DocumentFormatV2>()
+      .default(DEFAULT_FORMAT_V2), // instance-level fallback for application.format (§28.3)
     updatedAt: integer("updated_at").notNull(),
   },
   (t) => ({ singleton: check("settings_singleton", sql`${t.id} = 1`) }),
@@ -87,7 +84,7 @@ export const applications = sqliteTable("applications", {
   jobDescription: text("job_description").notNull(),
   context: text("context"), // guides emphasis only — never a fact source
   targetPages: integer("target_pages").notNull().default(1).$type<1 | 2>(), // page budget for this role (§28.1)
-  format: text("format", { mode: "json" }).$type<DocumentFormat | null>(), // per-app override of settings.defaultFormat (§28.3)
+  format: text("format", { mode: "json" }).$type<DocumentFormatV2 | null>(), // per-app override of settings.defaultFormat (§28.3)
   current: text("current", { mode: "json" }).$type<TailoredResume | null>(),
   locked: text("locked", { mode: "json" }).$type<TailoredResume | null>(),
   lockedFormat: text("locked_format", { mode: "json" }).$type<LockedFormat | null>(), // frozen at lock time (§28.3)

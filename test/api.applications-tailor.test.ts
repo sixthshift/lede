@@ -15,7 +15,7 @@ import { seedIfEmpty } from "../src/server/seed";
 import { CONTRAST_JDS } from "../src/server/tailor/evalcore";
 import { buildUserPrompt, type TailorEngine } from "../src/server/tailor/engine";
 import { deriveContentBudget } from "../src/server/tailor/budget";
-import { DEFAULT_FORMAT } from "@shared/format";
+import { DEFAULT_FORMAT_V2 } from "@shared/format-v2";
 import { applicationsRoutes } from "../src/server/routes/applications";
 
 const tmpDirs: string[] = [];
@@ -201,7 +201,7 @@ describe("E7-D1a: the route derives and threads a content budget to the engine (
     const expectedBudget = deriveContentBudget({
       paper: "letter", // settings.paper default
       targetPages: 1,
-      format: DEFAULT_FORMAT, // settings.defaultFormat default; app.format is null
+      format: DEFAULT_FORMAT_V2, // settings.defaultFormat default (migrated on read); app.format is null
     });
     expect(spy.calls[0]!.budget).toBe(expectedBudget);
     expect(spy.calls[0]!.composedPrompt).toContain(expectedBudget);
@@ -223,7 +223,7 @@ describe("E7-D1a: the route derives and threads a content budget to the engine (
     const expectedOnePageBudget = deriveContentBudget({
       paper: "letter",
       targetPages: 1,
-      format: DEFAULT_FORMAT,
+      format: DEFAULT_FORMAT_V2,
     });
     expect(spy.calls[0]!.budget).not.toBe(expectedOnePageBudget);
     expect(spy.calls[0]!.budget).toContain("2 pages");

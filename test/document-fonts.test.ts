@@ -2,8 +2,9 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { createElement } from "react";
 import { Document, Page, Text, renderToBuffer } from "@react-pdf/renderer";
-import { DEFAULT_FORMAT } from "@shared/format";
-import type { DocumentFormat, FontId, Profile, TailoredResume } from "@shared/types";
+import { DEFAULT_FORMAT_V2 } from "@shared/format-v2";
+import type { BodyFontId } from "@shared/format-v2";
+import type { FontId, Profile, TailoredResume } from "@shared/types";
 import { describe, expect, it } from "vitest";
 import { FONT_FACES, registerDocumentFonts } from "../src/client/document/fonts";
 import { renderResumeToBuffer } from "../src/client/document/renderResume";
@@ -17,20 +18,16 @@ const ALL_FONT_IDS: FontId[] = [
   "carlito",
 ];
 
-function fixtureDocument(family: FontId) {
+function fixtureDocument(family: FontId, text: string) {
   return createElement(
     Document,
     null,
-    createElement(
-      Page,
-      null,
-      createElement(Text, { style: { fontFamily: family } }, "The quick brown fox"),
-    ),
+    createElement(Page, null, createElement(Text, { style: { fontFamily: family } }, text)),
   );
 }
 
-async function renderFixture(family: FontId): Promise<Buffer> {
-  return renderToBuffer(fixtureDocument(family));
+async function renderFixture(family: FontId, text = "The quick brown fox"): Promise<Buffer> {
+  return renderToBuffer(fixtureDocument(family, text));
 }
 
 describe("registerDocumentFonts", () => {
@@ -71,13 +68,19 @@ describe("registerDocumentFonts", () => {
   });
 });
 
-// Escaped-bug regression (E9-R1): ibm-plex-mono's vendored @fontsource .woff
-// crashes fontkit ("Offset is outside the bounds of the DataView" reading the
-// space glyph) as soon as multi-word text forces word-wrap layout — every
-// other face was fine, so the bug shipped unnoticed. Parameterized over the
-// live FONT_FACES registry (not a hand-maintained id list) so a newly added
-// face is covered automatically, and applied at both the body and heading
-// typography roles since sections.tsx wires each role to a distinct style.
+// Escaped-bug regression (E9-R1 + re-verified E9-F0d1): ibm-plex-mono's
+// vendored @fontsource .woff crashed fontkit ("Offset is outside the bounds
+// of the DataView") as soon as multi-word text forced word-wrap layout —
+// every other face was fine, so the bug shipped unnoticed. E9-R1 swapped the
+// vendored asset to .woff2, which genuinely fixes THAT trigger. E9-F0d1
+// (this ticket) tried removing legacyAdapt.ts's ibm-plex-mono exclusion per
+// its brief and found a SECOND, narrower crash the original smoke fixture
+// never contained: @fontsource/ibm-plex-mono 5.2.7's .woff2 (latest
+// published — no newer version exists) crashes fontkit on a bare colon
+// (":"), which the ORIGINAL .woff does NOT (the two vendored assets have
+// complementary defects — neither is safe alone). The fixture below is
+// strengthened with a colon (this ticket) so this class of gap can't recur
+// silently; the exclusion in legacyAdapt.ts stays, verified below.
 
 function fontSmokeProfileFixture(): Profile {
   return {
@@ -89,10 +92,12 @@ function fontSmokeProfileFixture(): Profile {
   };
 }
 
+// "Skills:" (colon) is the E9-F0d1 escaped-gap capture — ordinary resume
+// content (labels, ratios, dates) routinely carries a colon.
 function fontSmokeResumeFixture(): TailoredResume {
   return {
     signals: { roleLevel: "senior", weights: [], hardRequirements: [] },
-    summary: "a proven track record of shipping backend systems at scale",
+    summary: "Skills: a proven track record of shipping backend systems at scale",
     sections: [
       {
         section: "experience",
@@ -109,31 +114,39 @@ function fontSmokeResumeFixture(): TailoredResume {
   };
 }
 
-function formatWithRole(role: "body" | "heading", family: FontId): DocumentFormat {
-  return {
-    ...DEFAULT_FORMAT,
-    typography:
-      role === "body"
-        ? { ...DEFAULT_FORMAT.typography, body: { ...DEFAULT_FORMAT.typography.body, family } }
-        : {
-            ...DEFAULT_FORMAT.typography,
-            heading: { ...DEFAULT_FORMAT.typography.heading, family },
-          },
-  };
-}
-
 describe.each(Object.keys(FONT_FACES) as FontId[])("render smoke: %s", (fontId) => {
-  it.each([
-    "body",
-    "heading",
-  ] as const)("renders multi-word text with the face at the %s role", async (role) => {
+  it("renders multi-word, colon-bearing text through the fallback-safe engine path without crashing", async () => {
     const buffer = await renderResumeToBuffer({
       resume: fontSmokeResumeFixture(),
       profile: fontSmokeProfileFixture(),
-      format: formatWithRole(role, fontId),
+      format: {
+        ...DEFAULT_FORMAT_V2,
+        fonts: { ...DEFAULT_FORMAT_V2.fonts, body: fontId as BodyFontId },
+      },
     });
 
     expect(buffer.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(buffer.length).toBeGreaterThan(0);
+  });
+});
+
+describe("ibm-plex-mono known limitation (§ document-fonts.test.ts escaped-gap capture)", () => {
+  it("the REGISTERED FACE ITSELF still crashes fontkit on a bare colon (tracked, not fixed here)", async () => {
+    registerDocumentFonts();
+    await expect(renderFixture("ibm-plex-mono", ":")).rejects.toThrow(
+      /Offset is outside the bounds of the DataView/,
+    );
+  });
+
+  it("but the ENGINE PATH never hits it: legacyAdapt.ts's exclusion routes fonts.body:'ibm-plex-mono' to the default face", async () => {
+    const buffer = await renderResumeToBuffer({
+      resume: fontSmokeResumeFixture(),
+      profile: fontSmokeProfileFixture(),
+      format: {
+        ...DEFAULT_FORMAT_V2,
+        fonts: { ...DEFAULT_FORMAT_V2.fonts, body: "ibm-plex-mono" },
+      },
+    });
+    expect(buffer.subarray(0, 5).toString("latin1")).toBe("%PDF-");
   });
 });

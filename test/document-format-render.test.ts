@@ -4,9 +4,10 @@
 // no fixture below ever needs leadRationale/cut asserted absent again;
 // test/document-render.test.ts already owns that invariant and stays green.
 import { describe, expect, it } from "vitest";
-import type { DocumentFormat, Profile, TailoredResume } from "@shared/types";
-import { DEFAULT_FORMAT } from "@shared/format";
-import { effectiveAtsGrade, TEMPLATES } from "../src/client/document/registry";
+import type { Profile, TailoredResume } from "@shared/types";
+import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
+import { effectiveAtsGrade, PRESET_MANIFESTS } from "../src/client/document/registry";
+import { PRESETS } from "../src/client/document/presets";
 import { renderResumeToBuffer } from "../src/client/document/renderResume";
 
 // A 1x1 transparent PNG, small enough to inline — @react-pdf/image resolves
@@ -99,21 +100,21 @@ async function hasImage(buffer: Buffer): Promise<boolean> {
   return opList.fnArray.includes(OPS.paintImageXObject);
 }
 
-describe("renderer obeys DocumentFormat (§28.3)", () => {
-  it("CONTRAST: a non-default format (font/color/page margin) produces different PDF bytes than DEFAULT_FORMAT", async () => {
+describe("renderer obeys DocumentFormatV2 (§28.3/§31)", () => {
+  it("CONTRAST: a non-default format (font/color/page margin) produces different PDF bytes than DEFAULT_FORMAT_V2", async () => {
     const resume = resumeFixture();
     const profile = profileFixture();
 
     const defaultBuffer = await renderResumeToBuffer({ resume, profile });
 
-    const customFormat: DocumentFormat = {
-      ...DEFAULT_FORMAT,
-      typography: {
-        ...DEFAULT_FORMAT.typography,
-        body: { ...DEFAULT_FORMAT.typography.body, family: "tinos" },
+    const customFormat: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      fonts: { ...DEFAULT_FORMAT_V2.fonts, body: "tinos" },
+      colors: { ...DEFAULT_FORMAT_V2.colors, accent: "#8b0000", text: "#222222" },
+      spacing: {
+        ...DEFAULT_FORMAT_V2.spacing,
+        marginsMm: { ...DEFAULT_FORMAT_V2.spacing.marginsMm, x: 25 },
       },
-      colors: { primary: "#8b0000", text: "#222222" },
-      page: { ...DEFAULT_FORMAT.page, marginX: 90 },
     };
     const customBuffer = await renderResumeToBuffer({ resume, profile, format: customFormat });
 
@@ -128,13 +129,17 @@ describe("renderer obeys DocumentFormat (§28.3)", () => {
     const resume = resumeFixture();
     const profile = profileFixture({ photoUrl: TINY_PNG_DATA_URL });
 
-    const hiddenBuffer = await renderResumeToBuffer({ resume, profile, format: DEFAULT_FORMAT });
-    expect(DEFAULT_FORMAT.photo.hidden).toBe(true);
+    const hiddenBuffer = await renderResumeToBuffer({
+      resume,
+      profile,
+      format: DEFAULT_FORMAT_V2,
+    });
+    expect(DEFAULT_FORMAT_V2.photo.hidden).toBe(true);
     expect(await hasImage(hiddenBuffer)).toBe(false);
 
-    const shownFormat: DocumentFormat = {
-      ...DEFAULT_FORMAT,
-      photo: { ...DEFAULT_FORMAT.photo, hidden: false },
+    const shownFormat: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      photo: { ...DEFAULT_FORMAT_V2.photo, hidden: false },
     };
     const shownBuffer = await renderResumeToBuffer({ resume, profile, format: shownFormat });
     expect(await hasImage(shownBuffer)).toBe(true);
@@ -145,44 +150,49 @@ describe("renderer obeys DocumentFormat (§28.3)", () => {
   it("a profile with no photoUrl never renders an image even when photo.hidden is false", async () => {
     const resume = resumeFixture();
     const profile = profileFixture(); // no photoUrl
-    const shownFormat: DocumentFormat = {
-      ...DEFAULT_FORMAT,
-      photo: { ...DEFAULT_FORMAT.photo, hidden: false },
+    const shownFormat: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      photo: { ...DEFAULT_FORMAT_V2.photo, hidden: false },
     };
     const buffer = await renderResumeToBuffer({ resume, profile, format: shownFormat });
     expect(await hasImage(buffer)).toBe(false);
   });
 
-  it("per-section columns: a section given columns:2 lays its items across 2 x-offsets, all items present", async () => {
+  // §31/E9-F0d1: v1's per-section `columns` axis existed for EVERY section;
+  // v2 only gives a grid axis to sectionDisplay.skillsLanguages/interests
+  // (§31.2), and that axis isn't wired into the engine's composition yet
+  // (F4's job, per document.tsx's "AXES NOT YET WIRED" list) — so the
+  // v1-era geometry claim (distinct x-offsets) has no v2 home THIS ticket.
+  // Honestly reparameterized as an unhandled-axis smoke: the axis is
+  // accepted, never crashes, and never cuts — it just doesn't move pixels
+  // yet, same posture as every other not-yet-wired §31.2 axis.
+  it("sectionDisplay.skillsLanguages grid layout: accepted, never crashes, never cuts (not yet wired to geometry — F4)", async () => {
     const resume = skillsFixture();
     const profile = profileFixture();
 
-    const columnsFormat: DocumentFormat = {
-      ...DEFAULT_FORMAT,
-      sections: { skill: { columns: 2 } },
+    const gridFormat: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      sectionDisplay: {
+        ...DEFAULT_FORMAT_V2.sectionDisplay,
+        skillsLanguages: {
+          ...DEFAULT_FORMAT_V2.sectionDisplay.skillsLanguages,
+          layout: "grid",
+          gridColumns: 2,
+        },
+      },
     };
-    const buffer = await renderResumeToBuffer({ resume, profile, format: columnsFormat });
+    const buffer = await renderResumeToBuffer({ resume, profile, format: gridFormat });
 
     const text = await extractText(buffer);
     for (const marker of ["SKILL_ONE", "SKILL_TWO", "SKILL_THREE", "SKILL_FOUR"]) {
       expect(text).toContain(marker); // §28.4: the renderer never cuts
     }
-
-    const items = await extractTextItems(buffer);
-    const xOffsets = new Set(
-      items
-        .filter((item) => item.str.startsWith("SKILL_"))
-        .map((item) => Math.round(item.transform[4])),
-    );
-    // a single vertical column would put every item at the same x; 2 columns
-    // must place items at (at least) 2 distinct x-offsets.
-    expect(xOffsets.size).toBeGreaterThanOrEqual(2);
   });
 
-  it("without a columns override, a section's items share a single x-offset", async () => {
+  it("without a grid override, a section's items share a single x-offset", async () => {
     const resume = skillsFixture();
     const profile = profileFixture();
-    const buffer = await renderResumeToBuffer({ resume, profile, format: DEFAULT_FORMAT });
+    const buffer = await renderResumeToBuffer({ resume, profile, format: DEFAULT_FORMAT_V2 });
 
     const items = await extractTextItems(buffer);
     const xOffsets = new Set(
@@ -194,20 +204,22 @@ describe("renderer obeys DocumentFormat (§28.3)", () => {
   });
 });
 
-describe("effectiveAtsGrade (§28.2)", () => {
-  it("strict template + hidden photo => 'strict'", () => {
-    expect(effectiveAtsGrade(TEMPLATES.strict, DEFAULT_FORMAT)).toBe("strict");
+describe("effectiveAtsGrade (§28.2/§31.5)", () => {
+  it("strict preset + hidden photo => 'strict'", () => {
+    expect(effectiveAtsGrade(PRESET_MANIFESTS.strict, DEFAULT_FORMAT_V2)).toBe("strict");
   });
 
   it("sidebar layout => 'good' regardless of photo", () => {
-    expect(effectiveAtsGrade(TEMPLATES["sidebar-left"], DEFAULT_FORMAT)).toBe("good");
+    expect(effectiveAtsGrade(PRESET_MANIFESTS["sidebar-left"], PRESETS["sidebar-left"])).toBe(
+      "good",
+    );
   });
 
-  it("strict template + photo shown => 'good'", () => {
-    const shownFormat: DocumentFormat = {
-      ...DEFAULT_FORMAT,
-      photo: { ...DEFAULT_FORMAT.photo, hidden: false },
+  it("strict preset + photo shown => 'good'", () => {
+    const shownFormat: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      photo: { ...DEFAULT_FORMAT_V2.photo, hidden: false },
     };
-    expect(effectiveAtsGrade(TEMPLATES.strict, shownFormat)).toBe("good");
+    expect(effectiveAtsGrade(PRESET_MANIFESTS.strict, shownFormat)).toBe("good");
   });
 });

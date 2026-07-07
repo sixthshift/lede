@@ -1,10 +1,11 @@
 // deriveContentBudget — spec.md §28.5. Pure, keyless: proves the budget
 // heuristic actually responds to its inputs (anti-gaming — a derivation that
 // returns "" or a constant string must fail this suite).
+// §31/E9-F0d1: format moved v1 -> DocumentFormatV2 (reparameterized).
 import { describe, it, expect } from "vitest";
 
-import type { DocumentFormat } from "@shared/types";
-import { DEFAULT_FORMAT } from "@shared/format";
+import type { DocumentFormatV2 } from "@shared/format-v2";
+import { DEFAULT_FORMAT_V2 } from "@shared/format-v2";
 import { deriveContentBudget } from "../src/server/tailor/budget";
 
 function counts(budget: string): { bullets: number; words: number } {
@@ -18,15 +19,15 @@ describe("deriveContentBudget — contrast (anti-gaming)", () => {
     const budget = deriveContentBudget({
       paper: "letter",
       targetPages: 1,
-      format: DEFAULT_FORMAT,
+      format: DEFAULT_FORMAT_V2,
     });
     expect(budget.length).toBeGreaterThan(0);
     expect(() => counts(budget)).not.toThrow();
   });
 
   it("targetPages=1 yields a strictly smaller budget than targetPages=2, same paper/format", () => {
-    const one = deriveContentBudget({ paper: "letter", targetPages: 1, format: DEFAULT_FORMAT });
-    const two = deriveContentBudget({ paper: "letter", targetPages: 2, format: DEFAULT_FORMAT });
+    const one = deriveContentBudget({ paper: "letter", targetPages: 1, format: DEFAULT_FORMAT_V2 });
+    const two = deriveContentBudget({ paper: "letter", targetPages: 2, format: DEFAULT_FORMAT_V2 });
 
     const oneCounts = counts(one);
     const twoCounts = counts(two);
@@ -40,24 +41,23 @@ describe("deriveContentBudget — contrast (anti-gaming)", () => {
 
   it("a4 (larger usable area than letter, same margins) shifts the budget up, not down", () => {
     const letter = counts(
-      deriveContentBudget({ paper: "letter", targetPages: 1, format: DEFAULT_FORMAT }),
+      deriveContentBudget({ paper: "letter", targetPages: 1, format: DEFAULT_FORMAT_V2 }),
     );
-    const a4 = counts(deriveContentBudget({ paper: "a4", targetPages: 1, format: DEFAULT_FORMAT }));
+    const a4 = counts(
+      deriveContentBudget({ paper: "a4", targetPages: 1, format: DEFAULT_FORMAT_V2 }),
+    );
 
     expect(a4.words).toBeGreaterThanOrEqual(letter.words);
   });
 
   it("tighter typography (smaller body size) fits more content, shifting the budget up", () => {
     const roomy = counts(
-      deriveContentBudget({ paper: "letter", targetPages: 1, format: DEFAULT_FORMAT }),
+      deriveContentBudget({ paper: "letter", targetPages: 1, format: DEFAULT_FORMAT_V2 }),
     );
 
-    const tighter: DocumentFormat = {
-      ...DEFAULT_FORMAT,
-      typography: {
-        ...DEFAULT_FORMAT.typography,
-        body: { ...DEFAULT_FORMAT.typography.body, size: 9 },
-      },
+    const tighter: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      typeScale: { ...DEFAULT_FORMAT_V2.typeScale, bodySize: 9 },
     };
     const tight = counts(deriveContentBudget({ paper: "letter", targetPages: 1, format: tighter }));
 
@@ -65,8 +65,8 @@ describe("deriveContentBudget — contrast (anti-gaming)", () => {
   });
 
   it("does not return a constant/empty string across differing inputs", () => {
-    const a = deriveContentBudget({ paper: "letter", targetPages: 1, format: DEFAULT_FORMAT });
-    const b = deriveContentBudget({ paper: "letter", targetPages: 2, format: DEFAULT_FORMAT });
+    const a = deriveContentBudget({ paper: "letter", targetPages: 1, format: DEFAULT_FORMAT_V2 });
+    const b = deriveContentBudget({ paper: "letter", targetPages: 2, format: DEFAULT_FORMAT_V2 });
     expect(a).not.toBe("");
     expect(a).not.toBe(b);
   });

@@ -15,10 +15,11 @@
 
 import { pdf } from "@react-pdf/renderer";
 import { useEffect, useState } from "react";
-import { DEFAULT_FORMAT } from "@shared/format";
-import type { DocumentFormat, Paper, Profile, TailoredResume } from "@shared/types";
+import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
+import type { Paper, Profile, TailoredResume } from "@shared/types";
 import { extractPdfText } from "../document/extractText";
 import { renderResumeDocument } from "../document/renderResume";
+import type { EngineDensity } from "../document/engine";
 
 // FileReader, not blob.arrayBuffer(): a real browser's Blob implements
 // arrayBuffer() directly, but jsdom's Blob shim (this component's other test
@@ -38,17 +39,18 @@ type AtsState = { status: "loading" } | { status: "error" } | { status: "ready";
 function useAtsExtraction(args: {
   resume: TailoredResume;
   profile: Profile;
-  format: DocumentFormat;
+  format: DocumentFormatV2;
   paper: Paper;
+  density?: EngineDensity;
 }): AtsState {
-  const { resume, profile, format, paper } = args;
+  const { resume, profile, format, paper, density } = args;
   const [state, setState] = useState<AtsState>({ status: "loading" });
 
   useEffect(() => {
     setState({ status: "loading" });
     let cancelled = false;
 
-    pdf(renderResumeDocument({ resume, profile, paper, templateId: format.templateId, format }))
+    pdf(renderResumeDocument({ resume, profile, paper, format, density }))
       .toBlob()
       .then(blobToArrayBuffer)
       .then((buffer) => extractPdfText(new Uint8Array(buffer)))
@@ -62,7 +64,7 @@ function useAtsExtraction(args: {
     return () => {
       cancelled = true;
     };
-  }, [resume, profile, format, paper]);
+  }, [resume, profile, format, paper, density]);
 
   return state;
 }
@@ -70,15 +72,17 @@ function useAtsExtraction(args: {
 export function AtsView({
   resume,
   profile,
-  format = DEFAULT_FORMAT,
+  format = DEFAULT_FORMAT_V2,
   paper = "letter",
+  density,
 }: {
   resume: TailoredResume;
   profile: Profile;
-  format?: DocumentFormat;
+  format?: DocumentFormatV2;
   paper?: Paper;
+  density?: EngineDensity;
 }) {
-  const state = useAtsExtraction({ resume, profile, format, paper });
+  const state = useAtsExtraction({ resume, profile, format, paper, density });
 
   if (state.status === "loading") {
     return <p className="ats-view__loading">Extracting…</p>;

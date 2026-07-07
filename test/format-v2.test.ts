@@ -2,6 +2,8 @@
 // Pure shared type/zod/migration; no rendering, no DB. See
 // src/shared/format-v2.ts. Additive-only ticket: this file only tests the new
 // module — it never touches src/shared/format.test.ts's existing coverage.
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, it, expect } from "vitest";
 import {
   formatV2Schema,
@@ -130,7 +132,7 @@ const EXPECTED_BASE: Omit<DocumentFormatV2, "layout" | "header" | "colors"> & {
   },
 };
 
-// src/client/document/templates/sidebar.tsx SIDEBAR_SECTIONS
+// The retired v1 sidebar composition's own SIDEBAR_SECTIONS (deleted E9-F0d1)
 const SIDEBAR_SECTIONS = ["skill", "language", "interest", "certification"];
 const ALL_SECTIONS = [
   "experience",
@@ -228,8 +230,77 @@ describe("migrateFormat — idempotence (§31.1)", () => {
   });
 });
 
+// [v3-044] escaped-gap repair (E9-F0d1): v1's per-section `{columns: N>1}`
+// had a seam for ANY section; v2 only gives a grid axis to two display
+// groups (skillsLanguages, interests, §31.2) — migrateFormat maps
+// sections.skill/language.columns onto sectionDisplay.skillsLanguages
+// {layout:'grid', gridColumns} and sections.interest.columns onto
+// sectionDisplay.interests the same way. Consumes the pre-E9 fixtures
+// VERBATIM (test/fixtures/pre-e9-formats/, forbidden to touch — read-only).
+describe("migrateFormat — [v3-044] section-columns repair, over the pre-E9 fixtures verbatim", () => {
+  const fixturesDir = path.join(process.cwd(), "test/fixtures/pre-e9-formats");
+
+  it("non-empty-sections.json (sections.skill.columns:2) migrates to sectionDisplay.skillsLanguages {layout:'grid', gridColumns:2}", () => {
+    const raw = JSON.parse(
+      readFileSync(path.join(fixturesDir, "non-empty-sections.json"), "utf8"),
+    ) as DocumentFormat;
+    expect(raw.sections).toEqual({ skill: { columns: 2 } }); // fixture precondition, unchanged
+
+    const migrated = migrateFormat(raw);
+    expect(migrated.sectionDisplay.skillsLanguages.layout).toBe("grid");
+    expect(migrated.sectionDisplay.skillsLanguages.gridColumns).toBe(2);
+    // interests carries no v1 columns in this fixture — untouched baseline.
+    expect(migrated.sectionDisplay.interests).toEqual({ layout: "rows", gridColumns: 1 });
+  });
+
+  it("non-default-photo.json (sections: {}) migrates with the baseline rows/1 sectionDisplay — no phantom grid", () => {
+    const raw = JSON.parse(
+      readFileSync(path.join(fixturesDir, "non-default-photo.json"), "utf8"),
+    ) as DocumentFormat;
+    expect(raw.sections).toEqual({});
+
+    const migrated = migrateFormat(raw);
+    expect(migrated.sectionDisplay.skillsLanguages.layout).toBe("rows");
+    expect(migrated.sectionDisplay.skillsLanguages.gridColumns).toBe(1);
+    expect(migrated.sectionDisplay.interests).toEqual({ layout: "rows", gridColumns: 1 });
+  });
+
+  it("non-default-photo.json (photo shown/square/non-default size) preserves the photo axes across migration", () => {
+    const raw = JSON.parse(
+      readFileSync(path.join(fixturesDir, "non-default-photo.json"), "utf8"),
+    ) as DocumentFormat;
+    expect(raw.photo).toEqual({ hidden: false, size: 96, shape: "square" });
+
+    const migrated = migrateFormat(raw);
+    expect(migrated.photo.hidden).toBe(false);
+    expect(migrated.photo.shape).toBe("square");
+    expect(migrated.photo.size).toBe(96);
+    expect(migrated.photo.size).not.toBe(64); // distinct from the v1 default, proves it's not silently reset
+  });
+
+  it("a v1 columns:1 (no-op) never fabricates a grid layout — only columns>1 triggers the repair", () => {
+    const withNoopColumns: DocumentFormat = {
+      ...DEFAULT_FORMAT,
+      sections: { skill: { columns: 1 }, interest: { columns: 1 } },
+    };
+    const migrated = migrateFormat(withNoopColumns);
+    expect(migrated.sectionDisplay.skillsLanguages.layout).toBe("rows");
+    expect(migrated.sectionDisplay.interests.layout).toBe("rows");
+  });
+
+  it("sections.interest.columns:3 migrates to sectionDisplay.interests {layout:'grid', gridColumns:3}, independent of skillsLanguages", () => {
+    const withInterestColumns: DocumentFormat = {
+      ...DEFAULT_FORMAT,
+      sections: { interest: { columns: 3 } },
+    };
+    const migrated = migrateFormat(withInterestColumns);
+    expect(migrated.sectionDisplay.interests).toEqual({ layout: "grid", gridColumns: 3 });
+    expect(migrated.sectionDisplay.skillsLanguages.layout).toBe("rows");
+  });
+});
+
 describe("migration anchors — named literals traceable to template source", () => {
-  it("sidebar-left/right sidebarWidthPct equals templates/sidebar.tsx's width constant (32)", () => {
+  it("sidebar-left/right sidebarWidthPct equals the retired v1 sidebar composition's width constant (32)", () => {
     expect(migrateFormat(v1Fixture("sidebar-left")).layout.sidebarWidthPct).toBe(32);
     expect(migrateFormat(v1Fixture("sidebar-right")).layout.sidebarWidthPct).toBe(32);
   });

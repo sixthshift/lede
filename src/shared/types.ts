@@ -1,6 +1,12 @@
 // Shared domain types — spec.md §4.1 (Entry), §4.2 (Profile/Layout), §5 (Output contract), §6.1 (ProviderId).
 // Imported by both server and client via `@shared/types`.
 
+// DocumentFormatV2 (spec.md §31.2, epic E9) lives in format-v2.ts; imported
+// here (and re-exported at the bottom of this file) so LockedFormat/Application
+// below — and every consumer importing document-format types from this one
+// place — can reference it without a second import.
+import type { DocumentFormatV2 } from "@shared/format-v2";
+
 export type Section =
   | "experience"
   | "project"
@@ -145,9 +151,11 @@ export type DocumentFormat = {
 
 // ── frozen at lock time alongside the resume snapshot (§28.3) — mirrors the
 // DB shape (server/db/schema.ts's LockedFormat); the fit ladder is a later
-// epic, so resolvedDensity is 'as-set' = 'comfortable' until then ──
+// epic, so resolvedDensity is 'as-set' = 'comfortable' until then. §31/E9-F0d1:
+// the persisted format moved from v1 `DocumentFormat` to `DocumentFormatV2` —
+// the ONE engine's input (src/shared/format-v2.ts) ──
 export type LockedFormat = {
-  format: DocumentFormat;
+  format: DocumentFormatV2;
   resolvedDensity: "comfortable" | "standard" | "compact";
   paper: Paper;
 };
@@ -160,7 +168,7 @@ export type Application = {
   jobDescription: string;
   context?: string; // guides emphasis only — never a fact source
   targetPages: 1 | 2; // page budget for this role, default 1 (§28.1)
-  format: DocumentFormat | null; // per-app override of settings.defaultFormat (§28.3)
+  format: DocumentFormatV2 | null; // per-app override of settings.defaultFormat (§28.3, v2 since E9-F0d1)
   current: TailoredResume | null;
   locked: TailoredResume | null;
   lockedFormat: LockedFormat | null; // frozen at lock time (§28.3)

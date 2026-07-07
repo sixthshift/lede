@@ -1,6 +1,9 @@
 // E7-B1c — persist format: application.format, settings.defaultFormat,
 // application.lockedFormat (frozen at lock time), profile.photoUrl. Mirrors
 // test/api.applications.test.ts's / test/api.profile-settings.test.ts's idiom.
+// §31/E9-F0d1: reparameterized onto DocumentFormatV2 — application.format /
+// settings.defaultFormat / lockedFormat.format all moved v1 -> v2 at the API
+// boundary this ticket.
 import { describe, it, expect, afterEach } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -11,8 +14,9 @@ import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/server/index";
 import { initDb } from "../src/server/db";
 import { applications } from "../src/server/db/schema";
-import { DEFAULT_FORMAT } from "../src/shared/format";
-import type { DocumentFormat, TailoredResume } from "../src/shared/types";
+import { DEFAULT_FORMAT_V2 } from "../src/shared/format-v2";
+import type { DocumentFormatV2 } from "../src/shared/format-v2";
+import type { TailoredResume } from "../src/shared/types";
 
 const tmpDirs: string[] = [];
 
@@ -32,18 +36,21 @@ afterEach(() => {
   }
 });
 
-// A non-default DocumentFormat, distinct from DEFAULT_FORMAT in every field —
-// proves the round-trip isn't accidentally reading back the seeded default.
-const CUSTOM_FORMAT: DocumentFormat = {
-  templateId: "editorial",
-  typography: {
-    body: { family: "ibm-plex-serif", size: 11, lineHeight: 1.5 },
-    heading: { family: "tinos", weight: 700 },
+// A non-default DocumentFormatV2, distinct from DEFAULT_FORMAT_V2 in a field
+// per top-level group — proves the round-trip isn't accidentally reading back
+// the seeded default.
+const CUSTOM_FORMAT: DocumentFormatV2 = {
+  ...DEFAULT_FORMAT_V2,
+  presetId: "editorial",
+  fonts: { ...DEFAULT_FORMAT_V2.fonts, body: "ibm-plex-serif" },
+  typeScale: { ...DEFAULT_FORMAT_V2.typeScale, bodySize: 11 },
+  spacing: {
+    ...DEFAULT_FORMAT_V2.spacing,
+    lineHeight: 1.3,
+    marginsMm: { x: 20, y: 18 },
   },
-  colors: { primary: "#2a2a4e", text: "#222222" },
-  page: { marginX: 48, marginY: 40, sectionGap: 12 },
-  photo: { hidden: false, size: 96, shape: "rounded" },
-  sections: { skill: { columns: 2 } },
+  colors: { ...DEFAULT_FORMAT_V2.colors, accent: "#2a2a4e", text: "#222222" },
+  photo: { ...DEFAULT_FORMAT_V2.photo, hidden: false, size: 96, shape: "rounded" },
 };
 
 const fakeResume: TailoredResume = {
@@ -54,7 +61,7 @@ const fakeResume: TailoredResume = {
 };
 
 describe("application.format round-trips and persists across a restart", () => {
-  it("PUT a non-default DocumentFormat -> GET returns it byte-equal, incl. after reopening the same .sqlite", async () => {
+  it("PUT a non-default DocumentFormatV2 -> GET returns it byte-equal, incl. after reopening the same .sqlite", async () => {
     const dataDir = freshDataDir();
     let app = appOn(dataDir);
 
@@ -91,12 +98,16 @@ describe("application.format round-trips and persists across a restart", () => {
 });
 
 describe("settings.defaultFormat round-trips", () => {
-  it("GET returns the seeded DEFAULT_FORMAT; PUT updates it", async () => {
+  it("GET returns the seeded default migrated to v2 (DEFAULT_FORMAT_V2); PUT updates it", async () => {
     const app = appOn(freshDataDir());
 
+    // The DB's SQL-level column DEFAULT is still frozen v1 JSON (an
+    // already-shipped migration, out of this ticket's file contract) —
+    // GET gates it through resolveStoredFormat (routes/settings.ts), so it
+    // reads back as DEFAULT_FORMAT_V2, never the raw v1 shape.
     const getRes = await app.inject({ method: "GET", url: "/api/settings" });
     expect(getRes.statusCode).toBe(200);
-    expect(getRes.json().defaultFormat).toEqual(DEFAULT_FORMAT);
+    expect(getRes.json().defaultFormat).toEqual(DEFAULT_FORMAT_V2);
 
     const putRes = await app.inject({
       method: "PUT",
@@ -115,7 +126,7 @@ describe("settings.defaultFormat round-trips", () => {
     const res = await app.inject({
       method: "PUT",
       url: "/api/settings",
-      payload: { defaultFormat: { ...CUSTOM_FORMAT, typography: undefined } },
+      payload: { defaultFormat: { ...CUSTOM_FORMAT, typeScale: undefined } },
     });
     expect(res.statusCode).toBe(400);
   });
@@ -150,7 +161,7 @@ describe("lockedFormat FREEZE CONTRAST — lock snapshots settings.defaultFormat
     expect(lockRes.statusCode).toBe(200);
     const lockedFormat = lockRes.json().lockedFormat;
     expect(lockedFormat).toEqual({
-      format: DEFAULT_FORMAT,
+      format: DEFAULT_FORMAT_V2,
       resolvedDensity: "comfortable",
       paper: "letter",
     });

@@ -2,8 +2,8 @@
 // immediately via PUT /api/settings; the BYOK key has its own write-only
 // sub-form (ApiKeyForm) since it never round-trips a value.
 import { PROVIDERS } from "@shared/providers";
-import { DEFAULT_FORMAT } from "@shared/format";
-import type { DocumentFormat, ProviderId } from "@shared/types";
+import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
+import type { ProviderId } from "@shared/types";
 
 import { useSettings, useUpdateSettings } from "../hooks/queries";
 import { ApiKeyForm } from "./ApiKeyForm";
@@ -39,7 +39,7 @@ export function SettingsView() {
     updateSettings.mutate({ model: nextModel });
   }
 
-  function handleDefaultFormatChange(next: DocumentFormat) {
+  function handleDefaultFormatChange(next: DocumentFormatV2) {
     updateSettings.mutate({ defaultFormat: next });
   }
 
@@ -91,7 +91,7 @@ export function SettingsView() {
         </CardHeader>
         <CardContent>
           <DesignPanel
-            format={defaultFormat ?? DEFAULT_FORMAT}
+            format={defaultFormat ?? DEFAULT_FORMAT_V2}
             onChange={handleDefaultFormatChange}
           />
         </CardContent>

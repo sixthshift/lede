@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { APICallError, NoObjectGeneratedError } from "ai";
 
 import { applicationCreate, applicationUpdate, documentFormatZ } from "@shared/schema";
+import { resolveStoredFormat } from "@shared/format-v2";
 import type { Entry, ProviderId, Section } from "@shared/types";
 import type { Db } from "../db";
 import { applications, entries, profile, settings, secrets } from "../db/schema";
@@ -216,7 +217,11 @@ export function applicationsRoutes(
 
       // §28.5 — derive a content budget from paper/targetPages/effective
       // format and ride it on the user message, same transport as context.
-      const effectiveFormat = existing.format ?? settingsRow.defaultFormat;
+      // resolveStoredFormat gates settingsRow.defaultFormat: a fresh DB's
+      // column DEFAULT is still frozen v1 JSON (see format-v2.ts's comment on
+      // resolveStoredFormat) — existing.format, when set, always came through
+      // the v2-only PUT validator already, so it needs no gate.
+      const effectiveFormat = existing.format ?? resolveStoredFormat(settingsRow.defaultFormat);
       const budget = deriveContentBudget({
         paper: settingsRow.paper,
         targetPages: existing.targetPages,
@@ -279,7 +284,7 @@ export function applicationsRoutes(
 
     const settingsRow = db.select().from(settings).where(eq(settings.id, 1)).get()!;
     const lockedFormat = structuredClone({
-      format: existing.format ?? settingsRow.defaultFormat,
+      format: existing.format ?? resolveStoredFormat(settingsRow.defaultFormat),
       resolvedDensity: "comfortable" as const,
       paper: settingsRow.paper,
     });

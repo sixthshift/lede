@@ -1,29 +1,50 @@
-// Bounded per-document design controls — spec.md §28.3. Every control is a
-// select/stepper/palette-swatch, never free-form text, so a saved
-// DocumentFormat can never drift outside documentFormatZ's ranges (@shared/schema).
-// Structure here stops at per-section column count — drag-drop/reorder/
-// visibility stays LayoutEditor's job, deferred (§28.3). Bound to either
-// application.format (ApplicationDetail) or settings.defaultFormat
-// (SettingsView) by the caller; `readOnly` reflects a locked application's
-// frozen lockedFormat, where editing the look is out of scope (it froze
-// what was sent).
-
+// Bounded per-document design controls — spec.md §28.3/§31.2. Every control
+// is a select/stepper/palette-swatch, never free-form text, so a saved
+// DocumentFormatV2 can never drift outside formatV2Schema's ranges
+// (@shared/schema). Bound to either application.format (ApplicationDetail) or
+// settings.defaultFormat (SettingsView) by the caller; `readOnly` reflects a
+// locked application's frozen lockedFormat, where editing the look is out of
+// scope (it froze what was sent).
+//
+// §31/E9-F0d1 field map (v1 -> v2, this ticket's cutover): body font ->
+// fonts.body · body size -> typeScale.bodySize · line height ->
+// spacing.lineHeight · heading weight -> header.nameWeight (v2 collapses the
+// old 4-value {400,500,600,700} weight to a 2-value normal/bold toggle — no
+// other weight axis exists on the engine's one composition) · primary/text
+// color -> colors.accent/colors.text · margins -> spacing.marginsMm (v2's
+// NATIVE unit is mm, not pt — the stepper UI is kept as-is, just relabeled
+// and re-bounded to mm directly; no pt<->mm conversion happens in this
+// component) · section gap -> spacing.elementSpacing (0-4 discrete scale) ·
+// per-section columns (previously a control for EVERY section) -> narrowed
+// to the two sections v2 actually gives a grid axis (§31.2's per-section
+// display group): skillsLanguages.gridColumns and interests.gridColumns —
+// every other section's columns had no v2 destination (format-v2.ts's
+// migration repair comment explains the same drop). The "Heading font"
+// control is DROPPED: v2 has no independent heading-family axis (the engine
+// always renders headings in the body face; a separate NAME font is
+// fonts.name, unwired until a later ticket lands its render seam) — keeping
+// a control with no observable effect would be a phantom knob.
 import type { ReactNode } from "react";
-import type { DocumentFormat, FontId, Section } from "@shared/types";
-import { SECTIONS, SECTION_VALUES } from "@shared/sections";
+import type { BodyFontId } from "@shared/format-v2";
+import { SECTIONS } from "@shared/sections";
+import type { DocumentFormatV2 } from "@shared/format-v2";
 import { FONT_FACES } from "../document/fonts";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
-const FONT_IDS = Object.keys(FONT_FACES) as FontId[];
-const HEADING_WEIGHTS = [400, 500, 600, 700] as const;
-const COLUMN_OPTIONS = [1, 2, 3] as const;
+// FONT_FACES (../document/fonts) registers a curated 6-face subset of v2's
+// full 31-face BODY_FONT_IDS roster (§31.2's other 25 faces land in a later
+// ticket, F2) — the picker only offers faces that actually render distinctly
+// today, never a phantom choice with no visible effect.
+const FONT_IDS = Object.keys(FONT_FACES) as Array<Extract<BodyFontId, keyof typeof FONT_FACES>>;
+const NAME_WEIGHT_OPTIONS = ["normal", "bold"] as const;
+const GRID_COLUMN_OPTIONS = [1, 2, 3, 4] as const;
 const HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
 // A curated set, not an open picker — every swatch here is already a valid
-// documentFormatZ hex; the text input next to it is the escape hatch for
+// formatV2Schema hex; the text input next to it is the escape hatch for
 // anything outside the curated set, still bounded by the same regex.
 const COLOR_SWATCHES = [
   "#1a1a2e",
@@ -65,12 +86,16 @@ function FontSelect({
   disabled,
 }: {
   id: string;
-  value: FontId;
-  onChange: (family: FontId) => void;
+  value: BodyFontId;
+  onChange: (family: BodyFontId) => void;
   disabled?: boolean;
 }) {
   return (
-    <Select value={value} onValueChange={(next) => onChange(next as FontId)} disabled={disabled}>
+    <Select
+      value={value}
+      onValueChange={(next) => onChange(next as BodyFontId)}
+      disabled={disabled}
+    >
       <SelectTrigger id={id} className="w-full">
         <SelectValue />
       </SelectTrigger>
@@ -168,11 +193,11 @@ export function DesignPanel({
   onChange,
   readOnly = false,
 }: {
-  format: DocumentFormat;
-  onChange: (next: DocumentFormat) => void;
+  format: DocumentFormatV2;
+  onChange: (next: DocumentFormatV2) => void;
   readOnly?: boolean;
 }) {
-  function set(next: DocumentFormat) {
+  function set(next: DocumentFormatV2) {
     if (readOnly) return;
     onChange(next);
   }
@@ -186,47 +211,22 @@ export function DesignPanel({
         <FieldRow label="Body font" htmlFor="design-body-family">
           <FontSelect
             id="design-body-family"
-            value={format.typography.body.family}
+            value={format.fonts.body}
             disabled={readOnly}
-            onChange={(family) =>
-              set({
-                ...format,
-                typography: { ...format.typography, body: { ...format.typography.body, family } },
-              })
-            }
-          />
-        </FieldRow>
-
-        <FieldRow label="Heading font" htmlFor="design-heading-family">
-          <FontSelect
-            id="design-heading-family"
-            value={format.typography.heading.family}
-            disabled={readOnly}
-            onChange={(family) =>
-              set({
-                ...format,
-                typography: {
-                  ...format.typography,
-                  heading: { ...format.typography.heading, family },
-                },
-              })
-            }
+            onChange={(body) => set({ ...format, fonts: { ...format.fonts, body } })}
           />
         </FieldRow>
 
         <FieldRow label="Body size (pt)" htmlFor="design-body-size">
           <NumberStepper
             id="design-body-size"
-            value={format.typography.body.size}
+            value={format.typeScale.bodySize}
             min={9}
             max={12}
             step={0.5}
             disabled={readOnly}
-            onChange={(size) =>
-              set({
-                ...format,
-                typography: { ...format.typography, body: { ...format.typography.body, size } },
-              })
+            onChange={(bodySize) =>
+              set({ ...format, typeScale: { ...format.typeScale, bodySize } })
             }
           />
         </FieldRow>
@@ -234,36 +234,28 @@ export function DesignPanel({
         <FieldRow label="Line height" htmlFor="design-line-height">
           <NumberStepper
             id="design-line-height"
-            value={format.typography.body.lineHeight}
-            min={1}
-            max={1.8}
-            step={0.1}
+            value={format.spacing.lineHeight}
+            min={1.15}
+            max={1.5}
+            step={0.05}
             disabled={readOnly}
             onChange={(lineHeight) =>
-              set({
-                ...format,
-                typography: {
-                  ...format.typography,
-                  body: { ...format.typography.body, lineHeight },
-                },
-              })
+              set({ ...format, spacing: { ...format.spacing, lineHeight } })
             }
           />
         </FieldRow>
 
         <FieldRow label="Heading weight" htmlFor="design-heading-weight">
           <Select
-            value={String(format.typography.heading.weight)}
+            value={format.header.nameWeight}
             disabled={readOnly}
             onValueChange={(next) =>
               set({
                 ...format,
-                typography: {
-                  ...format.typography,
-                  heading: {
-                    ...format.typography.heading,
-                    weight: Number(next) as 400 | 500 | 600 | 700,
-                  },
+                header: {
+                  ...format.header,
+                  nameWeight: next as "normal" | "bold",
+                  titleWeight: next as "normal" | "bold",
                 },
               })
             }
@@ -272,9 +264,9 @@ export function DesignPanel({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {HEADING_WEIGHTS.map((weight) => (
-                <SelectItem key={weight} value={String(weight)}>
-                  {weight}
+              {NAME_WEIGHT_OPTIONS.map((weight) => (
+                <SelectItem key={weight} value={weight}>
+                  {weight === "bold" ? "Bold" : "Normal"}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -287,9 +279,9 @@ export function DesignPanel({
         <FieldRow label="Primary color" htmlFor="design-color-primary">
           <ColorField
             id="design-color-primary"
-            value={format.colors.primary}
+            value={format.colors.accent}
             disabled={readOnly}
-            onChange={(primary) => set({ ...format, colors: { ...format.colors, primary } })}
+            onChange={(accent) => set({ ...format, colors: { ...format.colors, accent } })}
           />
         </FieldRow>
 
@@ -305,39 +297,51 @@ export function DesignPanel({
 
       {/* ── page ── */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <FieldRow label="Side margin (pt)" htmlFor="design-margin-x">
+        <FieldRow label="Side margin (mm)" htmlFor="design-margin-x">
           <NumberStepper
             id="design-margin-x"
-            value={format.page.marginX}
-            min={18}
-            max={72}
-            step={2}
-            disabled={readOnly}
-            onChange={(marginX) => set({ ...format, page: { ...format.page, marginX } })}
-          />
-        </FieldRow>
-
-        <FieldRow label="Top/bottom margin (pt)" htmlFor="design-margin-y">
-          <NumberStepper
-            id="design-margin-y"
-            value={format.page.marginY}
-            min={18}
-            max={72}
-            step={2}
-            disabled={readOnly}
-            onChange={(marginY) => set({ ...format, page: { ...format.page, marginY } })}
-          />
-        </FieldRow>
-
-        <FieldRow label="Section gap (pt)" htmlFor="design-section-gap">
-          <NumberStepper
-            id="design-section-gap"
-            value={format.page.sectionGap}
-            min={0}
-            max={24}
+            value={format.spacing.marginsMm.x}
+            min={10}
+            max={28}
             step={1}
             disabled={readOnly}
-            onChange={(sectionGap) => set({ ...format, page: { ...format.page, sectionGap } })}
+            onChange={(x) =>
+              set({
+                ...format,
+                spacing: { ...format.spacing, marginsMm: { ...format.spacing.marginsMm, x } },
+              })
+            }
+          />
+        </FieldRow>
+
+        <FieldRow label="Top/bottom margin (mm)" htmlFor="design-margin-y">
+          <NumberStepper
+            id="design-margin-y"
+            value={format.spacing.marginsMm.y}
+            min={10}
+            max={28}
+            step={1}
+            disabled={readOnly}
+            onChange={(y) =>
+              set({
+                ...format,
+                spacing: { ...format.spacing, marginsMm: { ...format.spacing.marginsMm, y } },
+              })
+            }
+          />
+        </FieldRow>
+
+        <FieldRow label="Element spacing" htmlFor="design-element-spacing">
+          <NumberStepper
+            id="design-element-spacing"
+            value={format.spacing.elementSpacing}
+            min={0}
+            max={4}
+            step={1}
+            disabled={readOnly}
+            onChange={(elementSpacing) =>
+              set({ ...format, spacing: { ...format.spacing, elementSpacing } })
+            }
           />
         </FieldRow>
       </div>
@@ -367,64 +371,74 @@ export function DesignPanel({
         ) : null}
       </div>
 
-      {/* ── structure — per-section column count only; order/visibility is LayoutEditor's job ── */}
+      {/* ── structure — the two sections v2 gives a grid axis (§31.2); every
+          other section's columns has no v2 destination (see module comment) ── */}
       <div className="flex flex-col gap-3">
         <p className="text-sm font-medium">Section columns</p>
         <div className="grid gap-3 sm:grid-cols-2">
-          {SECTION_VALUES.map((section) => (
-            <FieldRow
-              key={section}
-              label={SECTIONS[section].label}
-              htmlFor={`design-columns-${section}`}
-            >
-              <ColumnsSelect
-                id={`design-columns-${section}`}
-                section={section}
-                format={format}
-                disabled={readOnly}
-                onChange={set}
-              />
-            </FieldRow>
-          ))}
+          <FieldRow
+            label={`${SECTIONS.skill.label} & ${SECTIONS.language.label} columns`}
+            htmlFor="design-columns-skills-languages"
+          >
+            <GridColumnsSelect
+              id="design-columns-skills-languages"
+              value={format.sectionDisplay.skillsLanguages.gridColumns}
+              disabled={readOnly}
+              onChange={(gridColumns) =>
+                set({
+                  ...format,
+                  sectionDisplay: {
+                    ...format.sectionDisplay,
+                    skillsLanguages: { ...format.sectionDisplay.skillsLanguages, gridColumns },
+                  },
+                })
+              }
+            />
+          </FieldRow>
+          <FieldRow label={`${SECTIONS.interest.label} columns`} htmlFor="design-columns-interests">
+            <GridColumnsSelect
+              id="design-columns-interests"
+              value={format.sectionDisplay.interests.gridColumns}
+              disabled={readOnly}
+              onChange={(gridColumns) =>
+                set({
+                  ...format,
+                  sectionDisplay: {
+                    ...format.sectionDisplay,
+                    interests: { ...format.sectionDisplay.interests, gridColumns },
+                  },
+                })
+              }
+            />
+          </FieldRow>
         </div>
       </div>
     </div>
   );
 }
 
-function ColumnsSelect({
+function GridColumnsSelect({
   id,
-  section,
-  format,
+  value,
   disabled,
   onChange,
 }: {
   id: string;
-  section: Section;
-  format: DocumentFormat;
+  value: number;
   disabled?: boolean;
-  onChange: (next: DocumentFormat) => void;
+  onChange: (next: number) => void;
 }) {
-  const columns = format.sections[section]?.columns ?? 1;
   return (
     <Select
-      value={String(columns)}
+      value={String(value)}
       disabled={disabled}
-      onValueChange={(next) =>
-        onChange({
-          ...format,
-          sections: {
-            ...format.sections,
-            [section]: { ...format.sections[section], columns: Number(next) as 1 | 2 | 3 },
-          },
-        })
-      }
+      onValueChange={(next) => onChange(Number(next))}
     >
       <SelectTrigger id={id} className="w-full">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {COLUMN_OPTIONS.map((n) => (
+        {GRID_COLUMN_OPTIONS.map((n) => (
           <SelectItem key={n} value={String(n)}>
             {n}
           </SelectItem>

@@ -8,11 +8,12 @@ import { describe, expect, it } from "vitest";
 import type { Profile, TailoredResume } from "@shared/types";
 import { extractPdfText } from "../src/client/document/extractText";
 import { renderResumeToBuffer } from "../src/client/document/renderResume";
-import { TEMPLATES } from "../src/client/document/registry";
+import { PRESET_MANIFESTS } from "../src/client/document/registry";
+import { PRESETS } from "../src/client/document/presets";
 
-const STRICT_TEMPLATE_IDS = Object.values(TEMPLATES)
-  .filter((template) => template.atsGrade === "strict")
-  .map((template) => template.id);
+const STRICT_PRESET_IDS = Object.values(PRESET_MANIFESTS)
+  .filter((manifest) => manifest.atsGrade === "strict")
+  .map((manifest) => manifest.id);
 
 function profileFixture(): Profile {
   return {
@@ -64,14 +65,14 @@ function resumeFixture(): TailoredResume {
 }
 
 describe.each(
-  STRICT_TEMPLATE_IDS,
-)("extractPdfText extraction-order invariant (%s template, §28.6/§11)", (templateId) => {
+  STRICT_PRESET_IDS,
+)("extractPdfText extraction-order invariant (%s preset, §28.6/§11)", (presetId) => {
   it("contains profile header + every item.text in exact TailoredResume order; leadRationale/cut absent", async () => {
     const profile = profileFixture();
     const buffer = await renderResumeToBuffer({
       resume: resumeFixture(),
       profile,
-      templateId,
+      format: PRESETS[presetId],
     });
     const items = await extractPdfText(buffer);
     const text = items.join(" ");
