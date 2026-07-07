@@ -1628,3 +1628,33 @@ PHASE-CLOSE ORACLE (oracle.md Phase 7/E8) on merged tree, ALL GREEN (in the 363 
   lockedFormat. Builder honestly FLAGGED (not silently expanded) the remaining hole: pre-cutover
   backup FILES fail the v2-only import validator → E9-F0d3 seeded (in-phase migration completeness;
   F0 phase close waits for it). NEXT: F0d3 → F0 phase-close oracle → E9-R2 → chunk report.
+
+[v3-050] E9-F0d3 — ACCEPTED. Pre-cutover backup FILES now import: documentFormatV1OrV2Z (structural
+  v1 zod resurrected as import-compat only, union-transformed through resolveStoredFormat), settings
+  restore added to the import envelope. Verbatim-fixture tests: 2xx, v2-valid look-preserved formats,
+  locked app intact, malformed 400. Composite green serial (52/584 + 10/10); one overlapping-run
+  contention flake (5 spurious fails) identified and cleared by serial re-run — coordinator must not
+  race its composite against a builder's own background suite (noted for future runs).
+
+===== E9/F0 PHASE COMPLETE (engine core + migration — THE risk, spec §31.6 F0) =====
+PHASE-CLOSE ORACLE (oracle.md Phase 8 'F0' line) on the merged tree, ALL GREEN in the serial
+composite just run (52 files/584 vitest + playwright 10/10):
+ [x] v1→v2 migration fixture-exact: six template defaults + settings.defaultFormat + lockedFormat,
+     pure + idempotent (format-v2 + migration-v1-formats + api.migration-boundary suites; fixtures
+     consumed VERBATIM from the pre-cutover-committed ground truth)
+ [x] ONE engine renders six presets reproducing the retired templates; templates/ DELETED (0 refs)
+ [x] every §28.8-A/C + E8 invariant green over presets-through-one-engine: extraction content+order
+     per strict preset, sentinels absent, never-cut across every ladder, geometry contrasts (classic
+     centered mean-x, compact one-row shared y, sidebar mean-x BOTH sides, banner tint + contrast ink)
+ [x] anti-trenchcoat OFF-DIAGONAL composition guard standing (strict + header band)
+ [x] stored snapshots byte-identical across migration + v2 PUTs (§28.1 guard + integration suite)
+ [x] E8 gallery/thumbnails/e2e unchanged over presets (10/10: 6 painted pairwise-different thumbnails,
+     selection persists, sample badges, color repaint)
+ [x] BONUS beyond the line: pre-cutover sqlite rows AND backup files both migrate at their boundaries
+ Docker e2e NOT re-run (phase-close-only [v3-004]; packaging shape unchanged this phase — no
+ Dockerfile/compose/runtime change; rests on the prior recorded gate, flagged honestly — E7-C/E8
+ posture). Suite floor 258>=257 held through the cutover.
+ RESIDUALS (open, tracked): E9-R2 (ibm-plex-mono renders as fallback Sans until a clean asset lands —
+ crash-safe, visibly wrong face; NEXT ticket) · engine off-diagonal 'two'+header-band renders bandless
+ (F3 wires it) · fit.ts density duplication engine-vs-legacy consolidated at cutover (resolved) ·
+ §31.1 honest deviation stands: locked apps re-RENDER under v2 with unchanged data.

@@ -6,10 +6,16 @@ import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { entryImport, profileInput, applicationCreate, documentFormatZ } from "@shared/schema";
+import {
+  entryImport,
+  profileInput,
+  applicationCreate,
+  settingsInput,
+  documentFormatV1OrV2Z,
+} from "@shared/schema";
 import { SECTION_VALUES } from "@shared/sections";
 import type { Db } from "../db";
-import { entries, profile, applications } from "../db/schema";
+import { entries, profile, applications, settings } from "../db/schema";
 import { generateSlug } from "../slug";
 import { migrateStoredApplicationFormats } from "./applications";
 
@@ -42,9 +48,11 @@ const tailoredResumeZ = z.object({
 });
 
 // Mirrors the applications.ts lock endpoint's frozen shape (§28.3) — not
-// owned by @shared/schema, hand-written here for the same reason as tailoredResumeZ.
+// owned by @shared/schema, hand-written here for the same reason as
+// tailoredResumeZ. `format` accepts pre-cutover v1 JSON too (E9-F0d3): a
+// backup file exported before E9 freezes a v1-shaped format at lock time.
 const lockedFormatZ = z.object({
-  format: documentFormatZ,
+  format: documentFormatV1OrV2Z,
   resolvedDensity: z.enum(["comfortable", "standard", "compact"]),
   paper: z.enum(["letter", "a4"]),
 });
@@ -52,9 +60,12 @@ const lockedFormatZ = z.object({
 // A backed-up application carries its id + storage timestamps + the full
 // current/locked snapshots — applicationCreate/Update (routes/applications.ts)
 // only cover the user-editable subset, so this extends it for round-tripping.
+// `format` overrides applicationCreate's v2-only validator with the v1-or-v2
+// import-boundary union (E9-F0d3) — a pre-cutover export's application.format
+// column may still hold v1 JSON.
 const applicationImport = applicationCreate.extend({
   id: z.string().min(1),
-  format: documentFormatZ.nullish(),
+  format: documentFormatV1OrV2Z.nullish(),
   current: tailoredResumeZ.nullable(),
   locked: tailoredResumeZ.nullable(),
   lockedFormat: lockedFormatZ.nullish(),
@@ -73,10 +84,16 @@ const applicationImport = applicationCreate.extend({
 // profileInput (@shared/schema) doesn't own photoUrl — extended here, same as routes/profile.ts.
 const profileImport = profileInput.extend({ photoUrl: z.string().min(1).max(2000).nullish() });
 
+// settingsInput's `defaultFormat` overridden the same way as applicationImport's
+// `format`, above: a pre-cutover export's settings.defaultFormat column may
+// still hold v1 JSON (E9-F0d3).
+const settingsImport = settingsInput.extend({ defaultFormat: documentFormatV1OrV2Z.optional() });
+
 const backupImport = z.object({
   entries: entryImport.optional(),
   profile: profileImport.optional(),
   applications: z.array(applicationImport).max(500).optional(),
+  settings: settingsImport.optional(),
 });
 
 export function backupRoutes(app: FastifyInstance, db: Db): void {
@@ -105,7 +122,8 @@ export function backupRoutes(app: FastifyInstance, db: Db): void {
       return reply.code(400).send({ error: "invalid_body", issues: parsed.error.issues });
     }
 
-    const imported = { entries: 0, profile: 0, applications: 0 };
+    const imported: { entries: number; profile: number; applications: number; settings?: number } =
+      { entries: 0, profile: 0, applications: 0 };
     const input = parsed.data;
 
     if (input.entries) {
@@ -137,6 +155,14 @@ export function backupRoutes(app: FastifyInstance, db: Db): void {
         .where(eq(profile.id, 1))
         .run();
       imported.profile = 1;
+    }
+
+    if (input.settings) {
+      db.update(settings)
+        .set({ ...input.settings, updatedAt: Date.now() })
+        .where(eq(settings.id, 1))
+        .run();
+      imported.settings = 1;
     }
 
     if (input.applications) {

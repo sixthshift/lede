@@ -5,7 +5,7 @@
 import { z } from "zod";
 import { createInsertSchema } from "drizzle-zod";
 import { SECTION_VALUES } from "@shared/sections";
-import { formatV2Schema } from "@shared/format-v2";
+import { formatV2Schema, resolveStoredFormat } from "@shared/format-v2";
 import { entries } from "../server/db/schema";
 
 // ── §4.1 EntryMeta, one object per section, strict (reject foreign fields) ──
@@ -174,6 +174,63 @@ export const entryImport = z.array(entryInput).max(200);
 // call site for no behavior change), now aliased straight to it. The v1
 // zod object this used to be is retired along with the v1 render path.
 export const documentFormatZ = formatV2Schema;
+
+// ── v1 DocumentFormat — retired at the E9 cutover (the v1 render path + this
+// exact zod object, commit 1ddcaca), resurrected structurally here ONLY as an
+// IMPORT-BOUNDARY compat shape (E9-F0d3): a backup file exported before the
+// cutover carries this shape in applications[].format,
+// applications[].lockedFormat.format, and settings.defaultFormat. Every LIVE
+// write path (application create/update, settings PUT) stays `documentFormatZ`
+// (v2-only, above) — this widened union exists for routes/backup.ts's
+// POST /api/import alone, never re-deriving migration logic.
+const FONT_IDS_V1 = [
+  "ibm-plex-sans",
+  "ibm-plex-serif",
+  "ibm-plex-mono",
+  "arimo",
+  "tinos",
+  "carlito",
+] as const;
+const hexColorV1Z = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const documentFormatV1Z = z.object({
+  templateId: z.string().min(1),
+  typography: z.object({
+    body: z.object({
+      family: z.enum(FONT_IDS_V1),
+      size: z.number().min(9).max(12),
+      lineHeight: z.number().min(1).max(1.8),
+    }),
+    heading: z.object({
+      family: z.enum(FONT_IDS_V1),
+      weight: z.union([z.literal(400), z.literal(500), z.literal(600), z.literal(700)]),
+    }),
+  }),
+  colors: z.object({ primary: hexColorV1Z, text: hexColorV1Z }),
+  page: z.object({
+    marginX: z.number().min(18).max(72),
+    marginY: z.number().min(18).max(72),
+    sectionGap: z.number().min(0).max(24),
+  }),
+  photo: z.object({
+    hidden: z.boolean(),
+    size: z.number().min(32).max(160),
+    shape: z.enum(["circle", "rounded", "square"]),
+  }),
+  sections: z.partialRecord(
+    z.enum(SECTION_VALUES),
+    z.object({ columns: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional() }),
+  ),
+});
+
+// v1-shaped values fail formatV2Schema (no formatVersion/layout/typeScale/…)
+// and fall through to documentFormatV1Z, so the union discriminates by full
+// structural validation — the same criterion `isFormatV2` checks, just
+// zod-enforced rather than duck-typed. `resolveStoredFormat` (already the
+// read-boundary gate for sqlite) does the actual v1->v2 migration, so this
+// import boundary reuses the identical function rather than re-deriving it.
+export const documentFormatV1OrV2Z = z
+  .union([formatV2Schema, documentFormatV1Z])
+  .transform((value) => resolveStoredFormat(value));
 
 // ── §4.2/§16 profile input (identity for the header) ──
 const profileLinkZ = z.object({

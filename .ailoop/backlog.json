@@ -1843,7 +1843,7 @@
     {
       "id": "E9-F0d3",
       "title": "Backup-file compatibility: POST /api/import accepts pre-cutover (v1-format) backup files",
-      "status": "todo",
+      "status": "done",
       "depends_on": [
         "E9-F0d2"
       ],
@@ -1857,7 +1857,7 @@
       "context": "E9-F0d2 migrated the three sqlite storage sites but deliberately left POST /api/import untouched and flagged it: the import body validator is v2-only (documentFormatZ is now formatV2Schema-shaped), so a backup FILE exported before the E9 cutover — whose applications[].format / lockedFormat.format / settings.defaultFormat hold v1 JSON — is REJECTED. That breaks the standing Phase-5 oracle's spirit (export→wipe→import round-trips a full instance) for pre-E9 exports. Fix at the import boundary: accept v1 format values in the import body (zod union v1-shape|v2 with a preprocess through the existing migrateFormat/resolveStoredFormat from src/shared/format-v2.ts — reuse, do not re-derive) and persist v2. The v1 leg of the union should be structural (has templateId, no formatVersion) — isFormatV2 is the discriminator. In-test, construct a pre-cutover backup JSON by embedding the test/fixtures/pre-e9-formats/ files VERBATIM (read-only — zero diff under that dir) into a backup envelope: applications with format + lockedFormat (locked content present) + settings.defaultFormat. Import must restore them as schema-valid v2 with look preserved, locked apps still locked, locked TailoredResume content intact. Current-version (v2) import round-trip must stay green (the standing export-import tests). Frozen: §28.1; locked stays locked; no new axis logic.",
       "acceptance": "- bun run check → 0; bun run lint → 0; NODE_OPTIONS=--max-old-space-size=1024 bun run build → 0\n- bunx vitest run --passWithNoTests green; npx playwright test 10/10\n- new test: a pre-cutover backup envelope built from the verbatim pre-e9 fixtures imports successfully; GET after import returns schema-valid v2 (formatV2Schema.parse), look preserved (strict fixture → migrateFormat expectation), locked app locked with content toEqual-intact; settings.defaultFormat migrated\n- v2 backup round-trip (export→wipe→import) still green (standing tests untouched or extended, never weakened)\n- a malformed format (neither valid v1 shape nor v2) still 400s (tested)\n- zero diff under test/fixtures/pre-e9-formats/",
       "attempts": [],
-      "evidence": null
+      "evidence": "Independent re-verify 2026-07-07: check 0 · lint 0 · build 0 · vitest 52 files/584 green SERIAL (an overlapping-run contention flake produced 5 spurious failures when coordinator and builder suites raced — re-run clean; the standing [v3-041] flake mode, loadavg 33-56 during overlap) · playwright 10/10 · scope: exactly schema.ts + backup.ts + api.export-import.test.ts; pre-e9 fixtures 0 diff · gaming read: v1 zod resurrected structurally as import-compat only (commit-1ddcaca bounds), union transform delegates to resolveStoredFormat (zero re-derived logic), live write paths stay v2-only; tests embed fixtures verbatim, assert 2xx + migrateFormat-equal look + locked intact + settings migrated + malformed 400."
     }
   ]
 }
