@@ -60,7 +60,39 @@ export function resolveNameFont(format: DocumentFormatV2): FontId {
   return name === "same-as-body" ? resolveFont(format.fonts.body) : (name as unknown as FontId);
 }
 
-export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat {
+// typeScale's 4 offsets (§31.2, nameOffset/titleOffset/sectionHeadingOffset/
+// entryHeaderOffset) each resolve to one rendered role's absolute size —
+// bodySize plus that role's own offset. There is no per-role size field on
+// the legacy `DocumentFormat` shape this file returns (typography carries
+// one shared body/heading pair, not four independent sizes), so — same
+// seam as resolveNameFont/nameFontFamily above — these are threaded onto the
+// returned object as an EXTRA property (`typeScaleSizes`, optional on the
+// type sections.tsx reads it through) rather than a `DocumentFormat` field.
+// It survives density.ts's `{...format, ...}` reconstruction (which only
+// overrides `typography`/`page`, never touches unrelated top-level keys), so
+// it reaches sections.tsx unscaled by density — this ticket wires the 4
+// offsets' bounded values, not their interaction with the density ladder.
+export type TypeScaleSizes = {
+  name: number;
+  title: number;
+  sectionHeading: number;
+  entryHeader: number;
+};
+
+function resolveTypeScaleSizes(format: DocumentFormatV2): TypeScaleSizes {
+  const { bodySize, nameOffset, titleOffset, sectionHeadingOffset, entryHeaderOffset } =
+    format.typeScale;
+  return {
+    name: bodySize + nameOffset,
+    title: bodySize + titleOffset,
+    sectionHeading: bodySize + sectionHeadingOffset,
+    entryHeader: bodySize + entryHeaderOffset,
+  };
+}
+
+export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
+  typeScaleSizes: TypeScaleSizes;
+} {
   const bodyFont = resolveFont(format.fonts.body);
   return {
     templateId: ENGINE_TEMPLATE_ID,
@@ -84,5 +116,6 @@ export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat {
     },
     photo: { hidden: format.photo.hidden, size: format.photo.size, shape: format.photo.shape },
     sections: {},
+    typeScaleSizes: resolveTypeScaleSizes(format),
   };
 }

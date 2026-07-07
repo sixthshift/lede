@@ -16,10 +16,31 @@ import type {
   TailoredSection,
 } from "@shared/types";
 import { SECTIONS } from "@shared/sections";
+import type { TypeScaleSizes } from "./engine/legacyAdapt";
+
+// §31.2 typeScale's 4 offsets (nameOffset/titleOffset/sectionHeadingOffset/
+// entryHeaderOffset) arrive as an extra property on `format` rather than a
+// field of the legacy `DocumentFormat` type this module is locked to — see
+// legacyAdapt.ts's toLegacyFormat for why. Optional or absent (e.g. a caller
+// that builds a plain DocumentFormat directly, same as the type declares)
+// falls back to exactly the sizes this module hardcoded before this ticket,
+// so no existing caller's output changes.
+function resolveTypeScaleSizes(format: DocumentFormat): TypeScaleSizes {
+  const sizes = (format as DocumentFormat & { typeScaleSizes?: TypeScaleSizes }).typeScaleSizes;
+  return (
+    sizes ?? {
+      name: 20,
+      title: format.typography.body.size,
+      sectionHeading: format.typography.body.size + 1,
+      entryHeader: format.typography.body.size,
+    }
+  );
+}
 
 function buildStyles(format: DocumentFormat) {
   const { typography, colors, page, photo } = format;
   const photoRadius = photo.shape === "circle" ? photo.size / 2 : photo.shape === "rounded" ? 8 : 0;
+  const typeScaleSizes = resolveTypeScaleSizes(format);
 
   return StyleSheet.create({
     header: { marginBottom: 12, flexDirection: "row", alignItems: "center" },
@@ -43,9 +64,19 @@ function buildStyles(format: DocumentFormat) {
     photoCenterOverride: { marginRight: 0, marginBottom: 8 },
     headerText: { flex: 1 },
     name: {
-      fontSize: 20,
+      fontSize: typeScaleSizes.name,
       fontFamily: typography.heading.family,
       fontWeight: typography.heading.weight,
+      color: colors.text,
+    },
+    // §31.2 "title/subtitle" — profile.headline, previously never rendered
+    // in the PDF (only in plainText.ts's export) — this ticket gives it a
+    // render seam so titleOffset has somewhere to land (format-v2.ts's
+    // migration comment: "no distinct 'title' text rendered today").
+    title: {
+      fontSize: typeScaleSizes.title,
+      fontFamily: typography.body.family,
+      marginTop: 2,
       color: colors.text,
     },
     contactLine: {
@@ -67,7 +98,7 @@ function buildStyles(format: DocumentFormat) {
     },
     section: { marginBottom: page.sectionGap },
     sectionLabel: {
-      fontSize: typography.body.size + 1,
+      fontSize: typeScaleSizes.sectionHeading,
       fontFamily: typography.heading.family,
       fontWeight: typography.heading.weight,
       marginBottom: 4,
@@ -79,7 +110,7 @@ function buildStyles(format: DocumentFormat) {
     },
     group: { marginBottom: 6 },
     groupHeading: {
-      fontSize: typography.body.size,
+      fontSize: typeScaleSizes.entryHeader,
       fontFamily: typography.heading.family,
       fontWeight: typography.heading.weight,
       marginBottom: 2,
@@ -136,6 +167,8 @@ export function ProfileHeader({
     Object.keys(nameOverrides).length > 0 ? [styles.name, nameOverrides] : styles.name;
   const contactItemStyle = ink ? [styles.contactItem, { color: ink }] : styles.contactItem;
   const linkStyle = ink ? [styles.link, { color: ink }] : styles.link;
+  const titleStyle = ink ? [styles.title, { color: ink }] : styles.title;
+  const titleNode = profile.headline ? <Text style={titleStyle}>{profile.headline}</Text> : null;
   const contactParts = [profile.email, profile.phone, profile.location].filter(
     (part): part is string => Boolean(part),
   );
@@ -162,6 +195,7 @@ export function ProfileHeader({
           <Image src={profile.photoUrl} style={[styles.photo, styles.photoCenterOverride]} />
         ) : null}
         <Text style={nameStyle}>{profile.name}</Text>
+        {titleNode}
         <View style={styles.contactLine}>{contactItems}</View>
       </View>
     );
@@ -175,6 +209,7 @@ export function ProfileHeader({
             <Image src={profile.photoUrl} style={styles.photo} />
           ) : null}
           <Text style={nameStyle}>{profile.name}</Text>
+          {titleNode}
         </View>
         <View style={[styles.contactLine, styles.contactLineInline]}>{contactItems}</View>
       </View>
@@ -186,6 +221,7 @@ export function ProfileHeader({
       {showPhoto && profile.photoUrl ? <Image src={profile.photoUrl} style={styles.photo} /> : null}
       <View style={styles.headerText}>
         <Text style={nameStyle}>{profile.name}</Text>
+        {titleNode}
         <View style={styles.contactLine}>{contactItems}</View>
       </View>
     </View>

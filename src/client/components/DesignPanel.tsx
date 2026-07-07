@@ -340,6 +340,68 @@ export function DesignPanel({
             </SelectContent>
           </Select>
         </FieldRow>
+
+        <FieldRow label="Name size offset (pt over body)" htmlFor="design-name-offset">
+          <NumberStepper
+            id="design-name-offset"
+            value={format.typeScale.nameOffset}
+            min={4}
+            max={12}
+            step={1}
+            disabled={readOnly}
+            onChange={(nameOffset) =>
+              set({ ...format, typeScale: { ...format.typeScale, nameOffset } })
+            }
+          />
+        </FieldRow>
+
+        <FieldRow label="Title size offset (pt over body)" htmlFor="design-title-offset">
+          <NumberStepper
+            id="design-title-offset"
+            value={format.typeScale.titleOffset}
+            min={0}
+            max={4}
+            step={1}
+            disabled={readOnly}
+            onChange={(titleOffset) =>
+              set({ ...format, typeScale: { ...format.typeScale, titleOffset } })
+            }
+          />
+        </FieldRow>
+
+        <FieldRow
+          label="Section heading size offset (pt over body)"
+          htmlFor="design-section-heading-offset"
+        >
+          <NumberStepper
+            id="design-section-heading-offset"
+            value={format.typeScale.sectionHeadingOffset}
+            min={0}
+            max={3}
+            step={1}
+            disabled={readOnly}
+            onChange={(sectionHeadingOffset) =>
+              set({ ...format, typeScale: { ...format.typeScale, sectionHeadingOffset } })
+            }
+          />
+        </FieldRow>
+
+        <FieldRow
+          label="Entry header size offset (pt over body)"
+          htmlFor="design-entry-header-offset"
+        >
+          <NumberStepper
+            id="design-entry-header-offset"
+            value={format.typeScale.entryHeaderOffset}
+            min={0}
+            max={2}
+            step={1}
+            disabled={readOnly}
+            onChange={(entryHeaderOffset) =>
+              set({ ...format, typeScale: { ...format.typeScale, entryHeaderOffset } })
+            }
+          />
+        </FieldRow>
       </div>
 
       {/* ── color ── */}

@@ -116,7 +116,12 @@ const SENTINELS = [
   "SENTINEL_CUT_TWO",
 ];
 
-type TextGeometry = { str: string; x: number; y: number; width: number };
+// `fontSize` is item.transform[0] — for this engine's unrotated horizontal
+// text, pdf.js's text-content transform matrix is exactly
+// [fontSizePt, 0, 0, fontSizePt, x, y] (verified against a real render at
+// authoring time: a Text styled fontSize:14 extracts transform[0] === 14),
+// so it's the rendered point size itself, not a derived proxy.
+type TextGeometry = { str: string; x: number; y: number; width: number; fontSize: number };
 
 async function page1Geometry(
   buffer: Buffer,
@@ -136,6 +141,7 @@ async function page1Geometry(
       x: item.transform[4],
       y: item.transform[5],
       width: item.width,
+      fontSize: item.transform[0],
     }));
   return { items, pageWidth };
 }
@@ -678,5 +684,198 @@ describe.each(AXIS_CASES)("unhandled-axis smoke — $name", ({ apply, values }) 
       const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
       expect(buffer.length).toBeGreaterThan(0);
     }
+  });
+});
+
+// E9-F2b: typeScale's 4 offsets (§31.2) are now wired (legacyAdapt.ts's
+// typeScaleSizes, consumed by sections.tsx's buildStyles) — each must render
+// a MEASURABLY LARGER font size (not just different bytes) at its bounds'
+// high end than its low end. `marker` is the exact rendered string whose
+// extracted `fontSize` (page1Geometry's transform[0], the real pt size —
+// see its own comment) the offset controls.
+type TypeScaleCase = {
+  axis: "nameOffset" | "titleOffset" | "sectionHeadingOffset" | "entryHeaderOffset";
+  min: number;
+  max: number;
+  marker: string;
+};
+
+const TYPE_SCALE_CASES: TypeScaleCase[] = [
+  { axis: "nameOffset", min: 4, max: 12, marker: "Jordan Rivera" },
+  // profile.headline — previously never rendered in the PDF at all
+  // (format-v2.ts's baseFromV1 comment: "no distinct 'title' text rendered
+  // today"); this ticket gives it ProfileHeader's new `title` render seam.
+  { axis: "titleOffset", min: 0, max: 4, marker: "SENTINEL_HEADLINE" },
+  // sections.tsx's sectionLabel renders with textTransform:'uppercase' baked
+  // into the extracted text itself (verified at authoring time), so the
+  // marker is the section's SCREAMING-CASE label (@shared/sections.ts).
+  { axis: "sectionHeadingOffset", min: 0, max: 3, marker: "PROJECTS" },
+  { axis: "entryHeaderOffset", min: 0, max: 2, marker: "cloudcase-platform-sdk" },
+];
+
+describe("typeScale offsets — measurable size increase (E9-F2b, §31.2)", () => {
+  it.each(
+    TYPE_SCALE_CASES,
+  )("$axis: max bound renders a strictly larger $marker than min bound", async ({
+    axis,
+    min,
+    max,
+    marker,
+  }) => {
+    const profile: Profile = { ...profileFixture(), headline: "SENTINEL_HEADLINE" };
+    const resume = resumeFixture();
+    const lowFormat: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      typeScale: { ...DEFAULT_FORMAT_V2.typeScale, [axis]: min },
+    };
+    const highFormat: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      typeScale: { ...DEFAULT_FORMAT_V2.typeScale, [axis]: max },
+    };
+
+    const lowBuffer = await renderEngineToBuffer({
+      resume,
+      profile,
+      paper: "letter",
+      format: lowFormat,
+    });
+    const highBuffer = await renderEngineToBuffer({
+      resume,
+      profile,
+      paper: "letter",
+      format: highFormat,
+    });
+    expect(Buffer.compare(lowBuffer, highBuffer)).not.toBe(0);
+
+    const lowSize = (await page1Geometry(lowBuffer)).items.find((item) =>
+      item.str.includes(marker),
+    )?.fontSize;
+    const highSize = (await page1Geometry(highBuffer)).items.find((item) =>
+      item.str.includes(marker),
+    )?.fontSize;
+    expect(lowSize).toBeDefined();
+    expect(highSize).toBeDefined();
+    expect(highSize as number).toBeGreaterThan(lowSize as number);
+
+    // matches the ticket's exact contract: role size = bodySize + offset.
+    const bodySize = DEFAULT_FORMAT_V2.typeScale.bodySize;
+    expect(lowSize).toBeCloseTo(bodySize + min, 5);
+    expect(highSize).toBeCloseTo(bodySize + max, 5);
+  });
+});
+
+// E9-F2b: spacing's axes (lineHeight, elementSpacing, marginsMm.{x,y}) were
+// already wired (legacyAdapt.ts:69,72-81) before this ticket — this only
+// ADDS the distinctness/geometry proof the ticket calls for, same oracle as
+// the typeScale cases above (real measured geometry, not just distinct
+// bytes).
+describe("spacing axes — measurable geometry change (E9-F2b, §31.2)", () => {
+  it("lineHeight: a taller line height increases the y-gap between two wrapped summary lines", async () => {
+    const profile = profileFixture();
+    // Long enough, at DEFAULT_FORMAT_V2's page width/body size, to wrap onto
+    // (at least) two lines regardless of lineHeight — lineHeight changes the
+    // gap BETWEEN lines, never the wrap point itself.
+    const resume: TailoredResume = {
+      ...resumeFixture(),
+      summary:
+        "A very long summary sentence written specifically so that it wraps across multiple lines on the page regardless of the exact font metrics in play here today.",
+    };
+    const lowFormat: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      spacing: { ...DEFAULT_FORMAT_V2.spacing, lineHeight: 1.15 },
+    };
+    const highFormat: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      spacing: { ...DEFAULT_FORMAT_V2.spacing, lineHeight: 1.5 },
+    };
+
+    async function summaryLineGap(format: DocumentFormatV2): Promise<number> {
+      const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
+      const { items } = await page1Geometry(buffer);
+      // Each wrapped line of the summary is its own text-content item (one
+      // run of unstyled Text per visual line) — anchor on each line's own
+      // substring rather than "top 2 y's on the page" (which would just as
+      // easily pick up the name/contact-line rows above the summary).
+      const line1 = items.find((item) => item.str.includes("wraps across multiple lines"));
+      const line2 = items.find((item) => item.str.includes("font metrics in play here today"));
+      expect(line1).toBeDefined();
+      expect(line2).toBeDefined();
+      return (line1 as TextGeometry).y - (line2 as TextGeometry).y;
+    }
+
+    const lowGap = await summaryLineGap(lowFormat);
+    const highGap = await summaryLineGap(highFormat);
+    expect(highGap).toBeGreaterThan(lowGap);
+  });
+
+  it("elementSpacing: a wider section gap pushes the first section label further down the page", async () => {
+    const profile = profileFixture();
+    const resume = resumeFixture();
+
+    async function firstSectionLabelY(elementSpacing: number): Promise<number> {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        spacing: { ...DEFAULT_FORMAT_V2.spacing, elementSpacing },
+      };
+      const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
+      const { items } = await page1Geometry(buffer);
+      const label = items.find((item) => item.str === "PROJECTS");
+      expect(label).toBeDefined();
+      return (label as TextGeometry).y;
+    }
+
+    const lowY = await firstSectionLabelY(0);
+    const highY = await firstSectionLabelY(4);
+    // pdf y grows upward from the page bottom — pushed further DOWN the
+    // page means a SMALLER y.
+    expect(highY).toBeLessThan(lowY);
+  });
+
+  it("marginsMm.x: a wider side margin shifts the name's x-offset to the right", async () => {
+    const profile = profileFixture();
+    const resume = resumeFixture();
+
+    async function nameX(x: number): Promise<number> {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        spacing: {
+          ...DEFAULT_FORMAT_V2.spacing,
+          marginsMm: { ...DEFAULT_FORMAT_V2.spacing.marginsMm, x },
+        },
+      };
+      const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
+      const { items } = await page1Geometry(buffer);
+      const name = items.find((item) => item.str === "Jordan Rivera");
+      expect(name).toBeDefined();
+      return (name as TextGeometry).x;
+    }
+
+    const narrowX = await nameX(10);
+    const wideX = await nameX(28);
+    expect(wideX).toBeGreaterThan(narrowX);
+  });
+
+  it("marginsMm.y: a taller top margin shifts the name further down the page (smaller y)", async () => {
+    const profile = profileFixture();
+    const resume = resumeFixture();
+
+    async function nameY(y: number): Promise<number> {
+      const format: DocumentFormatV2 = {
+        ...DEFAULT_FORMAT_V2,
+        spacing: {
+          ...DEFAULT_FORMAT_V2.spacing,
+          marginsMm: { ...DEFAULT_FORMAT_V2.spacing.marginsMm, y },
+        },
+      };
+      const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
+      const { items } = await page1Geometry(buffer);
+      const name = items.find((item) => item.str === "Jordan Rivera");
+      expect(name).toBeDefined();
+      return (name as TextGeometry).y;
+    }
+
+    const shortY = await nameY(10);
+    const tallY = await nameY(28);
+    expect(tallY).toBeLessThan(shortY);
   });
 });
