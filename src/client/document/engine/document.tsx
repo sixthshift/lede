@@ -43,6 +43,16 @@
 // heading family, the only section-heading-vs-name font split this engine
 // makes.
 //
+// AXES WIRED THIS TICKET (E9-F3a): colors.area 'full-page' (page-level
+// backgroundColor = colors.background) and 'border' (same page background,
+// SENSIBLY rendered ahead of the actual frame — that's F3b's job, not this
+// one's); colors.mode 'multi' generalizes contrastInk (see below) beyond the
+// header band to the whole document's text when a full-page/border
+// background is actually painted — 'single' keeps the pre-ticket band-only
+// ink scope unchanged. The 'header' band (colors.area 'header') is now also
+// wired for columns:'two' (previously an unhandled off-diagonal — folded into
+// the main column with no band); 'one'/'mix' unchanged.
+//
 // AXES NOT YET WIRED (render as sections.tsx's one existing look — never a
 // crash; later tickets land their seam per §31.6's phase list):
 // typeScale.{nameOffset,titleOffset,
@@ -50,11 +60,7 @@
 // heading sizes with no per-field seam), entries.* (structure/date-location/
 // subtitle/list-style/per-field font style/body indent), headings.{style
 // beyond the underline sections.tsx already draws,capitalization,icons},
-// colors.{mode 'multi',
-// full-page/border area,border,accentPlacement} (colors.area 'header' is
-// only wired for columns:'one' and for the full-width header block in
-// 'mix' — a 'header' band combined with columns:'two' is an unhandled
-// off-diagonal: renders without the band, never crashes), header.
+// colors.{border the drawn frame itself,accentPlacement}, header.
 // {detailsArrangement 'wrapped',separator,contactIconStyle,titleWeight,
 // titlePosition}, photo.{crop,zoom}, links, footer, per-section display
 // variants, document.{pageFormat is honored via `paper`; dateFormat is not
@@ -79,8 +85,9 @@ const COLUMN_GUTTER_PT = 16;
 
 // Ported (not imported — the per-look composition directory is grep-guarded
 // out of this one) from the retired banner look's source: identical coarse
-// WCAG-style luminance check, used only to pick white-vs-near-black ink on a
-// filled band.
+// WCAG-style luminance check, used to pick white-vs-near-black ink on any
+// filled surface this engine paints — originally the header band alone,
+// generalized this ticket (E9-F3a) to a full-page/border background too.
 function contrastInk(hex: string): string {
   const normalized = hex.replace("#", "");
   const full =
@@ -96,6 +103,24 @@ function contrastInk(hex: string): string {
   const b = value & 255;
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance > 0.6 ? "#111111" : "#ffffff";
+}
+
+// colors.background as a page-level fill (§31.2) is a MULTI-mode-only feature:
+// spec.md:1014 defines single = "accent over black-on-white" and :1093 pins
+// "no full-page/header background (single mode over white)" as the strict-grade
+// premise F5's atsGrade relies on — so single mode ALWAYS leaves the page white
+// regardless of colors.area, and only multi paints colors.background. 'border'
+// rides the same gate ahead of its own frame (F3b): a page background is
+// sensible to render now even though the frame stroke isn't drawn yet. (The
+// header BAND — colors.area 'header' — is deliberately NOT gated here: the
+// banner preset paints its full-bleed accent band in single mode by default,
+// so band-in-single is pre-existing and F5 owns reconciling it with the grade
+// table.)
+function resolvePageBackground(format: DocumentFormatV2): string | undefined {
+  if (format.colors.mode !== "multi") return undefined;
+  return format.colors.area === "full-page" || format.colors.area === "border"
+    ? format.colors.background
+    : undefined;
 }
 
 // The three ProfileHeader variants sections.tsx exposes collapse two
@@ -206,30 +231,58 @@ export function EngineDocument({
   const legacy = applyEngineDensity(toLegacyFormat(format), density);
   const variant = resolveVariant(format);
   const hasBand = format.colors.area === "header";
-  const ink = hasBand ? contrastInk(format.colors.accent) : undefined;
+  const bandInk = hasBand ? contrastInk(format.colors.accent) : undefined;
+  // Only ever set in multi mode over a full-page/border area (see
+  // resolvePageBackground's own gate) — single mode leaves the page white.
+  const pageBackground = resolvePageBackground(format);
+  // A painted page background implies multi mode, so its auto-contrast ink
+  // (§31.2: "auto-contrast ink, the E8 banner logic generalized") generalizes
+  // contrastInk from the band to the whole document. Single mode never paints
+  // a page background, so it never gets document-wide ink — it keeps the
+  // pre-ticket band-only ink scope.
+  const documentInk = pageBackground ? contrastInk(pageBackground) : undefined;
+  // documentInk repaints EVERY text color sections.tsx reads off colors.text
+  // (name, contact, summary, entry titles, item text, …) by overriding that
+  // one field on the legacy shape handed to every renderer below — the same
+  // "one seam, every consumer" trick as bandInk's `ink` prop, just scoped to
+  // the whole document instead of the header alone.
+  const inkedLegacy = documentInk
+    ? { ...legacy, colors: { ...legacy.colors, text: documentInk } }
+    : legacy;
+  const headerInk = bandInk ?? documentInk;
   const columnsMode = format.layout.columns;
   const isColumnar = columnsMode !== "one";
-  // The header band (colors.area 'header') is only wired at the top of the
-  // page for 'one' and 'mix' (mix's header spans full width above the
-  // columns, same as 'one'); 'two' folds the header into the main column,
-  // where a full-bleed band isn't wired this ticket (unhandled off-diagonal
-  // — renders without the band, never crashes).
+  // The header band (colors.area 'header') sits at the top of the page for
+  // 'one' and 'mix' (mix's header spans full width above the columns, same
+  // as 'one'); 'two' folds the header into the main column instead, where the
+  // band wraps just that column's header block (see mainColumn below) rather
+  // than the page.
   const bandAtPageTop = hasBand && columnsMode !== "two";
 
+  const pageStyleBase = {
+    paddingTop: bandAtPageTop ? 0 : legacy.page.marginY,
+    paddingBottom: legacy.page.marginY,
+    // Columnar layouts hand their own horizontal margins to the `row`
+    // (see resolveColumnGeometry) rather than the page — mirrors the
+    // retired sidebar templates' page style (paddingHorizontal: 0).
+    paddingHorizontal: bandAtPageTop || isColumnar ? 0 : legacy.page.marginX,
+    fontSize: legacy.typography.body.size,
+    fontFamily: legacy.typography.body.family,
+  };
   const styles = StyleSheet.create({
-    page: {
-      paddingTop: bandAtPageTop ? 0 : legacy.page.marginY,
-      paddingBottom: legacy.page.marginY,
-      // Columnar layouts hand their own horizontal margins to the `row`
-      // (see resolveColumnGeometry) rather than the page — mirrors the
-      // retired sidebar templates' page style (paddingHorizontal: 0).
-      paddingHorizontal: bandAtPageTop || isColumnar ? 0 : legacy.page.marginX,
-      fontSize: legacy.typography.body.size,
-      fontFamily: legacy.typography.body.family,
-    },
+    page: pageBackground ? { ...pageStyleBase, backgroundColor: pageBackground } : pageStyleBase,
     band: {
       backgroundColor: format.colors.accent,
       paddingHorizontal: legacy.page.marginX,
+      paddingVertical: legacy.page.marginY * 0.6,
+    },
+    // The 'two'-column band (see mainColumn below): the row that hosts this
+    // column already carries the page's horizontal margin as its own
+    // paddingHorizontal (see `row`), so this fills only vertically — adding
+    // styles.band's own paddingHorizontal here would double the left/right
+    // margin inside the column.
+    columnBand: {
+      backgroundColor: format.colors.accent,
       paddingVertical: legacy.page.marginY * 0.6,
     },
     body: {
@@ -247,13 +300,13 @@ export function EngineDocument({
   const header = (
     <ProfileHeader
       profile={profile}
-      format={legacy}
+      format={inkedLegacy}
       variant={variant}
-      ink={ink}
+      ink={headerInk}
       nameFontFamily={nameFontFamily}
     />
   );
-  const summary = <SummarySection summary={resume.summary} format={legacy} />;
+  const summary = <SummarySection summary={resume.summary} format={inkedLegacy} />;
 
   if (!isColumnar) {
     const content = (
@@ -261,7 +314,7 @@ export function EngineDocument({
         {summary}
         {resume.sections.map((section) => (
           <View key={section.section} break={breaksBeforeSection(format, section)}>
-            <SectionBlock section={section} format={legacy} />
+            <SectionBlock section={section} format={inkedLegacy} />
           </View>
         ))}
       </>
@@ -314,16 +367,29 @@ export function EngineDocument({
     const sidebarColumn = (
       <View style={columnStyles.sidebar}>
         {sidebar.map((section) => (
-          <SectionBlock key={section.section} section={section} format={legacy} />
+          <SectionBlock key={section.section} section={section} format={inkedLegacy} />
         ))}
       </View>
     );
+    // 'two' + colors.area 'header' (the residual this ticket fixes): the band
+    // wraps just the header block, local to the main column it already folds
+    // into — not the full page width the 'one'/'mix' band gets (there is no
+    // full-bleed row here to paint; painting the whole `row` would tint the
+    // sidebar too, which colors.area 'header' never promised).
+    const headerBlock =
+      index === 0 && columnsMode === "two" ? (
+        hasBand ? (
+          <View style={styles.columnBand}>{header}</View>
+        ) : (
+          header
+        )
+      ) : null;
     const mainColumn = (
       <View style={columnStyles.main}>
-        {index === 0 && columnsMode === "two" ? header : null}
+        {headerBlock}
         {index === 0 && columnsMode === "two" ? summary : null}
         {main.map((section) => (
-          <SectionBlock key={section.section} section={section} format={legacy} />
+          <SectionBlock key={section.section} section={section} format={inkedLegacy} />
         ))}
       </View>
     );

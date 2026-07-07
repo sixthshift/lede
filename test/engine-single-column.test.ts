@@ -375,6 +375,72 @@ describe("OFF-DIAGONAL composition — a combination none of the six retired tem
   });
 });
 
+describe("colors.area 'full-page' + colors.mode — generalized auto-contrast ink (E9-F3a)", () => {
+  const DARK_BACKGROUND = "#0f172a"; // DesignPanel's own curated swatch set
+
+  it("mode 'multi': a dark full-page background paints the page AND flips ink document-wide; extraction text/order untouched", async () => {
+    const profile = profileFixture();
+    const format: DocumentFormatV2 = {
+      ...PRESETS.strict,
+      colors: {
+        ...PRESETS.strict.colors,
+        area: "full-page",
+        mode: "multi",
+        background: DARK_BACKGROUND,
+      },
+    };
+    const buffer = await renderEngineToBuffer({
+      resume: resumeFixture(),
+      profile,
+      paper: "letter",
+      format,
+    });
+
+    const fills = await page1FillColors(buffer);
+    expect(fills).toContain(DARK_BACKGROUND);
+    expect(expectedInk(DARK_BACKGROUND)).toBe("#ffffff");
+    expect(fills).toContain(expectedInk(DARK_BACKGROUND));
+
+    // colors paint only — content/order stays exactly what the un-colored
+    // strict preset produces.
+    const text = (await extractPdfText(buffer)).join(" ");
+    expect(text).toContain(profile.name);
+    let lastIdx = -1;
+    for (const marker of ORDERED_MARKERS) {
+      const idx = text.indexOf(marker);
+      expect(idx).toBeGreaterThan(-1);
+      expect(idx).toBeGreaterThan(lastIdx);
+      lastIdx = idx;
+    }
+  });
+
+  it("mode 'single': the page stays WHITE even with a dark colors.background set — a painted page background is a multi-mode-only feature (spec.md:1014,:1093 'single mode over white')", async () => {
+    const profile = profileFixture();
+    const format: DocumentFormatV2 = {
+      ...PRESETS.strict,
+      colors: {
+        ...PRESETS.strict.colors,
+        area: "full-page",
+        mode: "single",
+        background: DARK_BACKGROUND,
+      },
+    };
+    const buffer = await renderEngineToBuffer({
+      resume: resumeFixture(),
+      profile,
+      paper: "letter",
+      format,
+    });
+
+    // The authored dark background is NOT painted, and its would-be contrast
+    // ink is NOT applied — single mode is accent over black-on-white.
+    const fills = await page1FillColors(buffer);
+    expect(fills).not.toContain(DARK_BACKGROUND);
+    expect(fills).not.toContain(expectedInk(DARK_BACKGROUND));
+    expect(fills).toContain(format.colors.text);
+  });
+});
+
 describe("presets.ts (§31.1: retired templates reborn as presets, not hand-authored forks)", () => {
   it("six configs exist", () => {
     expect([...PRESET_IDS].sort()).toEqual(

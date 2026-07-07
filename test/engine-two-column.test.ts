@@ -151,6 +151,31 @@ function meanX(item: TextGeometry): number {
   return item.x + item.width / 2;
 }
 
+// Mirrors engine-single-column.test.ts's page1FillColors/expectedInk
+// (op-list fill extractor + the E8-A2 luminance oracle, ported again here
+// rather than shared — same reasoning as that file's own comment: this
+// doesn't need to import a private helper from the engine).
+async function page1FillColors(buffer: Buffer): Promise<string[]> {
+  const { getDocument, OPS } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await getDocument({ data: new Uint8Array(buffer) }).promise;
+  const page = await doc.getPage(1);
+  const opList = await page.getOperatorList();
+  const fills: string[] = [];
+  for (let i = 0; i < opList.fnArray.length; i++) {
+    if (opList.fnArray[i] === OPS.setFillRGBColor) fills.push(opList.argsArray[i][0]);
+  }
+  return fills;
+}
+
+function expectedInk(hex: string): string {
+  const value = Number.parseInt(hex.replace("#", ""), 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? "#111111" : "#ffffff";
+}
+
 describe.each(SIDEBAR_PRESET_IDS)("%s preset — extraction (through the engine)", (presetId) => {
   it("contains profile header + every selected item.text; leadRationale/cut absent", async () => {
     const profile = profileFixture();
@@ -320,6 +345,31 @@ describe("MIX composition — does not crash, renders all content (not pixel-gra
     const base = PRESETS["sidebar-left"];
     const format: DocumentFormatV2 = { ...base, layout: { ...base.layout, columns: "mix" } };
     const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
+    const text = (await extractPdfText(buffer)).join(" ");
+    expect(text).toContain(profile.name);
+    for (const marker of allItemTexts(resume)) {
+      expect(text).toContain(marker);
+    }
+  });
+});
+
+describe("colors.area 'header' band — the two-column residual this ticket fixes (E9-F3a)", () => {
+  it("sidebar-left preset + area:'header' paints the accent band with auto-contrast ink inside the main column, page 1", async () => {
+    const profile = profileFixture();
+    const resume = resumeFixture();
+    const base = PRESETS["sidebar-left"];
+    const format: DocumentFormatV2 = {
+      ...base,
+      colors: { ...base.colors, area: "header" },
+    };
+    const buffer = await renderEngineToBuffer({ resume, profile, paper: "letter", format });
+
+    const fills = await page1FillColors(buffer);
+    expect(fills).toContain(format.colors.accent);
+    expect(fills).toContain(expectedInk(format.colors.accent));
+
+    // colors paint only — every marker still extracts, same as the plain
+    // sidebar-left preset (this describe block's sibling above).
     const text = (await extractPdfText(buffer)).join(" ");
     expect(text).toContain(profile.name);
     for (const marker of allItemTexts(resume)) {

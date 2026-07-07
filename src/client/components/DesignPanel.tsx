@@ -28,6 +28,8 @@
 import type { ReactNode } from "react";
 import type {
   BodyFontId,
+  ColorArea,
+  ColorMode,
   ColumnsMode,
   DateFormatV2,
   EntryDateLocationOrder,
@@ -78,6 +80,21 @@ const HEADER_POSITION_OPTIONS: { value: HeaderPosition; label: string }[] = [
 const SECTION_COLUMN_OPTIONS: { value: SectionColumn; label: string }[] = [
   { value: "main", label: "Main" },
   { value: "sidebar", label: "Sidebar" },
+];
+// colors.area/mode (§31.2/E9-F3a, engine/document.tsx): area picks WHERE a
+// filled surface appears (full-page background, header band, or — ahead of
+// its own F3b frame ticket — a page background under the future border);
+// mode picks whether that surface (and, in 'multi', the rest of the
+// document's text) uses the independently-chosen background/text hexes
+// ('multi') or stays the pre-ticket accent-band-only look ('single').
+const COLOR_AREA_OPTIONS: { value: ColorArea; label: string }[] = [
+  { value: "full-page", label: "Full page" },
+  { value: "header", label: "Header band" },
+  { value: "border", label: "Border" },
+];
+const COLOR_MODE_OPTIONS: { value: ColorMode; label: string }[] = [
+  { value: "single", label: "Single (accent over black-on-white)" },
+  { value: "multi", label: "Multi (independent colors)" },
 ];
 // headings.style's 8 treatments (§31.2, sections.tsx's renderSectionHeading)
 // — distinct from the "Heading weight" control below, which binds
@@ -741,6 +758,26 @@ export function DesignPanel({
 
       {/* ── color ── */}
       <div className="grid gap-4 sm:grid-cols-2">
+        <FieldRow label="Color area" htmlFor="design-color-area">
+          <EnumSelect
+            id="design-color-area"
+            value={format.colors.area}
+            options={COLOR_AREA_OPTIONS}
+            disabled={readOnly}
+            onChange={(area) => set({ ...format, colors: { ...format.colors, area } })}
+          />
+        </FieldRow>
+
+        <FieldRow label="Color mode" htmlFor="design-color-mode">
+          <EnumSelect
+            id="design-color-mode"
+            value={format.colors.mode}
+            options={COLOR_MODE_OPTIONS}
+            disabled={readOnly}
+            onChange={(mode) => set({ ...format, colors: { ...format.colors, mode } })}
+          />
+        </FieldRow>
+
         <FieldRow label="Primary color" htmlFor="design-color-primary">
           <ColorField
             id="design-color-primary"
@@ -756,6 +793,15 @@ export function DesignPanel({
             value={format.colors.text}
             disabled={readOnly}
             onChange={(text) => set({ ...format, colors: { ...format.colors, text } })}
+          />
+        </FieldRow>
+
+        <FieldRow label="Background color" htmlFor="design-color-background">
+          <ColorField
+            id="design-color-background"
+            value={format.colors.background}
+            disabled={readOnly}
+            onChange={(background) => set({ ...format, colors: { ...format.colors, background } })}
           />
         </FieldRow>
       </div>
