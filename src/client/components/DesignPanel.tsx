@@ -29,6 +29,7 @@
 // render seam (E9-F2a, engine/document.tsx).
 import type { ReactNode } from "react";
 import type {
+  AccentPlacementV2,
   BodyFontId,
   BorderSize,
   ColorArea,
@@ -117,6 +118,23 @@ const BORDER_SIDES = [
   { key: "bottom", label: "Bottom" },
   { key: "left", label: "Left" },
 ] as const;
+// colors.accentPlacement's 9 independent toggles (§31.2/E9-F3d,
+// sections.tsx's accentOrText) — each gates accent (colors.accent) vs the
+// base text color on ONLY its own element class. `levelIndicators` has no
+// render seam yet (its element — the skills/languages level display — lands
+// in E9-F4); the toggle is exposed now so the panel matches
+// AccentPlacementV2's full 9 keys, but it's a no-op until that ticket wires it.
+const ACCENT_PLACEMENT_FIELDS: { key: keyof AccentPlacementV2; label: string }[] = [
+  { key: "name", label: "Name" },
+  { key: "title", label: "Title" },
+  { key: "headings", label: "Section headings" },
+  { key: "headingRules", label: "Heading rules/decoration" },
+  { key: "headerIcons", label: "Contact icons" },
+  { key: "levelIndicators", label: "Skill/language levels (coming soon)" },
+  { key: "dates", label: "Entry dates" },
+  { key: "entrySubtitles", label: "Entry subtitles" },
+  { key: "linkIcons", label: "Link icons" },
+];
 // headings.style's 8 treatments (§31.2, sections.tsx's renderSectionHeading)
 // — distinct from the "Heading weight" control below, which binds
 // header.nameWeight/titleWeight (the PROFILE header), not this axis.
@@ -1032,6 +1050,35 @@ export function DesignPanel({
                   className="h-4 w-4 rounded border-border"
                 />
                 <Label htmlFor={`design-border-side-${key}`}>{label}</Label>
+              </div>
+            ))}
+          </div>
+        </FieldRow>
+
+        <FieldRow label="Accent placement" htmlFor="design-accent-placement-name">
+          <div className="flex flex-wrap gap-3">
+            {ACCENT_PLACEMENT_FIELDS.map(({ key, label }) => (
+              <div key={key} className="flex items-center gap-2">
+                <input
+                  id={`design-accent-placement-${key}`}
+                  type="checkbox"
+                  checked={format.colors.accentPlacement[key]}
+                  disabled={readOnly}
+                  onChange={(e) =>
+                    set({
+                      ...format,
+                      colors: {
+                        ...format.colors,
+                        accentPlacement: {
+                          ...format.colors.accentPlacement,
+                          [key]: e.target.checked,
+                        },
+                      },
+                    })
+                  }
+                  className="h-4 w-4 rounded border-border"
+                />
+                <Label htmlFor={`design-accent-placement-${key}`}>{label}</Label>
               </div>
             ))}
           </div>

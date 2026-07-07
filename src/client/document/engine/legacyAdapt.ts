@@ -7,6 +7,7 @@
 // yet and why.
 import type { DocumentFormat, FontId } from "@shared/types";
 import type {
+  AccentPlacementV2,
   ContactIconStyle,
   DateFormatV2,
   DocumentFormatV2,
@@ -175,6 +176,15 @@ function resolveLinksConfig(format: DocumentFormatV2): LinksRenderConfig {
   return { ...format.links };
 }
 
+// colors.accentPlacement (§31.2, E9-F3d) resolves 1:1 to sections.tsx's
+// per-element-class accent-vs-text gate — no derivation, same seam as
+// linksConfig above (`accentPlacementConfig`).
+export type AccentPlacementRenderConfig = AccentPlacementV2;
+
+function resolveAccentPlacementConfig(format: DocumentFormatV2): AccentPlacementRenderConfig {
+  return { ...format.colors.accentPlacement };
+}
+
 export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
   typeScaleSizes: TypeScaleSizes;
   headingsConfig: HeadingsRenderConfig;
@@ -182,6 +192,7 @@ export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
   entriesConfig: EntriesRenderConfig;
   headerConfig: HeaderRenderConfig;
   linksConfig: LinksRenderConfig;
+  accentPlacementConfig: AccentPlacementRenderConfig;
 } {
   const bodyFont = resolveFont(format.fonts.body);
   return {
@@ -212,5 +223,6 @@ export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
     entriesConfig: resolveEntriesConfig(format),
     headerConfig: resolveHeaderConfig(format),
     linksConfig: resolveLinksConfig(format),
+    accentPlacementConfig: resolveAccentPlacementConfig(format),
   };
 }

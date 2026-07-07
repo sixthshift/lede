@@ -15,7 +15,11 @@ import {
   HEADING_STYLES,
   migrateFormat,
   NAME_DISPLAY_FONT_IDS,
+  type AccentPlacementV2,
   type DocumentFormatV2,
+  type HeaderV2,
+  type HeadingsV2,
+  type LinksV2,
 } from "@shared/format-v2";
 import { DEFAULT_FORMAT } from "@shared/format";
 import { extractPdfText } from "../src/client/document/extractText";
@@ -184,6 +188,24 @@ async function page1FillColors(buffer: Buffer): Promise<string[]> {
     if (opList.fnArray[i] === OPS.setFillRGBColor) fills.push(opList.argsArray[i][0]);
   }
   return fills;
+}
+
+// A View's `borderColor` (no `backgroundColor`) paints via a STROKE, not a
+// fill — @react-pdf/render's border path calls ctx.strokeColor, never
+// ctx.fillColor (verified in @react-pdf/render/lib/index.js at authoring
+// time) — so an outline-only element class (e.g. linkIcon, border-only
+// contact-icon shapes) needs this sibling extractor; page1FillColors alone
+// would never see it.
+async function page1StrokeColors(buffer: Buffer): Promise<string[]> {
+  const { getDocument, OPS } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await getDocument({ data: new Uint8Array(buffer) }).promise;
+  const page = await doc.getPage(1);
+  const opList = await page.getOperatorList();
+  const strokes: string[] = [];
+  for (let i = 0; i < opList.fnArray.length; i++) {
+    if (opList.fnArray[i] === OPS.setStrokeRGBColor) strokes.push(opList.argsArray[i][0]);
+  }
+  return strokes;
 }
 
 // Mirrors engine/document.tsx's contrastInk — ported again, assertion-only,
@@ -1509,5 +1531,144 @@ describe("header + links — extraction text is untouched by styling (E9-F3c, §
     expect(text).toContain(profile.phone as string);
     expect(text).toContain(profile.location as string);
     expect(text).toContain(profile.links[0].label);
+  });
+});
+
+describe("colors.accentPlacement — 8 of the 9 gates, each its own element class (E9-F3d, §31.2)", () => {
+  // levelIndicators is EXCLUDED here — its element (skills/languages level
+  // display) doesn't exist yet (E9-F4); sections.tsx's resolveAccentPlacement
+  // comment notes it as a documented no-op until that ticket lands.
+  const ALL_ACCENT_OFF: AccentPlacementV2 = {
+    name: false,
+    title: false,
+    headings: false,
+    headingRules: false,
+    headerIcons: false,
+    levelIndicators: false,
+    dates: false,
+    entrySubtitles: false,
+    linkIcons: false,
+  };
+  const ACCENT_HEX = "#ff00ff";
+  const TEXT_HEX = "#111111";
+
+  // One experience group carrying every headingParts field (engine-entries.
+  // test.ts's own fixture, ported — this file's resumeFixture() groups have
+  // no headingParts, so dates/entrySubtitles need one that does).
+  function structuredResume(): TailoredResume {
+    return {
+      signals: { roleLevel: "senior", weights: [], hardRequirements: [] },
+      summary: "",
+      sections: [
+        {
+          section: "experience",
+          groups: [
+            {
+              heading: "RAWHEADINGFALLBACK",
+              headingParts: {
+                title: "ENTRYTITLE",
+                subtitle: "ENTRYSUBTITLE",
+                date: "2021-06-15",
+                location: "ENTRYLOCATION",
+              },
+              items: [{ entryId: "e1", text: "ITEMONE" }],
+            },
+          ],
+        },
+      ],
+      cut: [],
+    };
+  }
+
+  // `headings`/`header`/`links` are the ONE non-color override needed to
+  // make that element class paint anything at all (e.g. no link icon is
+  // drawn unless links.icon is on) — held IDENTICAL across a case's on/off
+  // render pair, so the flag under test is the only input difference
+  // between them. links.accentColor is pinned false in every case
+  // (regardless of override) since it independently colors the link TEXT
+  // element class (E9-F3c, untouched by this ticket) — left at its
+  // DEFAULT_FORMAT_V2 default of true, profileFixture()'s link would paint
+  // colors.accent no matter which of these 9 flags is under test,
+  // contaminating every other case's fill-color check. `stroke` marks the
+  // two element classes whose color is a View border (drawn via
+  // ctx.strokeColor by @react-pdf/render, never ctx.fillColor) rather than a
+  // fill/Text run — see page1StrokeColors above.
+  const CASES: {
+    flag: keyof AccentPlacementV2;
+    headings?: Partial<HeadingsV2>;
+    header?: Partial<HeaderV2>;
+    links?: Partial<LinksV2>;
+    profile?: Profile;
+    resume?: TailoredResume;
+    stroke?: boolean;
+  }[] = [
+    { flag: "name" },
+    { flag: "title", profile: { ...profileFixture(), headline: "SENTINEL_HEADLINE" } },
+    { flag: "headings" },
+    {
+      // headingRules' decoration under the default 'underline' style is a
+      // border (a stroke) — 'accent-bar' swaps it for headingAccentBar's
+      // backgroundColor (a fill), so this flag is testable with the same
+      // page1FillColors extractor every other case (but linkIcons) uses.
+      flag: "headingRules",
+      headings: { style: "accent-bar" },
+    },
+    {
+      // contactIconStyle's default is 'none-frame' (no icon at all) — a
+      // '*-filled' shape paints a backgroundColor (a fill).
+      flag: "headerIcons",
+      header: { contactIconStyle: "circle-filled" },
+    },
+    { flag: "dates", resume: structuredResume() },
+    { flag: "entrySubtitles", resume: structuredResume() },
+    {
+      // links.icon's default is false (no icon View at all); linkIcon has no
+      // backgroundColor, only a borderColor — a stroke.
+      flag: "linkIcons",
+      links: { icon: true },
+      stroke: true,
+    },
+  ];
+
+  describe.each(CASES)("$flag", ({ flag, headings, header, links, profile, resume, stroke }) => {
+    it("gates colors.accent vs colors.text on ONLY its own element class; extraction text is unchanged either way", async () => {
+      const useProfile = profile ?? profileFixture();
+      const useResume = resume ?? resumeFixture();
+
+      async function render(value: boolean): Promise<Buffer> {
+        const format: DocumentFormatV2 = {
+          ...DEFAULT_FORMAT_V2,
+          headings: { ...DEFAULT_FORMAT_V2.headings, ...headings },
+          header: { ...DEFAULT_FORMAT_V2.header, ...header },
+          links: { ...DEFAULT_FORMAT_V2.links, accentColor: false, ...links },
+          colors: {
+            ...DEFAULT_FORMAT_V2.colors,
+            accent: ACCENT_HEX,
+            text: TEXT_HEX,
+            accentPlacement: { ...ALL_ACCENT_OFF, [flag]: value },
+          },
+        };
+        return renderEngineToBuffer({
+          resume: useResume,
+          profile: useProfile,
+          paper: "letter",
+          format,
+        });
+      }
+
+      const offBuffer = await render(false);
+      const onBuffer = await render(true);
+      expect(Buffer.compare(offBuffer, onBuffer)).not.toBe(0);
+
+      const colorsOf = stroke ? page1StrokeColors : page1FillColors;
+      const offColors = await colorsOf(offBuffer);
+      const onColors = await colorsOf(onBuffer);
+      expect(offColors).not.toContain(ACCENT_HEX);
+      expect(onColors).toContain(ACCENT_HEX);
+
+      const offText = (await extractPdfText(offBuffer)).join(" ");
+      const onText = (await extractPdfText(onBuffer)).join(" ");
+      expect(onText).toBe(offText);
+    });
   });
 });

@@ -25,6 +25,7 @@ import type {
   HeaderSeparator,
 } from "@shared/format-v2";
 import type {
+  AccentPlacementRenderConfig,
   EntriesRenderConfig,
   HeaderRenderConfig,
   HeadingsRenderConfig,
@@ -136,6 +137,43 @@ function resolveLinksConfig(format: DocumentFormat): LinksRenderConfig {
   return config ?? DEFAULT_LINKS_CONFIG;
 }
 
+// colors.accentPlacement (§31.2, E9-F3d) arrives as an extra property on
+// `format`, same seam as linksConfig above. Absent falls back to exactly
+// this module's pre-ticket look: headings/headingRules colored by
+// colors.primary, every other element class (name/title/headerIcons/dates/
+// entrySubtitles/linkIcons) by colors.text — see format-v2.ts's baseFromV1
+// accentPlacement value, which this mirrors 1:1.
+// levelIndicators is a NO-OP here: its element (skills/languages level
+// display) doesn't exist in this file yet — it's built in E9-F4. The flag
+// is threaded through so AccentPlacementV2 stays whole end-to-end, but
+// nothing reads it until that ticket gives it a color path to gate.
+const DEFAULT_ACCENT_PLACEMENT: AccentPlacementRenderConfig = {
+  name: false,
+  title: false,
+  headings: true,
+  headingRules: true,
+  headerIcons: false,
+  levelIndicators: false,
+  dates: false,
+  entrySubtitles: false,
+  linkIcons: false,
+};
+
+function resolveAccentPlacement(format: DocumentFormat): AccentPlacementRenderConfig {
+  const config = (
+    format as DocumentFormat & { accentPlacementConfig?: AccentPlacementRenderConfig }
+  ).accentPlacementConfig;
+  return config ?? DEFAULT_ACCENT_PLACEMENT;
+}
+
+// Every gated element class below reduces to this: colors.primary when its
+// own accentPlacement flag is on, colors.text otherwise. One helper so the
+// 8 call sites (name/title/headings/headingRules/headerIcons/dates/
+// entrySubtitles/linkIcons) can't drift into slightly different ternaries.
+function accentOrText(enabled: boolean, colors: DocumentFormat["colors"]): string {
+  return enabled ? colors.primary : colors.text;
+}
+
 // A group's structured date (headingParts.date), re-rendered through the
 // chosen dateFormat preset when parseable — same rule resolveGroupHeadingText
 // used pre-ticket, just extracted so both the fallback string join (none
@@ -156,10 +194,20 @@ function buildStyles(format: DocumentFormat) {
   const headingsConfig = resolveHeadingsConfig(format);
   const headerConfig = resolveHeaderConfig(format);
   const linksConfig = resolveLinksConfig(format);
+  const accentPlacement = resolveAccentPlacement(format);
   // "plain" (§31.2) means bare text — no accent color, no rule/box/bar
-  // decoration at all — so it also drops the accent-colored text every other
-  // treatment shares; every other treatment keeps today's colors.primary.
-  const headingColor = headingsConfig.style === "plain" ? colors.text : colors.primary;
+  // decoration at all — so it drops the accent-colored text every other
+  // treatment shares regardless of accentPlacement.headings; every other
+  // treatment gates that same fill on the flag (E9-F3d).
+  const headingColor =
+    headingsConfig.style === "plain" ? colors.text : accentOrText(accentPlacement.headings, colors);
+  const headingRuleColor = accentOrText(accentPlacement.headingRules, colors);
+  const nameColor = accentOrText(accentPlacement.name, colors);
+  const titleColor = accentOrText(accentPlacement.title, colors);
+  const headerIconColor = accentOrText(accentPlacement.headerIcons, colors);
+  const dateColor = accentOrText(accentPlacement.dates, colors);
+  const entrySubtitleColor = accentOrText(accentPlacement.entrySubtitles, colors);
+  const linkIconColor = accentOrText(accentPlacement.linkIcons, colors);
   const headingTextTransform =
     headingsConfig.capitalization === "uppercase" ? "uppercase" : "capitalize";
 
@@ -188,7 +236,7 @@ function buildStyles(format: DocumentFormat) {
       fontSize: typeScaleSizes.name,
       fontFamily: typography.heading.family,
       fontWeight: typography.heading.weight,
-      color: colors.text,
+      color: nameColor,
     },
     // §31.2 "title/subtitle" — profile.headline, previously never rendered
     // in the PDF (only in plainText.ts's export) — this ticket gives it a
@@ -202,7 +250,7 @@ function buildStyles(format: DocumentFormat) {
       fontSize: typeScaleSizes.title,
       fontFamily: typography.body.family,
       fontWeight: headerConfig.titleWeight,
-      color: colors.text,
+      color: titleColor,
     },
     // header.titlePosition (E9-F3c): 'same-line' wraps name+title in a row
     // (nameTitleRow); 'below' keeps the pre-ticket look — a plain column, the
@@ -247,18 +295,29 @@ function buildStyles(format: DocumentFormat) {
     // "no font glyph dependency" reasoning as headingIconOutline/Filled below.
     // "none-frame" renders no View at all (see renderContactIcon).
     contactIconBase: { width: 7, height: 7, marginRight: 3 },
-    contactIconCircleFilled: { borderRadius: 3.5, backgroundColor: colors.text },
-    contactIconCircleOutline: { borderRadius: 3.5, borderWidth: 0.75, borderColor: colors.text },
-    contactIconRoundedFilled: { borderRadius: 1.5, backgroundColor: colors.text },
-    contactIconRoundedOutline: { borderRadius: 1.5, borderWidth: 0.75, borderColor: colors.text },
-    contactIconSquareFilled: { backgroundColor: colors.text },
-    contactIconSquareOutline: { borderWidth: 0.75, borderColor: colors.text },
-    // links.* (E9-F3c): accentColor picks colors.primary vs colors.text;
-    // underline is applied per-Link (textDecoration) since it composes onto
-    // this base rather than replacing it. linkFieldRow/linkIcon mirror
-    // contactFieldRow/contactIconBase above — links.icon is a small glyph-free
-    // View ahead of the link text, sized distinctly from a contact icon so
-    // the two element classes stay visually (and byte-) distinguishable.
+    contactIconCircleFilled: { borderRadius: 3.5, backgroundColor: headerIconColor },
+    contactIconCircleOutline: {
+      borderRadius: 3.5,
+      borderWidth: 0.75,
+      borderColor: headerIconColor,
+    },
+    contactIconRoundedFilled: { borderRadius: 1.5, backgroundColor: headerIconColor },
+    contactIconRoundedOutline: {
+      borderRadius: 1.5,
+      borderWidth: 0.75,
+      borderColor: headerIconColor,
+    },
+    contactIconSquareFilled: { backgroundColor: headerIconColor },
+    contactIconSquareOutline: { borderWidth: 0.75, borderColor: headerIconColor },
+    // links.* (E9-F3c): accentColor picks colors.primary vs colors.text for
+    // the link TEXT; underline is applied per-Link (textDecoration) since it
+    // composes onto this base rather than replacing it. linkFieldRow/linkIcon
+    // mirror contactFieldRow/contactIconBase above — links.icon is a small
+    // glyph-free View ahead of the link text, sized distinctly from a
+    // contact icon so the two element classes stay visually (and byte-)
+    // distinguishable. The icon's OWN fill is linkIconColor (E9-F3d,
+    // accentPlacement.linkIcons) — an independent element class from the
+    // link text, gated by its own flag rather than links.accentColor.
     linkFieldRow: { flexDirection: "row", alignItems: "center", marginRight: 8 },
     link: { color: linksConfig.accentColor ? colors.primary : colors.text },
     linkIcon: {
@@ -267,7 +326,7 @@ function buildStyles(format: DocumentFormat) {
       marginRight: 3,
       borderRadius: 1,
       borderWidth: 0.75,
-      borderColor: linksConfig.accentColor ? colors.primary : colors.text,
+      borderColor: linkIconColor,
     },
     summary: {
       fontSize: typography.body.size,
@@ -291,19 +350,23 @@ function buildStyles(format: DocumentFormat) {
       textTransform: headingTextTransform,
       color: headingColor,
     },
+    // headingRuleColor (E9-F3d, accentPlacement.headingRules) is the ONE
+    // fill every decoration below shares — the section-label TEXT
+    // (sectionHeadingText, above) is a separate element class gated by its
+    // own accentPlacement.headings flag.
     headingUnderline: {
       paddingBottom: 2,
       borderBottomWidth: 0.75,
-      borderBottomColor: colors.primary,
+      borderBottomColor: headingRuleColor,
     },
     headingThinUnderline: {
       paddingBottom: 2,
       borderBottomWidth: 0.25,
-      borderBottomColor: colors.primary,
+      borderBottomColor: headingRuleColor,
     },
     headingBoxed: {
       borderWidth: 0.75,
-      borderColor: colors.primary,
+      borderColor: headingRuleColor,
       paddingVertical: 2,
       paddingHorizontal: 4,
       alignSelf: "flex-start",
@@ -312,34 +375,34 @@ function buildStyles(format: DocumentFormat) {
       paddingVertical: 2,
       borderTopWidth: 0.5,
       borderBottomWidth: 0.5,
-      borderTopColor: colors.primary,
-      borderBottomColor: colors.primary,
+      borderTopColor: headingRuleColor,
+      borderBottomColor: headingRuleColor,
     },
     headingAccentBar: {
       width: 3,
       marginRight: 6,
-      backgroundColor: colors.primary,
+      backgroundColor: headingRuleColor,
       height: typeScaleSizes.sectionHeading,
     },
     headingShortRuleWrap: { flexDirection: "column" },
-    headingShortRule: { marginTop: 2, width: 24, height: 1.25, backgroundColor: colors.primary },
+    headingShortRule: { marginTop: 2, width: 24, height: 1.25, backgroundColor: headingRuleColor },
     headingTicksRow: { flexDirection: "row", alignItems: "flex-end", marginRight: 5 },
     headingTickShort: {
       width: 2.5,
       height: typeScaleSizes.sectionHeading * 0.35,
-      backgroundColor: colors.primary,
+      backgroundColor: headingRuleColor,
       marginRight: 2,
     },
     headingTickMid: {
       width: 2.5,
       height: typeScaleSizes.sectionHeading * 0.6,
-      backgroundColor: colors.primary,
+      backgroundColor: headingRuleColor,
       marginRight: 2,
     },
     headingTickTall: {
       width: 2.5,
       height: typeScaleSizes.sectionHeading * 0.85,
-      backgroundColor: colors.primary,
+      backgroundColor: headingRuleColor,
       marginRight: 2,
     },
     headingIconOutline: {
@@ -347,9 +410,9 @@ function buildStyles(format: DocumentFormat) {
       height: 8,
       marginRight: 5,
       borderWidth: 0.75,
-      borderColor: colors.primary,
+      borderColor: headingRuleColor,
     },
-    headingIconFilled: { width: 8, height: 8, marginRight: 5, backgroundColor: colors.primary },
+    headingIconFilled: { width: 8, height: 8, marginRight: 5, backgroundColor: headingRuleColor },
     group: { marginBottom: 6 },
     // groupHeading: the pre-F2e joined-string look, kept ONLY for the
     // `headingParts`-less fallback (a group with a bare `heading`, e.g. a
@@ -401,7 +464,7 @@ function buildStyles(format: DocumentFormat) {
       fontSize: typography.body.size,
       fontFamily: typography.body.family,
       marginLeft: 4,
-      color: colors.text,
+      color: entrySubtitleColor,
     },
     // Overrides entrySubtitle's inline marginLeft when subtitlePlacement is
     // 'below' — the subtitle starts its own line, flush with the title.
@@ -410,7 +473,7 @@ function buildStyles(format: DocumentFormat) {
     entryDate: {
       fontSize: typography.body.size,
       fontFamily: typography.body.family,
-      color: colors.text,
+      color: dateColor,
     },
     entryLocation: {
       fontSize: typography.body.size,
