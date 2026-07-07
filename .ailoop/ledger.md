@@ -1563,3 +1563,18 @@ PHASE-CLOSE ORACLE (oracle.md Phase 7/E8) on merged tree, ALL GREEN (in the 363 
   threshold; 12s green). No change to what counts as done. Judgment endorsed: presetId not stamped by
   migrateFormat (a customized v1 format is not a preset); F0b's presets.ts self-identifies — F0b
   context/acceptance amended to match. NEXT: E9-F0b (engine core, single-column).
+
+[v3-044] E9-F0b — ACCEPTED (single dispatch, first attempt). ONE engine (engine/ 5 files: document.tsx
+  composition, legacyAdapt v2→sections.tsx seam, local density ladder, render entry) + presets.ts (six
+  = migrateFormat + presetId). Independent re-verify green: check/lint/build 0, vitest 49/518,
+  playwright 10/10, grep guards clean, geometry contrasts + OFF-DIAGONAL + non-vacuous ladder all real
+  (test read). TWO ESCAPED DEFECTS surfaced by this ticket's verify, escaped-bug rule applied:
+  (1) ibm-plex-mono vendored woff crashes fontkit on ANY multi-word render — CONFIRMED by coordinator
+  probe on the untouched v1 strict path (latent since E7; document-fonts.test.ts never render-smoked
+  faces) → repair ticket E9-R1 (fix asset + parameterized per-face multi-word render smoke, red-then-
+  green demonstration required). Engine's temporary mono exclusion lifts at F0d.
+  (2) F0a's migrateFormat ignores v1 sections.columns (fixtures all had sections:{}) → F0c fixtures
+  must include non-empty sections; F0d extends migrateFormat + strengthens format-v2.test.ts.
+  SCHEDULING JUDGMENT: E9-R1 is file-disjoint from E9-F0c (scheduler would batch them), but this host
+  has already OOM-killed two builds — parallel full-suite builders are a flake factory here; running
+  SERIAL (F0c → R1 → F0d), a deliberate deviation from the batch hint, not from correctness.

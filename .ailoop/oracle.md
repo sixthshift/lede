@@ -132,6 +132,10 @@ answer `GET /api/health` → `{ok:true}` — the gap the pure-vitest baseline mi
 
 - [ ] type-check: `bun run check` (`tsc --noEmit`, both tsconfigs) → exit 0
 - [ ] build (once buildable — from T001 on): `bun run build` → exit 0
+      **[AMENDED v3-043, mechanical]** in this environment run it as
+      `NODE_OPTIONS=--max-old-space-size=1024 bun run build` — the unbounded build is
+      SIGKILLed by the host OOM killer even on a clean tree (verified on HEAD f2f34f5);
+      the bounded heap forces GC under the threshold. Same command, same exit-0 bar.
 - [ ] lint/format: `bun run lint` (`biome check`) → exit 0 **[AMENDED v3-004, mechanical]**.
       Biome was added as the lint/format enforcement layer (commit bab52e3) AFTER this
       oracle was written and is enforced by the `.githooks` pre-commit hook — so a ticket
