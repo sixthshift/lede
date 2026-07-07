@@ -25,8 +25,8 @@
 // fonts.name, unwired until a later ticket lands its render seam) — keeping
 // a control with no observable effect would be a phantom knob.
 import type { ReactNode } from "react";
-import type { BodyFontId } from "@shared/format-v2";
-import { SECTIONS } from "@shared/sections";
+import type { BodyFontId, ColumnsMode, HeaderPosition, SectionColumn } from "@shared/format-v2";
+import { SECTIONS, SECTION_VALUES } from "@shared/sections";
 import type { DocumentFormatV2 } from "@shared/format-v2";
 import { FONT_FACES } from "../document/fonts";
 import { Alert, AlertDescription } from "./ui/alert";
@@ -42,6 +42,21 @@ const FONT_IDS = Object.keys(FONT_FACES) as Array<Extract<BodyFontId, keyof type
 const NAME_WEIGHT_OPTIONS = ["normal", "bold"] as const;
 const GRID_COLUMN_OPTIONS = [1, 2, 3, 4] as const;
 const HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
+
+const COLUMNS_MODE_OPTIONS: { value: ColumnsMode; label: string }[] = [
+  { value: "one", label: "One column" },
+  { value: "two", label: "Two columns (sidebar)" },
+  { value: "mix", label: "Mixed (banner + two columns)" },
+];
+const HEADER_POSITION_OPTIONS: { value: HeaderPosition; label: string }[] = [
+  { value: "top", label: "Top" },
+  { value: "left", label: "Left" },
+  { value: "right", label: "Right" },
+];
+const SECTION_COLUMN_OPTIONS: { value: SectionColumn; label: string }[] = [
+  { value: "main", label: "Main" },
+  { value: "sidebar", label: "Sidebar" },
+];
 
 // A curated set, not an open picker — every swatch here is already a valid
 // formatV2Schema hex; the text input next to it is the escape hatch for
@@ -203,6 +218,7 @@ export function DesignPanel({
   }
 
   const showPhoto = format.photo.hidden === false;
+  const isColumnar = format.layout.columns !== "one";
 
   return (
     <div className="flex flex-col gap-6">
@@ -412,6 +428,120 @@ export function DesignPanel({
             />
           </FieldRow>
         </div>
+      </div>
+
+      {/* ── layout — layout.columns/headerPosition/sidebarWidthPct/sectionPlacement
+          (§31.2, engine already renders these axes per E9-F0c). sectionPlacement
+          here is the per-document FORMAT axis, distinct from the global
+          settings.layout section-order/visibility store edited by
+          LayoutEditor.tsx — this group never touches that store. ── */}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-medium">Layout</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FieldRow label="Columns" htmlFor="design-layout-columns">
+            <Select
+              value={format.layout.columns}
+              disabled={readOnly}
+              onValueChange={(next) =>
+                set({ ...format, layout: { ...format.layout, columns: next as ColumnsMode } })
+              }
+            >
+              <SelectTrigger id="design-layout-columns" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {COLUMNS_MODE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FieldRow>
+
+          <FieldRow label="Header position" htmlFor="design-layout-header-position">
+            <Select
+              value={format.layout.headerPosition}
+              disabled={readOnly}
+              onValueChange={(next) =>
+                set({
+                  ...format,
+                  layout: { ...format.layout, headerPosition: next as HeaderPosition },
+                })
+              }
+            >
+              <SelectTrigger id="design-layout-header-position" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {HEADER_POSITION_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FieldRow>
+
+          {isColumnar ? (
+            <FieldRow label="Sidebar width (%)" htmlFor="design-layout-sidebar-width">
+              <NumberStepper
+                id="design-layout-sidebar-width"
+                value={format.layout.sidebarWidthPct}
+                min={25}
+                max={40}
+                step={1}
+                disabled={readOnly}
+                onChange={(sidebarWidthPct) =>
+                  set({ ...format, layout: { ...format.layout, sidebarWidthPct } })
+                }
+              />
+            </FieldRow>
+          ) : null}
+        </div>
+
+        {isColumnar ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm font-medium">Section placement</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {SECTION_VALUES.map((section) => (
+                <FieldRow
+                  key={section}
+                  label={`${SECTIONS[section].label} column`}
+                  htmlFor={`design-layout-section-${section}`}
+                >
+                  <Select
+                    value={format.layout.sectionPlacement[section]?.column ?? "main"}
+                    disabled={readOnly}
+                    onValueChange={(next) =>
+                      set({
+                        ...format,
+                        layout: {
+                          ...format.layout,
+                          sectionPlacement: {
+                            ...format.layout.sectionPlacement,
+                            [section]: { column: next as SectionColumn },
+                          },
+                        },
+                      })
+                    }
+                  >
+                    <SelectTrigger id={`design-layout-section-${section}`} className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SECTION_COLUMN_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FieldRow>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -18,6 +18,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { DEFAULT_FORMAT_V2 } from "../src/shared/format-v2";
 import type { DocumentFormatV2 } from "../src/shared/format-v2";
+import { SECTIONS } from "../src/shared/sections";
 import { FONT_FACES } from "../src/client/document/fonts";
 import { applyPreset } from "../src/client/document/presets";
 import { DesignPanel } from "../src/client/components/DesignPanel";
@@ -95,6 +96,116 @@ describe("DesignPanel — photo toggle", () => {
 
     expect(toggle.checked).toBe(true);
     expect(screen.getByText(/DACH/i)).toBeInTheDocument();
+  });
+});
+
+describe("DesignPanel — Layout group", () => {
+  it("renders a Layout group with columns/header position controls", () => {
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={vi.fn()} />);
+
+    expect(screen.getByText("Layout")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Columns" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Header position" })).toBeInTheDocument();
+  });
+
+  it("changing columns fires onChange with layout.columns", async () => {
+    const onChange = vi.fn();
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Columns" }));
+    fireEvent.click(await screen.findByRole("option", { name: /Two columns/ }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as DocumentFormatV2;
+    expect(next.layout.columns).toBe("two");
+  });
+
+  it("changing header position fires onChange with layout.headerPosition in {top,left,right}", async () => {
+    const onChange = vi.fn();
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Header position" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Left" }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as DocumentFormatV2;
+    expect(["top", "left", "right"]).toContain(next.layout.headerPosition);
+    expect(next.layout.headerPosition).toBe("left");
+  });
+
+  it("columns==='one' hides the sidebar-width and per-section-placement controls", () => {
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={vi.fn()} />);
+
+    expect(DEFAULT_FORMAT_V2.layout.columns).toBe("one");
+    expect(screen.queryByLabelText("Sidebar width (%)")).not.toBeInTheDocument();
+    expect(screen.queryByText("Section placement")).not.toBeInTheDocument();
+  });
+
+  it("columns==='two' shows sidebar width (bounded 25-40) and per-section placement selects", () => {
+    const format: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      layout: { ...DEFAULT_FORMAT_V2.layout, columns: "two" },
+    };
+    render(<DesignPanel format={format} onChange={vi.fn()} />);
+
+    const sidebarWidth = screen.getByLabelText("Sidebar width (%)") as HTMLInputElement;
+    expect(sidebarWidth).toBeInTheDocument();
+    expect(Number(sidebarWidth.min)).toBe(25);
+    expect(Number(sidebarWidth.max)).toBe(40);
+
+    expect(screen.getByText("Section placement")).toBeInTheDocument();
+    expect(
+      screen.getByRole("combobox", { name: `${SECTIONS.experience.label} column` }),
+    ).toBeInTheDocument();
+  });
+
+  it("changing sidebar width fires onChange with layout.sidebarWidthPct within [25,40]", () => {
+    const format: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      layout: { ...DEFAULT_FORMAT_V2.layout, columns: "two" },
+    };
+    const onChange = vi.fn();
+    render(<DesignPanel format={format} onChange={onChange} />);
+
+    fireEvent.change(screen.getByLabelText("Sidebar width (%)"), { target: { value: "35" } });
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as DocumentFormatV2;
+    expect(next.layout.sidebarWidthPct).toBeGreaterThanOrEqual(25);
+    expect(next.layout.sidebarWidthPct).toBeLessThanOrEqual(40);
+    expect(next.layout.sidebarWidthPct).toBe(35);
+  });
+
+  it("a per-section select fires onChange with layout.sectionPlacement[section].column in {main,sidebar}", async () => {
+    const format: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      layout: { ...DEFAULT_FORMAT_V2.layout, columns: "mix" },
+    };
+    const onChange = vi.fn();
+    render(<DesignPanel format={format} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole("combobox", { name: `${SECTIONS.experience.label} column` }));
+    fireEvent.click(await screen.findByRole("option", { name: "Sidebar" }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as DocumentFormatV2;
+    expect(["main", "sidebar"]).toContain(next.layout.sectionPlacement.experience?.column);
+    expect(next.layout.sectionPlacement.experience?.column).toBe("sidebar");
+  });
+
+  it("readOnly: no onChange fires on Layout control interaction", async () => {
+    const format: DocumentFormatV2 = {
+      ...DEFAULT_FORMAT_V2,
+      layout: { ...DEFAULT_FORMAT_V2.layout, columns: "two" },
+    };
+    const onChange = vi.fn();
+    render(<DesignPanel format={format} onChange={onChange} readOnly />);
+
+    fireEvent.change(screen.getByLabelText("Sidebar width (%)"), { target: { value: "38" } });
+    expect(onChange).not.toHaveBeenCalled();
+
+    const columnsSelect = screen.getByRole("combobox", { name: "Columns" });
+    expect(columnsSelect).toBeDisabled();
   });
 });
 
