@@ -62,6 +62,27 @@ function mapTailorError(err: unknown): { status: number; body: { error: string }
 const applicationCreateWithFormat = applicationCreate.extend({ format: documentFormatZ.nullish() });
 const applicationUpdateWithFormat = applicationUpdate.extend({ format: documentFormatZ.nullish() });
 
+// ── stored-format read boundary (§31.1 migration, ticket E9-F0d2) ──
+// A pre-cutover database may still hold v1 JSON in these two nullable
+// columns (settings.defaultFormat is gated at its own read site,
+// routes/settings.ts's currentSettings). Lazy-on-read, no boot-time table
+// rewrite: every site below that can expose an application row to a client
+// runs it through here first. Idempotent via resolveStoredFormat's
+// isFormatV2 short-circuit, so a genuine v2 value passes through untouched.
+// A subsequent write (PUT/tailor/lock all write the merged row back) then
+// naturally persists the migrated v2 value — no separate write-back step.
+type ApplicationRow = typeof applications.$inferSelect;
+export function migrateStoredApplicationFormats(row: ApplicationRow): ApplicationRow {
+  return {
+    ...row,
+    format: row.format === null ? null : resolveStoredFormat(row.format),
+    lockedFormat:
+      row.lockedFormat === null
+        ? null
+        : { ...row.lockedFormat, format: resolveStoredFormat(row.lockedFormat.format) },
+  };
+}
+
 export type ApplicationsRoutesDeps = {
   // Test-only seam (mirrors settingsRoutes' injected validator): a fixed
   // engine bypasses mode selection/decryption entirely, e.g. a spy proving
@@ -153,7 +174,7 @@ export function applicationsRoutes(
     if (!row) {
       return reply.code(404).send({ error: "not_found" });
     }
-    return row;
+    return migrateStoredApplicationFormats(row);
   });
 
   app.put<{ Params: { id: string } }>("/api/applications/:id", async (request, reply) => {
@@ -162,14 +183,15 @@ export function applicationsRoutes(
       return reply.code(400).send({ error: "invalid_body", issues: parsed.error.issues });
     }
 
-    const existing = db
+    const existingRow = db
       .select()
       .from(applications)
       .where(eq(applications.id, request.params.id))
       .get();
-    if (!existing) {
+    if (!existingRow) {
       return reply.code(404).send({ error: "not_found" });
     }
+    const existing = migrateStoredApplicationFormats(existingRow);
 
     const input = parsed.data;
     const row = {
@@ -195,14 +217,15 @@ export function applicationsRoutes(
   // stateless /api/tailor; persists the result on the application record
   // instead of returning it bare ──
   app.post<{ Params: { id: string } }>("/api/applications/:id/tailor", async (request, reply) => {
-    const existing = db
+    const existingRow = db
       .select()
       .from(applications)
       .where(eq(applications.id, request.params.id))
       .get();
-    if (!existing) {
+    if (!existingRow) {
       return reply.code(404).send({ error: "not_found" });
     }
+    const existing = migrateStoredApplicationFormats(existingRow);
 
     const config: Config = { ...loadConfig(), ...deps?.config };
     const engine = resolveEngine(db, config, deps);
@@ -217,10 +240,10 @@ export function applicationsRoutes(
 
       // §28.5 — derive a content budget from paper/targetPages/effective
       // format and ride it on the user message, same transport as context.
-      // resolveStoredFormat gates settingsRow.defaultFormat: a fresh DB's
-      // column DEFAULT is still frozen v1 JSON (see format-v2.ts's comment on
-      // resolveStoredFormat) — existing.format, when set, always came through
-      // the v2-only PUT validator already, so it needs no gate.
+      // Both sides are already-migrated v2 here: existing.format went through
+      // migrateStoredApplicationFormats above; settingsRow.defaultFormat still
+      // needs its own resolveStoredFormat gate (a fresh DB's column DEFAULT is
+      // frozen v1 JSON — see format-v2.ts's comment on resolveStoredFormat).
       const effectiveFormat = existing.format ?? resolveStoredFormat(settingsRow.defaultFormat);
       const budget = deriveContentBudget({
         paper: settingsRow.paper,
@@ -270,14 +293,15 @@ export function applicationsRoutes(
   // `lockedFormat` freezes the same way: the fit ladder is a later epic, so
   // resolvedDensity is 'as-set' = 'comfortable' until then (§28.3) ──
   app.post<{ Params: { id: string } }>("/api/applications/:id/lock", async (request, reply) => {
-    const existing = db
+    const existingRow = db
       .select()
       .from(applications)
       .where(eq(applications.id, request.params.id))
       .get();
-    if (!existing) {
+    if (!existingRow) {
       return reply.code(404).send({ error: "not_found" });
     }
+    const existing = migrateStoredApplicationFormats(existingRow);
     if (existing.current === null) {
       return reply.code(400).send({ error: "no_current" });
     }
@@ -300,14 +324,15 @@ export function applicationsRoutes(
   });
 
   app.delete<{ Params: { id: string } }>("/api/applications/:id/lock", async (request, reply) => {
-    const existing = db
+    const existingRow = db
       .select()
       .from(applications)
       .where(eq(applications.id, request.params.id))
       .get();
-    if (!existing) {
+    if (!existingRow) {
       return reply.code(404).send({ error: "not_found" });
     }
+    const existing = migrateStoredApplicationFormats(existingRow);
 
     const row = { ...existing, locked: null, lockedFormat: null, updatedAt: Date.now() };
     db.update(applications).set(row).where(eq(applications.id, existing.id)).run();

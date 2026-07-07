@@ -11,6 +11,7 @@ import { SECTION_VALUES } from "@shared/sections";
 import type { Db } from "../db";
 import { entries, profile, applications } from "../db/schema";
 import { generateSlug } from "../slug";
+import { migrateStoredApplicationFormats } from "./applications";
 
 // TailoredResume (@shared/types) has no zod counterpart elsewhere — it's the
 // server-assembled output, never a user-submitted body until now (a backup
@@ -86,7 +87,14 @@ export function backupRoutes(app: FastifyInstance, db: Db): void {
       updatedAt: _updatedAt,
       ...profileRest
     } = db.select().from(profile).where(eq(profile.id, 1)).get()!;
-    const applicationRows = db.select().from(applications).all();
+    // Gated the same way as every other application-row read site (§31.1
+    // migration, ticket E9-F0d2): a pre-cutover database's format/lockedFormat
+    // columns may still hold v1 JSON, and a backup export is client-facing.
+    const applicationRows = db
+      .select()
+      .from(applications)
+      .all()
+      .map(migrateStoredApplicationFormats);
 
     return { entries: entryRows, profile: profileRest, applications: applicationRows };
   });

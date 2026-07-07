@@ -1804,7 +1804,7 @@
     {
       "id": "E9-F0d2",
       "title": "Stored v1 format migration (old data) + migration test suite",
-      "status": "todo",
+      "status": "done",
       "depends_on": [
         "E9-F0d1"
       ],
@@ -1818,7 +1818,7 @@
       "context": "PART 2 of the F0 cutover (E9-F0d split [v3-047]). After E9-F0d1 the live app speaks v2 end-to-end, but pre-existing DB rows (applications.format, applications.lockedFormat.format, settings.defaultFormat) may hold v1 JSON written before the cutover. Wire migrateFormat (src/shared/format-v2.ts — migration wiring only, no new axis logic) into the persistence boundary. RECOMMENDED: lazy-on-read (migrateFormat applied when a row loads; idempotent via isFormatV2; no boot-time table rewrite) — state your choice and why in evidence. Migration tests consume test/fixtures/pre-e9-formats/ VERBATIM (your diff must not touch that directory). Locked applications stay LOCKED: migrating lockedFormat does not unlock or mutate locked TailoredResume snapshot bytes (§28.1). Frozen: react-pdf only; ONE engine; §28.1 byte-stability.",
       "acceptance": "- bun run check → 0; bun run lint → 0; NODE_OPTIONS=--max-old-space-size=1024 bun run build → 0\n- bunx vitest run --passWithNoTests green (serial fallback if contention flakes); npx playwright test → 10/10 green\n- every file under test/fixtures/pre-e9-formats/ (VERBATIM — git status shows zero changes there) migrates to schema-valid v2 preserving look: six template defaults → their preset configs (toEqual vs presets.ts modulo presetId), non-empty-sections → skillsLanguages grid/2, non-default-photo → photo preserved shown/square/size, lockedFormat wrapper + settings.defaultFormat cases covered\n- idempotence: second migration pass identical\n- integration: a pre-E9 sqlite row (v1 JSON in applications.format + lockedFormat + settings.defaultFormat, inserted raw) reads back through the API as schema-valid v2; locked TailoredResume snapshot bytes UNCHANGED by migration and by a subsequent v2 format PUT\n- format PUT round-trip persists across server restart\n- cross-cutting invariants + full baseline green",
       "attempts": [],
-      "evidence": null
+      "evidence": "Independent re-verify 2026-07-07: check 0 · lint 0 · build 0 (bounded heap) · vitest 52 files/582 · playwright 10/10 · scope: exactly routes/applications.ts + routes/backup.ts + 2 new test files; pre-e9 fixtures 0 diff · gaming read: one exported read-boundary helper applied at every client-exposing site; integration tests insert RAW v1 via drizzle into all three storage sites on a LOCKED app, read through the real API (schema-valid v2, locked stays locked, locked content toEqual-stable across migrating read + v2 PUT + fresh-instance restart, isFormatV2 pass-through asserted). Endorsed: lazy-on-read choice; latent pre-existing leak fixed (tailor/lock consumed existing.format ungated); export gated too. FLAGGED GAP accepted as E9-F0d3: POST /api/import rejects pre-cutover backup FILES (v2-only zod)."
     },
     {
       "id": "E9-R2",
@@ -1837,6 +1837,25 @@
       "origin": "repair: E9-R1 incomplete — colon-crash escaped its smoke (coordinator-verified during E9-F0d1 re-verify)",
       "context": "CONFIRMED (coordinator probes 2026-07-07, isolated react-pdf/fontkit renders): @fontsource/ibm-plex-mono latin-400 .woff crashes fontkit ('Offset is outside the bounds of the DataView') on ANY multi-word text (space glyph, the E9-R1 finding); the SAME package's .woff2 (5.2.7, latest) renders spaces fine but crashes on a bare colon ':'. Complementary defects — no vendored @fontsource asset for this face is safe for resume prose. The engine currently fail-safes by excluding ibm-plex-mono in src/client/document/engine/legacyAdapt.ts (falls back to the default face — the picker offers Mono but renders Sans: crash-safe, dishonest). FIX FOR REAL: source a clean IBM Plex Mono asset — preferred: the official IBM '@ibm/plex-mono' npm package (OFL, TTF/woff/woff2 variants; verify whichever variant you register renders spaces AND colons AND full resume prose through fontkit BEFORE wiring); alternatives: another @fontsource major version, or vendoring the TTF from IBM's GitHub release into the repo (document provenance + license). Wire it through fonts.ts's per-face manifest (the R1 'format' field generalizes to a per-face source override if needed) for BOTH the createRequire (node) and Vite URL (browser) paths, then DELETE the legacyAdapt.ts exclusion so Mono genuinely renders. ESCAPED-BUG RULE (second escape of the same class — the R1 smoke lacked ordinary punctuation): the per-face render smoke fixture text must include realistic resume punctuation for EVERY face — at minimum colon, comma, hyphen, parentheses, slash, digits, ampersand (e.g. 'Led team: shipped 3 services (2019-2023), cut costs 40% & latency 2x — a/b tested'), at body AND heading roles. Demonstrate the strengthened smoke RED on the current woff2 asset (colon) before your fix, GREEN after.",
       "acceptance": "- bun run check → 0; bun run lint → 0; NODE_OPTIONS=--max-old-space-size=1024 bun run build → 0 (mono assets present in dist)\n- bunx vitest run --passWithNoTests green; npx playwright test 10/10\n- strengthened per-face smoke (punctuation fixture, parameterized over the registry, body + heading roles) demonstrated RED on the unfixed woff2 (colon crash captured), GREEN after\n- ibm-plex-mono exclusion DELETED from legacyAdapt.ts; a resume with spaces + colons + digits renders through the engine with fonts.body 'ibm-plex-mono' (tested)\n- new dependency (if any) is OFL and pinned; provenance documented in fonts.ts\n- no face removed; existing tests untouched and green",
+      "attempts": [],
+      "evidence": null
+    },
+    {
+      "id": "E9-F0d3",
+      "title": "Backup-file compatibility: POST /api/import accepts pre-cutover (v1-format) backup files",
+      "status": "todo",
+      "depends_on": [
+        "E9-F0d2"
+      ],
+      "files": [
+        "src/server/routes/backup.ts",
+        "src/shared/schema.ts",
+        "test/api.export-import.test.ts",
+        "test/"
+      ],
+      "origin": "repair: gap flagged honestly by E9-F0d2 (spec §31.1 content-preserving migration + §2/§27 full-instance backup)",
+      "context": "E9-F0d2 migrated the three sqlite storage sites but deliberately left POST /api/import untouched and flagged it: the import body validator is v2-only (documentFormatZ is now formatV2Schema-shaped), so a backup FILE exported before the E9 cutover — whose applications[].format / lockedFormat.format / settings.defaultFormat hold v1 JSON — is REJECTED. That breaks the standing Phase-5 oracle's spirit (export→wipe→import round-trips a full instance) for pre-E9 exports. Fix at the import boundary: accept v1 format values in the import body (zod union v1-shape|v2 with a preprocess through the existing migrateFormat/resolveStoredFormat from src/shared/format-v2.ts — reuse, do not re-derive) and persist v2. The v1 leg of the union should be structural (has templateId, no formatVersion) — isFormatV2 is the discriminator. In-test, construct a pre-cutover backup JSON by embedding the test/fixtures/pre-e9-formats/ files VERBATIM (read-only — zero diff under that dir) into a backup envelope: applications with format + lockedFormat (locked content present) + settings.defaultFormat. Import must restore them as schema-valid v2 with look preserved, locked apps still locked, locked TailoredResume content intact. Current-version (v2) import round-trip must stay green (the standing export-import tests). Frozen: §28.1; locked stays locked; no new axis logic.",
+      "acceptance": "- bun run check → 0; bun run lint → 0; NODE_OPTIONS=--max-old-space-size=1024 bun run build → 0\n- bunx vitest run --passWithNoTests green; npx playwright test 10/10\n- new test: a pre-cutover backup envelope built from the verbatim pre-e9 fixtures imports successfully; GET after import returns schema-valid v2 (formatV2Schema.parse), look preserved (strict fixture → migrateFormat expectation), locked app locked with content toEqual-intact; settings.defaultFormat migrated\n- v2 backup round-trip (export→wipe→import) still green (standing tests untouched or extended, never weakened)\n- a malformed format (neither valid v1 shape nor v2) still 400s (tested)\n- zero diff under test/fixtures/pre-e9-formats/",
       "attempts": [],
       "evidence": null
     }

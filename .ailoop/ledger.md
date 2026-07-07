@@ -1618,3 +1618,13 @@ PHASE-CLOSE ORACLE (oracle.md Phase 7/E8) on merged tree, ALL GREEN (in the 363 
   E9-R2 seeded (clean asset + punctuation-bearing smoke, red-then-green), depends_on F0d2 (serial,
   [v3-044] memory judgment). Endorsed: gallery preset-apply preserves stylistic axes (E8 contract);
   F5 owns preset-apply semantics if the spec's rewrite-panel-state reading should win later.
+
+[v3-049] E9-F0d2 — ACCEPTED (single dispatch, first attempt). Lazy-on-read migration boundary
+  (exported helper at every client-exposing read site incl. export); raw-v1-into-sqlite integration
+  suite on a locked app (27 new tests): schema-valid v2 out, locked stays locked, locked content
+  stable across migrating read + PUT + restart, isFormatV2 pass-through. Composite green 52/582 +
+  10/10. BONUS DEFECT FIXED (pre-existing): tailor/lock consumed existing.format ungated — a
+  pre-cutover per-app format would have leaked raw v1 into budget derivation and the frozen
+  lockedFormat. Builder honestly FLAGGED (not silently expanded) the remaining hole: pre-cutover
+  backup FILES fail the v2-only import validator → E9-F0d3 seeded (in-phase migration completeness;
+  F0 phase close waits for it). NEXT: F0d3 → F0 phase-close oracle → E9-R2 → chunk report.
