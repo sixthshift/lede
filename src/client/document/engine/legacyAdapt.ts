@@ -6,7 +6,12 @@
 // see the engine-entry comment in document.tsx for which axes aren't wired
 // yet and why.
 import type { DocumentFormat, FontId } from "@shared/types";
-import type { DocumentFormatV2 } from "@shared/format-v2";
+import type {
+  DocumentFormatV2,
+  HeadingCapitalization,
+  HeadingIconStyle,
+  HeadingStyle,
+} from "@shared/format-v2";
 
 // sections.tsx's fontFamily is just a string handed to react-pdf. §31.2's
 // full 31-body/8-name-slot roster now registers a face for every id
@@ -90,8 +95,25 @@ function resolveTypeScaleSizes(format: DocumentFormatV2): TypeScaleSizes {
   };
 }
 
+// headings.{style,capitalization,icons} (§31.2) already resolve 1:1 to what
+// sections.tsx needs — no derivation, unlike resolveWeight/resolveTypeScaleSizes
+// above. It still needs the SAME threading trick: the legacy `DocumentFormat`
+// shape has one hardcoded section-label look (underline/uppercase/no icon)
+// with no per-axis seam, so this rides along as an extra property
+// (`headingsConfig`) exactly like typeScaleSizes/nameFontFamily.
+export type HeadingsRenderConfig = {
+  style: HeadingStyle;
+  capitalization: HeadingCapitalization;
+  icons: HeadingIconStyle;
+};
+
+function resolveHeadingsConfig(format: DocumentFormatV2): HeadingsRenderConfig {
+  return { ...format.headings };
+}
+
 export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
   typeScaleSizes: TypeScaleSizes;
+  headingsConfig: HeadingsRenderConfig;
 } {
   const bodyFont = resolveFont(format.fonts.body);
   return {
@@ -117,5 +139,6 @@ export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
     photo: { hidden: format.photo.hidden, size: format.photo.size, shape: format.photo.shape },
     sections: {},
     typeScaleSizes: resolveTypeScaleSizes(format),
+    headingsConfig: resolveHeadingsConfig(format),
   };
 }

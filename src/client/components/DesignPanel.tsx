@@ -30,6 +30,9 @@ import type {
   BodyFontId,
   ColumnsMode,
   HeaderPosition,
+  HeadingCapitalization,
+  HeadingIconStyle,
+  HeadingStyle,
   NameFontId,
   SectionColumn,
 } from "@shared/format-v2";
@@ -68,6 +71,28 @@ const HEADER_POSITION_OPTIONS: { value: HeaderPosition; label: string }[] = [
 const SECTION_COLUMN_OPTIONS: { value: SectionColumn; label: string }[] = [
   { value: "main", label: "Main" },
   { value: "sidebar", label: "Sidebar" },
+];
+// headings.style's 8 treatments (§31.2, sections.tsx's renderSectionHeading)
+// — distinct from the "Heading weight" control below, which binds
+// header.nameWeight/titleWeight (the PROFILE header), not this axis.
+const HEADING_STYLE_OPTIONS: { value: HeadingStyle; label: string }[] = [
+  { value: "underline", label: "Underline" },
+  { value: "boxed", label: "Boxed" },
+  { value: "outline-short-rule", label: "Short rule below" },
+  { value: "rules-above-below", label: "Rules above & below" },
+  { value: "accent-bar", label: "Accent bar" },
+  { value: "plain", label: "Plain" },
+  { value: "thin-underline", label: "Thin underline" },
+  { value: "tick-marks", label: "Tick marks" },
+];
+const HEADING_CAPITALIZATION_OPTIONS: { value: HeadingCapitalization; label: string }[] = [
+  { value: "capitalize", label: "Capitalize" },
+  { value: "uppercase", label: "Uppercase" },
+];
+const HEADING_ICON_OPTIONS: { value: HeadingIconStyle; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "outline", label: "Outline" },
+  { value: "filled", label: "Filled" },
 ];
 
 // A curated set, not an open picker — every swatch here is already a valid
@@ -402,6 +427,85 @@ export function DesignPanel({
             }
           />
         </FieldRow>
+      </div>
+
+      {/* ── section headings — headings.{style,capitalization,icons} (§31.2,
+          sections.tsx's renderSectionHeading). Distinct from "Heading
+          weight" above, which binds header.nameWeight/titleWeight (the
+          PROFILE header's name/title) — this group never touches that
+          axis. ── */}
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-medium">Section headings</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FieldRow label="Heading treatment" htmlFor="design-heading-style">
+            <Select
+              value={format.headings.style}
+              disabled={readOnly}
+              onValueChange={(next) =>
+                set({ ...format, headings: { ...format.headings, style: next as HeadingStyle } })
+              }
+            >
+              <SelectTrigger id="design-heading-style" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {HEADING_STYLE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FieldRow>
+
+          <FieldRow label="Heading capitalization" htmlFor="design-heading-capitalization">
+            <Select
+              value={format.headings.capitalization}
+              disabled={readOnly}
+              onValueChange={(next) =>
+                set({
+                  ...format,
+                  headings: { ...format.headings, capitalization: next as HeadingCapitalization },
+                })
+              }
+            >
+              <SelectTrigger id="design-heading-capitalization" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {HEADING_CAPITALIZATION_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FieldRow>
+
+          <FieldRow label="Heading icon" htmlFor="design-heading-icons">
+            <Select
+              value={format.headings.icons}
+              disabled={readOnly}
+              onValueChange={(next) =>
+                set({
+                  ...format,
+                  headings: { ...format.headings, icons: next as HeadingIconStyle },
+                })
+              }
+            >
+              <SelectTrigger id="design-heading-icons" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {HEADING_ICON_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FieldRow>
+        </div>
       </div>
 
       {/* ── color ── */}

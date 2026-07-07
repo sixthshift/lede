@@ -16,7 +16,7 @@ import type {
   TailoredSection,
 } from "@shared/types";
 import { SECTIONS } from "@shared/sections";
-import type { TypeScaleSizes } from "./engine/legacyAdapt";
+import type { HeadingsRenderConfig, TypeScaleSizes } from "./engine/legacyAdapt";
 
 // §31.2 typeScale's 4 offsets (nameOffset/titleOffset/sectionHeadingOffset/
 // entryHeaderOffset) arrive as an extra property on `format` rather than a
@@ -37,10 +37,34 @@ function resolveTypeScaleSizes(format: DocumentFormat): TypeScaleSizes {
   );
 }
 
+// §31.2 headings.{style,capitalization,icons} arrive as an extra property on
+// `format`, same seam as typeScaleSizes above (legacyAdapt.ts's
+// toLegacyFormat / HeadingsRenderConfig). Absent (a caller building a plain
+// DocumentFormat directly) falls back to exactly this module's pre-ticket
+// look: the underline treatment, uppercase, no icon.
+const DEFAULT_HEADINGS_CONFIG: HeadingsRenderConfig = {
+  style: "underline",
+  capitalization: "uppercase",
+  icons: "none",
+};
+
+function resolveHeadingsConfig(format: DocumentFormat): HeadingsRenderConfig {
+  const config = (format as DocumentFormat & { headingsConfig?: HeadingsRenderConfig })
+    .headingsConfig;
+  return config ?? DEFAULT_HEADINGS_CONFIG;
+}
+
 function buildStyles(format: DocumentFormat) {
   const { typography, colors, page, photo } = format;
   const photoRadius = photo.shape === "circle" ? photo.size / 2 : photo.shape === "rounded" ? 8 : 0;
   const typeScaleSizes = resolveTypeScaleSizes(format);
+  const headingsConfig = resolveHeadingsConfig(format);
+  // "plain" (§31.2) means bare text — no accent color, no rule/box/bar
+  // decoration at all — so it also drops the accent-colored text every other
+  // treatment shares; every other treatment keeps today's colors.primary.
+  const headingColor = headingsConfig.style === "plain" ? colors.text : colors.primary;
+  const headingTextTransform =
+    headingsConfig.capitalization === "uppercase" ? "uppercase" : "capitalize";
 
   return StyleSheet.create({
     header: { marginBottom: 12, flexDirection: "row", alignItems: "center" },
@@ -97,17 +121,79 @@ function buildStyles(format: DocumentFormat) {
       color: colors.text,
     },
     section: { marginBottom: page.sectionGap },
-    sectionLabel: {
+    // §31.2 headings.style's 8 treatments (HEADING_STYLES) each own a
+    // distinct wrapper style below, composed onto the section-label row by
+    // renderSectionHeading — see that function for which of these a given
+    // style actually uses. sectionHeadingRow/sectionHeadingText are the two
+    // EVERY treatment shares (row container, text run); the rest are
+    // decoration a subset of treatments opts into.
+    sectionHeadingRow: { marginBottom: 4, flexDirection: "row", alignItems: "center" },
+    sectionHeadingText: {
       fontSize: typeScaleSizes.sectionHeading,
       fontFamily: typography.heading.family,
       fontWeight: typography.heading.weight,
-      marginBottom: 4,
+      textTransform: headingTextTransform,
+      color: headingColor,
+    },
+    headingUnderline: {
       paddingBottom: 2,
-      textTransform: "uppercase",
-      color: colors.primary,
       borderBottomWidth: 0.75,
       borderBottomColor: colors.primary,
     },
+    headingThinUnderline: {
+      paddingBottom: 2,
+      borderBottomWidth: 0.25,
+      borderBottomColor: colors.primary,
+    },
+    headingBoxed: {
+      borderWidth: 0.75,
+      borderColor: colors.primary,
+      paddingVertical: 2,
+      paddingHorizontal: 4,
+      alignSelf: "flex-start",
+    },
+    headingRulesAboveBelow: {
+      paddingVertical: 2,
+      borderTopWidth: 0.5,
+      borderBottomWidth: 0.5,
+      borderTopColor: colors.primary,
+      borderBottomColor: colors.primary,
+    },
+    headingAccentBar: {
+      width: 3,
+      marginRight: 6,
+      backgroundColor: colors.primary,
+      height: typeScaleSizes.sectionHeading,
+    },
+    headingShortRuleWrap: { flexDirection: "column" },
+    headingShortRule: { marginTop: 2, width: 24, height: 1.25, backgroundColor: colors.primary },
+    headingTicksRow: { flexDirection: "row", alignItems: "flex-end", marginRight: 5 },
+    headingTickShort: {
+      width: 2.5,
+      height: typeScaleSizes.sectionHeading * 0.35,
+      backgroundColor: colors.primary,
+      marginRight: 2,
+    },
+    headingTickMid: {
+      width: 2.5,
+      height: typeScaleSizes.sectionHeading * 0.6,
+      backgroundColor: colors.primary,
+      marginRight: 2,
+    },
+    headingTickTall: {
+      width: 2.5,
+      height: typeScaleSizes.sectionHeading * 0.85,
+      backgroundColor: colors.primary,
+      marginRight: 2,
+    },
+    headingIconOutline: {
+      width: 8,
+      height: 8,
+      marginRight: 5,
+      borderWidth: 0.75,
+      borderColor: colors.primary,
+    },
+    headingIconFilled: { width: 8, height: 8, marginRight: 5, backgroundColor: colors.primary },
     group: { marginBottom: 6 },
     groupHeading: {
       fontSize: typeScaleSizes.entryHeader,
@@ -275,6 +361,98 @@ export function GroupBlock({
   );
 }
 
+type SectionStyles = ReturnType<typeof buildStyles>;
+
+// §31.2 headings.icons's outline/filled render as a small geometric square (a
+// View, not a font glyph) so the adornment never depends on the chosen
+// heading font having an icon glyph in its coverage.
+function renderHeadingIcon(icons: HeadingsRenderConfig["icons"], styles: SectionStyles) {
+  if (icons === "none") return null;
+  return <View style={icons === "filled" ? styles.headingIconFilled : styles.headingIconOutline} />;
+}
+
+// §31.2 headings.style's 8 treatments — every branch renders the SAME label
+// text (capitalization/icon already baked into sectionHeadingText/icon
+// above); only the surrounding decoration differs, so each of the 8 must
+// produce visually and byte-distinct output. 'underline' is also this
+// module's pre-ticket look (DEFAULT_HEADINGS_CONFIG's fallback).
+function renderSectionHeading(
+  label: string,
+  styles: SectionStyles,
+  headingsConfig: HeadingsRenderConfig,
+) {
+  const icon = renderHeadingIcon(headingsConfig.icons, styles);
+  const text = <Text style={styles.sectionHeadingText}>{label}</Text>;
+
+  switch (headingsConfig.style) {
+    case "boxed":
+      return (
+        <View style={[styles.sectionHeadingRow, styles.headingBoxed]}>
+          {icon}
+          {text}
+        </View>
+      );
+    case "rules-above-below":
+      return (
+        <View style={[styles.sectionHeadingRow, styles.headingRulesAboveBelow]}>
+          {icon}
+          {text}
+        </View>
+      );
+    case "thin-underline":
+      return (
+        <View style={[styles.sectionHeadingRow, styles.headingThinUnderline]}>
+          {icon}
+          {text}
+        </View>
+      );
+    case "accent-bar":
+      return (
+        <View style={styles.sectionHeadingRow}>
+          <View style={styles.headingAccentBar} />
+          {icon}
+          {text}
+        </View>
+      );
+    case "outline-short-rule":
+      return (
+        <View style={styles.headingShortRuleWrap}>
+          <View style={styles.sectionHeadingRow}>
+            {icon}
+            {text}
+          </View>
+          <View style={styles.headingShortRule} />
+        </View>
+      );
+    case "tick-marks":
+      return (
+        <View style={styles.sectionHeadingRow}>
+          <View style={styles.headingTicksRow}>
+            <View style={styles.headingTickShort} />
+            <View style={styles.headingTickMid} />
+            <View style={styles.headingTickTall} />
+          </View>
+          {icon}
+          {text}
+        </View>
+      );
+    case "plain":
+      return (
+        <View style={styles.sectionHeadingRow}>
+          {icon}
+          {text}
+        </View>
+      );
+    default:
+      return (
+        <View style={[styles.sectionHeadingRow, styles.headingUnderline]}>
+          {icon}
+          {text}
+        </View>
+      );
+  }
+}
+
 export function SectionBlock({
   section,
   format,
@@ -283,10 +461,11 @@ export function SectionBlock({
   format: DocumentFormat;
 }) {
   const styles = buildStyles(format);
+  const headingsConfig = resolveHeadingsConfig(format);
   const columns = format.sections[section.section]?.columns ?? 1;
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionLabel}>{SECTIONS[section.section].label}</Text>
+      {renderSectionHeading(SECTIONS[section.section].label, styles, headingsConfig)}
       {section.groups.map((group, i) => (
         <GroupBlock key={group.heading ?? i} group={group} format={format} columns={columns} />
       ))}
