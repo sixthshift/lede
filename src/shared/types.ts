@@ -117,7 +117,11 @@ export type TailorDecision = {
 };
 
 // ── what the SERVER assembles and the UI renders ──
-export type TailoredItem = { entryId: string; text: string };
+// level (E9-F4b2): copied verbatim from the source entry's meta.level at
+// assemble time — skill/language only (the only EntryMeta variants that
+// carry it), undefined otherwise. Never model-derived; tailoring stays
+// blind to it (§31.4) — this is display plumbing, not scoring.
+export type TailoredItem = { entryId: string; text: string; level?: number };
 // headingParts (E9-F2d): the SAME provenance as `heading` (assemble()'s
 // groupBy key), just not yet joined into one string — title/subtitle are
 // always the entry's own meta fields (e.g. role/company), `date` is the

@@ -140,6 +140,79 @@ describe("assemble — section order & filtering follow layout", () => {
   });
 });
 
+describe("assemble — level threading (E9-F4b2)", () => {
+  it("copies meta.level onto skill/language items, undefined when the entry has none", () => {
+    const leveled = entry(
+      "skill1",
+      "skill",
+      { section: "skill", category: "Backend", level: 4 },
+      ["Rust"],
+      202401,
+    );
+    const unleveled = entry(
+      "skill2",
+      "skill",
+      { section: "skill", category: "Backend" },
+      ["Go"],
+      202402,
+    );
+    const lang = entry("lang1", "language", { section: "language", level: 2 }, ["Spanish"], 202301);
+    const d = decision([
+      { entryId: "skill1", text: "Rust", rank: 1 },
+      { entryId: "skill2", text: "Go", rank: 2 },
+      { entryId: "lang1", text: "Spanish", rank: 1 },
+    ]);
+    const layout = layoutFor([
+      { section: "skill", enabled: true },
+      { section: "language", enabled: true },
+    ]);
+
+    const resume = assemble(d, [leveled, unleveled, lang], layout);
+    const skillItems = resume.sections
+      .find((s) => s.section === "skill")!
+      .groups.flatMap((g) => g.items);
+    const languageItems = resume.sections
+      .find((s) => s.section === "language")!
+      .groups.flatMap((g) => g.items);
+
+    expect(skillItems.find((i) => i.entryId === "skill1")!.level).toBe(4);
+    expect(skillItems.find((i) => i.entryId === "skill2")!.level).toBeUndefined();
+    expect(languageItems.find((i) => i.entryId === "lang1")!.level).toBe(2);
+  });
+
+  it("never puts a level on a non-leveled section's items (e.g. experience)", () => {
+    const meta: EntryMeta = {
+      section: "experience",
+      company: "Acme",
+      role: "Eng",
+      period: "2020-2023",
+    };
+    const e = entry("e1", "experience", meta, ["did a thing"], 202001);
+    const d = decision([{ entryId: "e1", text: "did a thing", rank: 1 }]);
+    const layout = layoutFor([{ section: "experience", enabled: true }]);
+
+    const resume = assemble(d, [e], layout);
+    expect(resume.sections[0]!.groups[0]!.items[0]!.level).toBeUndefined();
+  });
+
+  it("a level on an item is not fabricated content — coexists with facts-only text", () => {
+    const e = entry(
+      "skill3",
+      "skill",
+      { section: "skill", category: "Backend", level: 5 },
+      ["Python"],
+      202401,
+    );
+    const d = decision([{ entryId: "skill3", text: "Python", rank: 1 }]);
+    const layout = layoutFor([{ section: "skill", enabled: true }]);
+
+    const resume = assemble(d, [e], layout);
+    const item = resume.sections[0]!.groups[0]!.items[0]!;
+    expect(item.level).toBe(5);
+    expect(item.text).toBe("Python");
+  });
+});
+
 describe("assemble — items within a group order by rank", () => {
   const meta: EntryMeta = {
     section: "experience",

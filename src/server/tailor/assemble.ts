@@ -124,6 +124,7 @@ function toGroup(
   const items: TailoredItem[] = ordered.map((r) => ({
     entryId: r.entry.id,
     text: coerceText(r, rule),
+    level: entryLevel(r.entry.meta),
   }));
   const leadRationale = ordered[0]?.item.leadRationale;
   // heading is undefined for flat (non-grouped) sections — headingParts
@@ -164,6 +165,21 @@ function headingPartsFromMeta(meta: EntryMeta | undefined): TailoredGroupHeading
       // project's EntryMeta carries no location field — always undefined,
       // same "no v2 destination" reasoning as every other absent field here.
       return { title: meta.name, subtitle: meta.role, date: meta.period };
+    default:
+      return undefined;
+  }
+}
+
+// level (E9-F4b2): a display value the entry itself carries — only
+// skill/language's EntryMeta variant has a `level` field, so every other
+// section's items stay undefined here. Copied at assemble time (never
+// looked up again later) so a stored snapshot stays self-contained (§27)
+// even after the Library entry is edited or deleted.
+function entryLevel(meta: EntryMeta): number | undefined {
+  switch (meta.section) {
+    case "skill":
+    case "language":
+      return meta.level;
     default:
       return undefined;
   }

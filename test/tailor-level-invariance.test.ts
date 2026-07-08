@@ -5,8 +5,11 @@
 // libraries identical in every field EXCEPT skill/language level values get
 // their own recorded fixture (FixtureEngine keys on hashKey(jd, entries), so
 // differing entries need differing keys), both holding the SAME decision.
-// If assemble()/tailor() ever started reading level, the two resulting
-// resumes would diverge even though the decision is byte-identical.
+// If assemble()/tailor() ever started SCORING on level (letting it drive
+// selection/ordering), the two resulting resumes' entryId sequences would
+// diverge even though the decision is byte-identical. (assemble() DOES copy
+// level onto items as a display value, E9-F4b2 — that's fine, and expected
+// to differ between A/B; only selection/order is guarded here.)
 import { describe, it, expect, beforeEach } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -98,13 +101,24 @@ describe("tailor pipeline — blind to skill/language meta.level (§31.4 anti-sc
     );
   });
 
-  it("produces an identical resume (selection + order) for libraries differing only in level", async () => {
+  it("produces identical selection + order for libraries differing only in level", async () => {
+    // level (E9-F4b2) now legitimately rides on the assembled item, so a full
+    // toEqual would fail by design (resumeA's levels are A's, resumeB's are
+    // B's) — the real guard is that level never changes WHICH entries appear
+    // or in what order, only what's stamped on each. Strip level and compare
+    // the entryId sequence per section/group.
     const engine = new FixtureEngine(dir);
 
     const resumeA = await tailor(engine, JD, LIBRARY_A, LAYOUT);
     const resumeB = await tailor(engine, JD, LIBRARY_B, LAYOUT);
 
-    expect(resumeA).toEqual(resumeB);
+    const entryIdSequence = (resume: typeof resumeA) =>
+      resume.sections.map((s) => ({
+        section: s.section,
+        groups: s.groups.map((g) => g.items.map((i) => i.entryId)),
+      }));
+
+    expect(entryIdSequence(resumeA)).toEqual(entryIdSequence(resumeB));
   });
 
   it("is non-vacuous: the two libraries really do carry different level values", () => {
