@@ -201,14 +201,14 @@ function resolvePhotoConfig(format: DocumentFormatV2): PhotoRenderConfig {
   return { crop: { ...format.photo.crop }, zoom: format.photo.zoom };
 }
 
-// sectionDisplay.{skillsLanguages,interests} (§31.4, E9-F4b) resolve 1:1 to
-// sections.tsx's skill/language/interest items composition — no derivation,
-// same seam as linksConfig/accentPlacementConfig above (`sectionDisplayConfig`).
-// Only these two groups: sectionDisplay.{experience,summary,education} are
-// the NEXT ticket's (E9-F4c) seam, so this type deliberately narrows to the
-// two groups this ticket wires rather than passing the whole SectionDisplayV2
-// through unused.
-export type SectionDisplayRenderConfig = Pick<SectionDisplayV2, "skillsLanguages" | "interests">;
+// sectionDisplay.* (§31.4) resolves 1:1 to sections.tsx's per-section display
+// composition — no derivation, same seam as linksConfig/accentPlacementConfig
+// above (`sectionDisplayConfig`). E9-F4b wired skillsLanguages/interests
+// (the items-grid groups); this ticket (E9-F4c) widens the same seam to
+// experience/summary/education (the narrative-section groups) — the full
+// SectionDisplayV2 shape now passes through, since every one of its groups
+// has a render consumer in sections.tsx.
+export type SectionDisplayRenderConfig = SectionDisplayV2;
 
 function resolveSectionDisplayConfig(format: DocumentFormatV2): SectionDisplayRenderConfig {
   return {
@@ -217,6 +217,9 @@ function resolveSectionDisplayConfig(format: DocumentFormatV2): SectionDisplayRe
       levelLabels: [...format.sectionDisplay.skillsLanguages.levelLabels],
     },
     interests: { ...format.sectionDisplay.interests },
+    experience: { ...format.sectionDisplay.experience },
+    summary: { ...format.sectionDisplay.summary },
+    education: { ...format.sectionDisplay.education },
   };
 }
 

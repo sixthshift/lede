@@ -183,12 +183,15 @@ function resolvePhotoConfig(format: DocumentFormat): PhotoRenderConfig {
   return config ?? DEFAULT_PHOTO_CONFIG;
 }
 
-// sectionDisplay.{skillsLanguages,interests} (§31.4, E9-F4b) arrive as an
-// extra property on `format`, same seam as photoConfig above
-// (legacyAdapt.ts's toLegacyFormat / SectionDisplayRenderConfig). Absent
-// falls back to exactly format-v2.ts's own DEFAULT_FORMAT_V2 values: 'rows'
-// at 1 column for both groups, 'text' level display with the stock 5 labels
-// — this module's pre-ticket look (one stacked list, no level anything).
+// sectionDisplay.* (§31.4) arrives as an extra property on `format`, same
+// seam as photoConfig above (legacyAdapt.ts's toLegacyFormat /
+// SectionDisplayRenderConfig). Absent falls back to exactly format-v2.ts's
+// own DEFAULT_FORMAT_V2 values for every group — 'rows' at 1 column for
+// skillsLanguages/interests, 'text' level display with the stock 5 labels,
+// employer-first/school-first experience/education order (mirroring the
+// registry groupBy's own company-first/school-first string join — see
+// sections.ts), promotions never collapsed, and the summary rendered as its
+// own unlabeled section — this module's pre-ticket look end to end.
 const DEFAULT_SECTION_DISPLAY_CONFIG: SectionDisplayRenderConfig = {
   skillsLanguages: {
     layout: "rows",
@@ -197,6 +200,9 @@ const DEFAULT_SECTION_DISPLAY_CONFIG: SectionDisplayRenderConfig = {
     levelLabels: ["Beginner", "Elementary", "Intermediate", "Advanced", "Expert"],
   },
   interests: { layout: "rows", gridColumns: 1 },
+  experience: { order: "employer-first", groupPromotions: false },
+  summary: { asPartOfHeader: false, showHeading: false },
+  education: { order: "school-first" },
 };
 
 function resolveSectionDisplayConfig(format: DocumentFormat): SectionDisplayRenderConfig {
@@ -207,11 +213,14 @@ function resolveSectionDisplayConfig(format: DocumentFormat): SectionDisplayRend
 
 // The skill/language sections share ONE display config (skillsLanguages);
 // interest owns its own (no level axis — InterestsLayout has no 'level'
-// value, §31.4). Every other section has no §31.4 items-display seam yet
-// (F4c's experience/summary/education, or sections with no per-item display
-// axis at all) — undefined, so SectionBlock falls through to the legacy
-// per-section `columns` field exactly as this module rendered before this
-// ticket.
+// value, §31.4). experience/summary/education have their own §31.4 axes
+// (order/groupPromotions/asPartOfHeader/showHeading, wired below via
+// resolveGroupHeadingParts/collapsePromotions/SummarySection) but none of
+// them is an items-GRID layout — this ItemsDisplayConfig seam stays specific
+// to the skillsLanguages/interests items grid. Every other section has no
+// items-display seam at all — undefined, so SectionBlock falls through to
+// the legacy per-section `columns` field exactly as this module rendered
+// before E9-F4b.
 type ItemsDisplayConfig = {
   layout: SectionLayout | InterestsLayout;
   gridColumns: number;
@@ -287,15 +296,30 @@ function buildStyles(format: DocumentFormat) {
   const levelIndicatorColor = accentOrText(accentPlacement.levelIndicators, colors);
   const headingTextTransform =
     headingsConfig.capitalization === "uppercase" ? "uppercase" : "capitalize";
+  // sectionDisplay.summary.asPartOfHeader (§31.4, F4c): document.tsx (outside
+  // this ticket's declared files) always renders `header` then `summary` as
+  // adjacent siblings — this axis can't change THAT composition, only how
+  // close the two sit. Off keeps this module's pre-ticket 12pt header gap
+  // (its own section's worth of whitespace, visually distinct from the
+  // summary below). On shrinks it to 2pt — the same tight gap
+  // ProfileHeader's own name/title/contact lines use between each other — so
+  // the summary reads as one more line of the header block rather than a new
+  // section starting after it.
+  const sectionDisplay = resolveSectionDisplayConfig(format);
+  const headerBottomGap = sectionDisplay.summary.asPartOfHeader ? 2 : 12;
 
   return StyleSheet.create({
-    header: { marginBottom: 12, flexDirection: "row", alignItems: "center" },
+    header: { marginBottom: headerBottomGap, flexDirection: "row", alignItems: "center" },
     // centered/inline are alternate header compositions (spec.md §28.2's
     // classic/compact templates) — the profile's fields never change, only
     // which axis they're laid out on.
-    headerCentered: { marginBottom: 12, flexDirection: "column", alignItems: "center" },
+    headerCentered: {
+      marginBottom: headerBottomGap,
+      flexDirection: "column",
+      alignItems: "center",
+    },
     headerInline: {
-      marginBottom: 12,
+      marginBottom: headerBottomGap,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
@@ -417,6 +441,18 @@ function buildStyles(format: DocumentFormat) {
       fontFamily: typography.body.family,
       color: colors.text,
     },
+    // sectionDisplay.summary.showHeading (§31.4, F4c): the labeled path wraps
+    // the summary in `section` (below) alongside its own heading row — that
+    // outer View already carries the trailing sectionGap, so this text-only
+    // style drops `summary`'s OWN marginBottom to avoid doubling it, same
+    // "section supplies the gap, its children don't" split SectionBlock's own
+    // heading+groups composition already uses.
+    summaryText: {
+      fontSize: typography.body.size,
+      lineHeight: typography.body.lineHeight,
+      fontFamily: typography.body.family,
+      color: colors.text,
+    },
     section: { marginBottom: page.sectionGap },
     // §31.2 headings.style's 8 treatments (HEADING_STYLES) each own a
     // distinct wrapper style below, composed onto the section-label row by
@@ -496,6 +532,11 @@ function buildStyles(format: DocumentFormat) {
     },
     headingIconFilled: { width: 8, height: 8, marginRight: 5, backgroundColor: headingRuleColor },
     group: { marginBottom: 6 },
+    // sectionDisplay.experience.groupPromotions (§31.4, F4c): one role
+    // sub-entry within a collapsed multi-role PromotionGroupBlock — indented
+    // under the shared employer header, its own small top gap since it
+    // follows either that header or a previous role's items.
+    promotionRole: { marginTop: 4, marginLeft: 8 },
     // groupHeading: the pre-F2e joined-string look, kept ONLY for the
     // `headingParts`-less fallback (a group with a bare `heading`, e.g. a
     // pre-E9-F2d stored snapshot) — every group WITH headingParts renders
@@ -987,10 +1028,26 @@ export function ProfileHeader({
   );
 }
 
+// sectionDisplay.summary.showHeading (§31.4, F4c): off keeps this module's
+// pre-ticket look — a bare Text run, no label, own trailing sectionGap
+// (styles.summary). On renders the SAME "Summary" label every other section
+// gets from renderSectionHeading (headings.style/capitalization/icons all
+// apply identically — never a hand-rolled second look for this one label),
+// wrapped in `section` so ONE place supplies the trailing gap.
 export function SummarySection({ summary, format }: { summary: string; format: DocumentFormat }) {
   if (!summary) return null;
   const styles = buildStyles(format);
-  return <Text style={styles.summary}>{summary}</Text>;
+  const sectionDisplay = resolveSectionDisplayConfig(format);
+  if (!sectionDisplay.summary.showHeading) {
+    return <Text style={styles.summary}>{summary}</Text>;
+  }
+  const headingsConfig = resolveHeadingsConfig(format);
+  return (
+    <View style={styles.section}>
+      {renderSectionHeading("Summary", styles, headingsConfig)}
+      <Text style={styles.summaryText}>{summary}</Text>
+    </View>
+  );
 }
 
 // entries.listStyle (§31.2) picks the bullet glyph. Only 2 values —
@@ -1267,11 +1324,42 @@ function buildEntryHeaderRow(
   );
 }
 
+// sectionDisplay.experience.order / .education.order (§31.4, F4c): headingParts
+// (assemble.ts's headingPartsFromMeta) always carries title=role/subtitle=company
+// for experience and title=degree/subtitle=school for education — the SAME
+// mapping regardless of this axis, since it's the entry's own facts, not a
+// display choice. 'title-first'/'degree-first' render that mapping as-is
+// (title leads, exactly this module's pre-ticket look); 'employer-first'/
+// 'school-first' swap which fact occupies the leading (bold, entryTitle)
+// slot vs the trailing (entrySubtitle) one — a real content swap, not a
+// style-only change, so extraction order actually flips. Every other
+// groupable section (project, skill's category grouping) has no order axis
+// at all — parts pass through untouched.
+function swapTitleSubtitle(parts: TailoredGroupHeadingParts): TailoredGroupHeadingParts {
+  if (!parts.subtitle) return parts;
+  return { ...parts, title: parts.subtitle, subtitle: parts.title };
+}
+
+function resolveOrderedHeadingParts(
+  section: Section | undefined,
+  parts: TailoredGroupHeadingParts,
+  sectionDisplay: SectionDisplayRenderConfig,
+): TailoredGroupHeadingParts {
+  if (section === "experience" && sectionDisplay.experience.order === "employer-first") {
+    return swapTitleSubtitle(parts);
+  }
+  if (section === "education" && sectionDisplay.education.order === "school-first") {
+    return swapTitleSubtitle(parts);
+  }
+  return parts;
+}
+
 export function GroupBlock({
   group,
   format,
   columns = 1,
   itemsDisplay,
+  section,
 }: {
   group: TailoredGroup;
   format: DocumentFormat;
@@ -1281,10 +1369,18 @@ export function GroupBlock({
   // Undefined ⇒ `columns` alone decides the container, exactly this module's
   // pre-ticket behavior for every other section.
   itemsDisplay?: ItemsDisplayConfig;
+  // §31.4 sectionDisplay.{experience,education}.order (F4c) — which section
+  // this group belongs to, so resolveOrderedHeadingParts knows whether/how to
+  // apply the order axis. Undefined (every non-experience/education caller,
+  // or a caller built before this ticket) ⇒ parts pass through untouched.
+  section?: Section;
 }) {
   const styles = buildStyles(format);
   const entriesConfig = resolveEntriesConfig(format);
-  const parts = group.headingParts;
+  const sectionDisplay = resolveSectionDisplayConfig(format);
+  const parts = group.headingParts
+    ? resolveOrderedHeadingParts(section, group.headingParts, sectionDisplay)
+    : undefined;
   const itemsBlock = buildItemsBlock(group.items, format, styles, columns, itemsDisplay);
 
   // Back-compat (§31.1): a group with no headingParts (every snapshot from
@@ -1419,6 +1515,85 @@ function renderSectionHeading(
   }
 }
 
+// sectionDisplay.experience.groupPromotions (§31.4, F4c): a VIEW-layer
+// re-grouping on top of the section registry's own company·role·period
+// groupBy (src/shared/sections.ts, unedited) — merges the TailoredGroups
+// that share the SAME employer (headingParts.subtitle: the entry's own
+// company fact, assemble.ts's headingPartsFromMeta) into one rendered block,
+// each source group becoming a role sub-entry instead of its own top-level
+// group. A group with no headingParts, or no subtitle at all, never merges
+// with any other group — it's keyed by its own position, so two such groups
+// can't spuriously collide on the shared "no employer" bucket.
+type PromotionGroup = { employer?: string; roles: TailoredGroup[] };
+
+function collapsePromotions(groups: TailoredGroup[]): PromotionGroup[] {
+  const byEmployer = new Map<string, PromotionGroup>();
+  const order: PromotionGroup[] = [];
+  groups.forEach((group, i) => {
+    const employer = group.headingParts?.subtitle;
+    const key = employer ?? `__ungrouped_${i}__`;
+    let promoted = byEmployer.get(key);
+    if (!promoted) {
+      promoted = { employer, roles: [] };
+      byEmployer.set(key, promoted);
+      order.push(promoted);
+    }
+    promoted.roles.push(group);
+  });
+  return order;
+}
+
+// A single-role PromotionGroup (no actual promotion at that employer, the
+// common case) renders through the SAME GroupBlock every other experience
+// group does — byte-identical to groupPromotions off, so collapsing never
+// changes the 1-role-per-employer look. Multiple roles get ONE employer
+// header (entryTitle's own look) followed by one role sub-block per member:
+// role/date/location per role, subtitle stripped since the employer header
+// above already carries that fact — it never repeats per role.
+function PromotionGroupBlock({
+  promoted,
+  format,
+  columns,
+  itemsDisplay,
+}: {
+  promoted: PromotionGroup;
+  format: DocumentFormat;
+  columns: number;
+  itemsDisplay?: ItemsDisplayConfig;
+}) {
+  if (promoted.roles.length === 1) {
+    return (
+      <GroupBlock
+        group={promoted.roles[0]}
+        format={format}
+        columns={columns}
+        itemsDisplay={itemsDisplay}
+        section="experience"
+      />
+    );
+  }
+  const styles = buildStyles(format);
+  const entriesConfig = resolveEntriesConfig(format);
+  return (
+    <View style={styles.group}>
+      {promoted.employer ? <Text style={styles.entryTitle}>{promoted.employer}</Text> : null}
+      {promoted.roles.map((role, i) => (
+        <View key={role.headingParts?.title ?? i} style={styles.promotionRole}>
+          {role.headingParts
+            ? buildEntryHeaderRow(
+                { ...role.headingParts, subtitle: undefined },
+                format,
+                entriesConfig,
+                styles,
+              )
+            : null}
+          {buildItemsBlock(role.items, format, styles, columns, itemsDisplay)}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export function SectionBlock({
   section,
   format,
@@ -1440,18 +1615,33 @@ export function SectionBlock({
       ? itemsDisplay.gridColumns
       : 1
     : (format.sections[section.section]?.columns ?? 1);
+  const promoted =
+    section.section === "experience" && sectionDisplay.experience.groupPromotions
+      ? collapsePromotions(section.groups)
+      : undefined;
   return (
     <View style={styles.section}>
       {renderSectionHeading(SECTIONS[section.section].label, styles, headingsConfig)}
-      {section.groups.map((group, i) => (
-        <GroupBlock
-          key={group.heading ?? i}
-          group={group}
-          format={format}
-          columns={columns}
-          itemsDisplay={itemsDisplay}
-        />
-      ))}
+      {promoted
+        ? promoted.map((group, i) => (
+            <PromotionGroupBlock
+              key={group.employer ?? i}
+              promoted={group}
+              format={format}
+              columns={columns}
+              itemsDisplay={itemsDisplay}
+            />
+          ))
+        : section.groups.map((group, i) => (
+            <GroupBlock
+              key={group.heading ?? i}
+              group={group}
+              format={format}
+              columns={columns}
+              itemsDisplay={itemsDisplay}
+              section={section.section}
+            />
+          ))}
     </View>
   );
 }
