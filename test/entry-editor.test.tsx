@@ -81,6 +81,99 @@ describe("EntryEditor — registry-driven meta fields", () => {
   });
 });
 
+describe("EntryEditor — skill/language level: bounded 1-5, not free text (§31.4)", () => {
+  it("renders Level as a bounded <select> with exactly options '', 1-5", () => {
+    mockFetch([]);
+    render(withClient(<EntryEditor open onOpenChange={() => {}} defaultSection="skill" />));
+
+    const level = screen.getByLabelText("Level");
+    expect(level.tagName).toBe("SELECT");
+    const optionValues = Array.from(level.querySelectorAll("option")).map((o) =>
+      o.getAttribute("value"),
+    );
+    expect(optionValues).toEqual(["", "1", "2", "3", "4", "5"]);
+  });
+
+  it("create: a skill entry left at 'Not set' omits meta.level entirely (never invented)", async () => {
+    const fetchMock = mockFetch([]);
+    render(withClient(<EntryEditor open onOpenChange={() => {}} defaultSection="skill" />));
+
+    fireEvent.change(screen.getByLabelText("Label"), { target: { value: "TypeScript" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create entry" }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([, init]) => (init as RequestInit | undefined)?.method === "POST",
+        ),
+      ).toBe(true);
+    });
+
+    const postCall = fetchMock.mock.calls.find(
+      ([, init]) => (init as RequestInit | undefined)?.method === "POST",
+    )!;
+    const body = JSON.parse(String((postCall[1] as RequestInit).body));
+    expect(body.meta).toEqual({ section: "skill" });
+    expect(Object.keys(body.meta)).not.toContain("level");
+  });
+
+  it("create: picking Level 4 sends meta.level as the number 4, not the string '4'", async () => {
+    const fetchMock = mockFetch([]);
+    render(withClient(<EntryEditor open onOpenChange={() => {}} defaultSection="skill" />));
+
+    fireEvent.change(screen.getByLabelText("Label"), { target: { value: "Rust" } });
+    fireEvent.change(screen.getByLabelText("Level"), { target: { value: "4" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create entry" }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([, init]) => (init as RequestInit | undefined)?.method === "POST",
+        ),
+      ).toBe(true);
+    });
+
+    const postCall = fetchMock.mock.calls.find(
+      ([, init]) => (init as RequestInit | undefined)?.method === "POST",
+    )!;
+    const body = JSON.parse(String((postCall[1] as RequestInit).body));
+    expect(body.meta.level).toBe(4);
+    expect(typeof body.meta.level).toBe("number");
+  });
+
+  it("edit: populates the Level select from a numeric meta.level and keeps it numeric on save", async () => {
+    const existingSkill: Entry = {
+      id: "skill-rust",
+      section: "skill",
+      meta: { section: "skill", category: "Backend", level: 3 },
+      facts: ["Rust"],
+      tags: [],
+      sortKey: 1,
+    };
+    const fetchMock = mockFetch([existingSkill]);
+    render(withClient(<EntryEditor open onOpenChange={() => {}} entry={existingSkill} />));
+
+    expect(screen.getByLabelText("Level")).toHaveValue("3");
+
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([, init]) => (init as RequestInit | undefined)?.method === "PUT",
+        ),
+      ).toBe(true);
+    });
+
+    const putCall = fetchMock.mock.calls.find(
+      ([, init]) => (init as RequestInit | undefined)?.method === "PUT",
+    )!;
+    const body = JSON.parse(String((putCall[1] as RequestInit).body));
+    expect(body.meta.level).toBe(3);
+    expect(typeof body.meta.level).toBe("number");
+  });
+});
+
 describe("EntryEditor — create e2e via LibraryView", () => {
   it("Add entry -> fill experience -> save fires POST with entered data; new EntryCard appears", async () => {
     const fetchMock = mockFetch([]);

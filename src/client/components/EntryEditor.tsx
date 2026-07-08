@@ -41,7 +41,9 @@ function metaToValues(meta: EntryMeta): MetaValues {
   const { section: _section, ...rest } = meta as Record<string, unknown>;
   const values: MetaValues = {};
   for (const [key, value] of Object.entries(rest)) {
-    if (typeof value === "string") values[key] = value;
+    // level (§31.4) is numeric CONTENT; every other meta field is a string.
+    // The form itself stays string-keyed either way (cleanMeta converts back).
+    if (typeof value === "string" || typeof value === "number") values[key] = String(value);
   }
   return values;
 }
@@ -73,10 +75,11 @@ function buildInitialState(entry: Entry | undefined, defaultSection: Section): F
 }
 
 function cleanMeta(section: Section, values: MetaValues): EntryMeta {
-  const meta: Record<string, string> = { section };
+  const meta: Record<string, string | number> = { section };
   for (const field of META_FIELDS[section]) {
     const value = (values[field.key] ?? "").trim();
-    if (value) meta[field.key] = value;
+    if (!value) continue; // optional and unset — omit, never invent (§31.4)
+    meta[field.key] = field.kind === "level" ? Number(value) : value;
   }
   return meta as EntryMeta;
 }
@@ -102,8 +105,11 @@ function validate(state: FormState): string[] {
   for (const field of META_FIELDS[state.section]) {
     const value = (state.meta[field.key] ?? "").trim();
     if (field.required && !value) errors.push(`${field.label} is required.`);
-    if (value.length > META_MAX_LEN)
+    if (field.kind === "level") {
+      if (value && !/^[1-5]$/.test(value)) errors.push(`${field.label} must be between 1 and 5.`);
+    } else if (value.length > META_MAX_LEN) {
       errors.push(`${field.label} must be ${META_MAX_LEN} characters or fewer.`);
+    }
   }
 
   if (!Number.isInteger(Number(state.sortKey))) errors.push("Sort key must be a whole number.");

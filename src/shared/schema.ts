@@ -82,11 +82,13 @@ const referenceMetaZ = z
   })
   .strict();
 
+// level (§31.4): CONTENT, 1–5 — the renamable labels for those numbers are
+// FORMAT (formatV2Schema's levelLabels), never this schema's concern.
 const skillMetaZ = z
   .object({
     section: z.literal("skill"),
     category: z.string().min(1).max(120).optional(),
-    level: z.string().min(1).max(120).optional(),
+    level: z.number().int().min(1).max(5).optional(),
   })
   .strict();
 
@@ -99,7 +101,7 @@ const interestMetaZ = z
 const languageMetaZ = z
   .object({
     section: z.literal("language"),
-    level: z.string().min(1).max(120).optional(),
+    level: z.number().int().min(1).max(5).optional(),
   })
   .strict();
 

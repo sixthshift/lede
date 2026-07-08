@@ -3,6 +3,7 @@ import {
   TailorDecisionZ,
   entryMetaZ,
   entryInput,
+  entryImport,
   profileInput,
   settingsInput,
   applicationCreate,
@@ -77,6 +78,212 @@ describe("entryMetaZ", () => {
     const { role, ...withoutRole } = experienceMeta();
     expect(entryMetaZ.safeParse(withoutRole).success).toBe(false);
   });
+});
+
+// ── skill/language meta.level: numeric CONTENT, 1–5 (§31.4) ──
+
+describe("entryMetaZ — skill/language meta.level", () => {
+  it("accepts a skill with an omitted level (unleveled entries stay valid)", () => {
+    expect(entryMetaZ.safeParse({ section: "skill" }).success).toBe(true);
+  });
+
+  it("accepts a skill with a numeric level of 3", () => {
+    expect(entryMetaZ.safeParse({ section: "skill", level: 3 }).success).toBe(true);
+  });
+
+  it("rejects a skill with a string level (the old free-text shape)", () => {
+    expect(entryMetaZ.safeParse({ section: "skill", level: "expert" }).success).toBe(false);
+  });
+
+  it("rejects a skill level outside 1–5", () => {
+    expect(entryMetaZ.safeParse({ section: "skill", level: 0 }).success).toBe(false);
+    expect(entryMetaZ.safeParse({ section: "skill", level: 6 }).success).toBe(false);
+  });
+
+  it("rejects a non-integer skill level", () => {
+    expect(entryMetaZ.safeParse({ section: "skill", level: 2.5 }).success).toBe(false);
+  });
+
+  it("accepts a language with an omitted level (unleveled entries stay valid)", () => {
+    expect(entryMetaZ.safeParse({ section: "language" }).success).toBe(true);
+  });
+
+  it("accepts a language with a numeric level of 5", () => {
+    expect(entryMetaZ.safeParse({ section: "language", level: 5 }).success).toBe(true);
+  });
+
+  it("rejects a language with a string level (the old free-text shape)", () => {
+    expect(entryMetaZ.safeParse({ section: "language", level: "fluent" }).success).toBe(false);
+  });
+});
+
+// ── entryInput / entryImport: a STRING level fails the full parse; numeric passes ──
+
+describe("entryInput — meta.level parse (§31.4)", () => {
+  it("rejects a skill entry whose level is a string", () => {
+    const bad = {
+      section: "skill",
+      meta: { section: "skill", level: "expert" },
+      facts: ["TypeScript"],
+      tags: [],
+      sortKey: 1,
+    };
+    expect(entryInput.safeParse(bad).success).toBe(false);
+  });
+
+  it("accepts a skill entry whose level is numeric (3)", () => {
+    const ok = {
+      section: "skill",
+      meta: { section: "skill", level: 3 },
+      facts: ["TypeScript"],
+      tags: [],
+      sortKey: 1,
+    };
+    expect(entryInput.safeParse(ok).success).toBe(true);
+  });
+
+  it("accepts a skill entry with no level at all", () => {
+    const ok = {
+      section: "skill",
+      meta: { section: "skill" },
+      facts: ["TypeScript"],
+      tags: [],
+      sortKey: 1,
+    };
+    expect(entryInput.safeParse(ok).success).toBe(true);
+  });
+
+  it("rejects a language entry whose level is a string, via entryImport too", () => {
+    const bad = [
+      {
+        section: "language",
+        meta: { section: "language", level: "fluent" },
+        facts: ["Spanish"],
+        tags: [],
+        sortKey: 1,
+      },
+    ];
+    expect(entryImport.safeParse(bad).success).toBe(false);
+  });
+});
+
+// ── §31.4 data migration (drizzle/0004): a pre-existing STRING level must be
+// cleared on boot so the row parses under the new numeric schema ──
+
+describe("drizzle/0004 — meta.level string-to-cleared migration", () => {
+  it(
+    "is registered in the journal and picked up on boot: applying it clears a string level " +
+      "but leaves a numeric level intact",
+    async () => {
+      const { mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdirSync } = await import(
+        "node:fs"
+      );
+      const { tmpdir } = await import("node:os");
+      const path = await import("node:path");
+      const Database = (await import("better-sqlite3")).default;
+      const { drizzle } = await import("drizzle-orm/better-sqlite3");
+      const { migrate } = await import("drizzle-orm/better-sqlite3/migrator");
+      const schema = await import("../src/server/db/schema");
+
+      const projectDrizzleDir = path.join(process.cwd(), "drizzle");
+      const migrationFile = readdirSync(projectDrizzleDir).find((f) => f.startsWith("0004_"));
+      expect(migrationFile, "a 0004_*.sql migration must exist").toBeDefined();
+
+      const journal = JSON.parse(
+        readFileSync(path.join(projectDrizzleDir, "meta", "_journal.json"), "utf-8"),
+      );
+      const entry0004 = journal.entries.find((e: { idx: number }) => e.idx === 4);
+      expect(entry0004, "0004 must be registered in meta/_journal.json").toBeDefined();
+      expect(entry0004.tag).toBe(migrationFile!.replace(/\.sql$/, ""));
+
+      // Apply only migrations 0000-0003 first, from a scratch copy — this
+      // reproduces "an existing install that hasn't seen 0004 yet."
+      const dbFile = path.join(mkdtempSync(path.join(tmpdir(), "lede-migration-")), "lede.sqlite");
+      const sqlite = new Database(dbFile);
+      const db = drizzle(sqlite, { schema });
+
+      const priorDir = mkdtempSync(path.join(tmpdir(), "lede-prior-migrations-"));
+      mkdirSync(path.join(priorDir, "meta"));
+      const priorEntries = journal.entries.filter((e: { idx: number }) => e.idx < 4);
+      for (const e of priorEntries) {
+        writeFileSync(
+          path.join(priorDir, `${e.tag}.sql`),
+          readFileSync(path.join(projectDrizzleDir, `${e.tag}.sql`)),
+        );
+      }
+      writeFileSync(
+        path.join(priorDir, "meta", "_journal.json"),
+        JSON.stringify({
+          version: journal.version,
+          dialect: journal.dialect,
+          entries: priorEntries,
+        }),
+      );
+      migrate(db, { migrationsFolder: priorDir });
+
+      // Insert rows shaped like pre-ticket data: a string skill level and a
+      // string language level (both must be cleared), plus a numeric skill
+      // level (must survive untouched — the guard is json_type = 'text' only).
+      const now = Date.now();
+      const insert = sqlite.prepare(
+        `INSERT INTO entries (id, section, meta, facts, tags, sort_key, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      );
+      insert.run(
+        "skill-dirty",
+        "skill",
+        JSON.stringify({ section: "skill", level: "expert" }),
+        JSON.stringify(["Rust"]),
+        JSON.stringify([]),
+        1,
+        now,
+        now,
+      );
+      insert.run(
+        "lang-dirty",
+        "language",
+        JSON.stringify({ section: "language", level: "fluent" }),
+        JSON.stringify(["Spanish"]),
+        JSON.stringify([]),
+        1,
+        now,
+        now,
+      );
+      insert.run(
+        "skill-numeric",
+        "skill",
+        JSON.stringify({ section: "skill", level: 4 }),
+        JSON.stringify(["Go"]),
+        JSON.stringify([]),
+        1,
+        now,
+        now,
+      );
+
+      // Now migrate against the REAL project drizzle/ folder — 0000-0003 are
+      // already applied (by timestamp), so only 0004 runs, proving it's the
+      // one that's registered and picked up on boot (mirrors migrateDb()).
+      migrate(db, { migrationsFolder: "drizzle" });
+
+      const rows = sqlite
+        .prepare(
+          "SELECT id, meta FROM entries WHERE id IN ('skill-dirty','lang-dirty','skill-numeric')",
+        )
+        .all() as { id: string; meta: string }[];
+      const metaById = new Map(rows.map((r) => [r.id, JSON.parse(r.meta)]));
+
+      expect(metaById.get("skill-dirty").level).toBeUndefined();
+      expect(metaById.get("lang-dirty").level).toBeUndefined();
+      expect(metaById.get("skill-numeric").level).toBe(4);
+
+      // The cleared rows now parse under the new numeric-only schema.
+      expect(entryMetaZ.safeParse(metaById.get("skill-dirty")).success).toBe(true);
+      expect(entryMetaZ.safeParse(metaById.get("lang-dirty")).success).toBe(true);
+      expect(entryMetaZ.safeParse(metaById.get("skill-numeric")).success).toBe(true);
+
+      sqlite.close();
+    },
+  );
 });
 
 // ── entryInput: facts arity + meta/section agreement ──

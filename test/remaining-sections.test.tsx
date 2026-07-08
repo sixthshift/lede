@@ -73,7 +73,7 @@ describe("remaining sections — coverage (§10)", () => {
         202101,
       ),
       entry("interest1", "interest", { section: "interest" }, ["Woodworking"], 202001),
-      entry("lang1", "language", { section: "language", level: "fluent" }, ["Spanish"], 202001),
+      entry("lang1", "language", { section: "language", level: 5 }, ["Spanish"], 202001),
       entry(
         "ref1",
         "reference",

@@ -58,12 +58,14 @@ export const SECTIONS: { [S in Section]: SectionConfig<S> } = {
   },
   // interest has no meta fields beyond `section` — the interest name lives in facts
   interest: { label: "Interests", rephrase: "none", order: "relevance" },
-  // language meta carries no `name` field (§4.1) — the language name lives in facts
+  // language meta carries no `name` field (§4.1) — the language name lives in
+  // facts. No metaText: level (§31.4) is CONTENT rendered via the format-v2
+  // levelDisplay axis, not as fallback display text — like interest, this
+  // section shows nothing when facts are (impossibly, per LABEL_SECTIONS) empty.
   language: {
     label: "Languages",
     rephrase: "none",
     order: "manual",
-    metaText: (m) => m.level ?? "",
   },
 };
 

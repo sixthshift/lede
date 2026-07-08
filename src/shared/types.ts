@@ -20,6 +20,10 @@ export type Section =
   | "language";
 
 // section-specific provenance — discriminated union on `section`
+// skill/language `level` (§31.4): a CONTENT value 1–5; the 5 renamable
+// labels shown for those numbers are FORMAT (levelDisplay/levelLabels,
+// src/shared/format-v2.ts) — tailoring never reads level (§1 tag-scoring
+// tripwire extends to levels: level-scoring is a failed ticket).
 export type EntryMeta =
   | { section: "experience"; company: string; role: string; period: string; location?: string }
   | { section: "project"; name: string; role?: string; period?: string; url?: string }
@@ -56,9 +60,9 @@ export type EntryMeta =
       email?: string;
       phone?: string;
     }
-  | { section: "skill"; category?: string; level?: string }
+  | { section: "skill"; category?: string; level?: number }
   | { section: "interest" }
-  | { section: "language"; level?: string };
+  | { section: "language"; level?: number };
 
 export type Entry = {
   id: string; // stable slug, e.g. "cloudcase-rules-engine"

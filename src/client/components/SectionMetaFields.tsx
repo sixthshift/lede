@@ -7,7 +7,14 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 
 export type MetaValues = Record<string, string>;
-export type MetaFieldDescriptor = { key: string; label: string; required: boolean };
+// `kind: "level"` (§31.4): the ONLY bounded field today — skill/language
+// meta.level is CONTENT, a 1–5 integer (the renamable labels for those
+// numbers are FORMAT, src/shared/format-v2.ts). Every other field stays free
+// text; MetaValues itself stays string-keyed either way — EntryEditor's
+// cleanMeta is what turns a "level" string back into the numeric meta field.
+export type MetaFieldDescriptor = { key: string; label: string; required: boolean; kind?: "level" };
+
+const LEVEL_OPTIONS = [1, 2, 3, 4, 5] as const;
 
 // Mirrors the meta shape for each section in @shared/types EntryMeta /
 // @shared/schema entryMetaZ — the UI's view of the same discriminated union.
@@ -59,10 +66,10 @@ export const META_FIELDS: Record<Section, MetaFieldDescriptor[]> = {
   ],
   skill: [
     { key: "category", label: "Category", required: false },
-    { key: "level", label: "Level", required: false },
+    { key: "level", label: "Level", required: false, kind: "level" },
   ],
   interest: [],
-  language: [{ key: "level", label: "Level", required: false }],
+  language: [{ key: "level", label: "Level", required: false, kind: "level" }],
 };
 
 export function SectionMetaFields({
@@ -88,11 +95,27 @@ export function SectionMetaFields({
             {field.label}
             {field.required ? " *" : ""}
           </Label>
-          <Input
-            id={`entry-meta-${field.key}`}
-            value={meta[field.key] ?? ""}
-            onChange={(e) => onChange({ ...meta, [field.key]: e.target.value })}
-          />
+          {field.kind === "level" ? (
+            <select
+              id={`entry-meta-${field.key}`}
+              className="flex h-9 w-full rounded-md border border-border bg-surface px-3 py-1 text-sm text-foreground shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:border-primary"
+              value={meta[field.key] ?? ""}
+              onChange={(e) => onChange({ ...meta, [field.key]: e.target.value })}
+            >
+              <option value="">Not set</option>
+              {LEVEL_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <Input
+              id={`entry-meta-${field.key}`}
+              value={meta[field.key] ?? ""}
+              onChange={(e) => onChange({ ...meta, [field.key]: e.target.value })}
+            />
+          )}
         </div>
       ))}
     </div>
