@@ -150,9 +150,9 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
   await expectCanvasPainted(page);
 
   // (6) reload — the body-font change persists. This freshly mounts the
-  // pinned preview at the persisted format (arimo, experience employer-first,
-  // the seed default), which is the baseline for the Sections pixel-diff
-  // below.
+  // pinned preview at the persisted format (arimo, experience title-first —
+  // the seed default, [v3-076]), which is the baseline for the Sections
+  // pixel-diff below.
   await page.reload();
   await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Body font" })).toHaveText(/Arimo/);
@@ -186,13 +186,15 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
   const experienceOrderCombobox = page.getByRole("combobox", { name: "Experience order" });
   await experienceOrderCombobox.evaluate((el) => el.scrollIntoView({ block: "center" }));
   await experienceOrderCombobox.click({ position: { x: 8, y: 8 } });
+  // default experience order is now "title-first" ([v3-076]) — pick the OTHER value so
+  // this is a real change that fires a PUT (selecting the current value is a no-op).
   const [orderPutResponse] = await Promise.all([
     page.waitForResponse(applicationPut),
-    page.getByRole("option", { name: "Title first" }).click(),
+    page.getByRole("option", { name: "Employer first" }).click(),
   ]);
   expect(orderPutResponse.status()).toBe(200);
   expect((await orderPutResponse.json()).format.sectionDisplay.experience.order).toBe(
-    "title-first",
+    "employer-first",
   );
 
   // (6c) reload — the Sections change persists AND the freshly mounted
@@ -201,7 +203,9 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
   await page.reload();
   await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Body font" })).toHaveText(/Arimo/);
-  await expect(page.getByRole("combobox", { name: "Experience order" })).toHaveText(/Title first/);
+  await expect(page.getByRole("combobox", { name: "Experience order" })).toHaveText(
+    /Employer first/,
+  );
   await expectCanvasPainted(page);
   await expect
     .poll(() => previewDataUrl(page), { timeout: 15000 })

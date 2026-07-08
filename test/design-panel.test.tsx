@@ -366,12 +366,14 @@ describe("DesignPanel — Sections group (sectionDisplay.*, E9-F4d)", () => {
     const onChange = vi.fn();
     render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} />);
 
+    // default is now "title-first" ([v3-076]) — select the OTHER value so this is a
+    // real change that fires onChange (selecting the current value is a no-op).
     fireEvent.click(screen.getByRole("combobox", { name: "Experience order" }));
-    fireEvent.click(await screen.findByRole("option", { name: "Title first" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Employer first" }));
 
     expect(onChange).toHaveBeenCalledTimes(1);
     const next = onChange.mock.calls[0][0] as DocumentFormatV2;
-    expect(next.sectionDisplay.experience.order).toBe("title-first");
+    expect(next.sectionDisplay.experience.order).toBe("employer-first");
     expect(next.sectionDisplay.experience.groupPromotions).toBe(
       DEFAULT_FORMAT_V2.sectionDisplay.experience.groupPromotions,
     );
@@ -420,12 +422,13 @@ describe("DesignPanel — Sections group (sectionDisplay.*, E9-F4d)", () => {
     const onChange = vi.fn();
     render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} />);
 
+    // default is now "degree-first" ([v3-076]) — select the OTHER value for a real change.
     fireEvent.click(screen.getByRole("combobox", { name: "Education order" }));
-    fireEvent.click(await screen.findByRole("option", { name: "Degree first" }));
+    fireEvent.click(await screen.findByRole("option", { name: "School first" }));
 
     expect(onChange).toHaveBeenCalledTimes(1);
     const next = onChange.mock.calls[0][0] as DocumentFormatV2;
-    expect(next.sectionDisplay.education.order).toBe("degree-first");
+    expect(next.sectionDisplay.education.order).toBe("school-first");
   });
 
   it("readOnly: no onChange fires on any Sections control, and every control is disabled", () => {

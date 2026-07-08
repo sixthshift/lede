@@ -551,9 +551,15 @@ function baseFromV1(v1: DocumentFormat): DocumentFormatV2 {
         levelLabels: ["Beginner", "Elementary", "Intermediate", "Advanced", "Expert"],
       },
       interests: { layout: "rows", gridColumns: 1 },
-      experience: { order: "employer-first", groupPromotions: false }, // groupBy: `${company} · ${role} · ${period}`
+      // order MUST match the pre-E9 HEADING DISPLAY, not the groupBy KEY: assemble's
+      // headingPartsFromMeta renders title=role (experience) / title=degree (education)
+      // first, so the migration default is title-first / degree-first (the no-swap look
+      // sections.tsx shipped pre-E9-F4c). Keying it off the groupBy order (company·role,
+      // school·degree) was a latent bug — dormant until F4c consumed the axis — that
+      // silently flipped the default render; see ledger [v3-076].
+      experience: { order: "title-first", groupPromotions: false },
       summary: { asPartOfHeader: false, showHeading: false }, // SummarySection renders no label
-      education: { order: "school-first" }, // groupBy: `${school} · ${degree}`
+      education: { order: "degree-first" },
     },
   };
 }

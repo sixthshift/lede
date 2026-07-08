@@ -126,9 +126,9 @@ const EXPECTED_BASE: Omit<DocumentFormatV2, "layout" | "header" | "colors"> & {
       levelLabels: ["Beginner", "Elementary", "Intermediate", "Advanced", "Expert"],
     },
     interests: { layout: "rows", gridColumns: 1 },
-    experience: { order: "employer-first", groupPromotions: false }, // groupBy: `${company} · ${role} · ${period}`
+    experience: { order: "title-first", groupPromotions: false }, // matches pre-E9 heading render (title=role leads), not the groupBy key — [v3-076]
     summary: { asPartOfHeader: false, showHeading: false }, // SummarySection renders no heading label
-    education: { order: "school-first" }, // groupBy: `${school} · ${degree}`
+    education: { order: "degree-first" }, // matches pre-E9 heading render (title=degree leads) — [v3-076]
   },
 };
 
