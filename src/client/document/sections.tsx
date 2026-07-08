@@ -12,6 +12,7 @@ import { Image, Link, StyleSheet, Text, View } from "@react-pdf/renderer";
 import type {
   DocumentFormat,
   Profile,
+  Section,
   TailoredGroup,
   TailoredGroupHeadingParts,
   TailoredItem,
@@ -23,6 +24,9 @@ import type {
   DateFormatV2,
   EntryFontStyle,
   HeaderSeparator,
+  InterestsLayout,
+  LevelDisplay,
+  SectionLayout,
 } from "@shared/format-v2";
 import type {
   AccentPlacementRenderConfig,
@@ -31,6 +35,7 @@ import type {
   HeadingsRenderConfig,
   LinksRenderConfig,
   PhotoRenderConfig,
+  SectionDisplayRenderConfig,
   TypeScaleSizes,
 } from "./engine/legacyAdapt";
 import { formatDate, parseHeadingDate } from "./formatDate";
@@ -144,10 +149,9 @@ function resolveLinksConfig(format: DocumentFormat): LinksRenderConfig {
 // colors.primary, every other element class (name/title/headerIcons/dates/
 // entrySubtitles/linkIcons) by colors.text — see format-v2.ts's baseFromV1
 // accentPlacement value, which this mirrors 1:1.
-// levelIndicators is a NO-OP here: its element (skills/languages level
-// display) doesn't exist in this file yet — it's built in E9-F4. The flag
-// is threaded through so AccentPlacementV2 stays whole end-to-end, but
-// nothing reads it until that ticket gives it a color path to gate.
+// levelIndicators (E9-F4b): the flag went live once the level element it
+// gates — the skills/languages level display below — existed to color. Same
+// accentOrText gate as every other element class here.
 const DEFAULT_ACCENT_PLACEMENT: AccentPlacementRenderConfig = {
   name: false,
   title: false,
@@ -177,6 +181,65 @@ const DEFAULT_PHOTO_CONFIG: PhotoRenderConfig = { crop: { x: 50, y: 50 }, zoom: 
 function resolvePhotoConfig(format: DocumentFormat): PhotoRenderConfig {
   const config = (format as DocumentFormat & { photoConfig?: PhotoRenderConfig }).photoConfig;
   return config ?? DEFAULT_PHOTO_CONFIG;
+}
+
+// sectionDisplay.{skillsLanguages,interests} (§31.4, E9-F4b) arrive as an
+// extra property on `format`, same seam as photoConfig above
+// (legacyAdapt.ts's toLegacyFormat / SectionDisplayRenderConfig). Absent
+// falls back to exactly format-v2.ts's own DEFAULT_FORMAT_V2 values: 'rows'
+// at 1 column for both groups, 'text' level display with the stock 5 labels
+// — this module's pre-ticket look (one stacked list, no level anything).
+const DEFAULT_SECTION_DISPLAY_CONFIG: SectionDisplayRenderConfig = {
+  skillsLanguages: {
+    layout: "rows",
+    gridColumns: 1,
+    levelDisplay: "text",
+    levelLabels: ["Beginner", "Elementary", "Intermediate", "Advanced", "Expert"],
+  },
+  interests: { layout: "rows", gridColumns: 1 },
+};
+
+function resolveSectionDisplayConfig(format: DocumentFormat): SectionDisplayRenderConfig {
+  const config = (format as DocumentFormat & { sectionDisplayConfig?: SectionDisplayRenderConfig })
+    .sectionDisplayConfig;
+  return config ?? DEFAULT_SECTION_DISPLAY_CONFIG;
+}
+
+// The skill/language sections share ONE display config (skillsLanguages);
+// interest owns its own (no level axis — InterestsLayout has no 'level'
+// value, §31.4). Every other section has no §31.4 items-display seam yet
+// (F4c's experience/summary/education, or sections with no per-item display
+// axis at all) — undefined, so SectionBlock falls through to the legacy
+// per-section `columns` field exactly as this module rendered before this
+// ticket.
+type ItemsDisplayConfig = {
+  layout: SectionLayout | InterestsLayout;
+  gridColumns: number;
+  levelDisplay?: LevelDisplay;
+  levelLabels?: readonly [string, string, string, string, string];
+};
+
+function resolveItemsDisplay(
+  section: Section,
+  sectionDisplay: SectionDisplayRenderConfig,
+): ItemsDisplayConfig | undefined {
+  if (section === "skill" || section === "language") return sectionDisplay.skillsLanguages;
+  if (section === "interest") return sectionDisplay.interests;
+  return undefined;
+}
+
+// §31.4: meta.level (skill/language EntryMeta, src/shared/types.ts) is
+// CONTENT, 1–5. The assemble()->TailoredItem pipeline (src/server/tailor/
+// assemble.ts) doesn't carry it onto TailoredItem yet — outside this
+// ticket's declared files — so, same "extra property, absent = fallback"
+// seam as every format extra above, an item MAY carry its own `level`
+// alongside entryId/text. Absent (every item until that pipeline threads it)
+// renders through the plain row the 'level' layout guarantees for a
+// level-less entry — never an invented number.
+type LeveledItem = TailoredItem & { level?: number };
+
+function resolveItemLevel(item: TailoredItem): number | undefined {
+  return (item as LeveledItem).level;
 }
 
 // Every gated element class below reduces to this: colors.primary when its
@@ -221,6 +284,7 @@ function buildStyles(format: DocumentFormat) {
   const dateColor = accentOrText(accentPlacement.dates, colors);
   const entrySubtitleColor = accentOrText(accentPlacement.entrySubtitles, colors);
   const linkIconColor = accentOrText(accentPlacement.linkIcons, colors);
+  const levelIndicatorColor = accentOrText(accentPlacement.levelIndicators, colors);
   const headingTextTransform =
     headingsConfig.capitalization === "uppercase" ? "uppercase" : "capitalize";
 
@@ -513,6 +577,76 @@ function buildStyles(format: DocumentFormat) {
     // independent of the bullet glyph's position — a real x-offset on the
     // body only, never the bullet.
     itemTextIndent: { marginLeft: 10 },
+    // sectionDisplay.{skillsLanguages,interests}.layout 'compact'/'bubble'
+    // (§31.4, E9-F4b): both share the row-wrap container (itemsGrid, above —
+    // the SAME container 'grid' reuses) but replace ItemRow's bullet+flex
+    // item with a bare, un-widthed Text run — no bullet glyph, so 'compact'
+    // is byte-distinct from 'rows'/'grid' by that glyph's absence alone,
+    // on top of the tighter margins below.
+    itemTextInline: {
+      fontSize: typography.body.size,
+      fontFamily: typography.body.family,
+      color: colors.text,
+    },
+    itemCompact: { flexDirection: "row", marginRight: 8, marginBottom: 4 },
+    // 'bubble': the same bare text run, wrapped in a bordered pill — real
+    // geometry (a stroked box) 'compact' never draws, so the two stay
+    // pairwise-distinct regardless of content.
+    itemBubble: {
+      flexDirection: "row",
+      borderWidth: 0.75,
+      borderColor: colors.text,
+      borderRadius: 8,
+      paddingVertical: 2,
+      paddingHorizontal: 6,
+      marginRight: 6,
+      marginBottom: 6,
+    },
+    // sectionDisplay.skillsLanguages.levelDisplay (§31.4, E9-F4b): the
+    // per-item level indicator, appended after an otherwise-ordinary
+    // ItemRow — 'level' layout is exactly the 'rows' row plus this, so an
+    // item with no level (resolveItemLevel undefined) renders NOTHING extra,
+    // which is the fallback the ticket requires. 'dots'/'bar' are plain
+    // Views — no Text child, so pdf.js text extraction sees zero added
+    // content for either (the EXTRACTION-NEUTRALITY oracle,
+    // test/engine-section-display.test.ts); 'text' is the one levelDisplay
+    // that legitimately adds extraction text (levelIndicatorText, below).
+    levelIndicatorWrap: { flexDirection: "row", alignItems: "center", marginLeft: 6 },
+    levelDot: {
+      width: 5,
+      height: 5,
+      borderRadius: 2.5,
+      marginRight: 2,
+      borderWidth: 0.75,
+      borderColor: levelIndicatorColor,
+    },
+    levelDotFilled: { backgroundColor: levelIndicatorColor },
+    // The bar track is a fixed-width strip tinted off colors.text at low
+    // opacity (never a new hardcoded hex) so it reads as a neutral groove
+    // regardless of the document's own palette; the fill on top of it is
+    // the one part levelIndicators actually gates.
+    levelBarTrack: {
+      position: "relative",
+      width: 30,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.text,
+      opacity: 0.2,
+    },
+    levelBarFill: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: levelIndicatorColor,
+    },
+    levelIndicatorText: {
+      fontSize: typography.body.size - 1,
+      fontFamily: typography.body.family,
+      marginLeft: 6,
+      color: levelIndicatorColor,
+    },
   });
 }
 
@@ -888,10 +1022,16 @@ export function ItemRow({
   item,
   format,
   columns,
+  trailing,
 }: {
   item: TailoredItem;
   format: DocumentFormat;
   columns: number;
+  // sectionDisplay.skillsLanguages.layout 'level' (§31.4, E9-F4b): the
+  // item's own level indicator, rendered as this row's last child — absent
+  // (every other layout, or a level-less item within 'level' itself) leaves
+  // this row byte-identical to the plain 'rows' row it always was.
+  trailing?: ReactNode;
 }) {
   const styles = buildStyles(format);
   const entriesConfig = resolveEntriesConfig(format);
@@ -903,6 +1043,122 @@ export function ItemRow({
     <View style={[styles.item, width]}>
       <Text style={styles.bullet}>{BULLET_GLYPHS[entriesConfig.listStyle]}</Text>
       <Text style={bodyStyle}>{item.text}</Text>
+      {trailing}
+    </View>
+  );
+}
+
+// sectionDisplay.{skillsLanguages,interests}.layout 'compact'/'bubble'
+// (§31.4, E9-F4b) — see itemCompact/itemBubble's own comment (buildStyles)
+// for why these skip ItemRow's bullet entirely rather than reusing it.
+function ChipItemRow({
+  item,
+  styles,
+  variant,
+}: {
+  item: TailoredItem;
+  styles: SectionStyles;
+  variant: "compact" | "bubble";
+}) {
+  return (
+    <View style={variant === "bubble" ? styles.itemBubble : styles.itemCompact}>
+      <Text style={styles.itemTextInline}>{item.text}</Text>
+    </View>
+  );
+}
+
+// sectionDisplay.skillsLanguages.levelDisplay (§31.4, E9-F4b). `level`
+// undefined (an unleveled entry, or levelDisplay has nothing to show for
+// it) renders nothing — the 'level' layout's rows fallback for that one
+// item. 'dots'/'bar' are plain Views (levelDot/levelBarTrack+Fill,
+// buildStyles) — zero Text children, so they add nothing to pdf.js
+// extraction; 'text' is a Text run and legitimately does.
+function renderLevelIndicator(
+  level: number | undefined,
+  levelDisplay: LevelDisplay,
+  levelLabels: readonly string[],
+  styles: SectionStyles,
+): ReactNode {
+  if (level === undefined) return null;
+  if (levelDisplay === "text") {
+    return <Text style={styles.levelIndicatorText}>{levelLabels[level - 1]}</Text>;
+  }
+  if (levelDisplay === "dots") {
+    return (
+      <View style={styles.levelIndicatorWrap}>
+        {[1, 2, 3, 4, 5].map((dotLevel) => (
+          <View
+            key={`dot-${dotLevel}`}
+            style={dotLevel <= level ? [styles.levelDot, styles.levelDotFilled] : styles.levelDot}
+          />
+        ))}
+      </View>
+    );
+  }
+  return (
+    <View style={[styles.levelBarTrack, { marginLeft: 6 }]}>
+      <View style={[styles.levelBarFill, { width: `${(level / 5) * 100}%` }]} />
+    </View>
+  );
+}
+
+// The section/group items block — every §31.4 skillsLanguages/interests
+// layout value shares this ONE dispatch, reusing the same itemsGrid-vs-items
+// container switch this module used before this ticket (never a second grid
+// path): 'compact'/'bubble' opt into the row-wrap container with a bare
+// ChipItemRow child; 'grid' and the legacy per-section `columns` fallback
+// both resolve to a column count and share ItemRow's existing width-percent
+// math; 'level' stays in the single-column container and appends each item's
+// own indicator via ItemRow's `trailing`.
+function buildItemsBlock(
+  items: TailoredGroup["items"],
+  format: DocumentFormat,
+  styles: SectionStyles,
+  columns: number,
+  itemsDisplay: ItemsDisplayConfig | undefined,
+): ReactNode {
+  const layout = itemsDisplay?.layout;
+
+  if (layout === "compact" || layout === "bubble") {
+    return (
+      <View style={styles.itemsGrid}>
+        {items.map((item) => (
+          <ChipItemRow key={item.entryId} item={item} styles={styles} variant={layout} />
+        ))}
+      </View>
+    );
+  }
+
+  if (layout === "level") {
+    const levelDisplay = itemsDisplay?.levelDisplay ?? "text";
+    const levelLabels =
+      itemsDisplay?.levelLabels ?? DEFAULT_SECTION_DISPLAY_CONFIG.skillsLanguages.levelLabels;
+    return (
+      <View style={styles.items}>
+        {items.map((item) => (
+          <ItemRow
+            key={item.entryId}
+            item={item}
+            format={format}
+            columns={1}
+            trailing={renderLevelIndicator(
+              resolveItemLevel(item),
+              levelDisplay,
+              levelLabels,
+              styles,
+            )}
+          />
+        ))}
+      </View>
+    );
+  }
+
+  const resolvedColumns = layout === "grid" ? (itemsDisplay?.gridColumns ?? 1) : columns;
+  return (
+    <View style={resolvedColumns > 1 ? styles.itemsGrid : styles.items}>
+      {items.map((item) => (
+        <ItemRow key={item.entryId} item={item} format={format} columns={resolvedColumns} />
+      ))}
     </View>
   );
 }
@@ -1015,21 +1271,21 @@ export function GroupBlock({
   group,
   format,
   columns = 1,
+  itemsDisplay,
 }: {
   group: TailoredGroup;
   format: DocumentFormat;
   columns?: number;
+  // §31.4 sectionDisplay.{skillsLanguages,interests} (E9-F4b) — set only by
+  // SectionBlock, only for skill/language/interest sections (resolveItemsDisplay).
+  // Undefined ⇒ `columns` alone decides the container, exactly this module's
+  // pre-ticket behavior for every other section.
+  itemsDisplay?: ItemsDisplayConfig;
 }) {
   const styles = buildStyles(format);
   const entriesConfig = resolveEntriesConfig(format);
   const parts = group.headingParts;
-  const itemsBlock = (
-    <View style={columns > 1 ? styles.itemsGrid : styles.items}>
-      {group.items.map((item) => (
-        <ItemRow key={item.entryId} item={item} format={format} columns={columns} />
-      ))}
-    </View>
-  );
+  const itemsBlock = buildItemsBlock(group.items, format, styles, columns, itemsDisplay);
 
   // Back-compat (§31.1): a group with no headingParts (every snapshot from
   // before E9-F2d, or a hand-built fixture) renders exactly its raw
@@ -1172,12 +1428,29 @@ export function SectionBlock({
 }) {
   const styles = buildStyles(format);
   const headingsConfig = resolveHeadingsConfig(format);
-  const columns = format.sections[section.section]?.columns ?? 1;
+  const sectionDisplay = resolveSectionDisplayConfig(format);
+  const itemsDisplay = resolveItemsDisplay(section.section, sectionDisplay);
+  // §31.4 (E9-F4b): a skill/language/interest section's column count now
+  // comes from its own gridColumns when its layout is 'grid' (1 for every
+  // other layout — 'compact'/'bubble' wrap freely, 'rows'/'level' stay
+  // single-column); every other section keeps the legacy per-section
+  // `columns` field exactly as this module read it before this ticket.
+  const columns = itemsDisplay
+    ? itemsDisplay.layout === "grid"
+      ? itemsDisplay.gridColumns
+      : 1
+    : (format.sections[section.section]?.columns ?? 1);
   return (
     <View style={styles.section}>
       {renderSectionHeading(SECTIONS[section.section].label, styles, headingsConfig)}
       {section.groups.map((group, i) => (
-        <GroupBlock key={group.heading ?? i} group={group} format={format} columns={columns} />
+        <GroupBlock
+          key={group.heading ?? i}
+          group={group}
+          format={format}
+          columns={columns}
+          itemsDisplay={itemsDisplay}
+        />
       ))}
     </View>
   );

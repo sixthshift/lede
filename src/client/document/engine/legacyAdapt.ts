@@ -20,6 +20,7 @@ import type {
   HeadingStyle,
   LinksV2,
   PhotoV2,
+  SectionDisplayV2,
 } from "@shared/format-v2";
 
 // sections.tsx's fontFamily is just a string handed to react-pdf. §31.2's
@@ -200,6 +201,25 @@ function resolvePhotoConfig(format: DocumentFormatV2): PhotoRenderConfig {
   return { crop: { ...format.photo.crop }, zoom: format.photo.zoom };
 }
 
+// sectionDisplay.{skillsLanguages,interests} (§31.4, E9-F4b) resolve 1:1 to
+// sections.tsx's skill/language/interest items composition — no derivation,
+// same seam as linksConfig/accentPlacementConfig above (`sectionDisplayConfig`).
+// Only these two groups: sectionDisplay.{experience,summary,education} are
+// the NEXT ticket's (E9-F4c) seam, so this type deliberately narrows to the
+// two groups this ticket wires rather than passing the whole SectionDisplayV2
+// through unused.
+export type SectionDisplayRenderConfig = Pick<SectionDisplayV2, "skillsLanguages" | "interests">;
+
+function resolveSectionDisplayConfig(format: DocumentFormatV2): SectionDisplayRenderConfig {
+  return {
+    skillsLanguages: {
+      ...format.sectionDisplay.skillsLanguages,
+      levelLabels: [...format.sectionDisplay.skillsLanguages.levelLabels],
+    },
+    interests: { ...format.sectionDisplay.interests },
+  };
+}
+
 export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
   typeScaleSizes: TypeScaleSizes;
   headingsConfig: HeadingsRenderConfig;
@@ -209,6 +229,7 @@ export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
   linksConfig: LinksRenderConfig;
   accentPlacementConfig: AccentPlacementRenderConfig;
   photoConfig: PhotoRenderConfig;
+  sectionDisplayConfig: SectionDisplayRenderConfig;
 } {
   const bodyFont = resolveFont(format.fonts.body);
   return {
@@ -241,5 +262,6 @@ export function toLegacyFormat(format: DocumentFormatV2): DocumentFormat & {
     linksConfig: resolveLinksConfig(format),
     accentPlacementConfig: resolveAccentPlacementConfig(format),
     photoConfig: resolvePhotoConfig(format),
+    sectionDisplayConfig: resolveSectionDisplayConfig(format),
   };
 }
