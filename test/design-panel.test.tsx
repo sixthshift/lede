@@ -278,6 +278,173 @@ describe("DesignPanel — Page breaks (layout.manualPageBreaks, E9-F1c)", () => 
   });
 });
 
+describe("DesignPanel — Sections group (sectionDisplay.*, E9-F4d)", () => {
+  it("renders a Sections group with a control for every new axis", () => {
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={vi.fn()} />);
+
+    expect(screen.getByText("Sections")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Skills & languages layout" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Level display" })).toBeInTheDocument();
+    for (let i = 1; i <= 5; i++) {
+      expect(screen.getByLabelText(`Level ${i}`)).toBeInTheDocument();
+    }
+    expect(screen.getByRole("combobox", { name: "Interests layout" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Experience order" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Group promotions")).toBeInTheDocument();
+    expect(screen.getByLabelText("Show summary as part of header")).toBeInTheDocument();
+    expect(screen.getByLabelText("Show summary heading")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Education order" })).toBeInTheDocument();
+  });
+
+  it("changing skills & languages layout fires onChange with sectionDisplay.skillsLanguages.layout", async () => {
+    const onChange = vi.fn();
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Skills & languages layout" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Bubble" }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as DocumentFormatV2;
+    expect(next.sectionDisplay.skillsLanguages.layout).toBe("bubble");
+    // every other sectionDisplay axis is untouched
+    expect(next.sectionDisplay.skillsLanguages.gridColumns).toBe(
+      DEFAULT_FORMAT_V2.sectionDisplay.skillsLanguages.gridColumns,
+    );
+    expect(next.sectionDisplay.interests).toEqual(DEFAULT_FORMAT_V2.sectionDisplay.interests);
+  });
+
+  it("changing level display fires onChange with sectionDisplay.skillsLanguages.levelDisplay", async () => {
+    const onChange = vi.fn();
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Level display" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Dots" }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as DocumentFormatV2;
+    expect(next.sectionDisplay.skillsLanguages.levelDisplay).toBe("dots");
+  });
+
+  it("editing a level label fires onChange with the SAME index rewritten in sectionDisplay.skillsLanguages.levelLabels, others untouched", () => {
+    const onChange = vi.fn();
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} />);
+
+    fireEvent.change(screen.getByLabelText("Level 3"), { target: { value: "Fluent" } });
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as DocumentFormatV2;
+    const expected = [...DEFAULT_FORMAT_V2.sectionDisplay.skillsLanguages.levelLabels];
+    expected[2] = "Fluent";
+    expect(next.sectionDisplay.skillsLanguages.levelLabels).toEqual(expected);
+  });
+
+  it("clearing a level label to empty does NOT fire onChange (formatV2Schema requires 1-40 chars)", () => {
+    const onChange = vi.fn();
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} />);
+
+    fireEvent.change(screen.getByLabelText("Level 1"), { target: { value: "" } });
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("changing interests layout fires onChange with sectionDisplay.interests.layout", async () => {
+    const onChange = vi.fn();
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Interests layout" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Compact" }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as DocumentFormatV2;
+    expect(next.sectionDisplay.interests.layout).toBe("compact");
+    expect(next.sectionDisplay.interests.gridColumns).toBe(
+      DEFAULT_FORMAT_V2.sectionDisplay.interests.gridColumns,
+    );
+  });
+
+  it("changing experience order fires onChange with sectionDisplay.experience.order", async () => {
+    const onChange = vi.fn();
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Experience order" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Title first" }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as DocumentFormatV2;
+    expect(next.sectionDisplay.experience.order).toBe("title-first");
+    expect(next.sectionDisplay.experience.groupPromotions).toBe(
+      DEFAULT_FORMAT_V2.sectionDisplay.experience.groupPromotions,
+    );
+  });
+
+  it("toggling group promotions fires onChange with sectionDisplay.experience.groupPromotions", () => {
+    const onChange = vi.fn();
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} />);
+
+    expect(DEFAULT_FORMAT_V2.sectionDisplay.experience.groupPromotions).toBe(false);
+    fireEvent.click(screen.getByLabelText("Group promotions"));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as DocumentFormatV2;
+    expect(next.sectionDisplay.experience.groupPromotions).toBe(true);
+  });
+
+  it("toggling 'show summary as part of header' fires onChange with sectionDisplay.summary.asPartOfHeader", () => {
+    const onChange = vi.fn();
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} />);
+
+    expect(DEFAULT_FORMAT_V2.sectionDisplay.summary.asPartOfHeader).toBe(false);
+    fireEvent.click(screen.getByLabelText("Show summary as part of header"));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as DocumentFormatV2;
+    expect(next.sectionDisplay.summary.asPartOfHeader).toBe(true);
+    expect(next.sectionDisplay.summary.showHeading).toBe(
+      DEFAULT_FORMAT_V2.sectionDisplay.summary.showHeading,
+    );
+  });
+
+  it("toggling 'show summary heading' fires onChange with sectionDisplay.summary.showHeading", () => {
+    const onChange = vi.fn();
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} />);
+
+    expect(DEFAULT_FORMAT_V2.sectionDisplay.summary.showHeading).toBe(false);
+    fireEvent.click(screen.getByLabelText("Show summary heading"));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as DocumentFormatV2;
+    expect(next.sectionDisplay.summary.showHeading).toBe(true);
+  });
+
+  it("changing education order fires onChange with sectionDisplay.education.order", async () => {
+    const onChange = vi.fn();
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Education order" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Degree first" }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as DocumentFormatV2;
+    expect(next.sectionDisplay.education.order).toBe("degree-first");
+  });
+
+  it("readOnly: no onChange fires on any Sections control, and every control is disabled", () => {
+    const onChange = vi.fn();
+    render(<DesignPanel format={DEFAULT_FORMAT_V2} onChange={onChange} readOnly />);
+
+    expect(screen.getByRole("combobox", { name: "Skills & languages layout" })).toBeDisabled();
+    expect(screen.getByLabelText("Level 1")).toBeDisabled();
+    expect(screen.getByLabelText("Group promotions")).toBeDisabled();
+    expect(screen.getByLabelText("Show summary as part of header")).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Experience order" }));
+    fireEvent.click(screen.getByLabelText("Group promotions"));
+    fireEvent.change(screen.getByLabelText("Level 1"), { target: { value: "Native" } });
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
 describe("TemplatePicker — ATS badge CONTRAST (effectiveAtsGrade)", () => {
   it("the default strict/no-photo/single-column format shows 'ATS: strict' with no Workday/Taleo caveat", () => {
     render(<TemplatePicker format={DEFAULT_FORMAT_V2} onChange={vi.fn()} />);

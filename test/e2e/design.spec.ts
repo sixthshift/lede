@@ -46,6 +46,18 @@ async function expectCanvasPainted(page: Page): Promise<void> {
     .toBe(true);
 }
 
+// Pixel-diff pattern (E8-B1, applications.spec.ts's thumbnailDataUrl) applied
+// to the pinned main preview canvas rather than a template-card thumbnail —
+// a snapshot of the actual painted pixels, compared before/after a Sections
+// control change to prove the change repainted the real PDF rather than
+// just flipping a control's own on-screen state.
+function previewDataUrl(page: Page): Promise<string> {
+  return page
+    .locator(".document-preview canvas")
+    .first()
+    .evaluate((el: HTMLCanvasElement) => el.toDataURL());
+}
+
 test("design view: deep link, debounced persistence, multi-page host, locked read-only", async ({
   page,
 }) => {
@@ -123,8 +135,8 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
   await expectCanvasPainted(page);
   await expect(page.getByText(/^Fits \d+ pages? · (comfortable|standard|compact)$/)).toBeVisible();
 
-  // (5) change a DesignPanel control — debounced ~300ms, then PUT — and the
-  // preview repaints.
+  // (5) change a DesignPanel control (body font) — debounced ~300ms, then a
+  // PUT that persists across reload.
   const applicationPut = (r: import("@playwright/test").Response) =>
     r.url().endsWith(`/api/applications/${applicationId}`) && r.request().method() === "PUT";
 
@@ -137,11 +149,63 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
   expect((await fontPutResponse.json()).format.fonts.body).toBe("arimo");
   await expectCanvasPainted(page);
 
-  // (6) full reload of the deep URL — the changed format persists.
+  // (6) reload — the body-font change persists. This freshly mounts the
+  // pinned preview at the persisted format (arimo, experience employer-first,
+  // the seed default), which is the baseline for the Sections pixel-diff
+  // below.
   await page.reload();
   await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Body font" })).toHaveText(/Arimo/);
   await expectCanvasPainted(page);
+  const previewBeforeOrderChange = await previewDataUrl(page);
+
+  // (6b) a new "Sections" control (E9-F4d) drives the rendered artifact AND
+  // persists. sectionDisplay.experience.order is the axis exercised: the §22
+  // seed profile this fresh server tailors is entirely Experience entries, so
+  // it is the one Sections axis guaranteed to relayout the rendered page —
+  // its title/employer swap is the same reorder engine-section-order.test.ts
+  // asserts at the byte level.
+  //
+  // The proof is a pixel-diff (E8-B1's toDataURL pattern) taken across the
+  // reload that (6c) forces, NOT against a live edit: the pinned preview does
+  // not repaint in place on a format change (DocumentPreview's usePDF is
+  // never handed the updated document — its `update` fn is unused, and there
+  // is no format-keyed remount; that wiring lives outside this ticket's three
+  // declared files). Diffing across the remount both proves the axis reaches
+  // the rendered PDF bytes and that the PUT persisted — the two things the
+  // control must do — with the body font held fixed so only experience.order
+  // differs between the two captures.
+  //
+  // The full-page preview canvas renders at its native ~918px width, wider
+  // than its half of the max-w-5xl (1024px) two-column grid, so it overflows
+  // its centered column back over the RIGHT portion of the control panel.
+  // The Sections group sits low in that panel, so its full-width combobox is
+  // partly under that overflow. Both nudges below keep this a real user
+  // interaction (never a forced click): center it vertically to clear the
+  // sticky header, then click its LEFT edge, which is clear of the overflow.
+  const experienceOrderCombobox = page.getByRole("combobox", { name: "Experience order" });
+  await experienceOrderCombobox.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await experienceOrderCombobox.click({ position: { x: 8, y: 8 } });
+  const [orderPutResponse] = await Promise.all([
+    page.waitForResponse(applicationPut),
+    page.getByRole("option", { name: "Title first" }).click(),
+  ]);
+  expect(orderPutResponse.status()).toBe(200);
+  expect((await orderPutResponse.json()).format.sectionDisplay.experience.order).toBe(
+    "title-first",
+  );
+
+  // (6c) reload — the Sections change persists AND the freshly mounted
+  // preview now paints the flipped order: its page-1 pixels differ from the
+  // pre-change baseline, with the body font unchanged between the two.
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Body font" })).toHaveText(/Arimo/);
+  await expect(page.getByRole("combobox", { name: "Experience order" })).toHaveText(/Title first/);
+  await expectCanvasPainted(page);
+  await expect
+    .poll(() => previewDataUrl(page), { timeout: 15000 })
+    .not.toBe(previewBeforeOrderChange);
 
   // (7) the deep URL, opened by a FRESH server round-trip (not client-side
   // router push), resolves to the SAME design view via the SPA fallback —
@@ -170,6 +234,9 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
   for (const button of await page.getByRole("button", { name: /ATS:/ }).all()) {
     await expect(button).toBeDisabled();
   }
+  // Locked read-only reaches the new Sections group too.
+  await expect(page.getByRole("combobox", { name: "Skills & languages layout" })).toBeDisabled();
+  await expect(page.getByLabel("Group promotions")).toBeDisabled();
   await expectCanvasPainted(page);
 
   expect(pageErrors, `unexpected page errors: ${pageErrors.join(", ")}`).toHaveLength(0);

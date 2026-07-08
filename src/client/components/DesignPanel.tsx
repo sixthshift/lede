@@ -43,6 +43,8 @@ import type {
   EntryListStyle,
   EntryStructure,
   EntrySubtitlePlacement,
+  EducationOrder,
+  ExperienceOrder,
   HeaderDetailsArrangement,
   HeaderPosition,
   HeaderSeparator,
@@ -50,9 +52,12 @@ import type {
   HeadingCapitalization,
   HeadingIconStyle,
   HeadingStyle,
+  InterestsLayout,
+  LevelDisplay,
   NameFontId,
   PhotoShape,
   SectionColumn,
+  SectionLayout,
 } from "@shared/format-v2";
 import { CONTACT_ICON_STYLES, DATE_FORMATS, NAME_DISPLAY_FONT_IDS } from "@shared/format-v2";
 import { SECTIONS, SECTION_VALUES } from "@shared/sections";
@@ -231,6 +236,36 @@ const ENTRY_FONT_STYLE_OPTIONS: { value: EntryFontStyle; label: string }[] = [
   { value: "normal", label: "Normal" },
   { value: "bold", label: "Bold" },
   { value: "italic", label: "Italic" },
+];
+
+// sectionDisplay.* (§31.2's per-section display group, §31.4's level labels;
+// E9-F4d — see the "Sections" group below, which is where every one of these
+// axes gets its control).
+const SECTION_LAYOUT_OPTIONS: { value: SectionLayout; label: string }[] = [
+  { value: "grid", label: "Grid" },
+  { value: "rows", label: "Rows" },
+  { value: "compact", label: "Compact" },
+  { value: "bubble", label: "Bubble" },
+  { value: "level", label: "Level" },
+];
+const INTERESTS_LAYOUT_OPTIONS: { value: InterestsLayout; label: string }[] = [
+  { value: "grid", label: "Grid" },
+  { value: "rows", label: "Rows" },
+  { value: "compact", label: "Compact" },
+  { value: "bubble", label: "Bubble" },
+];
+const LEVEL_DISPLAY_OPTIONS: { value: LevelDisplay; label: string }[] = [
+  { value: "text", label: "Text" },
+  { value: "dots", label: "Dots" },
+  { value: "bar", label: "Bar" },
+];
+const EXPERIENCE_ORDER_OPTIONS: { value: ExperienceOrder; label: string }[] = [
+  { value: "title-first", label: "Title first" },
+  { value: "employer-first", label: "Employer first" },
+];
+const EDUCATION_ORDER_OPTIONS: { value: EducationOrder; label: string }[] = [
+  { value: "degree-first", label: "Degree first" },
+  { value: "school-first", label: "School first" },
 ];
 
 // A curated set, not an open picker — every swatch here is already a valid
@@ -1248,49 +1283,6 @@ export function DesignPanel({
         ) : null}
       </div>
 
-      {/* ── structure — the two sections v2 gives a grid axis (§31.2); every
-          other section's columns has no v2 destination (see module comment) ── */}
-      <div className="flex flex-col gap-3">
-        <p className="text-sm font-medium">Section columns</p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <FieldRow
-            label={`${SECTIONS.skill.label} & ${SECTIONS.language.label} columns`}
-            htmlFor="design-columns-skills-languages"
-          >
-            <GridColumnsSelect
-              id="design-columns-skills-languages"
-              value={format.sectionDisplay.skillsLanguages.gridColumns}
-              disabled={readOnly}
-              onChange={(gridColumns) =>
-                set({
-                  ...format,
-                  sectionDisplay: {
-                    ...format.sectionDisplay,
-                    skillsLanguages: { ...format.sectionDisplay.skillsLanguages, gridColumns },
-                  },
-                })
-              }
-            />
-          </FieldRow>
-          <FieldRow label={`${SECTIONS.interest.label} columns`} htmlFor="design-columns-interests">
-            <GridColumnsSelect
-              id="design-columns-interests"
-              value={format.sectionDisplay.interests.gridColumns}
-              disabled={readOnly}
-              onChange={(gridColumns) =>
-                set({
-                  ...format,
-                  sectionDisplay: {
-                    ...format.sectionDisplay,
-                    interests: { ...format.sectionDisplay.interests, gridColumns },
-                  },
-                })
-              }
-            />
-          </FieldRow>
-        </div>
-      </div>
-
       {/* ── layout — layout.columns/headerPosition/sidebarWidthPct/sectionPlacement
           (§31.2, engine already renders these axes per E9-F0c). sectionPlacement
           here is the per-document FORMAT axis, distinct from the global
@@ -1510,6 +1502,286 @@ export function DesignPanel({
             }
           />
         </FieldRow>
+      </div>
+
+      {/* ── sections — sectionDisplay.* (§31.2's per-section display group,
+          §31.4's level labels; E9-F4d). One consolidated group for every
+          per-section display axis, last in §31.2b's jump-nav order. Per-
+          section groups are FlowCV-gated on content there; this panel is
+          handed only `format` (no resume), and no content-aware gating
+          exists elsewhere in it to extend, so every axis shows
+          unconditionally — the documented fallback (§31.2b). ── */}
+      <div className="flex flex-col gap-4">
+        <p className="text-sm font-medium">Sections</p>
+
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-medium">
+            {`${SECTIONS.skill.label} & ${SECTIONS.language.label}`}
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FieldRow
+              label={`${SECTIONS.skill.label} & ${SECTIONS.language.label} columns`}
+              htmlFor="design-columns-skills-languages"
+            >
+              <GridColumnsSelect
+                id="design-columns-skills-languages"
+                value={format.sectionDisplay.skillsLanguages.gridColumns}
+                disabled={readOnly}
+                onChange={(gridColumns) =>
+                  set({
+                    ...format,
+                    sectionDisplay: {
+                      ...format.sectionDisplay,
+                      skillsLanguages: { ...format.sectionDisplay.skillsLanguages, gridColumns },
+                    },
+                  })
+                }
+              />
+            </FieldRow>
+
+            <FieldRow label="Skills & languages layout" htmlFor="design-section-skills-layout">
+              <EnumSelect
+                id="design-section-skills-layout"
+                value={format.sectionDisplay.skillsLanguages.layout}
+                options={SECTION_LAYOUT_OPTIONS}
+                disabled={readOnly}
+                onChange={(layout) =>
+                  set({
+                    ...format,
+                    sectionDisplay: {
+                      ...format.sectionDisplay,
+                      skillsLanguages: { ...format.sectionDisplay.skillsLanguages, layout },
+                    },
+                  })
+                }
+              />
+            </FieldRow>
+
+            <FieldRow label="Level display" htmlFor="design-section-skills-level-display">
+              <EnumSelect
+                id="design-section-skills-level-display"
+                value={format.sectionDisplay.skillsLanguages.levelDisplay}
+                options={LEVEL_DISPLAY_OPTIONS}
+                disabled={readOnly}
+                onChange={(levelDisplay) =>
+                  set({
+                    ...format,
+                    sectionDisplay: {
+                      ...format.sectionDisplay,
+                      skillsLanguages: { ...format.sectionDisplay.skillsLanguages, levelDisplay },
+                    },
+                  })
+                }
+              />
+            </FieldRow>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm text-muted-foreground">Level labels</span>
+            <div className="grid gap-2 sm:grid-cols-5">
+              {format.sectionDisplay.skillsLanguages.levelLabels.map((levelLabel, index) => {
+                const id = `design-section-skills-level-label-${index}`;
+                return (
+                  <div key={id} className="flex flex-col gap-1">
+                    <Label htmlFor={id} className="text-xs text-muted-foreground">
+                      {`Level ${index + 1}`}
+                    </Label>
+                    <Input
+                      id={id}
+                      value={levelLabel}
+                      maxLength={40}
+                      disabled={readOnly}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        // formatV2Schema bounds each label to 1-40 chars — an
+                        // empty value is rejected the same way ColorField
+                        // rejects an incomplete hex, rather than persisting
+                        // out of bounds.
+                        if (next.length < 1) return;
+                        const levelLabels = [
+                          ...format.sectionDisplay.skillsLanguages.levelLabels,
+                        ] as [string, string, string, string, string];
+                        levelLabels[index] = next;
+                        set({
+                          ...format,
+                          sectionDisplay: {
+                            ...format.sectionDisplay,
+                            skillsLanguages: {
+                              ...format.sectionDisplay.skillsLanguages,
+                              levelLabels,
+                            },
+                          },
+                        });
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-medium">{SECTIONS.interest.label}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FieldRow
+              label={`${SECTIONS.interest.label} columns`}
+              htmlFor="design-columns-interests"
+            >
+              <GridColumnsSelect
+                id="design-columns-interests"
+                value={format.sectionDisplay.interests.gridColumns}
+                disabled={readOnly}
+                onChange={(gridColumns) =>
+                  set({
+                    ...format,
+                    sectionDisplay: {
+                      ...format.sectionDisplay,
+                      interests: { ...format.sectionDisplay.interests, gridColumns },
+                    },
+                  })
+                }
+              />
+            </FieldRow>
+
+            <FieldRow label="Interests layout" htmlFor="design-section-interests-layout">
+              <EnumSelect
+                id="design-section-interests-layout"
+                value={format.sectionDisplay.interests.layout}
+                options={INTERESTS_LAYOUT_OPTIONS}
+                disabled={readOnly}
+                onChange={(layout) =>
+                  set({
+                    ...format,
+                    sectionDisplay: {
+                      ...format.sectionDisplay,
+                      interests: { ...format.sectionDisplay.interests, layout },
+                    },
+                  })
+                }
+              />
+            </FieldRow>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-medium">{SECTIONS.experience.label}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FieldRow label="Experience order" htmlFor="design-section-experience-order">
+              <EnumSelect
+                id="design-section-experience-order"
+                value={format.sectionDisplay.experience.order}
+                options={EXPERIENCE_ORDER_OPTIONS}
+                disabled={readOnly}
+                onChange={(order) =>
+                  set({
+                    ...format,
+                    sectionDisplay: {
+                      ...format.sectionDisplay,
+                      experience: { ...format.sectionDisplay.experience, order },
+                    },
+                  })
+                }
+              />
+            </FieldRow>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              id="design-section-experience-group-promotions"
+              type="checkbox"
+              checked={format.sectionDisplay.experience.groupPromotions}
+              disabled={readOnly}
+              onChange={(e) =>
+                set({
+                  ...format,
+                  sectionDisplay: {
+                    ...format.sectionDisplay,
+                    experience: {
+                      ...format.sectionDisplay.experience,
+                      groupPromotions: e.target.checked,
+                    },
+                  },
+                })
+              }
+              className="h-4 w-4 rounded border-border"
+            />
+            <Label htmlFor="design-section-experience-group-promotions">Group promotions</Label>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-medium">Summary</p>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center gap-2">
+              <input
+                id="design-section-summary-as-part-of-header"
+                type="checkbox"
+                checked={format.sectionDisplay.summary.asPartOfHeader}
+                disabled={readOnly}
+                onChange={(e) =>
+                  set({
+                    ...format,
+                    sectionDisplay: {
+                      ...format.sectionDisplay,
+                      summary: {
+                        ...format.sectionDisplay.summary,
+                        asPartOfHeader: e.target.checked,
+                      },
+                    },
+                  })
+                }
+                className="h-4 w-4 rounded border-border"
+              />
+              <Label htmlFor="design-section-summary-as-part-of-header">
+                Show summary as part of header
+              </Label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                id="design-section-summary-show-heading"
+                type="checkbox"
+                checked={format.sectionDisplay.summary.showHeading}
+                disabled={readOnly}
+                onChange={(e) =>
+                  set({
+                    ...format,
+                    sectionDisplay: {
+                      ...format.sectionDisplay,
+                      summary: { ...format.sectionDisplay.summary, showHeading: e.target.checked },
+                    },
+                  })
+                }
+                className="h-4 w-4 rounded border-border"
+              />
+              <Label htmlFor="design-section-summary-show-heading">Show summary heading</Label>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-medium">{SECTIONS.education.label}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FieldRow label="Education order" htmlFor="design-section-education-order">
+              <EnumSelect
+                id="design-section-education-order"
+                value={format.sectionDisplay.education.order}
+                options={EDUCATION_ORDER_OPTIONS}
+                disabled={readOnly}
+                onChange={(order) =>
+                  set({
+                    ...format,
+                    sectionDisplay: {
+                      ...format.sectionDisplay,
+                      education: { ...format.sectionDisplay.education, order },
+                    },
+                  })
+                }
+              />
+            </FieldRow>
+          </div>
+        </div>
       </div>
     </div>
   );
