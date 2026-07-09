@@ -166,15 +166,14 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
   // its title/employer swap is the same reorder engine-section-order.test.ts
   // asserts at the byte level.
   //
-  // The proof is a pixel-diff (E8-B1's toDataURL pattern) taken across the
-  // reload that (6c) forces, NOT against a live edit: the pinned preview does
-  // not repaint in place on a format change (DocumentPreview's usePDF is
-  // never handed the updated document — its `update` fn is unused, and there
-  // is no format-keyed remount; that wiring lives outside this ticket's three
-  // declared files). Diffing across the remount both proves the axis reaches
-  // the rendered PDF bytes and that the PUT persisted — the two things the
-  // control must do — with the body font held fixed so only experience.order
-  // differs between the two captures.
+  // The proof is a LIVE pixel-diff (E8-B1's toDataURL pattern) taken with NO
+  // reload in between (E9-F4d2 repair): the pinned preview repaints in place
+  // on a format change — DocumentPreview re-renders the PDF bytes in an
+  // effect keyed on resume/format/density and re-paints the same canvas,
+  // rather than requiring a remount. Asserting the diff live (not just after
+  // (6c)'s reload below) is what actually proves that repaint wiring, with
+  // the body font held fixed so only experience.order differs between the
+  // two captures.
   //
   // The full-page preview canvas renders at its native ~918px width, wider
   // than its half of the max-w-5xl (1024px) two-column grid, so it overflows
@@ -197,9 +196,18 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
     "employer-first",
   );
 
-  // (6c) reload — the Sections change persists AND the freshly mounted
-  // preview now paints the flipped order: its page-1 pixels differ from the
-  // pre-change baseline, with the body font unchanged between the two.
+  // LIVE repaint — no reload since previewBeforeOrderChange was captured.
+  // The pinned preview must have already repainted with the flipped order by
+  // the time the PUT above resolves; expect.poll gives the async
+  // render-then-paint pipeline room to finish without a fixed sleep.
+  await expect
+    .poll(() => previewDataUrl(page), { timeout: 15000 })
+    .not.toBe(previewBeforeOrderChange);
+
+  // (6c) reload — the Sections change persists AND the reloaded (freshly
+  // mounted) preview still paints the flipped order: its page-1 pixels still
+  // differ from the pre-change baseline, with the body font unchanged
+  // between the two.
   await page.reload();
   await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Body font" })).toHaveText(/Arimo/);

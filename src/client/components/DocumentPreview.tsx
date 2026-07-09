@@ -141,9 +141,23 @@ function RenderedPreview({
   density?: EngineDensity;
   allPages?: boolean;
 }) {
-  const [instance] = usePDF({
+  const [instance, update] = usePDF({
     document: renderResumeDocument({ resume, profile, paper, format, density }),
   });
+
+  // usePDF's own render effect has an empty dependency array — it calls
+  // updateContainer once on mount and never again, so a changed
+  // resume/format/density prop was silently ignored: the preview only
+  // repainted after a full remount (e.g. a page reload). Calling its
+  // returned `update` fn here, in an effect keyed on the actual rendered
+  // document, is the same pattern react-pdf's own PDFViewer uses internally
+  // (usePDF() + useEffect(() => updateInstance(children), [children])) —
+  // it re-runs the container update whenever the document actually changes,
+  // which is what makes the preview repaint in place instead of requiring a
+  // remount.
+  useEffect(() => {
+    update(renderResumeDocument({ resume, profile, paper, format, density }));
+  }, [update, resume, profile, paper, format, density]);
 
   if (instance.error) {
     return (
