@@ -87,15 +87,52 @@ export function getPreset(id: string): PresetManifest {
   return manifest;
 }
 
-// §31.5 (graded honesty): a shown photo or any non-single-column layout reads
-// to an ATS parser as something less linear than plain top-to-bottom text, no
-// matter how ATS-strict the preset's own composition claims to be — so both
-// cap the grade at 'good', never letting a preset's declared atsGrade
-// overstate what the LIVE format (not just the preset it started from)
-// actually produces. Unlike v1 (where layout was entirely templateId-
-// dispatched), v2's layout lives on the format itself — so the cap reads the
-// format's own `layout.columns` / `photo.hidden`, not the manifest.
-export function effectiveAtsGrade(manifest: PresetManifest, format: DocumentFormatV2): AtsGrade {
-  const capped = format.photo.hidden === false || format.layout.columns !== "one";
-  return capped ? "good" : manifest.atsGrade;
+// §31.5/oracle [v3-038]: the shipped ATS classification table. atsGrade keys
+// ONLY on the format's own axes — never on which preset (if any) produced it
+// — so a live format always self-reports the grade it actually earns.
+// atsGradeCauses is the same table read the other way: each condition that
+// fails contributes its own human-readable reason (F5c caveat UI copy),
+// rather than atsGrade collapsing them into one opaque "good".
+//
+// A colored PAGE background only exists in 'multi' mode over a 'full-page'
+// or 'border' area (src/client/document/engine/document.tsx's
+// resolvePageBackground) — 'single' mode always renders the page white
+// regardless of area, and the 'header' band (colors.area 'header', e.g. the
+// banner preset) paints with colors.accent, never colors.background, so it
+// is never a page-background fill and never downgrades the grade.
+function hasColoredPageBackground(colors: DocumentFormatV2["colors"]): boolean {
+  return colors.mode === "multi" && (colors.area === "full-page" || colors.area === "border");
+}
+
+export function atsGradeCauses(format: DocumentFormatV2): string[] {
+  const causes: string[] = [];
+  if (format.layout.columns !== "one") {
+    causes.push("Multi-column layout reads as non-linear to strict-order ATS parsers.");
+  }
+  if (format.layout.headerPosition !== "top") {
+    causes.push("Header sits beside the body (sidebar) instead of above it.");
+  }
+  if (format.photo.hidden === false) {
+    causes.push("A profile photo is shown.");
+  }
+  if (format.headings.icons !== "none") {
+    causes.push("Section heading icons are enabled.");
+  }
+  if (hasColoredPageBackground(format.colors)) {
+    causes.push("A colored page background is applied.");
+  }
+  return causes;
+}
+
+export function atsGrade(format: DocumentFormatV2): AtsGrade {
+  return atsGradeCauses(format).length === 0 ? "strict" : "good";
+}
+
+// §31.5 (graded honesty): effectiveAtsGrade is kept as the two call sites'
+// entry point (manifest + live format) but now fully DELEGATES to the pure
+// atsGrade(format) above — the manifest's own declared atsGrade is never
+// consulted; a live format always self-reports the grade its OWN axes earn,
+// never what the preset it started from claims.
+export function effectiveAtsGrade(_manifest: PresetManifest, format: DocumentFormatV2): AtsGrade {
+  return atsGrade(format);
 }
