@@ -2,7 +2,7 @@
 // a hiring tracker (no status field). Mirrors routes/entries.ts's idiom.
 import type { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { APICallError, NoObjectGeneratedError } from "ai";
 
@@ -273,6 +273,10 @@ function resolveEngine(
 // (§9 "no heavy snapshots") — only metadata + genState + currentMeta. The
 // letter snapshots (letterCurrent/letterPrevious) are the same kind of heavy
 // document payload and are omitted here for the same reason (§ letter epic).
+// `letterGenState` and `locked` (T030 CO-1, OQ4a card content) are additive:
+// the dashboard card needs a letter-state pill and a locked badge, but never
+// the heavy snapshots themselves — `locked` is derived to a plain boolean
+// (existence, not content) rather than selecting the `locked` column.
 const LIST_COLUMNS = {
   id: applications.id,
   company: applications.company,
@@ -281,6 +285,8 @@ const LIST_COLUMNS = {
   context: applications.context,
   targetPages: applications.targetPages,
   genState: applications.genState,
+  letterGenState: applications.letterGenState,
+  locked: sql<boolean>`(${applications.locked} is not null)`.mapWith(Boolean),
   currentMeta: applications.currentMeta,
   createdAt: applications.createdAt,
   updatedAt: applications.updatedAt,

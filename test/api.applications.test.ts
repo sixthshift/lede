@@ -63,6 +63,9 @@ describe("CRUD round-trip: create -> list -> get -> update -> delete", () => {
     expect(list).toHaveLength(1);
     expect(list[0].id).toBe(created.id);
     expect(list[0].genState).toBe("untailored");
+    expect(list[0].letterGenState).toBe("untailored");
+    expect(list[0].locked).toBe(false);
+    expect(list[0].current).toBeUndefined(); // list omits the heavy snapshot (§9)
 
     const getRes = await app.inject({ method: "GET", url: `/api/applications/${created.id}` });
     expect(getRes.statusCode).toBe(200);
@@ -173,8 +176,10 @@ describe("RED-TEAM #4: list payload omits heavy snapshots even when current is n
     const listRow = listRes.json().find((a: { id: string }) => a.id === "tailored-app");
     expect(listRow).toBeDefined();
     expect(listRow).not.toHaveProperty("current");
-    expect(listRow).not.toHaveProperty("locked");
     expect(listRow.genState).toBe("tailored");
+    // T030 CO-1 — `locked` survives in the list, but only as a derived
+    // boolean (existence), never the heavy snapshot itself.
+    expect(listRow.locked).toBe(false);
 
     const getRes = await app.inject({ method: "GET", url: "/api/applications/tailored-app" });
     expect(getRes.statusCode).toBe(200);

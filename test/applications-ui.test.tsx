@@ -75,10 +75,16 @@ function applicationFixture(overrides: Partial<Application>): Application {
     role: "Staff Engineer",
     jobDescription: "We need someone who can ship.",
     context: undefined,
+    format: null,
     current: null,
     locked: null,
+    lockedFormat: null,
     genState: "untailored",
     currentMeta: null,
+    letterCurrent: null,
+    letterPrevious: null,
+    letterGenState: "untailored",
+    letterFailedReason: null,
     createdAt: 1,
     updatedAt: 1,
     ...overrides,
@@ -111,7 +117,10 @@ function mockFetch(handlers: {
     }
 
     if (method === "GET" && url === "/api/applications") {
-      const list = (handlers.list?.() ?? []).map(({ current: _c, locked: _l, ...rest }) => rest);
+      const list = (handlers.list?.() ?? []).map(({ current: _c, locked, ...rest }) => ({
+        ...rest,
+        locked: locked !== null,
+      }));
       return new Response(JSON.stringify(list), {
         status: 200,
         headers: { "Content-Type": "application/json" },

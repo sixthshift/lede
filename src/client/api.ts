@@ -9,6 +9,7 @@ import type {
   Layout,
   Section,
   Application,
+  ApplicationSummary,
   Paper,
   VoiceSource,
 } from "@shared/types";
@@ -34,8 +35,10 @@ export type ApplicationUpdateInput = z.infer<typeof applicationUpdate>;
 // silently out of sync with what the client sends.
 export type ResumePartPatchInput = z.infer<typeof resumePartPatchZ>;
 export type LetterPartPatchInput = z.infer<typeof letterPartPatchZ>;
-// The list endpoint omits the heavy current/locked TailoredResume snapshots (§9).
-export type ApplicationListItem = Omit<Application, "current" | "locked">;
+// The list endpoint omits the heavy current/locked TailoredResume snapshots
+// (§9) — ApplicationSummary (src/shared/types.ts) is the canonical shape,
+// kept in lockstep with the server's own LIST_COLUMNS projection.
+export type ApplicationListItem = ApplicationSummary;
 export type SettingsResponse = {
   keySet: boolean;
   provider: string;

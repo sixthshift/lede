@@ -249,6 +249,16 @@ export type Application = {
   updatedAt: number;
 };
 
+// ── list-row summary for GET /api/applications (T030, OQ4a) — mirrors
+// LIST_COLUMNS in src/server/routes/applications.ts exactly: the heavy
+// current/locked TailoredResume snapshots are never sent to the list view
+// (§9 "no heavy snapshots"), but `locked` still needs to say WHETHER a
+// snapshot exists (for the dashboard's locked badge) — hence the boolean
+// override rather than a plain Omit. ──
+export type ApplicationSummary = Omit<Application, "current" | "locked"> & {
+  locked: boolean;
+};
+
 // ── DocumentFormat v2 (spec.md §31.2, epic E9) — additive; re-exported here
 // so consumers can keep importing document-format types from one place. The
 // v1 `DocumentFormat` above is unchanged; see src/shared/format-v2.ts. ──

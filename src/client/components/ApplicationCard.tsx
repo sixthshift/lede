@@ -3,12 +3,11 @@
 // genState (untailored/tailoring/tailored/failed) — never applied/interviewing/
 // rejected or any kanban-style hiring status.
 
-import type { Application } from "@shared/types";
+import type { ApplicationSummary } from "@shared/types";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
+import { Badge } from "./ui/badge";
 import { GenStateBadge } from "./GenStateBadge";
-
-type ApplicationSummary = Omit<Application, "current" | "locked">;
 
 const JD_PREVIEW_LENGTH = 160;
 
@@ -51,7 +50,13 @@ export function ApplicationCard({ application }: { application: ApplicationSumma
           </p>
         </CardContent>
         <CardFooter className="mt-auto justify-between border-t border-border/60 py-3">
-          <GenStateBadge state={application.genState} />
+          <div className="flex flex-wrap items-center gap-1.5">
+            <GenStateBadge state={application.genState} />
+            {application.letterGenState !== "untailored" ? (
+              <GenStateBadge state={application.letterGenState} kind="letter" />
+            ) : null}
+            {application.locked ? <Badge variant="secondary">Locked</Badge> : null}
+          </div>
           <span className="text-xs text-muted-foreground">
             Updated {formatUpdatedAt(application.updatedAt)}
           </span>

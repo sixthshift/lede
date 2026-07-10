@@ -1808,3 +1808,99 @@ test("NewApplication (v3-T020): the create panel is non-modal, the underlying li
   await expect(panel).toBeHidden();
   await expect(trigger).toBeFocused();
 });
+
+// ── T030 (Phase 3, OQ4a): card dashboard content — the list's GEN_STATE
+// LABEL text this pill-contrast check reads against, mirrored here (not
+// imported) so this spec exercises the same accessible text a real user
+// sees rather than reaching into GenStateBadge.tsx's internals.
+const RESUME_STATE_LABEL: Record<string, string> = {
+  untailored: "Untailored",
+  tailoring: "Tailoring…",
+  tailored: "Tailored",
+  failed: "Failed",
+};
+const LETTER_STATE_LABEL: Record<string, string> = {
+  untailored: "No letter",
+  tailoring: "Generating…",
+  tailored: "Letter ready",
+  failed: "Letter failed",
+};
+
+test("dashboard card content (T030, OQ4a): resume pills differ and match server genState; the locked badge appears only on a locked app; the letter pill appears iff a letter exists", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const marker = `${runId}-${testInfo.retry}`;
+  const untailoredCompany = `E2E T030 Untailored Co ${marker}`;
+  const tailoredCompany = `E2E T030 Tailored Co ${marker}`;
+
+  // (1) one application left untailored, one driven to tailored + locked +
+  // a generated letter — the three axes this ticket's card content covers.
+  const untailoredId = await createApplication(page, { company: untailoredCompany, jd: JD });
+  const tailoredId = await createApplication(page, { company: tailoredCompany, jd: JD });
+
+  await page.goto(`/applications/${tailoredId}`);
+  await tailor(page, tailoredId);
+  await expectCanvasPainted(page);
+  await generateLetter(page, tailoredId, { status: 200 });
+  await lockFinal(page, tailoredId);
+  await expect(page.getByRole("button", { name: "Unlock", exact: true })).toBeVisible();
+
+  // (2) server-side truth for both rows, read via the LIST endpoint itself
+  // (the CO-1 projection under test) — never the detail route.
+  const listRows = await (await page.request.get("/api/applications")).json();
+  const untailoredRow = listRows.find((r: { id: string }) => r.id === untailoredId);
+  const tailoredRow = listRows.find((r: { id: string }) => r.id === tailoredId);
+  expect(untailoredRow.genState).toBe("untailored");
+  expect(untailoredRow.letterGenState).toBe("untailored");
+  expect(untailoredRow.locked).toBe(false);
+  expect(tailoredRow.genState).toBe("tailored");
+  expect(tailoredRow.letterGenState).toBe("tailored");
+  expect(tailoredRow.locked).toBe(true);
+
+  // (3) back on the list — each card's resume pill DIFFERS and matches its
+  // own row's server genState (never hardcoded/swapped).
+  await page.goto("/applications");
+  const untailoredCard = page
+    .locator("[data-application-id]")
+    .filter({ hasText: untailoredCompany });
+  const tailoredCard = page.locator("[data-application-id]").filter({ hasText: tailoredCompany });
+  await expect(untailoredCard).toBeVisible();
+  await expect(tailoredCard).toBeVisible();
+
+  const untailoredLabel = RESUME_STATE_LABEL[untailoredRow.genState]!;
+  const tailoredLabel = RESUME_STATE_LABEL[tailoredRow.genState]!;
+  expect(untailoredLabel).not.toBe(tailoredLabel);
+  expect(Object.values(RESUME_STATE_LABEL)).toContain(untailoredLabel);
+  expect(Object.values(RESUME_STATE_LABEL)).toContain(tailoredLabel);
+
+  await expect(untailoredCard.getByText(untailoredLabel, { exact: true })).toBeVisible();
+  await expect(untailoredCard.getByText(tailoredLabel, { exact: true })).toHaveCount(0);
+  await expect(tailoredCard.getByText(tailoredLabel, { exact: true })).toBeVisible();
+  await expect(tailoredCard.getByText(untailoredLabel, { exact: true })).toHaveCount(0);
+
+  // (4) locked badge: present on the locked app's card, absent on the
+  // unlocked one.
+  await expect(tailoredCard.getByText("Locked", { exact: true })).toBeVisible();
+  await expect(untailoredCard.getByText("Locked", { exact: true })).toHaveCount(0);
+
+  // (5) letter pill: present (its "letter exists" label) on the app with a
+  // generated letter, absent entirely on the one that never generated one —
+  // "untailored" letterGenState renders NO letter pill at all (never a
+  // visible "No letter" pill on the card).
+  const letterReadyLabel = LETTER_STATE_LABEL.tailored!;
+  await expect(tailoredCard.getByText(letterReadyLabel, { exact: true })).toBeVisible();
+  for (const label of Object.values(LETTER_STATE_LABEL)) {
+    await expect(untailoredCard.getByText(label, { exact: true })).toHaveCount(0);
+  }
+
+  // NOT A TRACKER (scope tripwire): no hiring-status vocabulary anywhere on
+  // the list, regardless of gen/locked/letter state.
+  const html = (await page.locator("body").innerText()).toString();
+  for (const forbidden of ["Applied", "Interviewing", "Offer", "Rejected"]) {
+    expect(html).not.toContain(forbidden);
+  }
+});

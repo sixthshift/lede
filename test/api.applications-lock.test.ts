@@ -100,6 +100,38 @@ describe("POST/DELETE /api/applications/:id/lock — via FixtureEngine (keyless,
     expect(fetched.json().locked).toBeNull();
   });
 
+  // T030 CO-1 — the list projection carries letterGenState verbatim and
+  // `locked` as a derived boolean (existence, never the heavy snapshot
+  // itself), so the dashboard card can show a locked badge without the list
+  // endpoint's payload growing the heavy TailoredResume it was designed to
+  // omit (§9).
+  it("GET /api/applications list carries letterGenState + a derived `locked` boolean that flips with lock/unlock", async () => {
+    const db = freshDb();
+    seedIfEmpty(db);
+    const app = buildApp(db);
+
+    const created = await post(app, "/api/applications", { jobDescription: CONTRAST_JDS[0]!.jd });
+    const id = created.json().id as string;
+    await post(app, `/api/applications/${id}/tailor`);
+
+    const beforeLock = await get(app, "/api/applications");
+    const beforeRow = beforeLock.json().find((row: { id: string }) => row.id === id);
+    expect(beforeRow.letterGenState).toBe("untailored");
+    expect(beforeRow.locked).toBe(false);
+    expect(beforeRow.current).toBeUndefined();
+
+    await post(app, `/api/applications/${id}/lock`);
+    const afterLock = await get(app, "/api/applications");
+    const lockedRow = afterLock.json().find((row: { id: string }) => row.id === id);
+    expect(lockedRow.locked).toBe(true);
+    expect(lockedRow.locked).not.toBe(1); // a real boolean, not a raw sqlite 0/1
+
+    await del(app, `/api/applications/${id}/lock`);
+    const afterUnlock = await get(app, "/api/applications");
+    const unlockedRow = afterUnlock.json().find((row: { id: string }) => row.id === id);
+    expect(unlockedRow.locked).toBe(false);
+  });
+
   it("lock with no current -> 400", async () => {
     const db = freshDb();
     seedIfEmpty(db);
