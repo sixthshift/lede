@@ -29,7 +29,7 @@ export function WorkspaceShell({ rail, editor, preview }: WorkspaceShellProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
 
   return (
-    <div data-testid="workspace-shell" className="flex h-screen bg-background text-foreground">
+    <div data-testid="workspace-shell" className="flex h-full bg-background text-foreground">
       <aside
         data-testid="rail-pane"
         className="w-56 shrink-0 overflow-y-auto border-r border-border bg-surface"

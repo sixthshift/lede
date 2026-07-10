@@ -2,6 +2,15 @@
 // separate ticket (E6-B2); this takes an id and renders the record.
 // The tailor/lock lifecycle actions live up here in the page header — always
 // visible — while JobPanel below is just the editable record.
+//
+// v3-T011: rendered inside WorkspaceShell (rail | editor | preview) rather
+// than a single scrolling column. The preview pane hosts EXACTLY one
+// document at a time — the resume side (FitChip/Preview-ATS toggle/
+// ResultView-or-AtsView, unchanged internally) or the letter side
+// (LetterPreview, unchanged internally, editor fields and all) — switched
+// via the docTab buttons below. Action buttons, JobPanel, the cover-letter
+// card's controls (never its preview), and the design card all live in the
+// editor pane instead, since they aren't the artifact itself.
 
 import { ArrowLeft, BookOpen, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -35,6 +44,7 @@ import { TemplatePicker } from "./TemplatePicker";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
 import { Skeleton } from "./ui/skeleton";
+import { WorkspaceShell } from "./WorkspaceShell";
 
 function formatStaleDate(at: number): string {
   return new Date(at).toLocaleDateString(undefined, {
@@ -125,6 +135,11 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   // below, so switching never re-tailors or re-fits.
   const [view, setView] = useState<"preview" | "ats">("preview");
 
+  // Which document the (co-visible) preview pane currently shows — a purely
+  // client-side switch, independent of `view` above (that toggle only
+  // matters once the resume side is showing).
+  const [docTab, setDocTab] = useState<"resume" | "letter">("resume");
+
   // Locked freezes the look along with the resume — editing a locked app's
   // format is out of scope (it froze what was actually sent), so the design
   // panel reflects lockedFormat.format/paper read-only rather than the live
@@ -157,7 +172,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6 p-6">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-40 rounded-xl" />
       </div>
@@ -165,7 +180,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   }
   if (isError || !application) {
     return (
-      <p role="alert" className="text-sm text-destructive">
+      <p role="alert" className="p-6 text-sm text-destructive">
         Couldn't load application.
       </p>
     );
@@ -183,96 +198,98 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
     updateApplication.mutate({ id: applicationId, input: { format: next } });
   };
 
-  return (
-    <div className="flex flex-col gap-6">
+  const rail = (
+    <div className="flex flex-col gap-4 p-4">
+      <Link
+        to="/applications"
+        className="inline-flex items-center gap-1.5 rounded-md text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <ArrowLeft aria-hidden className="h-3.5 w-3.5" />
+        Applications
+      </Link>
+
+      <div className="min-w-0">
+        {application.company ? (
+          <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+            {application.company}
+          </p>
+        ) : null}
+        <h1 className="mt-1 text-lg font-semibold tracking-tight">
+          {application.role || "Untitled application"}
+        </h1>
+        <div className="mt-2 flex flex-col items-start gap-1.5">
+          <GenStateBadge state={application.genState} />
+          {isTailoring ? <span className="text-xs text-muted-foreground">Tailoring…</span> : null}
+        </div>
+      </div>
+    </div>
+  );
+
+  const editor = (
+    <div className="flex flex-col gap-6 p-6">
       <div>
-        <Link
-          to="/applications"
-          className="inline-flex items-center gap-1.5 rounded-md text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <ArrowLeft aria-hidden className="h-3.5 w-3.5" />
-          Applications
-        </Link>
-
-        <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            {application.company ? (
-              <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-                {application.company}
-              </p>
-            ) : null}
-            <div className="mt-1 flex items-center gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                {application.role || "Untitled application"}
-              </h1>
-              <GenStateBadge state={application.genState} />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {isTailoring ? <span className="text-sm text-muted-foreground">Tailoring…</span> : null}
-            <Button
-              variant="outline"
-              onClick={() =>
-                application.locked
-                  ? unlockApplication.mutate(application.id)
-                  : lockApplication.mutate(application.id)
-              }
-              disabled={
-                (!application.locked && !application.current) ||
-                lockApplication.isPending ||
-                unlockApplication.isPending
-              }
-            >
-              {application.locked ? "Unlock" : "Lock final"}
-            </Button>
-            <Button onClick={() => tailorApplication.mutate(application.id)} disabled={isTailoring}>
-              {tailorLabel}
-            </Button>
-            <Button
-              variant="outline"
-              disabled={!application.current || !profile}
-              onClick={() =>
-                profile &&
-                application.current &&
-                downloadResumePdf({
-                  resume: application.current,
-                  profile,
-                  company: application.company,
-                  role: application.role,
-                  format: resolvedFormat,
-                  paper,
-                  density,
-                })
-              }
-            >
-              Download PDF
-            </Button>
-            <Button
-              variant="outline"
-              disabled={!application.current || !profile}
-              onClick={() =>
-                profile &&
-                application.current &&
-                downloadResumeText({
-                  resume: application.current,
-                  profile,
-                  company: application.company,
-                  role: application.role,
-                })
-              }
-            >
-              Plain text
-            </Button>
-            <Button
-              variant="outline"
-              disabled={!application.current || flagVoiceResume.isPending}
-              data-testid="flag-voice-resume"
-              onClick={() => flagVoiceResume.mutate({ id: application.id, kind: "resume" })}
-            >
-              Use as a voice source
-            </Button>
-          </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() =>
+              application.locked
+                ? unlockApplication.mutate(application.id)
+                : lockApplication.mutate(application.id)
+            }
+            disabled={
+              (!application.locked && !application.current) ||
+              lockApplication.isPending ||
+              unlockApplication.isPending
+            }
+          >
+            {application.locked ? "Unlock" : "Lock final"}
+          </Button>
+          <Button onClick={() => tailorApplication.mutate(application.id)} disabled={isTailoring}>
+            {tailorLabel}
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!application.current || !profile}
+            onClick={() =>
+              profile &&
+              application.current &&
+              downloadResumePdf({
+                resume: application.current,
+                profile,
+                company: application.company,
+                role: application.role,
+                format: resolvedFormat,
+                paper,
+                density,
+              })
+            }
+          >
+            Download PDF
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!application.current || !profile}
+            onClick={() =>
+              profile &&
+              application.current &&
+              downloadResumeText({
+                resume: application.current,
+                profile,
+                company: application.company,
+                role: application.role,
+              })
+            }
+          >
+            Plain text
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!application.current || flagVoiceResume.isPending}
+            data-testid="flag-voice-resume"
+            onClick={() => flagVoiceResume.mutate({ id: application.id, kind: "resume" })}
+          >
+            Use as a voice source
+          </Button>
         </div>
         {flagVoiceResume.isError ? (
           <p role="alert" className="mt-2 text-right text-xs text-destructive">
@@ -347,16 +364,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
             </p>
           ) : null}
 
-          {application.letterCurrent ? (
-            <div data-testid="letter-preview">
-              <LetterPreview
-                letter={application.letterCurrent}
-                format={resolvedFormat}
-                applicationId={applicationId}
-                readOnly={isLocked}
-              />
-            </div>
-          ) : (
+          {!application.letterCurrent ? (
             <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border-strong py-12 text-center">
               <BookOpen
                 aria-hidden
@@ -380,7 +388,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
                 Create blank letter
               </Button>
             </div>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 
@@ -433,98 +441,136 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
           to fold in newer entries.
         </p>
       ) : null}
+    </div>
+  );
 
-      {application.current ? (
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            {fit ? <FitChip fit={fit} /> : null}
-            {fitError ? (
-              <span role="alert" className="text-xs text-destructive">
-                Couldn't measure the fitted page count.
-              </span>
-            ) : null}
-            <div className="flex items-center gap-1">
-              <Button
-                size="sm"
-                variant={view === "preview" ? "default" : "outline"}
-                aria-pressed={view === "preview"}
-                onClick={() => setView("preview")}
-              >
-                Preview
-              </Button>
-              <Button
-                size="sm"
-                variant={view === "ats" ? "default" : "outline"}
-                aria-pressed={view === "ats"}
-                onClick={() => setView("ats")}
-              >
-                What the ATS sees
-              </Button>
-            </div>
-          </div>
+  const preview = (
+    <div className="flex flex-col gap-3 p-4">
+      <div className="flex items-center gap-1">
+        <Button
+          size="sm"
+          variant={docTab === "resume" ? "default" : "outline"}
+          aria-pressed={docTab === "resume"}
+          onClick={() => setDocTab("resume")}
+        >
+          Resume
+        </Button>
+        <Button
+          size="sm"
+          variant={docTab === "letter" ? "default" : "outline"}
+          aria-pressed={docTab === "letter"}
+          onClick={() => setDocTab("letter")}
+        >
+          Letter
+        </Button>
+      </div>
 
-          {fit && !fit.fits ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-warn-soft px-4 py-3 text-sm text-warn">
-              <span>
-                Exceeds the {targetPages}-page target — even at the tightest density this renders at{" "}
-                {fit.pageCount} pages. Nothing was cut.
-              </span>
-              <div className="flex gap-2">
-                {targetPages === 1 ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      updateApplication.mutate({ id: applicationId, input: { targetPages: 2 } })
-                    }
-                  >
-                    Allow 2 pages
-                  </Button>
-                ) : null}
+      {docTab === "resume" ? (
+        application.current ? (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {fit ? <FitChip fit={fit} /> : null}
+              {fitError ? (
+                <span role="alert" className="text-xs text-destructive">
+                  Couldn't measure the fitted page count.
+                </span>
+              ) : null}
+              <div className="flex items-center gap-1">
                 <Button
                   size="sm"
-                  variant="outline"
-                  disabled
-                  title="Re-tailoring to a tighter budget is coming in a later update (E7-D1)."
+                  variant={view === "preview" ? "default" : "outline"}
+                  aria-pressed={view === "preview"}
+                  onClick={() => setView("preview")}
                 >
-                  Re-tailor to a tighter budget
+                  Preview
+                </Button>
+                <Button
+                  size="sm"
+                  variant={view === "ats" ? "default" : "outline"}
+                  aria-pressed={view === "ats"}
+                  onClick={() => setView("ats")}
+                >
+                  What the ATS sees
                 </Button>
               </div>
             </div>
-          ) : null}
 
-          {view === "ats" && profile ? (
-            <AtsView
-              resume={application.current}
-              profile={profile}
-              format={resolvedFormat}
-              paper={paper}
-              density={density}
-            />
-          ) : (
-            <ResultView
-              resume={application.current}
-              format={resolvedFormat}
-              density={density}
-              applicationId={applicationId}
-              readOnly={isLocked}
-            />
-          )}
+            {fit && !fit.fits ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-warn-soft px-4 py-3 text-sm text-warn">
+                <span>
+                  Exceeds the {targetPages}-page target — even at the tightest density this renders
+                  at {fit.pageCount} pages. Nothing was cut.
+                </span>
+                <div className="flex gap-2">
+                  {targetPages === 1 ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        updateApplication.mutate({ id: applicationId, input: { targetPages: 2 } })
+                      }
+                    >
+                      Allow 2 pages
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled
+                    title="Re-tailoring to a tighter budget is coming in a later update (E7-D1)."
+                  >
+                    Re-tailor to a tighter budget
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            {view === "ats" && profile ? (
+              <AtsView
+                resume={application.current}
+                profile={profile}
+                format={resolvedFormat}
+                paper={paper}
+                density={density}
+              />
+            ) : (
+              <ResultView
+                resume={application.current}
+                format={resolvedFormat}
+                density={density}
+                applicationId={applicationId}
+                readOnly={isLocked}
+              />
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border-strong py-16 text-center">
+            <BookOpen aria-hidden className="h-8 w-8 text-muted-foreground/60" strokeWidth={1.5} />
+            <div>
+              <p className="text-sm font-medium">No tailored resume yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Tailor pulls from your Library —{" "}
+                <Link to="/library" className="text-primary underline underline-offset-4">
+                  add missing facts in Library →
+                </Link>
+              </p>
+            </div>
+          </div>
+        )
+      ) : application.letterCurrent ? (
+        <div data-testid="letter-preview">
+          <LetterPreview
+            letter={application.letterCurrent}
+            format={resolvedFormat}
+            applicationId={applicationId}
+            readOnly={isLocked}
+          />
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border-strong py-16 text-center">
-          <BookOpen aria-hidden className="h-8 w-8 text-muted-foreground/60" strokeWidth={1.5} />
-          <div>
-            <p className="text-sm font-medium">No tailored resume yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Tailor pulls from your Library —{" "}
-              <Link to="/library" className="text-primary underline underline-offset-4">
-                add missing facts in Library →
-              </Link>
-            </p>
-          </div>
-        </div>
+        <p className="text-sm text-muted-foreground">Nothing to preview yet.</p>
       )}
     </div>
   );
+
+  return <WorkspaceShell rail={rail} editor={editor} preview={preview} />;
 }

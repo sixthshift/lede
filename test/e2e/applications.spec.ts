@@ -51,6 +51,8 @@ import {
   letterPreviewCanvas,
   expectResumeCanvasPainted,
   expectLetterCanvasPainted,
+  switchPreviewDoc,
+  distinctColorCount,
 } from "./helpers/workspace";
 
 const PASSWORD = "correct horse battery staple e2e applications";
@@ -529,6 +531,9 @@ test("cover letter: generate/paint isolation, download filename, undo, motivatio
     "generate-letter must not touch the resume's `current` snapshot",
   ).toBe(JSON.stringify(currentBefore));
 
+  // The letter lives behind the preview pane's in-pane switch (v3-T011) —
+  // never mounted alongside the resume side.
+  await switchPreviewDoc(page, "letter");
   await expectLetterCanvasPainted(page);
   await expect(page.getByText("Letter ready", { exact: true })).toBeVisible();
 
@@ -541,6 +546,11 @@ test("cover letter: generate/paint isolation, download filename, undo, motivatio
   // isolation actually means here: the resume's CONTENT never changes from a
   // letter-only mutation — not that its DOM node is untouched by shared
   // plumbing — so this polls for that eventual, stable equality.
+  // Switch back to the resume side to read its canvas — the preview pane
+  // shows one document at a time (v3-T011), so the isolation proof below
+  // reads whatever a fresh mount of the resume side paints, same tolerance
+  // the comment above already documents for the shared-invalidation settle.
+  await switchPreviewDoc(page, "resume");
   await expect
     .poll(() => resumeCanvas.evaluate((el: HTMLCanvasElement) => el.toDataURL()), {
       timeout: 10000,
@@ -672,6 +682,9 @@ test("cover letter: a typography format change re-renders the letter preview (pi
 
   await generateLetter(page, applicationId!, { status: 200 });
 
+  // The letter lives behind the preview pane's in-pane switch (v3-T011).
+  await switchPreviewDoc(page, "letter");
+
   // (2) the before-capture must be of a PAINTED (non-blank) letter canvas —
   // proves the diff below is real content changing, not a blank canvas
   // trivially differing from itself.
@@ -755,27 +768,31 @@ test("in-place text editing: resume + letter edits persist and reach the artifac
   await expectCanvasPainted(page);
 
   await generateLetter(page, applicationId!, { status: 200 });
+  // The letter side lives behind the preview pane's in-pane switch
+  // (v3-T011) — never mounted alongside the resume side.
+  await switchPreviewDoc(page, "letter");
   const letterCanvas = letterPreviewCanvas(page);
   await expectLetterCanvasPainted(page);
 
   // (2) capture the PRE-EDIT baseline for the first resume item and the
   // first letter paragraph, so the later reload assertion can prove the
-  // edit is non-vacuous (a no-op would leave these identical).
-  const resumeItemField = page.locator('[data-testid="resume-edit-item-0"]');
+  // edit is non-vacuous (a no-op would leave these identical). Each field
+  // only mounts while its own side of the preview switch is active.
   const letterParagraphField = page.locator('[data-testid="letter-edit-paragraph-0"]');
-  await expect(resumeItemField).toBeVisible();
   await expect(letterParagraphField).toBeVisible();
-
-  const resumeBaseline = await resumeItemField.inputValue();
   const letterBaseline = await letterParagraphField.inputValue();
+  const letterPixelsBefore = await letterCanvas.evaluate((el: HTMLCanvasElement) => el.toDataURL());
+
+  await switchPreviewDoc(page, "resume");
+  const resumeItemField = page.locator('[data-testid="resume-edit-item-0"]');
+  await expect(resumeItemField).toBeVisible();
+  const resumeBaseline = await resumeItemField.inputValue();
 
   const runUniqueMarker = `${runId}-${testInfo.retry}`;
   const resumeMarker = `RESUME EDIT MARKER ${runUniqueMarker}`;
   const letterMarker = `LETTER EDIT MARKER ${runUniqueMarker}`;
   const resumeEditedText = `${resumeBaseline} ${resumeMarker}`;
   const letterEditedText = `${letterBaseline} ${letterMarker}`;
-
-  const letterPixelsBefore = await letterCanvas.evaluate((el: HTMLCanvasElement) => el.toDataURL());
 
   // (3) type the markers in and blur (Tab) each field — the PATCH fires and
   // 200s.
@@ -790,6 +807,7 @@ test("in-place text editing: resume + letter edits persist and reach the artifac
   ]);
   expect(resumePatchResponse.status()).toBe(200);
 
+  await switchPreviewDoc(page, "letter");
   await letterParagraphField.fill(letterEditedText);
   const [letterPatchResponse] = await Promise.all([
     page.waitForResponse(
@@ -812,7 +830,9 @@ test("in-place text editing: resume + letter edits persist and reach the artifac
 
   // ...and the resume side: a REAL downloaded PDF (not merely "a canvas
   // painted") extracts to text containing the resume marker — same
-  // extractPdfText proof the lifecycle test's (4a) step uses.
+  // extractPdfText proof the lifecycle test's (4a) step uses. Download PDF
+  // is an editor-pane control, reachable regardless of which preview tab is
+  // active.
   const [resumeDownload] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: "Download PDF" }).click(),
@@ -825,10 +845,13 @@ test("in-place text editing: resume + letter edits persist and reach the artifac
   );
 
   // (5) reload — the edits persist VERBATIM, and each differs from its
-  // captured pre-edit baseline (non-vacuous).
+  // captured pre-edit baseline (non-vacuous). The preview pane resets to its
+  // default (resume) tab on reload.
   await page.reload();
   await expect(page.locator('[data-testid="resume-edit-item-0"]')).toHaveValue(resumeEditedText);
   await expect(page.locator('[data-testid="resume-edit-item-0"]')).not.toHaveValue(resumeBaseline);
+
+  await switchPreviewDoc(page, "letter");
   await expect(page.locator('[data-testid="letter-edit-paragraph-0"]')).toHaveValue(
     letterEditedText,
   );
@@ -840,14 +863,16 @@ test("in-place text editing: resume + letter edits persist and reach the artifac
   await lockFinal(page, applicationId!);
   await expect(page.getByRole("button", { name: "Unlock", exact: true })).toBeVisible();
 
-  // (a) the resume text-edit control.
-  await expect(page.locator('[data-testid="resume-edit-item-0"]')).toBeDisabled();
-  // (b) the letter text-edit control.
+  // (b) the letter text-edit control (still on the letter tab from above).
   await expect(page.locator('[data-testid="letter-edit-paragraph-0"]')).toBeDisabled();
   // (c) the insert button.
   await expect(page.locator('[data-testid="letter-insert-paragraph-0"]')).toBeDisabled();
   // (d) the remove button.
   await expect(page.locator('[data-testid="letter-remove-paragraph-0"]')).toBeDisabled();
+
+  // (a) the resume text-edit control.
+  await switchPreviewDoc(page, "resume");
+  await expect(page.locator('[data-testid="resume-edit-item-0"]')).toBeDisabled();
 
   // (7) a WELL-FORMED PATCH to the (now locked) resume-part route 409s, and
   // a GET shows the row byte-unchanged by the failed attempt.
@@ -946,6 +971,10 @@ test("retroactive import: blank letter -> hand-authored via in-place editing -> 
     ),
     page.getByTestId("create-blank-letter").click(),
   ]);
+
+  // The letter's in-place editor fields live behind the preview pane's
+  // in-pane switch (v3-T011) — never mounted alongside the resume side.
+  await switchPreviewDoc(page, "letter");
 
   // (2) hand-author DISTINCTIVE whitespace/punctuation across greeting, TWO
   // body paragraphs, and closing — via T34's in-place letter editing.
@@ -1137,4 +1166,195 @@ test("deleting a voice source in Profile removes it server-side, not just from t
 
   expect(pageErrors, `unexpected page errors: ${pageErrors.join(", ")}`).toHaveLength(0);
   expect(consoleErrors, `unexpected console errors: ${consoleErrors.join(", ")}`).toHaveLength(0);
+});
+
+// ── v3-T011: WorkspaceShell wiring for /applications/:id — editor + preview
+// co-visible at desktop width, drawer-collapsed below it, and never modal.
+// Own applications, same rationale as the letter tests above. ──
+
+// Both the box lookup AND the occlusion check are polled: a preview-pane
+// document mid-switch can transiently re-mount (usePDF's loading -> ready
+// cycle, same "1-2 benign settle cycles" already documented above for the
+// resume/letter isolation checks), during which boundingBox() can briefly
+// return null or a stale element can fail elementFromPoint — polling until
+// BOTH settle is what makes this assertion about the final, stable layout
+// rather than an accidental mid-transition frame.
+async function assertUnoccluded(locator: Locator): Promise<{
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}> {
+  let box: { x: number; y: number; width: number; height: number } | null = null;
+  let unoccluded = false;
+  await expect
+    .poll(
+      async () => {
+        box = await locator.boundingBox();
+        if (!box) return false;
+        const cx = box.x + box.width / 2;
+        const cy = box.y + box.height / 2;
+        unoccluded = await locator.evaluate(
+          (el, point) => {
+            const hit = document.elementFromPoint(point.cx, point.cy);
+            return hit !== null && (hit === el || el.contains(hit));
+          },
+          { cx, cy },
+        );
+        return unoccluded;
+      },
+      { timeout: 10000 },
+    )
+    .toBe(true);
+  expect(box, "element must have a real layout box").toBeTruthy();
+  expect(
+    unoccluded,
+    "the element's own bbox center must resolve to itself or a descendant — no occluding overlay",
+  ).toBe(true);
+  return box!;
+}
+
+test("WorkspaceShell (protocol C): editor + preview panes are co-visible and unoccluded at 1280px, and switching the preview's resume/letter tab never remounts the editor pane", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `E2E Covis Co ${runId}-${testInfo.retry}`;
+  const applicationId = await createApplication(page, { company, jd: JD });
+  await page.goto(`/applications/${applicationId}`);
+  await tailor(page, applicationId!);
+  await expectCanvasPainted(page);
+  await generateLetter(page, applicationId!, { status: 200 });
+
+  const editorPane = page.getByTestId("editor-pane");
+
+  async function assertCoVisible(
+    canvas: Locator,
+    expectPainted: () => Promise<void>,
+  ): Promise<void> {
+    // Wait for a genuinely painted, settled canvas BEFORE snapshotting its
+    // box/pixels below — a freshly (re)mounted preview briefly shows a
+    // loading placeholder or a not-yet-painted canvas first.
+    await expectPainted();
+    await expect(editorPane).toBeInViewport({ ratio: 0.9 });
+    await expect(canvas).toBeInViewport({ ratio: 0.9 });
+    await assertUnoccluded(editorPane);
+    const canvasBox = await assertUnoccluded(canvas);
+    expect(canvasBox.width).toBeGreaterThanOrEqual(320);
+    await expect.poll(() => distinctColorCount(canvas), { timeout: 10000 }).toBeGreaterThan(1);
+  }
+
+  // RESUME is the default active document.
+  await assertCoVisible(resumePreviewCanvas(page), () => expectCanvasPainted(page));
+
+  // Mark the editor-pane's own DOM node — surviving the switch below (rather
+  // than a fresh node coming back with no marker) is the proof the switch is
+  // in-pane, not a remount of the whole surface.
+  await editorPane.evaluate((el) => {
+    (el as unknown as Record<string, string>).__t011EditorMarker = "same-node";
+  });
+
+  await switchPreviewDoc(page, "letter");
+  await assertCoVisible(letterPreviewCanvas(page), () => expectLetterCanvasPainted(page));
+
+  const markerSurvived = await editorPane.evaluate(
+    (el) => (el as unknown as Record<string, string>).__t011EditorMarker === "same-node",
+  );
+  expect(markerSurvived, "switching the preview's doc must not remount the editor pane").toBe(true);
+});
+
+test("WorkspaceShell (protocol B): the surface stays non-modal — no aria-modal/backdrop overlay, and an underlying editor control stays genuinely clickable — at 1280px and in the below-1280 drawer-open state", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `E2E Modality Co ${runId}-${testInfo.retry}`;
+  const applicationId = await createApplication(page, { company, jd: JD });
+  await page.goto(`/applications/${applicationId}`);
+  await tailor(page, applicationId!);
+  await expectCanvasPainted(page);
+
+  async function assertNonModal(): Promise<void> {
+    expect(await page.locator('[aria-modal="true"]').count()).toBe(0);
+
+    // Scoped to OVERLAY-shaped elements (fixed/absolute positioned) — a
+    // normal in-flow content pane (e.g. editor-pane) legitimately fills a
+    // large share of the layout, and that's not what "modal" means here
+    // (CLAUDE.md's modality ban is about backdrops/overlays, never plain
+    // document flow).
+    const viewport = page.viewportSize();
+    expect(viewport, "viewport size must be known").toBeTruthy();
+    const oversizedOverlayCount = await page.evaluate((viewportArea) => {
+      const elements = Array.from(document.querySelectorAll("body *"));
+      return elements.filter((el) => {
+        const style = getComputedStyle(el);
+        if (style.position !== "fixed" && style.position !== "absolute") return false;
+        const rect = el.getBoundingClientRect();
+        return (rect.width * rect.height) / viewportArea > 0.5;
+      }).length;
+    }, viewport!.width * viewport!.height);
+    expect(
+      oversizedOverlayCount,
+      "no fixed/absolute-positioned element may cover more than half the viewport",
+    ).toBe(0);
+
+    // A real, un-forced click on an underlying editor control succeeds: a
+    // genuine browser download is the observable side effect, proving
+    // nothing invisible is intercepting the click.
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "Plain text" }).click(),
+    ]);
+    expect(download.suggestedFilename()).toBeTruthy();
+  }
+
+  // At 1280px (editor + preview co-visible, no drawer involved).
+  await assertNonModal();
+
+  // In the below-1280 drawer-OPEN state.
+  await page.setViewportSize({ width: 1024, height: 720 });
+  await page.getByRole("button", { name: "Show preview" }).click();
+  await expect(page.getByTestId("preview-pane")).toBeVisible();
+  await assertNonModal();
+});
+
+test("WorkspaceShell drawer: below 1280px the preview pane starts non-co-visible (closed), and the toggle reveals a real painted canvas", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1024, height: 720 });
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `E2E Drawer Co ${runId}-${testInfo.retry}`;
+  const applicationId = await createApplication(page, { company, jd: JD });
+  await page.goto(`/applications/${applicationId}`);
+  await tailor(page, applicationId!);
+
+  // Drawer closed by default below 1280 — the preview pane (and whatever
+  // canvas it hosts) is not visible/co-visible at all.
+  const previewPane = page.getByTestId("preview-pane");
+  await expect(previewPane).toBeHidden();
+  await expect(page.getByRole("button", { name: "Show preview" })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+
+  // Activate the drawer — the resume canvas becomes visible and genuinely
+  // painted (non-uniform pixels), not just present-but-blank.
+  await page.getByRole("button", { name: "Show preview" }).click();
+  await expect(previewPane).toBeVisible();
+  await expect(page.getByRole("button", { name: "Hide preview" })).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+
+  const canvas = resumePreviewCanvas(page);
+  await expectResumeCanvasPainted(page);
+  await expect.poll(() => distinctColorCount(canvas), { timeout: 10000 }).toBeGreaterThan(1);
 });

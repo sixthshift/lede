@@ -61,25 +61,38 @@ body {
   color: #b00020;
 }
 
-/* Split view (§11) — DocumentPreview and ReasoningPanel side by side, siblings. */
+/* Split view (§11) — DocumentPreview and ReasoningPanel, siblings. Stacked
+   (not side by side): since v3-T011 this only ever renders inside the
+   WorkspaceShell preview pane's fixed, narrow column, which has no spare
+   width for a second side-by-side panel. */
 .result-view {
   display: flex;
+  flex-direction: column;
   gap: 24px;
-  align-items: flex-start;
 }
 
-/* The margin-note to the resume's document: a quiet card that follows the
-   scroll (sticky offset = header height + page padding). */
+/* The differentiator card, below its document in the stack. */
 .reasoning-panel {
-  flex: 1 1 40%;
-  min-width: 0;
-  position: sticky;
-  top: 80px;
   background: var(--surface, #fff);
   border: 1px solid var(--border, #e4e4e7);
   border-radius: calc(var(--radius, 8px) + 4px);
   box-shadow: var(--shadow-sm);
   padding: 20px;
+}
+
+/* The preview IS the artifact (§28.0) — real PDF pixel dimensions (e.g. a
+   US-Letter page at pdf.js's 1.5x render scale is 918px wide), independent
+   of whatever column happens to host it. Scaling the ELEMENT down to its
+   container (never touching the canvas's backing pixel buffer, so
+   getImageData-based paint/color assertions read the exact same data) is
+   what makes the doc fit the WorkspaceShell preview pane instead of
+   overflowing it. */
+.document-preview__canvas,
+.document-preview__pages canvas,
+.letter-preview__canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 
 .reasoning-panel__heading {

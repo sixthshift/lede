@@ -126,6 +126,14 @@ export async function regenerateLetter(
   return response;
 }
 
+// ── WorkspaceShell preview pane (v3-T011) ── the in-pane resume/letter
+// switch scoped to the preview pane itself (never a bare `getByRole`), since
+// nothing else on the page carries these exact accessible names.
+export async function switchPreviewDoc(page: Page, doc: "resume" | "letter"): Promise<void> {
+  const label = doc === "resume" ? "Resume" : "Letter";
+  await page.getByTestId("preview-pane").getByRole("button", { name: label, exact: true }).click();
+}
+
 // ── Design view ──
 export async function openDesignView(page: Page, applicationId: string): Promise<void> {
   await page.getByRole("link", { name: "Open design view" }).click();
