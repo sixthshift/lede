@@ -283,6 +283,9 @@ export const applicationCreate = z.object({
   role: z.string().min(1).max(200).nullish(),
   jobDescription: z.string().min(1).max(20000),
   context: z.string().min(1).max(4000).nullish(),
+  // dedicated letter-only field, beside context — authored intent, optional
+  // (a letter can be generated without it), excluded from grounding.
+  motivation: z.string().min(1).max(4000).optional().nullable(),
   targetPages: z.union([z.literal(1), z.literal(2)]).optional(),
   format: documentFormatZ.nullish(), // per-app override of settings.defaultFormat (§28.3)
 });
@@ -292,6 +295,7 @@ export const applicationUpdate = z.object({
   role: z.string().min(1).max(200).nullish(),
   jobDescription: z.string().min(1).max(20000).optional(),
   context: z.string().min(1).max(4000).nullish(),
+  motivation: z.string().min(1).max(4000).optional().nullable(),
   targetPages: z.union([z.literal(1), z.literal(2)]).optional(),
   format: documentFormatZ.nullish(), // per-app override of settings.defaultFormat (§28.3)
 });

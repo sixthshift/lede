@@ -12,6 +12,7 @@ import {
   applicationCreate,
   settingsInput,
   documentFormatV1OrV2Z,
+  LetterDecisionZ,
 } from "@shared/schema";
 import { SECTION_VALUES } from "@shared/sections";
 import type { Db } from "../db";
@@ -72,12 +73,21 @@ const lockedFormatZ = z.object({
   paper: z.enum(["letter", "a4"]),
 });
 
+// The persisted letter snapshot (applications.letterCurrent/letterPrevious)
+// mirrors the model's LetterDecisionZ output contract (@shared/schema)
+// exactly — same shape (CoverLetter, @shared/types), reused rather than
+// re-declared here.
+const coverLetterZ = LetterDecisionZ;
+
 // A backed-up application carries its id + storage timestamps + the full
 // current/locked snapshots — applicationCreate/Update (routes/applications.ts)
 // only cover the user-editable subset, so this extends it for round-tripping.
 // `format` overrides applicationCreate's v2-only validator with the v1-or-v2
 // import-boundary union (E9-F0d3) — a pre-cutover export's application.format
 // column may still hold v1 JSON.
+// letter* fields are .optional() (unlike current/locked/genState) so a
+// pre-letter-epic backup — which never had these columns — still imports;
+// present values are still fully validated.
 const applicationImport = applicationCreate.extend({
   id: z.string().min(1),
   format: documentFormatV1OrV2Z.nullish(),
@@ -92,6 +102,10 @@ const applicationImport = applicationCreate.extend({
       model: z.string(),
     })
     .nullable(),
+  letterCurrent: coverLetterZ.nullable().optional(),
+  letterPrevious: coverLetterZ.nullable().optional(),
+  letterGenState: z.enum(["untailored", "tailoring", "tailored", "failed"]).optional(),
+  letterFailedReason: z.string().nullable().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });

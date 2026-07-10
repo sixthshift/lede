@@ -11,7 +11,8 @@ import { initDb } from "../src/server/db";
 import { applications } from "../src/server/db/schema";
 import type { TailoredResume } from "../src/shared/types";
 import { migrateFormat, formatV2Schema } from "../src/shared/format-v2";
-import type { DocumentFormat } from "../src/shared/types";
+import type { DocumentFormat, CoverLetter } from "../src/shared/types";
+import { applicationCreate } from "../src/shared/schema";
 
 // E9-F0d3 fixtures (test/fixtures/pre-e9-formats/, read-only/zero-diff): real
 // pre-cutover v1 `DocumentFormat` JSON, embedded VERBATIM below to prove
@@ -436,5 +437,134 @@ describe("auth guard", () => {
     const app = buildApp(initDb(freshDataDir()).db, { authDisabled: false });
     const res = await app.inject({ method: "GET", url: "/api/export" });
     expect(res.statusCode).toBe(401);
+  });
+});
+
+// ── T12: motivation + letter snapshot zod contracts ──
+
+describe("applicationCreate: motivation", () => {
+  it("accepts a well-formed motivation", () => {
+    const ok = { jobDescription: "We are hiring...", motivation: "I admire this team's mission." };
+    expect(applicationCreate.safeParse(ok).success).toBe(true);
+  });
+
+  it("accepts its absence (optional)", () => {
+    expect(applicationCreate.safeParse({ jobDescription: "We are hiring..." }).success).toBe(true);
+  });
+
+  it("rejects an empty motivation", () => {
+    const bad = { jobDescription: "We are hiring...", motivation: "" };
+    expect(applicationCreate.safeParse(bad).success).toBe(false);
+  });
+
+  it("rejects a motivation over 4000 chars", () => {
+    const bad = { jobDescription: "We are hiring...", motivation: "x".repeat(4001) };
+    expect(applicationCreate.safeParse(bad).success).toBe(false);
+  });
+
+  it("rejects a non-string motivation (proves bounded z.string, not z.any)", () => {
+    const bad = { jobDescription: "We are hiring...", motivation: 12345 };
+    expect(applicationCreate.safeParse(bad).success).toBe(false);
+  });
+});
+
+function letterFor(letterCurrent: unknown) {
+  const now = Date.now();
+  return {
+    id: "app-letter-shape",
+    jobDescription: "N/A",
+    current: null,
+    locked: null,
+    genState: "untailored" as const,
+    currentMeta: null,
+    letterCurrent,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+describe("POST /api/import: coverLetterZ (letterCurrent/letterPrevious) shape", () => {
+  it("a paragraph with the groundedOn key deleted -> 4xx, not accepted", async () => {
+    const app = appOn(freshDataDir());
+    const badLetter = {
+      greeting: "Dear Hiring Team,",
+      body: [{ text: "I led the migration described in my resume." }], // groundedOn deleted
+      closing: "Sincerely,",
+    };
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/import",
+      payload: { applications: [letterFor(badLetter)] },
+    });
+    expect(res.statusCode).toBeGreaterThanOrEqual(400);
+    expect(res.statusCode).toBeLessThan(500);
+  });
+
+  it("a paragraph with groundedOn: [] -> accepted (required key, empty allowed)", async () => {
+    const app = appOn(freshDataDir());
+    const okLetter: CoverLetter = {
+      greeting: "Dear Hiring Team,",
+      body: [{ text: "I led the migration described in my resume.", groundedOn: [] }],
+      closing: "Sincerely,",
+    };
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/import",
+      payload: { applications: [letterFor(okLetter)] },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ imported: { entries: 0, profile: 0, applications: 1 } });
+  });
+});
+
+describe("round-trip: motivation + letterCurrent survive export -> wipe -> import", () => {
+  it("restores motivation and letterCurrent into the SAME row after it was genuinely deleted", async () => {
+    const dataDir = freshDataDir();
+    const { db } = initDb(dataDir);
+    const app = buildApp(db);
+
+    const letterCurrent: CoverLetter = {
+      greeting: "Dear Hiring Team,",
+      body: [{ text: "I led the migration described in my resume.", groundedOn: ["exp-acme"] }],
+      closing: "Sincerely,",
+    };
+    db.insert(applications)
+      .values({
+        ...seededApplication(),
+        motivation: "I admire this team's mission.",
+        letterCurrent,
+      })
+      .run();
+    await app.inject({
+      method: "PUT",
+      url: "/api/profile",
+      payload: { name: "Ada Lovelace", email: "ada@example.com", links: [] },
+    });
+
+    const backup = (await app.inject({ method: "GET", url: "/api/export" })).json();
+    expect(backup.applications[0].motivation).toBe("I admire this team's mission.");
+    expect(backup.applications[0].letterCurrent).toEqual(letterCurrent);
+
+    // Genuinely wipe the source row — a pass below proves import restored
+    // it, not that it was never deleted.
+    const deleteRes = await app.inject({
+      method: "DELETE",
+      url: "/api/applications/app-round-trip",
+    });
+    expect(deleteRes.statusCode).toBe(200);
+    const afterDelete = await app.inject({
+      method: "GET",
+      url: "/api/applications/app-round-trip",
+    });
+    expect(afterDelete.statusCode).toBe(404);
+
+    const importRes = await app.inject({ method: "POST", url: "/api/import", payload: backup });
+    expect(importRes.statusCode).toBe(200);
+
+    const restored = (
+      await app.inject({ method: "GET", url: "/api/applications/app-round-trip" })
+    ).json();
+    expect(restored.motivation).toBe("I admire this team's mission.");
+    expect(restored.letterCurrent).toEqual(letterCurrent);
   });
 });
