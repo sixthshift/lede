@@ -4,7 +4,9 @@
 // keyless suite (T015) can never drift apart (red-team Findings A+B).
 
 import { createHash } from "node:crypto";
-import type { Entry, TailoredResume } from "@shared/types";
+import type { CoverLetter, Entry, LetterDecision, TailoredResume } from "@shared/types";
+import { assembleLetter, validateLetterNoFabrication } from "./letter";
+import { FabricationError } from "./validate";
 
 // ── 1. the ONE fixture key ──
 // Deterministic and order-insensitive over entries: sort by id before
@@ -122,4 +124,90 @@ export function tagShuffle(entries: Entry[]): Entry[] {
 function rotate<T>(arr: T[]): T[] {
   if (arr.length <= 1) return [...arr];
   return [...arr.slice(1), arr[0]!];
+}
+
+// ── 5. the letter-flip predicate (T04) ──
+// The LEAD body paragraph — body[0], the letter's opening argument — must
+// cite the target. A target that only shows up in a later paragraph is not a
+// flip: it proves the letter *mentions* the entry, not that it *leads* with
+// it, so this stays strict about position, not mere presence.
+export function letterFlipPredicate(letter: CoverLetter, targetEntryId: string): boolean {
+  const lead = letter.body[0];
+  return !!lead && lead.groundedOn.includes(targetEntryId);
+}
+
+// ── 6. the letter-flip contrast control (T04) ──
+// Per letter, the union of groundedOn ids across ALL body paragraphs must
+// pairwise-differ from every other letter's union, in BOTH directions. A
+// letter whose union is a strict superset of another's still has an empty
+// difference in the subset's direction, so it fails here even though every
+// id it cites is "different" in the naive one-directional sense — that
+// superset case is exactly what a ground-on-everything letter looks like.
+export function letterFlipContrast(letters: { name: string; letter: CoverLetter }[]): boolean {
+  const unions = letters.map((l) => new Set(l.letter.body.flatMap((p) => p.groundedOn)));
+
+  for (let i = 0; i < unions.length; i++) {
+    for (let j = i + 1; j < unions.length; j++) {
+      const a = unions[i]!;
+      const b = unions[j]!;
+      const aMinusB = [...a].some((id) => !b.has(id));
+      const bMinusA = [...b].some((id) => !a.has(id));
+      if (!aMinusB || !bMinusA) return false;
+    }
+  }
+  return true;
+}
+
+// ── 7. the per-JD record/verify step (T04) ──
+// Mirrors record-fixtures.ts's decide -> assemble -> validate -> flip-check
+// sequence for a single JD, but as a pure(ish) function: no fs access, so it
+// is unit-testable keylessly against a mock engine. The caller (a record
+// script) is the one that writes a fixture, and only when `ok` is true — a
+// failing flip or fabrication check is reported here, never forced.
+export type LetterRecordEngine = {
+  decideLetter: (
+    jd: string,
+    entries: Entry[],
+    motivation?: string | null,
+    context?: string | null,
+    voice?: string | null,
+  ) => Promise<LetterDecision>;
+};
+
+export type RecordOneLetterResult =
+  | { ok: true; decision: LetterDecision }
+  | { ok: false; reason: string };
+
+export async function recordOneLetter(
+  engine: LetterRecordEngine,
+  jd: string,
+  entries: Entry[],
+  targetEntryId: string,
+): Promise<RecordOneLetterResult> {
+  let decision: LetterDecision;
+  try {
+    decision = await engine.decideLetter(jd, entries);
+  } catch (err) {
+    return { ok: false, reason: `decideLetter() failed — ${(err as Error).message}` };
+  }
+
+  try {
+    const letter = assembleLetter(decision);
+    validateLetterNoFabrication(letter, entries);
+
+    if (!letterFlipPredicate(letter, targetEntryId)) {
+      const leadCites = letter.body[0]?.groundedOn.join(", ") || "(none)";
+      return {
+        ok: false,
+        reason: `did not flip — lead paragraph cites [${leadCites}], not "${targetEntryId}"`,
+      };
+    }
+
+    return { ok: true, decision };
+  } catch (err) {
+    if (err instanceof FabricationError) {
+      return { ok: false, reason: `fabrication check failed — ${err.message}` };
+    }
+    return { ok: false, reason: `unexpected error — ${(err as Error).message}` };
+  }
 }
