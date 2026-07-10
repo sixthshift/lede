@@ -12,6 +12,7 @@ import {
   CONTACT_ICON_STYLES,
   DATE_FORMATS,
   DEFAULT_FORMAT_V2,
+  formatV2Schema,
   HEADING_STYLES,
   migrateFormat,
   NAME_DISPLAY_FONT_IDS,
@@ -28,7 +29,13 @@ import {
   fitEngineToPages,
   renderEngineToBuffer,
 } from "../src/client/document/engine";
-import { PRESET_IDS, PRESETS, SINGLE_COLUMN_PRESET_IDS } from "../src/client/document/presets";
+import {
+  LEGACY_PRESET_IDS,
+  NEW_AXIS_PRESET_IDS,
+  PRESET_IDS,
+  PRESETS,
+  SINGLE_COLUMN_PRESET_IDS,
+} from "../src/client/document/presets";
 
 function profileFixture(): Profile {
   return {
@@ -776,17 +783,29 @@ describe("colors.border — page frame (E9-F3b, §31.2)", () => {
 });
 
 describe("presets.ts (§31.1: retired templates reborn as presets, not hand-authored forks)", () => {
-  it("six configs exist", () => {
-    expect([...PRESET_IDS].sort()).toEqual(
-      ["banner", "classic", "compact", "sidebar-left", "sidebar-right", "strict"].sort(),
-    );
+  it("the roster is exactly PRESET_IDS — no drift between the id list and the PRESETS map", () => {
     expect(Object.keys(PRESETS).sort()).toEqual([...PRESET_IDS].sort());
+    expect(new Set(PRESET_IDS).size).toBe(PRESET_IDS.length); // no duplicate ids
   });
 
-  it.each(PRESET_IDS)("%s deep-equals { ...migrateFormat(its v1 default), presetId }", (id) => {
+  // F0-LOCKED: each of the six ORIGINAL/legacy presets is a pure migration of
+  // that retired template's v1 default config, byte-for-byte — never a
+  // hand-authored fork. Scoped to the legacy six only (E9-F5c): the new-axis
+  // presets below have no v1 predecessor to migrate from.
+  it.each(
+    LEGACY_PRESET_IDS,
+  )("%s deep-equals { ...migrateFormat(its v1 default), presetId }", (id) => {
     const v1Default = { ...DEFAULT_FORMAT, templateId: id };
     const expected = { ...migrateFormat(v1Default), presetId: id };
     expect(PRESETS[id]).toEqual(expected);
+  });
+
+  // New-axis presets (E9-F5c) are v2-native — composed directly, not migrated
+  // — so their contract is "parses as a valid DocumentFormatV2", not
+  // migration-exactness.
+  it.each(NEW_AXIS_PRESET_IDS)("%s parses as a valid DocumentFormatV2", (id) => {
+    expect(formatV2Schema.safeParse(PRESETS[id]).success).toBe(true);
+    expect(PRESETS[id].presetId).toBe(id);
   });
 
   it("carries no render functions — every preset value is JSON-serializable data", () => {

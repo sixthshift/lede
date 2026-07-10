@@ -15,8 +15,11 @@ export type { PresetId };
 // Purely descriptive (picker/gallery labels) — the actual composition a
 // preset produces is driven entirely by its DocumentFormatV2 (presets.ts),
 // never by this field. 'single' | 'sidebar-left' | 'sidebar-right' mirror the
-// six retired templates' own composition identity.
-export type PresetLayout = "single" | "sidebar-left" | "sidebar-right";
+// six retired templates' own composition identity; 'two-column' (E9-F5c)
+// covers the new-axis roster's spotlight preset — a columns:'mix' composition
+// (full-width header above a sidebar/main split) with no single "which side"
+// identity the sidebar-left/right labels imply.
+export type PresetLayout = "single" | "sidebar-left" | "sidebar-right" | "two-column";
 export type AtsGrade = "strict" | "good";
 
 export type PresetManifest = {
@@ -78,6 +81,38 @@ export const PRESET_MANIFESTS: Record<PresetId, PresetManifest> = {
       "Single-column, ATS-strict layout — full-bleed header band tinted with your accent color, name/contact set on the band.",
     layout: "single",
     atsGrade: "strict",
+  },
+  signature: {
+    id: "signature",
+    name: "Signature",
+    description:
+      "Single-column, ATS-strict layout — accent-bar section headings, a display name face, rich accent-color placement, dot-style skill/language levels.",
+    layout: "single",
+    atsGrade: "strict",
+  },
+  ledger: {
+    id: "ledger",
+    name: "Ledger",
+    description:
+      "Single-column, ATS-strict layout — thin-underline headings, split date/location placement, indented entry bodies, circle-filled contact icons.",
+    layout: "single",
+    atsGrade: "strict",
+  },
+  frame: {
+    id: "frame",
+    name: "Frame",
+    description:
+      "Single-column, ATS-strict layout — a 4-side accent-colored page frame, boxed section headings, a bold display name face.",
+    layout: "single",
+    atsGrade: "strict",
+  },
+  spotlight: {
+    id: "spotlight",
+    name: "Spotlight",
+    description:
+      "Two-column layout — a full-width header band above a sidebar/main split, distinct from the side-anchored Sidebar templates.",
+    layout: "two-column",
+    atsGrade: "good",
   },
 } satisfies Record<PresetId, PresetManifest>;
 

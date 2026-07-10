@@ -115,16 +115,9 @@ async function page1Geometry(
 }
 
 describe("preset registry", () => {
-  it("has 6 entries — the complete roster (spec.md §28.2, fixed 2026-07-05)", () => {
-    const ids = [...PRESET_IDS].sort();
-    expect(ids).toEqual([
-      "banner",
-      "classic",
-      "compact",
-      "sidebar-left",
-      "sidebar-right",
-      "strict",
-    ]);
+  it("PRESET_IDS and PRESET_MANIFESTS never drift apart (spec.md §28.2/§31.5)", () => {
+    expect(Object.keys(PRESET_MANIFESTS).sort()).toEqual([...PRESET_IDS].sort());
+    expect(new Set(PRESET_IDS).size).toBe(PRESET_IDS.length); // no duplicate ids
   });
 
   it("classic and compact declare layout 'single' + atsGrade 'strict'", () => {
@@ -161,11 +154,13 @@ describe("preset registry", () => {
   });
 });
 
-describe.each([
-  "classic",
-  "compact",
-  "banner",
-] as const)("%s preset (§28.8-A oracle, through renderResumeToBuffer)", (presetId) => {
+// Parameterized over the FULL roster (E9-F5c: "prefer parameterizing over
+// PRESET_IDS" so newly-added presets — signature/ledger/frame/spotlight and
+// anything landing after them — get this base extraction coverage for free,
+// with zero list maintenance here).
+describe.each(
+  PRESET_IDS,
+)("%s preset (§28.8-A oracle, through renderResumeToBuffer)", (presetId) => {
   it("renders the fixture to a valid PDF containing profile header + every item.text, never leadRationale/cut", async () => {
     const buffer = await renderResumeToBuffer({
       resume: resumeFixture(),

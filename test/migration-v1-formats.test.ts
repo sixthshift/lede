@@ -10,7 +10,7 @@ import path from "node:path";
 import { describe, it, expect } from "vitest";
 import { migrateFormat, resolveStoredFormat, formatV2Schema } from "@shared/format-v2";
 import type { DocumentFormat } from "@shared/types";
-import { PRESETS, PRESET_IDS } from "../src/client/document/presets";
+import { LEGACY_PRESET_IDS, PRESETS } from "../src/client/document/presets";
 
 const FIXTURES_DIR = path.join(process.cwd(), "test/fixtures/pre-e9-formats");
 
@@ -18,15 +18,17 @@ function readFixture<T = unknown>(name: string): T {
   return JSON.parse(readFileSync(path.join(FIXTURES_DIR, name), "utf8")) as T;
 }
 
-// The six template-default fixtures (strict/classic/compact/banner/sidebar-
-// left/sidebar-right .json) are each `{...DEFAULT_FORMAT, templateId}` —
-// exactly what src/client/document/presets.ts's PRESETS[id] is built from
-// (migrateFormat(v1DefaultFor(id)) + presetId). Comparing against the real
-// PRESETS export (read-only import — presets.ts is client code, untouched by
-// this ticket) proves the fixtures migrate to the SHIPPED preset shape, not
-// just to some hand-rolled expectation that could drift from it.
+// The six LEGACY template-default fixtures (strict/classic/compact/banner/
+// sidebar-left/sidebar-right .json) are each `{...DEFAULT_FORMAT,
+// templateId}` — exactly what src/client/document/presets.ts's PRESETS[id]
+// is built from (migrateFormat(v1DefaultFor(id)) + presetId). Comparing
+// against the real PRESETS export (read-only import — presets.ts is client
+// code, untouched by this ticket) proves the fixtures migrate to the SHIPPED
+// preset shape, not just to some hand-rolled expectation that could drift
+// from it. Scoped to the six legacy ids (E9-F5c): the new-axis presets are
+// v2-native, with no v1 fixture to migrate from.
 describe("template-default fixtures migrate to their preset, modulo presetId", () => {
-  for (const id of PRESET_IDS) {
+  for (const id of LEGACY_PRESET_IDS) {
     it(`${id}.json migrates to a config deep-equal to PRESETS['${id}'] once presetId is added`, () => {
       const raw = readFixture<DocumentFormat>(`${id}.json`);
       const migrated = migrateFormat(raw);
@@ -99,7 +101,9 @@ describe("settings-default-format.json — an instance-level default distinct fr
 });
 
 describe("idempotence over every fixture (§31.1: a v2 value passes through untouched)", () => {
-  const allTemplateFixtures = PRESET_IDS.map((id) => `${id}.json`);
+  // Legacy-only (E9-F5c): a v1 fixture only exists for the six original
+  // templates — the new-axis presets have no v1 predecessor to fixture.
+  const allTemplateFixtures = LEGACY_PRESET_IDS.map((id) => `${id}.json`);
   const allFixtures = [
     ...allTemplateFixtures,
     "non-empty-sections.json",

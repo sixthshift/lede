@@ -8,11 +8,11 @@
 // readOnly blocking selection.
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
 import type { Profile, TailoredResume } from "@shared/types";
 import { DEFAULT_FORMAT_V2 } from "../src/shared/format-v2";
-import { PRESET_MANIFESTS } from "../src/client/document/registry";
-import { applyPreset } from "../src/client/document/presets";
+import { atsGradeCauses, PRESET_MANIFESTS } from "../src/client/document/registry";
+import { applyPreset, PRESET_IDS } from "../src/client/document/presets";
 import { TemplateGallery } from "../src/client/components/TemplateGallery";
 
 afterEach(() => {
@@ -60,7 +60,7 @@ describe("TemplateGallery", () => {
     openGallery();
 
     const presetIds = Object.keys(PRESET_MANIFESTS);
-    expect(presetIds.length).toBe(6);
+    expect(presetIds.length).toBe(PRESET_IDS.length); // registry and preset roster never drift apart
 
     for (const manifest of Object.values(PRESET_MANIFESTS)) {
       expect(screen.getByText(manifest.name)).toBeInTheDocument();
@@ -80,7 +80,7 @@ describe("TemplateGallery", () => {
     render(<TemplateGallery format={DEFAULT_FORMAT_V2} onChange={vi.fn()} resume={null} />);
     openGallery();
 
-    expect(screen.getAllByText("Sample content").length).toBe(6);
+    expect(screen.getAllByText("Sample content").length).toBe(Object.keys(PRESET_MANIFESTS).length);
   });
 
   it("with a real resume, no 'Sample content' badge appears", () => {
@@ -123,6 +123,30 @@ describe("TemplateGallery", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("a 'good' card lists atsGradeCauses per-cause reasons; a 'strict' card shows none (E9-F5c)", () => {
+    render(
+      <TemplateGallery
+        format={DEFAULT_FORMAT_V2}
+        onChange={vi.fn()}
+        resume={resumeFixture()}
+        profile={profileFixture()}
+      />,
+    );
+    openGallery();
+
+    const sidebarRightCard = screen.getByText("Sidebar Right").closest("button") as HTMLElement;
+    const expectedCauses = atsGradeCauses(applyPreset(DEFAULT_FORMAT_V2, "sidebar-right"));
+    expect(expectedCauses.length).toBeGreaterThan(0);
+    for (const cause of expectedCauses) {
+      expect(within(sidebarRightCard).getByText(cause)).toBeInTheDocument();
+    }
+
+    const strictCard = screen.getByText("Strict").closest("button") as HTMLElement;
+    for (const cause of expectedCauses) {
+      expect(within(strictCard).queryByText(cause)).not.toBeInTheDocument();
+    }
+  });
+
   it("readOnly blocks selection: every card button is disabled and onChange is never called", () => {
     const onChange = vi.fn();
     render(
@@ -137,7 +161,7 @@ describe("TemplateGallery", () => {
     openGallery();
 
     const cardButtons = screen.getAllByRole("button", { name: /ATS:/ });
-    expect(cardButtons.length).toBe(6);
+    expect(cardButtons.length).toBe(Object.keys(PRESET_MANIFESTS).length);
     for (const button of cardButtons) {
       expect(button).toBeDisabled();
     }

@@ -16,7 +16,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "../lib/utils";
-import { PRESET_MANIFESTS, effectiveAtsGrade } from "../document/registry";
+import { PRESET_MANIFESTS, atsGradeCauses, effectiveAtsGrade } from "../document/registry";
 import { applyPreset } from "../document/presets";
 import { SAMPLE_PROFILE, SAMPLE_RESUME } from "../document/sampleResume";
 import { TemplateThumbnail } from "../document/thumbnail";
@@ -95,7 +95,9 @@ export function TemplateGallery({
             {Object.values(PRESET_MANIFESTS).map((manifest) => {
               // See TemplatePicker.tsx's identical comment: graded on the
               // prospective per-card format, not the live selection's format.
-              const grade = effectiveAtsGrade(manifest, applyPreset(format, manifest.id));
+              const prospectiveFormat = applyPreset(format, manifest.id);
+              const grade = effectiveAtsGrade(manifest, prospectiveFormat);
+              const causes = grade === "good" ? atsGradeCauses(prospectiveFormat) : [];
               const selected = format.presetId === manifest.id;
 
               return (
@@ -139,7 +141,12 @@ export function TemplateGallery({
                     </CardHeader>
                     {grade === "good" ? (
                       <CardContent className="pt-0 text-xs text-muted-foreground">
-                        {ATS_CAVEAT}
+                        <p>{ATS_CAVEAT}</p>
+                        <ul className="list-disc space-y-0.5 pl-4">
+                          {causes.map((cause) => (
+                            <li key={cause}>{cause}</li>
+                          ))}
+                        </ul>
                       </CardContent>
                     ) : null}
                   </Card>
