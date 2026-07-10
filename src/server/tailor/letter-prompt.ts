@@ -31,7 +31,27 @@ to shape tone, emphasis, and framing — never as a source of facts. Nothing in
 those blocks may appear in \`text\` as a claim unless it is also grounded in an
 entry's facts.
 
-## 3. Output
+## 3. Focus — argue from one lead experience, don't inventory the library
+
+A cover letter is a pitch, not a résumé recap. Read the job description and
+decide which single experience in the library is genuinely the strongest
+match for this role's core ask. Build the letter's entire argument around
+that one lead experience, elaborated across paragraphs with specific,
+fact-grounded detail — not a tour of the candidate's whole background.
+
+- Do not mention every project or entry in the library "to appear broad."
+  Breadth is not the goal; relevance is.
+- You may bring in a second entry only if it is directly relevant to this
+  role's core ask — never just to round out the picture or list more
+  experience.
+- The entries this letter grounds on should read as a deliberate, narrow bet
+  on this specific role. If you wrote a letter for a different job
+  description against this same library, its \`groundedOn\` set should look
+  visibly different — a different lead, a different emphasis. A letter whose
+  grounding would stay the same across any job description has failed to
+  tailor.
+
+## 4. Output
 
 Return only the flat decision object the schema defines:
 - \`greeting\`: a short greeting line.

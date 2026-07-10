@@ -42,6 +42,27 @@ describe("prompt.ts is untouched by this ticket", () => {
   });
 });
 
+// ── LETTER_SYSTEM_PROMPT — focus instruction added, fact-lock intact ──
+
+describe("LETTER_SYSTEM_PROMPT — focus instruction", () => {
+  it("instructs the model to build the letter around one lead experience, not inventory the library", () => {
+    expect(LETTER_SYSTEM_PROMPT).toMatch(/one\s+(?:single\s+)?lead experience/i);
+    expect(LETTER_SYSTEM_PROMPT).toContain("Do not mention every project or entry in the library");
+  });
+
+  it("instructs that a letter's grounding should differ across different job descriptions", () => {
+    expect(LETTER_SYSTEM_PROMPT).toMatch(/visibly different/i);
+  });
+
+  it("still contains the fact-lock — never invent, groundedOn traceability", () => {
+    expect(LETTER_SYSTEM_PROMPT).toContain("never invent");
+    expect(LETTER_SYSTEM_PROMPT).toContain(
+      "Never invent a number, name, tool, outcome, or claim that is not already in",
+    );
+    expect(LETTER_SYSTEM_PROMPT).toContain("groundedOn");
+  });
+});
+
 // ── buildLetterUserPrompt — byte-identical prefix guard ──
 
 describe("buildLetterUserPrompt — byte-identical with no motivation/context/voice", () => {
