@@ -27,6 +27,7 @@ import {
   resumePreviewCanvas,
   expectResumeCanvasPainted,
   canvasSnapshot,
+  assertNoModalOverlay,
 } from "./helpers/workspace";
 
 // MUST match applications.spec.ts's PASSWORD exactly (playwright.config.ts:
@@ -301,4 +302,78 @@ test("design controls: reachable in-workspace, debounced persistence, preview ho
 
   expect(pageErrors, `unexpected page errors: ${pageErrors.join(", ")}`).toHaveLength(0);
   expect(consoleErrors, `unexpected console errors: ${consoleErrors.join(", ")}`).toHaveLength(0);
+});
+
+// ── v3-T024: de-modal TemplateGallery ── same bar v3-T020/T021/T022/T023 set
+// for NewApplication/EntryEditor/LayoutEditor/ProfileEditor: no aria-modal, no
+// oversized overlay, the underlying workspace stays genuinely clickable,
+// focus opens into the panel, and Escape returns focus to the "Browse
+// templates" button that invoked it. Reuses this file's own PASSWORD/JD
+// (firstRunLogin's setup-409-then-login fallback makes a second first-run
+// call safe — see that const's comment above) so this test is fully
+// self-contained rather than depending on state left by the test above.
+test.describe("de-modal TemplateGallery (v3-T024)", () => {
+  test("Browse templates panel: non-modal, underlying workspace stays clickable, focus opens into the panel, Escape returns focus to the trigger, selecting a template applies it", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+
+    await page.goto("/");
+    await firstRunLogin(page, PASSWORD);
+    await expect(page).toHaveURL(/\/applications$/);
+
+    const COMPANY = `E2E Gallery Modality Co ${runId}`;
+    const applicationId = await createApplication(page, { company: COMPANY, jd: JD });
+    await page.goto(`/applications/${applicationId}`);
+    await tailor(page, applicationId);
+    await expect(page.getByRole("button", { name: "Re-tailor", exact: true })).toBeVisible();
+
+    const trigger = page.getByRole("button", { name: "Browse templates" });
+    await trigger.click();
+
+    // The gallery actually opened with real cards, not an empty shell —
+    // asserted FIRST, before any modality check.
+    const firstCard = page.locator("[data-template-id]").first();
+    await expect(firstCard).toBeVisible();
+
+    await assertNoModalOverlay(page);
+
+    // Focus opens INTO the panel (the first template card), not left on the trigger.
+    await expect(firstCard).toBeFocused();
+
+    // The underlying workspace stays genuinely interactive while the panel is
+    // open: a real, un-forced click on the preview pane's "Letter" tab (a
+    // control OUTSIDE the gallery) flips its own aria-pressed state — proof
+    // nothing invisible is intercepting the click, not merely that the
+    // element "exists".
+    const letterTab = page.getByRole("button", { name: "Letter", exact: true });
+    await letterTab.click();
+    await expect(letterTab).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Resume", exact: true }).click();
+
+    // Selecting a built-in template applies it — observed as the format PUT
+    // round trip (the same oracle design.spec.ts's saved-preset case uses
+    // above), rather than a no-op click on the already-selected card.
+    const applicationPut = (r: import("@playwright/test").Response) =>
+      r.url().endsWith(`/api/applications/${applicationId}`) && r.request().method() === "PUT";
+    const compactCard = page.locator('[data-template-id="compact"]');
+    await expect(compactCard).toBeVisible();
+    const [applyPutResponse] = await Promise.all([
+      page.waitForResponse(applicationPut),
+      compactCard.click(),
+    ]);
+    expect(applyPutResponse.status()).toBe(200);
+    expect((await applyPutResponse.json()).format.presetId).toBe("compact");
+    await expect(page.getByRole("dialog")).toBeHidden();
+    await expectResumeCanvasPainted(page);
+
+    // Escape returns focus to the trigger — reopen the (now-closed) gallery
+    // to exercise Escape specifically, since selecting a card above already
+    // closed it via onChange rather than Escape.
+    await trigger.click();
+    await expect(page.locator("[data-template-id]").first()).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
 });

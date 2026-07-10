@@ -12,8 +12,25 @@
 // onChange(applyPreset(format, presetId)) — every stylistic axis untouched —
 // and then closes the gallery so the inline picker + preview reflect the
 // choice immediately.
+//
+// Non-modal by construction (v3-T024, same approach as v3-T020's
+// NewApplication / v3-T021's EntryEditor / v3-T022's LayoutEditor / v3-T023's
+// ProfileEditor): built directly on @radix-ui/react-dialog's `modal={false}`
+// mode with an owned `DialogPrimitive.Trigger` (like NewApplication — the
+// gallery has always self-rendered its own "Browse templates" button, so
+// there's no external triggerRef to thread) rather than the shared
+// ui/dialog.tsx wrapper (which stays modal for its other, legitimately-modal
+// consumers). `modal={false}` skips the overlay entirely and disables the
+// focus trap/outside-pointer lock; Radix's default `onCloseAutoFocus`
+// already restores focus to the Trigger on Escape/selection, so — unlike
+// LayoutEditor/EntryEditor, which have no owned trigger — no explicit
+// triggerRef bookkeeping is needed here. It renders in place (no
+// DialogPortal) as a `relative`-anchored dropdown under the trigger, so the
+// rest of the workspace stays in the tab order and clickable underneath it.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { X } from "lucide-react";
 import { cn } from "../lib/utils";
 import {
   PRESET_MANIFESTS,
@@ -30,7 +47,6 @@ import type { UserPreset } from "@shared/schema";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./ui/dialog";
 
 // Large enough to actually read as "one big preview per preset" (vs. the
 // inline picker's card-grid thumbnail) while staying well under a full-page
@@ -70,24 +86,52 @@ export function TemplateGallery({
   const isSample = !resume;
   const previewResume = resume ?? SAMPLE_RESUME;
   const previewProfile = profile ?? SAMPLE_PROFILE;
+  // Focus target on open — the first built-in template card. PRESET_MANIFESTS
+  // is a static registry (unlike LayoutEditor's settings-backed rows), so
+  // it's always populated the instant the panel mounts; no open+loaded-gated
+  // effect is needed, just a ref assigned to the first mapped card.
+  const firstCardRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <>
-      <Button type="button" variant="outline" onClick={() => setOpen(true)}>
-        Browse templates
-      </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Browse templates</DialogTitle>
-            <DialogDescription>
-              {readOnly
-                ? "Locked — this application's look is frozen. Unlock to change templates."
-                : "One large preview per template. Pick one to use it for this application."}
-            </DialogDescription>
-          </DialogHeader>
+    <DialogPrimitive.Root open={open} onOpenChange={setOpen} modal={false}>
+      <div className="relative inline-block text-left">
+        <DialogPrimitive.Trigger asChild>
+          <Button type="button" variant="outline">
+            Browse templates
+          </Button>
+        </DialogPrimitive.Trigger>
+
+        <DialogPrimitive.Content
+          className="absolute right-0 top-full z-20 mt-2 max-h-[80vh] w-[42rem] max-w-[90vw] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg"
+          onOpenAutoFocus={(e) => {
+            // Land focus on the first template card rather than the panel container.
+            e.preventDefault();
+            firstCardRef.current?.focus();
+          }}
+        >
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <DialogPrimitive.Title className="text-lg font-semibold leading-none tracking-tight text-foreground">
+                Browse templates
+              </DialogPrimitive.Title>
+              <DialogPrimitive.Description className="mt-1.5 text-sm text-muted-foreground">
+                {readOnly
+                  ? "Locked — this application's look is frozen. Unlock to change templates."
+                  : "One large preview per template. Pick one to use it for this application."}
+              </DialogPrimitive.Description>
+            </div>
+            <DialogPrimitive.Close asChild>
+              <button
+                type="button"
+                className="rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </button>
+            </DialogPrimitive.Close>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            {Object.values(PRESET_MANIFESTS).map((manifest) => {
+            {Object.values(PRESET_MANIFESTS).map((manifest, i) => {
               // See TemplatePicker.tsx's identical comment: graded on the
               // prospective per-card format, not the live selection's format.
               const prospectiveFormat = applyPreset(format, manifest.id);
@@ -98,6 +142,7 @@ export function TemplateGallery({
               return (
                 <button
                   key={manifest.id}
+                  ref={i === 0 ? firstCardRef : undefined}
                   type="button"
                   disabled={readOnly}
                   aria-pressed={selected}
@@ -202,8 +247,8 @@ export function TemplateGallery({
               </div>
             </div>
           ) : null}
-        </DialogContent>
-      </Dialog>
-    </>
+        </DialogPrimitive.Content>
+      </div>
+    </DialogPrimitive.Root>
   );
 }
