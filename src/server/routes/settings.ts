@@ -32,6 +32,7 @@ function currentSettings(db: Db) {
     layout: row.layout,
     paper: row.paper,
     defaultFormat: resolveStoredFormat(row.defaultFormat),
+    presets: row.presets ?? [],
   };
 }
 

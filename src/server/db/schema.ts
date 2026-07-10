@@ -8,6 +8,7 @@ import { sql } from "drizzle-orm";
 import type { EntryMeta, Paper, ProviderId, Section, TailoredResume } from "@shared/types";
 import type { DocumentFormatV2 } from "@shared/format-v2";
 import { DEFAULT_FORMAT_V2 } from "@shared/format-v2";
+import type { UserPreset } from "@shared/schema";
 
 // ── frozen at lock time alongside the resume snapshot (§28.3) — the fit
 // ladder is a later epic, so resolvedDensity is 'as-set' = 'comfortable' until
@@ -71,6 +72,7 @@ export const settings = sqliteTable(
       .notNull()
       .$type<DocumentFormatV2>()
       .default(DEFAULT_FORMAT_V2), // instance-level fallback for application.format (§28.3)
+    presets: text("presets", { mode: "json" }).$type<UserPreset[] | null>(), // saved format presets (§9/E9-F5b); nullable for legacy rows, resolved to [] at the route layer
     updatedAt: integer("updated_at").notNull(),
   },
   (t) => ({ singleton: check("settings_singleton", sql`${t.id} = 1`) }),

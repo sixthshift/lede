@@ -123,6 +123,7 @@ describe("CONTRAST: /api/settings never leaks the key or auth hash", () => {
       "layout",
       "paper",
       "defaultFormat",
+      "presets",
     ]);
     for (const key of Object.keys(body)) {
       expect(allowed.has(key)).toBe(true);

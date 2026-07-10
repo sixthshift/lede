@@ -36,6 +36,13 @@
       "when": 1783256067782,
       "tag": "0004_clear_string_levels",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1783642175875,
+      "tag": "0005_magical_eddie_brock",
+      "breakpoints": true
     }
   ]
 }

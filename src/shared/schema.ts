@@ -258,6 +258,15 @@ const layoutEntryZ = z.object({
   enabled: z.boolean(),
 });
 
+// §9/E9-F5b user-defined format presets — a saved name + DocumentFormat pair,
+// no scoring/status fields (locked: presets carry ONLY {id,name,format}).
+export const userPresetZ = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  format: documentFormatZ,
+});
+export type UserPreset = z.infer<typeof userPresetZ>;
+
 export const settingsInput = z.object({
   provider: z.string().min(1).max(120).optional(),
   model: z.string().min(1).max(120).optional(),
@@ -265,6 +274,7 @@ export const settingsInput = z.object({
   layout: z.array(layoutEntryZ).optional(),
   paper: z.enum(["letter", "a4"]).optional(),
   defaultFormat: documentFormatZ.optional(), // instance-level fallback for application.format (§28.3)
+  presets: z.array(userPresetZ).optional(), // saved format presets (§9/E9-F5b)
 });
 
 // ── §27 application input — a tailoring record for one job, no hiring status ──
