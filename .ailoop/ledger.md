@@ -1668,3 +1668,666 @@ composite just run (52 files/584 vitest + playwright 10/10):
   license check + dep-removal confirm). One applications-e2e contention flake in the concurrent run,
   cleared by isolated + full re-run (known [v3-041] host flake). Manifest gained an optional per-weight
   `files` override for the one face that doesn't follow @fontsource naming — minimal, documented.
+
+===== CHUNK BOUNDARY — RUN 2026-07-07 (E9 intake + F0 drive) END =====
+9 tickets closed this run (F0 phase complete + all its repairs). Backlog: total 91, done 79,
+todo 6 (E9-F1..F5 coarse + E9-F0d3 done), decomposed 8. Chunk cap (30) not the limiter — this is a
+clean phase boundary. NEXT ready: E9-F1 (design view shell + layout axes, COARSE — decompose at
+pickup; F0's real shape now teaches the axes, per §31.6). Recommend a fresh /ailoop invocation.
+
+===== RUN 2026-07-07b — E9/F1 drive START (chunk cap 30, maxAttempts 3, thrash 2) =====
+
+[v3-052] E9-F1 — DECOMPOSED at pickup (COARSE epic, pre-flagged at intake §31.6 "F0's shape
+  teaches the axes"). Coordinator mapped the client surface (Explore) + engine axis-support before
+  splitting. KEY FINDING: the engine (document.tsx, landed F0c) ALREADY renders every F1 layout axis
+  — columns one|two|mix (:157), headerPosition (:115), sidebarWidthPct real geometry (:126),
+  sectionPlacement per-section (:105) — EXCEPT layout.manualPageBreaks (explicitly "NOT YET WIRED"
+  :28-31). So F1 = a big client SHELL + UI wiring over already-rendered axes + ONE engine seam.
+  Split into a SERIAL chain (F1a->F1b->F1c; F1b/F1c both edit DesignPanel.tsx so no fan-out is safe):
+   - E9-F1a: design-view shell — real route /applications/:id/design (deep-link + refresh via SPA
+     fallback, NOT the '*' redirect), hosts existing DesignPanel verbatim + pinned pdf.js preview,
+     ~300ms DEBOUNCED persist (today's ApplicationDetail path is un-debounced, confirmed), multi-page
+     preview with VISIBLE page boundaries (DocumentPreview paints only page 1 today), fit chip,
+     locked read-only, narrow-viewport Design/Preview tabs, entry from Design card AND gallery, e2e.
+   - E9-F1b: Layout-GROUP controls in DesignPanel (columns/header-pos/sidebar-width/per-section
+     placement) — pure UI over already-wired render axes; render proof already lives in
+     engine-two-column.test.ts (do not duplicate), this ticket proves controls write the axis.
+     Explicitly distinguished layout.sectionPlacement (per-app format) from settings.layout
+     (global order, LayoutEditor.tsx) so the builder doesn't conflate them.
+   - E9-F1c: manual page-break token — the one engine gap (react-pdf `break`) + per-section toggle +
+     NEW engine-page-break.test.ts proving a real boundary (numPages, cross-page ordering) with
+     never-cut (item set invariant) held.
+  Each child cold-start-runnable (self-contained context citing exact file:line anchors + existing
+  harnesses). E9-F2 dependency repointed E9-F1 -> E9-F1c (linear spine F1..F5). Graph clean
+  (schedule.mjs: no problems/cycles). NEXT: dispatch E9-F1a (single Sonnet builder).
+
+[v3-053] E9-F1a — ACCEPTED (single Sonnet dispatch, first attempt; merged ff to main @5a16417).
+  Design-view shell: real route /applications/:id/design (deep-link + browser-refresh resolve to the
+  view via SPA fallback, NOT the '*' redirect — e2e proves a fresh goto lands on the Design heading),
+  hosts DesignPanel/gallery/picker verbatim, pinned pdf.js preview + FitChip, ~300ms TRAILING-EDGE
+  debounced PUT (clearTimeout coalesce + draftFormat immediate echo; the un-debounced ApplicationDetail
+  card path preserved), multi-page preview (DocumentPreview.allPages loops doc.numPages, one
+  bordered/gapped canvas per page; default false keeps ResultView/AtsView single-page), locked =>
+  every control disabled + live preview, narrow-viewport Design/Preview tabs, entry from Design card
+  AND gallery. Independent coordinator re-verify green (check/build/lint 0; vitest 588 pass; playwright
+  11/11 incl new design.spec.ts). Gaming read clean.
+  SCOPE JUDGMENT (endorsed): builder touched playwright.config.ts (NOT in declared files) to wire
+  design.spec.ts into the existing "applications" project — a new e2e spec is dead code until
+  registered, and a 4th concurrent tsx+sqlite+react-pdf webServer measurably flaked even the untouched
+  applications.spec.ts on this host. Accepted as a necessary, coordinator-under-declared touch (I
+  should have listed it); the shared-server coupling (design.spec.ts must reuse applications.spec.ts's
+  password) is documented in-config. Future e2e-adding tickets should declare playwright.config.ts.
+  FLAKE (not a regression): ats-view.tsx timed out once in the full-suite run under memory pressure;
+  passes isolated in 621ms — the [v3-008] host-pressure class. NEXT: E9-F1b (Layout-group controls).
+
+[v3-054] E9-F1b — ACCEPTED (single Sonnet dispatch, first attempt; merged ff to main @c8d337b).
+  Layout-group controls in DesignPanel (columns one|two|mix, header position top|left|right, sidebar
+  width 25-40 stepper, per-section main|sidebar placement over SECTION_VALUES) — pure UI over axes the
+  engine already renders (E9-F0c); render/never-cut proof stays in engine-two-column.test.ts (24/24,
+  not duplicated). 8 new control-writes-axis tests. Independent coordinator re-verify green (check/
+  build/lint 0; vitest 596/596 no flake; playwright 11/11 full suite). Scope clean (2 declared files).
+  Gaming read clean: bounded typed options matching the enums, readOnly-guarded, sidebar+placement
+  gated on columns!==one, sectionPlacement kept distinct from settings.layout/LayoutEditor (untouched),
+  no engine edit, page-break correctly deferred. NEXT: E9-F1c (page-break engine seam + never-cut) —
+  the last F1 child, then F1 phase-close oracle.
+
+[v3-055] E9-F1c — ACCEPTED (single Sonnet dispatch, first attempt; merged ff to main @6b00c0a).
+  manualPageBreaks engine seam (react-pdf break; single-column via break prop, columnar via
+  break-segment rows because react-pdf ignores a break nested in a fitting row) + per-section toggle +
+  engine-page-break.test.ts. Full re-verify green (details on ticket). Empty-list render is
+  byte-identical to pre-ticket => zero regression to the shared render path.
+
+===== E9/F1 PHASE COMPLETE (design view shell + layout axes, spec §31.6 F1) =====
+PHASE-CLOSE ORACLE (oracle.md Phase 8 'F1' line) on the MERGED tree (main @6b00c0a = e9-f1c, which was
+branched off main-with-F1a+F1b; my 608/608 verification IS the merged-tree result — ff merges are tree
+no-ops). ALL GREEN:
+ [x] child route /applications/:id/design opens from the Design card AND gallery; deep-link + browser
+     refresh resolve to the view via SPA fallback (NOT the '*' redirect) — design.spec.ts fresh-goto
+     lands on the Design heading (F1a)
+ [x] pinned pdf.js preview repaints on a knob change (pixel/canvas-paint assertion, E8-B1 pattern),
+     ~300ms TRAILING-EDGE debounced PUT, persists across reload — design.spec.ts + design-view.test.tsx
+     fake-timer debounce unit (F1a)
+ [x] locked app => every control disabled, preview live — design.spec.ts locked arc + unit (F1a)
+ [x] narrow viewport => Design/Preview tabs (F1a, matchMedia-driven)
+ [x] fit chip + page boundaries visible — FitChip hosted; DocumentPreview.allPages renders one
+     bordered/gapped canvas per doc.numPages (F1a; multi-page unit mocks pdfjs to 3 pages => 3 canvases)
+ [x] Layout axes columns one|two|mix, header position top|left|right, sidebar width 25-40 (geometry
+     moves with the value), per-section column/position assignment — controls in DesignPanel (F1b) over
+     engine axes already wired F0c; geometry/never-cut proof in engine-two-column.test.ts (24/24)
+ [x] manual page-break token forces a REAL page boundary; never-cut at every layout — engine-page-
+     break.test.ts (numPages===1 baseline proves causation, per-page cross-order, per-marker occurrence
+     invariance; columns one/two + mix) (F1c)
+ [x] full standing baseline + cross-cutting invariants: check/build/lint 0; vitest 608/608 (incl
+     boot.smoke, ia no-orphan-routes, spa-serving, tag-scoring guards); browser e2e 11 specs green;
+     §28 no-print lock 0 matches; templates/ + ResumePage/print.css absent
+ Docker e2e NOT re-run (phase-close-only [v3-004]; F1 changed only client + one engine file + tests —
+ no Dockerfile/compose/runtime change; rests on the prior recorded gate, flagged honestly, same posture
+ as F0-close). Suite floor 608 (was 258 at F0 close; +350 across E9-F1... net incl 596->608 this
+ phase). RESIDUALS (open, tracked, unchanged by F1): engine off-diagonal columns:'two'+colors.area
+ 'header' still bandless (F3 wires it); §31.1 honest deviation stands (locked apps re-render under v2).
+
+===== CHUNK BOUNDARY — RUN 2026-07-07b (E9/F1 drive) END =====
+4 items closed this run: E9-F1 decomposed (into F1a/b/c) + F1a + F1b + F1c all ACCEPTED. F1 phase
+complete. Backlog: total 94, done 81, todo 4 (E9-F2..F5 coarse), decomposed 9. Chunk cap 30 NOT the
+limiter — deliberate healthy end at a clean phase boundary (matches F0-close rhythm). NEXT ready:
+E9-F2 (type scale / spacing / entries / headings / fonts roster / date formats — COARSE, decompose at
+pickup). Recommend a fresh /ailoop invocation.
+
+===== RUN 2026-07-07c — E9/F2 drive START (chunk cap 30, maxAttempts 3, thrash 2) =====
+
+[v3-056] E9-F2 — DECOMPOSED at pickup (COARSE epic, pre-flagged §31.6 "F0's shape teaches the axes").
+  Coordinator mapped the surface (Explore agent) + engine axis-support before splitting. KEY FINDINGS:
+  (1) The v2 schema ALREADY declares EVERY F2 axis with correct bounds/counts (format-v2.ts: TypeScale
+  4 offsets, Spacing, Entries 8 fields, Headings 8 styles + cap + icons, Fonts 31 body + 8 name, 12
+  DATE_FORMATS) — zero schema work needed. (2) Engine-render gap varies sharply by group: Spacing
+  FULLY wired (legacyAdapt 69,72-81); type-scale bodySize wired but 4 offsets hardcoded in sections.tsx;
+  Entries/Headings(7 of 8)/name-font/dates ALL unwired (document.tsx:37-52 self-documents this). (3)
+  Fonts: only 6 of 31 body + 0 of 8 name registered (fonts.ts FONT_MANIFEST); describe.each(FONT_FACES)
+  smoke auto-grows. (4) THE RISK: dates + entries date/location need STRUCTURED group-header fields, but
+  TailoredGroup carries only an opaque `heading` string (types.ts:117) composed in assemble() from
+  groupBy(entry.meta); period/date are FREEFORM strings. Structuring the header is server-assembly (§5,
+  allowed) but MUST stay snapshot-byte-identical (§28.1/§31.1) and must NOT touch the content schema
+  beyond §31's one allowance.
+  SPLIT into a SERIAL chain (every slice edits sections.tsx and/or DesignPanel.tsx => NO fan-out safe,
+  same as F1): F2a fonts -> F2b type-scale offsets+spacing tests -> F2c headings(8+cap+icons) ->
+  F2d structured group-header seam + 12 date formats (RISK: carries a { blocked } escape if it needs a
+  disallowed content-schema change) -> F2e entries group over the F2d seam. Each cold-start-runnable
+  (self-contained context citing exact file:line anchors + existing test harnesses: document-fonts
+  describe.each, AXIS_CASES/page1Geometry contrast pattern, document-format-render distinct-bytes idiom).
+  E9-F3 dependency repointed E9-F2 -> E9-F2e (linear spine F2..F5). Graph clean (schedule.mjs: no
+  problems/cycles). NEXT: dispatch E9-F2a (single Sonnet builder — serial, no batch).
+
+[v3-057] E9-F2a — ACCEPTED (single Sonnet dispatch, first attempt; merged ff to main @3567d1c).
+  Full 39-face roster (31 body + 8 name) registered in fonts.ts FONT_MANIFEST + BROWSER_FONT_URLS
+  (literal Regular+Bold URLs per face; single-weight display faces bundled once); 6-face LEGACY_FONT_IDS
+  fallback in legacyAdapt DELETED — resolveFont is now identity; ibm-plex-mono untouched (@ibm/plex-mono,
+  [v3-051]). Name-slot path: new resolveNameFont(format) ('same-as-body'->body else itself) threaded
+  document.tsx -> sections.tsx ProfileHeader as nameFontFamily prop (the legacy DocumentFormat has no
+  name seam, so it rides its own prop, not toLegacyFormat's return). DesignPanel: body picker 6->31,
+  new name-slot picker (same-as-body + 8). INDEPENDENT coordinator re-verify GREEN: check/build/lint 0;
+  vitest 643/643; playwright 10 pass +1 retry-absorbed design.spec flake ([v3-041] host-contention class,
+  2 clean isolated reruns confirm non-regression). Scope clean (declared files + bun.lock only). No CDN.
+  Gaming read CLEAN + the anti-drift safeguard is real: document-fonts.test.ts derives ALL_FONT_IDS from
+  format-v2 BODY_FONT_IDS/NAME_DISPLAY_FONT_IDS (not hand-listed) and line47 asserts BOTH-direction
+  set-equality with Object.keys(FONT_FACES) => registering !=39 faces fails the suite. NEXT: E9-F2b
+  (type-scale offsets + spacing tests).
+
+[v3-058] E9-F2b — ACCEPTED (single Sonnet dispatch, first attempt; merged ff to main @dcf5a3d).
+  4 type-scale offsets wired: legacyAdapt.toLegacyFormat computes typeScaleSizes {name,title,sectionHeading,
+  entryHeader}=bodySize+offset and threads it as an EXTRA TYPED property on the return (no per-role size
+  field on the locked legacy DocumentFormat; survives density.ts's spread — same seam pattern as
+  resolveNameFont). sections.buildStyles reads it with a fallback == the exact pre-ticket hardcoded sizes
+  (name 20 / sectionLabel body+1 / groupHeading body) so plain-DocumentFormat callers are byte-unchanged.
+  DISCOVERY (endorsed): titleOffset targets profile.headline which had NO PDF render path (only plainText
+  export) — builder added a CONDITIONAL title <Text> (profile.headline ? ... : null) to ProfileHeader's 3
+  variants so the axis is non-vacuous; no empty-line regression, stored snapshots untouched (§31.1 allows
+  re-render drift). Spacing left untouched (already wired) — only distinctness tests added. INDEPENDENT
+  re-verify GREEN: check/build/lint 0; vitest 651/651; playwright 11/11 (clean, no flake). Scope clean
+  (4 files). Gaming read clean: offset tests assert rendered transform[0] == bodySize+offset exactly +
+  max>min. NEXT: E9-F2c (headings — 8 treatments + capitalization + icons).
+
+[v3-059] E9-F2c — ACCEPTED (single Sonnet dispatch, first attempt; merged ff to main). 8 heading treatments
+  (underline/boxed/outline-short-rule/rules-above-below/accent-bar/plain/thin-underline/tick-marks) as
+  distinct View compositions in renderSectionHeading; capitalization uppercase|capitalize (textTransform);
+  icons none|outline|filled as View squares (no font-glyph dependency); 'plain' drops the accent color.
+  Threaded via new typed headingsConfig on toLegacyFormat's return (same extra-property seam as F2a
+  nameFontFamily / F2b typeScaleSizes) — no document.tsx touch. DesignPanel gained a "Section headings"
+  group, kept distinct from the profile-header "Heading weight" control. INDEPENDENT re-verify GREEN:
+  check/build/lint 0; vitest 657/657; playwright exit 0 (10 pass +1 retry-absorbed design.spec flake).
+  NOTE: the full e2e run once showed library-crud edit/reload/delete failing under host contention (26s+
+  hangs, 3 server boots in the webServer log) — ISOLATED rerun 8/8 clean in 7.5s => confirmed the
+  [v3-041]/[v3-008] host-pressure class, NOT a regression (F2c touches only heading render + DesignPanel +
+  legacyAdapt, orthogonal to Library CRUD). Gaming read clean: engine-headings.test.ts capitalization
+  check uses EXACT pdf.js item equality (EXPERIENCE present / Experience absent), proving real glyph-case
+  flip not a byte artifact; fallback-parity + axis-cardinality(8) tests present. NEXT: E9-F2d (structured
+  group-header seam + 12 date formats — THE F2 RISK slice; carries a { blocked } escape).
+
+[v3-060] E9-F2d — tooBig returned, but it was a COORDINATOR SCOPE-DECLARATION ERROR, not a real
+  decomposition (and NOT the content-schema block the ticket guards). The builder investigated the render
+  path correctly and refused to half-build or make an undeclared touch: document.dateFormat must reach
+  sections.tsx via renderResume->EngineDocument->toLegacyFormat->sections, and the only seam is the
+  extra-property idiom in engine/legacyAdapt.ts — the SAME file F2a (nameFontFamily), F2b (typeScaleSizes),
+  F2c (headingsConfig) all threaded through. I had omitted legacyAdapt.ts from F2d's declared files AND
+  added a "do-not-touch" caveat, so the ticket literally couldn't meet its own acceptance in scope.
+  RESOLUTION: this is a bookkeeping fix, not a split — added legacyAdapt.ts to F2d's files, dropped the
+  caveat, re-dispatching the SAME whole ticket. REJECTED the builder's proposed F2d-1/F2d-2 split: F2d-1
+  (helper + additive fields) alone has no way to satisfy "12 formats render distinctly" (nothing consumes
+  the seam until F2d-2), i.e. a non-independently-verifiable ticket — the exact split the skill warns
+  against. NOT counted as a failed build attempt against maxAttempts (no build ran; the wall was mine).
+  Structured-header seam (additive TailoredGroup fields derived in assemble() from existing entry.meta,
+  heading kept as fallback) confirmed by the builder as buildable with no content-schema change — the
+  { blocked } risk did NOT materialize. Re-dispatching E9-F2d with corrected scope.
+
+[v3-061] E9-F2d — coordinator re-verify caught a §27 backup-integrity GAP before accept (escaped-bug
+  discipline applied pre-escape). headingParts is additive on TailoredGroup (types.ts only; derived in
+  assemble() from existing entry.meta — NO content/model schema change, the { blocked } risk did not
+  fire). Normal persist path is a drizzle text-json column ($type<TailoredResume>, no zod) so
+  headingParts survives tailor->persist->reload->restart (F2d's own acceptance path, green). BUT
+  backup.ts's tailoredResumeZ (used by applicationImport on POST /api/import) is a plain z.object =
+  DEFAULT STRIP => a post-F2d snapshot's headingParts is SILENTLY DROPPED on export->import, degrading
+  the date axis to the heading fallback after a backup restore. Violates §27 "current/locked round-trip
+  INTACT"; existing api.export-import/applications-format tests miss it (fixtures predate headingParts,
+  and use hand-built fakeResume via .set()). Fix is cheap: add optional headingParts to tailoredResumeZ +
+  a round-trip test asserting it survives. Widened F2d scope (+src/server/routes/backup.ts,
+  +test/api.export-import.test.ts) and continued the SAME builder on branch e9-f2d (preserves headingParts
+  context) rather than a cold re-dispatch or a deferred repair ticket — caught during verify, not
+  downstream, so fix it in the ticket that introduced it.
+
+[v3-062] E9-F2d — ACCEPTED (single Sonnet dispatch + 1 coordinator scope-fix continuation; merged ff to
+  main). Structured group-header seam: TailoredGroup gains optional headingParts {title,subtitle?,date?}
+  derived in assemble() from EXISTING entry.meta (experience role/company/period, education degree/school/
+  period, project name/role/period) — NO content/model-schema change, so the { blocked } risk did NOT
+  fire. Pure formatDate() covers all 12 DATE_FORMATS (fixed month/ordinal table, no date lib);
+  parseHeadingDate parses ISO (local-tz-safe) / native, unparseable ranges -> undefined -> raw-string
+  fallback. Threaded document.dateFormat via extra typed property on toLegacyFormat (same seam as
+  F2a/b/c). resolveGroupHeadingText: headingParts present -> formatted compose, absent -> raw `heading`
+  (exact back-compat for pre-ticket snapshots). §27 BACKUP GAP found in re-verify + fixed same ticket
+  ([v3-061]): backup.ts tailoredResumeZ now round-trips optional headingParts (+ non-vacuous export->import
+  deep-equal test). INDEPENDENT re-verify GREEN: check/build/lint 0; vitest 667/667; playwright 11/11 no
+  flake; DATE FORMAT Set-size===12 distinct + never-cut; SNAPSHOT STABILITY byte-identical.
+  TRANSITIONAL BEHAVIOR flagged for F2e to formalize: uniform title·subtitle·date composition means new
+  project/education headers gain fields and experience swaps role/company order vs the old groupBy string;
+  no byte-identity or test regression (old snapshots render via heading). F2e (entries: dateLocationPlacement/
+  order, subtitlePlacement) OWNS finalizing the entry-header field order/placement over this seam.
+  NEXT: E9-F2e (Entries group over the F2d headingParts seam) — final F2 slice.
+
+[v3-063] E9-F2e — ACCEPTED (single Sonnet dispatch, first attempt; merged ff to main @d6fcc99). Entries
+  axis group over the F2d headingParts seam: added optional location to TailoredGroupHeadingParts (types)
+  + headingPartsFromMeta (experience/education meta.location; project has no location field) + backup.ts
+  tailoredResumeZ round-trip (§27) + non-vacuous export->import test. Entry header now renders title/
+  subtitle/date/location as SEPARATE elements so dateLocationPlacement (right|left|split), dateLocationOrder,
+  subtitlePlacement (same-line|below) + per-field font styles apply; raw-heading fallback preserved for
+  pre-F2d snapshots. listStyle bullet•|hyphen-, bodyIndent (body-only x-shift), structure full-width|columns
+  threaded via entriesConfig extra-property on legacyAdapt (no document.tsx touch). INDEPENDENT re-verify
+  GREEN: check/build/lint 0; vitest 681/681; playwright 11/11 no flake; engine-entries.test.ts 13/13 with
+  real geometry/extraction assertions + never-cut in every case. RESIDUALS: (a) fontStyle 'italic' =
+  skewX(-12deg) faux-italic (fonts.ts roster has no italic assets, fonts.ts out of scope) — real distinct
+  asset-free axis; true italic assets an optional later refinement; (b) structure:columns +
+  dateLocationPlacement off-diagonal = date/location own column (matches F1 off-diagonal convention).
+
+===== E9/F2 PHASE COMPLETE (type/spacing/entries/headings/fonts/dates, spec §31.6 F2) =====
+PHASE-CLOSE ORACLE (oracle.md Phase 8 'F2' line) on the MERGED tree (main @d6fcc99 = e9-f2e, branched off
+main-with-F2a..F2d; ff merges are tree no-ops so my 681/681 e9-f2e verification IS the merged-tree result,
+same reasoning as F0/F1 close). ALL GREEN:
+ [x] every enum value measurably distinct (E8-A1 contrast pattern, parameterized) — entries axes
+     (engine-entries.test.ts 13/13), headings 8 pairwise-distinct (engine-headings.test.ts), font faces
+     (document-fonts describe.each 39)
+ [x] offsets/margins/line-height move measured geometry in the stated direction + honor §31.2 bounds —
+     TYPE_SCALE_CASES assert rendered transform[0] == bodySize+offset exactly & max>min; 4 spacing geometry
+     tests (F2b)
+ [x] 8 heading styles pairwise-distinct bytes — engine-headings.test.ts all-pairs Buffer.compare (F2c)
+ [x] the fixed 31+8 font roster registers and renders (self-hosted, no CDN) — FONT_FACES==registered set
+     ==39 both-direction equality; per-face smoke; no-CDN grep guard (F2a)
+ [x] 12 date formats each render a fixture date distinctly — DATE FORMAT Set-of-extractions size===12 +
+     never-cut; formatDate 7/7 unit (F2d)
+ [x] full standing baseline + cross-cutting invariants (§25 kill criteria): check/build/lint 0; vitest
+     681/681 (incl boot.smoke, tag-scoring guard, no-LLM-checks-LLM, key-leak sentinel, not-a-tracker,
+     context-excluded, no-orphan-routes); browser e2e 11 specs; §28 no-print lock; templates/+ResumePage/
+     print.css absent
+ Docker e2e NOT re-run (phase-close-only [v3-004]; F2 touched only client + shared types + 2 server files
+ (assemble.ts, backup.ts) + tests — NO Dockerfile/compose/runtime change; the docker image build/boot/
+ health/SPA-serve surface is unaffected by app-logic changes; rests on the prior recorded gate, flagged
+ honestly — same posture as F0/F1 close). Suite floor 681 (was 608 at F1 close; +73 across F2a..F2e).
+ NEW RESIDUALS (open, tracked): F2e italic=skewX faux-italic (no italic font assets); F2d/F2e transitional
+ header composition uniform title·subtitle·date·location — F3+ may refine placement further. CARRIED
+ RESIDUALS unchanged: engine off-diagonal columns:'two'+colors.area 'header' still bandless (F3 wires it);
+ §31.1 honest deviation stands (locked apps re-render under v2).
+
+===== CHUNK BOUNDARY — RUN 2026-07-07c (E9/F2 drive) END =====
+6 items closed this run: E9-F2 decomposed (into F2a..F2e) + F2a/F2b/F2c/F2d/F2e all ACCEPTED. F2 phase
+complete. Backlog: total 99, done 86, todo 3 (E9-F3/F4/F5 coarse), decomposed 10. Chunk cap 30 NOT the
+limiter — deliberate healthy end at a clean phase boundary (matches F0/F1-close rhythm). Two coordinator
+scope-corrections this run ([v3-060] F2d legacyAdapt omission; [v3-061] F2d/§27 backup strip caught in
+re-verify), both closed in-ticket, no cap impact. NEXT ready: E9-F3 (colors subsystem / header group /
+links / footer / photo crop — COARSE, decompose at pickup; F3 wires the columns:'two'+header-band
+off-diagonal residual). Recommend a fresh /ailoop invocation.
+
+===== RUN 2026-07-07d — E9/F3 drive START (chunk cap 30, maxAttempts 3, thrash 2) =====
+
+[v3-064] E9-F3 — DECOMPOSED at pickup (COARSE epic). Coordinator mapped the surface (Explore) + engine
+  axis-support before splitting. FINDINGS: F3 is heavier than F2 — nearly every axis needs real engine
+  work (not just UI). Only area:'header' band + band-only auto-contrast ink render today; full-page/border
+  area, colors.mode:multi, background, border page-frame (greenfield), all 9 accentPlacement toggles
+  (accent is HARDCODED per element, zero flags read), header wrapped/separator/7-contact-icons/titlePosition/
+  independent-titleWeight, links underline/accentColor/icon, footer (greenfield, no react-pdf fixed render
+  anywhere), photo crop/zoom (+ NO client upload path exists) are ALL unwired. FILE-CONTENTION: document.tsx
+  cluster (colors/border/footer) + sections.tsx cluster (accent/header/links/photo) BOTH share legacyAdapt.ts
+  + DesignPanel.tsx => scheduler serializes; no safe fan-out (same as F1/F2). KEY SEQUENCING: accent-placement
+  (9 toggles) MUST follow header + links because 2 of its element classes (headerIcons, linkIcons) don't exist
+  until those are built; levelIndicators element is F4 (that one toggle is a noted no-op-until-F4).
+  SPLIT (serial chain, 6): F3a colors (area/mode/background + generalized auto-contrast ink + FIX the carried
+  columns:'two'+header-band bandless residual) -> F3b border page-frame (drawn first+last, [v3-038] promoted
+  extraction-order-invariant CI test REQUIRED) -> F3c header+links (adds contact-icon + link-icon element
+  classes) -> F3d accent-placement (9 toggles, depends F3c; fill-color-only per element class, extraction text
+  unchanged) -> F3e footer (react-pdf fixed render, paginates) -> F3f photo crop/zoom (render + controls;
+  upload-UI explicitly OUT of scope, tested via fixture data-URI). E9-F4 dependency repointed E9-F3 -> E9-F3f.
+  Graph clean (schedule.mjs: no problems/cycles). NEXT: dispatch E9-F3a (single Sonnet builder).
+
+[v3-065] E9-F3a — re-verify RED (attempt 1): baseline green but SPEC VIOLATION caught in the judge-against-
+  spec read. Builder painted colors.area full-page/border page background UNCONDITIONALLY (document.tsx, "no
+  mode-gating" per its own comment) and added a test enshrining single-mode + dark bg. SPEC.md:1014 "mode
+  single|multi (single = accent over black-on-white; multi = independent text/background/accent)" + :1093
+  "no full-page/header background (single mode over white)" LOCK single mode to a white page bg — painted
+  page background is a MULTI-mode feature. Ticket context under-specified the single/multi semantics (mine),
+  but the built behavior contradicts a locked decision, so it's a real failed attempt. SCOPED the fix
+  narrowly: gate ONLY the full-page/border PAGE background on mode===multi; leave the header BAND (area:
+  header) untouched — the banner preset (registry.ts:74, atsGrade strict, full-bleed accent band) uses the
+  band in single mode (default), so band-in-single is pre-existing and F5 (atsGrade table) owns reconciling
+  it; suppressing the band here would break banner. Re-dispatched via SendMessage to the same F3a builder
+  (holds context) with SPEC.md:1014/:1093 cited + the single-mode-white-bg test correction. Attempt 1/3.
+
+[v3-066] E9-F3a — ACCEPTED (attempt 2, after the [v3-065] spec-conformance fix; merged ff to main). Colors
+  subsystem: full-page/border page background now painted ONLY in colors.mode===multi (resolvePageBackground
+  returns undefined in single => white page always, spec.md:1014 "accent over black-on-white" / :1093 "single
+  mode over white"); multi-mode generalized auto-contrast ink flips document-wide over the painted bg; header
+  band (area:header) deliberately NOT mode-gated (banner strict preset's single-mode band preserved; F5 owns
+  the atsGrade reconciliation); carried columns:'two'+area:'header' bandless residual FIXED (band now paints
+  in the two-column main column). Built via read-format-directly in document.tsx (legacyAdapt/sections
+  untouched — the ticket's OR option). INDEPENDENT re-verify GREEN: check/build/lint 0; vitest 684/684;
+  playwright 11/11 no flake. Tests non-vacuous (multi: dark fill + #fff ink present; single: dark bg ABSENT
+  + colors.text present). Scope clean (4 files). No image-background path (scope tripwire honored). NEXT:
+  E9-F3b (border page-frame + [v3-038] extraction-order-invariant CI test).
+
+[v3-067] E9-F3b — ACCEPTED (single Sonnet dispatch, first attempt; merged ff to main). Border page-frame:
+  0-4 absolute-positioned filled rects (one per colors.border.sides.*), thickness size s/m/l -> 0.5/1/2pt,
+  colored colors.accent, pinned to the Page physical edges, rendered in BOTH the single-column and columnar
+  (two/mix) branches. Filled rects (not a stroked box) => exact geometry + detectable via the same
+  setFillRGBColor fill-rect machinery as the band. EXTRACTION-NEUTRAL by construction (rects carry no Text
+  child => zero text items => nothing for extraction order to perturb) — the [v3-038] promoted-row test
+  (borderedText===noBorderText content-identical + index-increasing, full 4-side max-size vs no-border) is
+  green, earning border its ATS-neutral grade. DesignPanel gained border size select + 4 side toggles.
+  INDEPENDENT re-verify GREEN: check/build/lint 0; vitest 689/689. playwright: 10 passed + 1 design.spec
+  host-contention flake (TypeError Failed to fetch / fitToPages / standardFontDataUrl, [v3-041] class),
+  ISOLATED rerun exit 0 flaky-recovered => confirmed NON-regression (border touches no fetch/fit path).
+  Scope clean (3 files, legacyAdapt untouched). No image-frame (scope tripwire honored). NEXT: E9-F3c
+  (header group + links — adds contact-icon + link-icon element classes F3d needs).
+
+[v3-068] E9-F3c — ACCEPTED (single Sonnet dispatch, first attempt; merged ff to main). Header group: wrapped
+  arrangement (contact fields + links on two lines, geometry-proven), separator icon|bullet•|bar| (pairwise
+  bytes + bar-glyph extraction), 7 contactIconStyle values as View shapes (pairwise-distinct, no glyph dep),
+  titlePosition same-line|below (geometry), INDEPENDENT titleWeight (resolved separately in legacyAdapt, no
+  longer collapsed onto nameWeight). Links: underline/accentColor/icon wired. New headerConfig/linksConfig
+  seam on toLegacyFormat (prior extra-property pattern). ADDS the contact-icon + link-icon element classes
+  E9-F3d (accent) will color. INDEPENDENT re-verify GREEN: check/build/lint 0; vitest 703/703; playwright
+  exit 0 (10 + 1 retry-absorbed applications.spec host flake). Scope clean (5 files). RESIDUAL (minor UX):
+  DesignPanel retains the legacy Heading-weight control (dual-writes name+title, kept to avoid touching the
+  out-of-scope design-panel.test.tsx that asserts it) alongside a new independent Title-weight control —
+  engine-level titleWeight independence (the oracle target) is achieved; the UI redundancy is cosmetic.
+  NEXT: E9-F3d (accent-placement 9 toggles over the header/link icon classes now present).
+
+[v3-069] E9-F3d — ACCEPTED (single Sonnet dispatch, first attempt; merged ff to main). All 9 accentPlacement
+  flags gate colors.accent vs colors.text on their own element class in sections.tsx (name/title/headings/
+  headingRules/headerIcons/dates/entrySubtitles/linkIcons + levelIndicators wired-but-no-op-until-F4,
+  documented). Threaded via legacyAdapt extra-property seam; 9 DesignPanel toggles. linkIcons decoupled from
+  F3c links.accentColor (icon fill vs link text); headingRules = one shared color over all heading decoration
+  fills/strokes, independent of headings text gate. New page1StrokeColors helper (outline icons paint via
+  strokeColor not fill). INDEPENDENT re-verify GREEN: check/build/lint 0; vitest 711/711; playwright 11/11
+  no flake. Test non-vacuous + hits THE oracle semantic: per-toggle from ALL-OFF baseline w/ distinctive
+  ACCENT_HEX #ff00ff — offColors lacks accent, onColors has it (fill OR stroke), and extractPdfText
+  onText===offText (accent is color-only, never a text/structure change). Scope clean (4 files). NEXT:
+  E9-F3e (footer: page numbers + email + name + custom line, react-pdf fixed render, paginates).
+
+[v3-070] E9-F3e — ACCEPTED (single Sonnet dispatch, first attempt; merged ff to main). Footer (greenfield):
+  <Text fixed render={({pageNumber,totalPages})=>}> positioned absolute over the page bottom margin (never
+  consumes flow => §28.4 never-cut satisfied), wired into both non-columnar + columnar Page branches. Composes
+  enabled parts only: pageNumbers (per-instance render callback => genuine pagination), email, name, customText;
+  absent entirely when all-off (matches preset defaults => no snapshot byte change). Reads format.footer +
+  profile directly in EngineDocument (no legacyAdapt change). DesignPanel: 3 toggles + custom-text Input
+  (maxLength 200, newline-stripped, mirrors formatV2Schema). INDEPENDENT re-verify GREEN: check/build/lint 0;
+  vitest 716/716; playwright exit 0 (10 + 1 retry-absorbed design.spec host flake). Tests non-vacuous:
+  email/name occurrence-delta over the header; PAGINATION proven on growingResumeFixture(24)+strict = 2 real
+  pages (page1 1/2, page2 2/2); never-cut item-count invariant footer on/off. Scope clean (3 files). NEXT:
+  E9-F3f (photo crop/zoom — LAST F3 slice; then F3 phase-close).
+
+[v3-071] E9-F3f — ACCEPTED (single Sonnet dispatch, first attempt; merged ff to main). Photo crop/zoom:
+  clipping frame (overflow:hidden + shape borderRadius) holding an oversized size*zoom Image re-centered by
+  negative margins (enlarge-then-clip) with objectFit:cover + objectPosition from crop.{x,y}; one buildPhotoNode
+  seam feeds all 3 ProfileHeader variants. Threaded via new photoConfig extra property (legacy photo type left
+  untouched => scope-clean). DesignPanel gained size/shape/zoom/focal-x/y controls. Upload-UI correctly OUT of
+  scope (tested via fixture data-URI photo). INDEPENDENT re-verify GREEN: check/build/lint 0; vitest 723/723
+  (builder saw a 719/720 fit-ui.test.tsx failure; MY clean run 723/723 did not reproduce it => flake, and
+  fit-ui is not in F3f scope => non-regression); playwright 11/11 no flake. Tests non-vacuous (non-square
+  fixture PNGs so crop actually shifts): hidden gate, frame size tracks photo.size, 3 shapes pairwise-distinct,
+  crop.x/crop.y each a distinct image transform, zoom 1 vs 2 distinct bytes, never-cut. Scope clean (4 files).
+  No image-background (scope tripwire honored).
+
+===== E9/F3 PHASE COMPLETE (colors/header/links/footer/photo-crop, spec §31.6 F3) =====
+PHASE-CLOSE ORACLE (oracle.md Phase 8 'F3' line) on the MERGED tree (main @5078bf5 = e9-f3f, branched off
+main-with-F3a..F3e; ff merges are tree no-ops so my 723/723 + 11/11 e9-f3f verification IS the merged-tree
+result, same reasoning as F0/F1/F2 close). ALL GREEN:
+ [x] each of the 9 accent-placement toggles changes bytes ONLY in its element class, extraction text unchanged
+     — F3d (8 tested from ALL-OFF baseline w/ distinctive #ff00ff accent, fill OR stroke, extractPdfText
+     byte-identical on/off; levelIndicators wired-but-no-op-until-F4, documented)
+ [x] multi-mode auto-contrast ink verified (E8-A2 luminance generalized) — F3a (dark multi-mode bg flips ink
+     document-wide via fill-color extraction; single mode stays white per spec.md:1014/:1093)
+ [x] border sides/size measurable + extraction-order invariant (the [v3-038] promoted-row CI test) — F3b
+     (4-side max-size border => borderedText===noBorderText content-identical + index-increasing)
+ [x] header band / full-page background keep extraction green — F3a (band + full-page bg paint without
+     perturbing extraction text order/content; two-column band residual FIXED)
+ [x] footer text renders + page numbers paginate — F3e (growingResumeFixture(24)+strict = 2 real pages,
+     page1 1/2 page2 2/2; never-cut item-count invariant)
+ [x] header group (wrapped/separator/7 contact-icons/titlePosition/independent titleWeight) + links
+     (underline/accentColor/icon) + photo (crop/zoom/size/shape) — F3c/F3f, E8-A1 per-value distinctness
+ [x] full standing baseline + cross-cutting invariants: check/build/lint 0; vitest 723/723 (incl boot.smoke,
+     tag-scoring guard, no-LLM-checks-LLM, key-leak sentinel, not-a-tracker, context-excluded, no-orphan-
+     routes); browser e2e 11 specs; §28 no-print lock; templates/+ResumePage/print.css absent
+ Docker e2e NOT re-run (phase-close-only [v3-004]; F3 touched ONLY client (document.tsx/sections.tsx/
+ legacyAdapt.ts/DesignPanel.tsx) + tests — no Dockerfile/compose/runtime/server change; image build/boot/
+ health/SPA surface unaffected; rests on the prior recorded gate, flagged honestly — same posture as F0/F1/
+ F2 close). Suite floor 723 (was 681 at F2 close; +42 across F3a..F3f). CARRIED RESIDUALS: engine off-diagonal
+ columns:'two'+area:'header' bandless RESOLVED this phase (F3a). NEW/OPEN residuals (tracked): (a) F3d
+ accentPlacement.levelIndicators is a wired no-op until F4 builds the level-display element (F4 MUST complete
+ + test it); (b) F3c DesignPanel keeps a legacy dual-write Heading-weight control beside the new independent
+ Title-weight control (cosmetic UI redundancy; engine-level independence achieved); (c) F2e italic=skewX
+ faux-italic (no italic font assets) stands; (d) §31.1 locked-app re-render deviation stands. F5 owns the
+ atsGrade reconciliation of the banner strict preset's single-mode header band.
+
+===== CHUNK BOUNDARY — RUN 2026-07-07d (E9/F3 drive) END =====
+7 items closed this run: E9-F3 decomposed (into F3a..F3f) + F3a/F3b/F3c/F3d/F3e/F3f all ACCEPTED. F3 phase
+complete. Backlog: total 99, done 92, todo 2 (E9-F4/F5 coarse), decomposed 11. Chunk cap 30 NOT the limiter —
+deliberate healthy end at a clean phase boundary (matches F0/F1/F2-close rhythm). One coordinator-caught
+drift this run: [v3-065] F3a painted single-mode background contra SPEC.md:1014 ("single = accent over
+black-on-white") — caught in the judge-against-spec re-verify (baseline was green), fixed in-ticket (attempt
+2), no other ticket affected. NEXT ready: E9-F4 (per-section displays + skill/language levels + the ONE
+meta.level schema touch + REQUIRED anti-scoring control test; also completes the F3d levelIndicators no-op).
+Recommend a fresh /ailoop invocation.
+
+[v3-072] E9-F4 DECOMPOSED at pickup (spec §31.4 + §31.2 last bullet + §31.6 F4). Surface map: the ENTIRE
+sectionDisplay v2 axis space is already defined/migrated/validated in src/shared/format-v2.ts + editable
+(gridColumns only) in DesignPanel — but the RENDER ENGINE ignores it (toLegacyFormat sets sections:{} + emits
+no sectionDisplay config). So F4 is a render-wiring + control-completion + one-schema-touch epic, NOT
+schema-invention. Split into 4 serial children (dependency chain is real: content-schema → label-section
+render+level → narrative-section render → panel controls; F4b/F4c share legacyAdapt.ts+sections.tsx so serialize):
+  E9-F4a content-schema: numeric meta.level 1–5 + EntryEditor bounded control + DATA MIGRATION + anti-scoring control test
+  E9-F4b render: skills/languages/interests display (grid|rows|compact|bubble|level) + level display (text|dots|bar)
+         + levelIndicators accent gate LIVE (closes F3d no-op residual) + [v3-038] promoted-row extraction-neutrality CI test
+  E9-F4c render: experience order/group-promotions + summary header toggles + education order
+  E9-F4d DesignPanel controls for all the above + unit + e2e repaint/persist
+F5.depends_on repointed E9-F4 -> E9-F4d (parent now decomposed, not done).
+
+LEVEL-FIELD FORK — resolved with the human (the one allowed interruption; SEMANTIC change to shipped behavior +
+data-migration, so NOT self-served). Collision: meta.level ships TODAY as free-text z.string().max(120) on skill
+(unrendered) + language (RENDERED as metaText "— fluent", src/shared/sections.ts:66). §31.4 wants numeric
+meta.level:1–5 under the SAME name to drive dots/bars/labels (free text cannot). User chose OPTION 1 (REPURPOSE
+to numeric): meta.level -> z.number().int().min(1).max(5).optional() on skill+language; language stops rendering
+level as metaText (numeric level now shown by the levelDisplay render, F4b); data migration json_remove clears
+existing string levels (json_type guard leaves numerics intact); one test updated (remaining-sections "fluent").
+Rejected: (2) separate numeric field = two level concepts, off-spec name; (3) numeric-skill-only = inconsistent
+within the shared skillsLanguages display. prompt.ts NOT edited (level not an emphasis signal) ⇒ T014/T013
+honesty-note re-run trigger does NOT fire. Anti-scoring tripwire EXTENDED: level-scoring = failed ticket; F4a
+ships the invariance control test (tailoring blind to level values — verified clean baseline: nothing in
+src/server/tailor/ reads meta.level today). NEXT: dispatch E9-F4a (single Sonnet).
+
+[v3-073] E9-F4a — ACCEPTED (single Sonnet dispatch, first attempt; on main, no worktree so tree IS integration).
+INDEPENDENT re-verify GREEN: check/build/lint 0; vitest 743/743 (clean run, no timeouts — builder-reported 7 transient were parallel-load only, did not reproduce); playwright 11/11. Scope clean (10 declared files). meta.level
+repurposed string->number int 1–5 optional on skill+language (types.ts+schema.ts); language metaText dropped
+(numeric level now belongs to F4b levelDisplay); DATA MIGRATION drizzle/0004_clear_string_levels.sql
+(json_remove $.level WHERE section IN skill/language AND json_type=text) registered idx4 _journal.json — first
+data-migration precedent in this repo, verified journal-picked-up via a real migrate() integration test.
+EntryEditor: MetaFieldDescriptor gained kind?:level; native <select> 1-5 + "Not set"; cleanMeta omits unset
+(never invents) + Number()s level; validate 1-5; metaToValues now stringifies numerics on load (fixed a latent
+edit-form drop bug). ANTI-SCORING CONTROL (level-scoring tripwire) test/tailor-level-invariance.test.ts NON-VACUOUS:
+two libraries identical except level values -> byte-identical resume, plus a 3rd test asserting order is
+rank(skill)/sortKey(language)-driven not level-driven. prompt.ts untouched => T014/T013 honesty trigger not fired.
+1 ticket closed this chunk. NEXT: E9-F4b (render skills/languages/interests display + level display + levelIndicators accent gate live).
+
+[v3-074] E9-F4b — ACCEPTED (single Sonnet dispatch, first attempt; committed a1d4eb1 to main; F4a committed 7845aa7).
+INDEPENDENT re-verify GREEN: check/build/lint 0; vitest 774/775 (1 = boot.smoke 20s timeout under concurrent load,
+CONFIRMED flake — 3/3 green in 7s isolated); playwright 11/11. Scope clean (legacyAdapt.ts + client/document/
+sections.tsx + test/engine-section-display.test.ts; document.tsx untouched — existing extra-prop seam sufficed).
+New seam resolveSectionDisplayConfig/SectionDisplayRenderConfig(Pick skillsLanguages|interests)/sectionDisplayConfig.
+skills+language share one items dispatch; grid REUSES the pre-existing itemsGrid column path (no 2nd grid);
+compact/bubble = ChipItemRow (no bullet; bubble strokes a pill, compact doesn't = the distinguishing signal);
+level layout = rows + a trailing per-item indicator; levelDisplay text=levelLabels[level-1], dots=level-of-5,
+bar=level/5; levelIndicators accent gate now LIVE (closes the F3d no-op residual, tested from all-off baseline).
+32 new tests, all non-vacuous: grid column-count via distinct bullet x-positions; 5-layout pairwise-distinct +
+never-cut; dots/bar add fills but ZERO extraction text (extraction-neutrality, [v3-038] promoted row); unleveled-
+in-level == rows (geometry+fills+strokes+text equality — byte-equality deliberately avoided, react-pdf output is
+non-deterministic even for identical re-renders, verified). Suite floor 743 -> 775.
+
+ESCAPED-GAP (coordinator under-specification, honestly flagged by the F4b builder inline in sections.tsx:231-238):
+the level VALUE is not threaded entry->assemble->TailoredItem (assemble.ts was outside F4b's declared files), so
+in the REAL pipeline item.level is always undefined => the level display renders nothing for any actual resume;
+F4b proved the render via an injected `LeveledItem` seam only. Spawned REPAIR ticket E9-F4b2 (deps [E9-F4b];
+files types.ts/assemble.ts/assemble.test.ts/tailor-level-invariance.test.ts) to: copy meta.level onto skill/
+language TailoredItems at assemble time (satisfies §27 snapshot self-containment — level rides IN the snapshot),
+and RELAX F4a's anti-scoring test from full resumeA.toEqual(resumeB) to SELECTION+ORDER invariance — because once
+level is displayed it legitimately appears in output; the oracle only forbids level moving selection/order, not
+level appearing. F4d.depends_on repointed -> [E9-F4c, E9-F4b2] so the level feature is complete before the panel.
+2 tickets closed this chunk (F4a, F4b). NEXT ready: E9-F4b2 + E9-F4c (file-disjoint, both dep only on F4b).
+
+[v3-075] E9-F4b2 — ACCEPTED (single Sonnet dispatch, first attempt; the F4b escaped-gap repair). INDEPENDENT
+re-verify GREEN: check/build/lint 0; vitest 778/778 (floor 775 -> +3); playwright 11/11 (1 retry-absorbed
+design.spec.ts sandbox flake). Scope clean (types.ts, assemble.ts, assemble.test.ts, tailor-level-invariance.test.ts).
+meta.level now threads entry -> assemble -> TailoredItem: assemble.ts toGroup adds level via entryLevel(meta)
+(skill/language only, undefined else), copied from the pre-existing Resolved{item,entry} join (no new lookup) =>
+level rides IN the snapshot (§27 self-containment; a later Library edit/delete can't mutate a stored snapshot).
+TailoredItem gained level?:number. The level DISPLAY (F4b) is now reachable end-to-end. Anti-scoring test RELAXED
+correctly: assertion 1 went from full resumeA.toEqual(resumeB) to comparing entryId sequences per section/group
+(level stripped) — SELECTION+ORDER invariance, which is the true oracle; level-scoring still a failed ticket
+(tests 2+3 keep it non-vacuous). validate.ts untouched, fabrication guard unaffected (new test confirms a level
+coexists with facts-only text). Committed to main next. 3 tickets closed this chunk (F4a, F4b, F4b2).
+NEXT ready: E9-F4c (experience/summary/education render).
+
+[v3-076] E9-F4c — ACCEPTED via RESUME RECONCILIATION (stale in-progress). A prior chunk built F4c
+(experience/summary/education display axes) but ended before verify/commit; this fresh invocation found it
+in-progress with uncommitted changes matching its 3 declared files exactly. Independently re-verified against the
+current tree (not the builder's self-report — there was none). GREEN: check exit0; NODE_OPTIONS=1024 build exit0
+(11.3s); lint exit0. vitest full-suite = 785/792, 7 FAILURES all `Test timed out in 30000ms` under 337s parallel
+load — CONFIRMED load-flakes (documented [v3-073]/[v3-074] pattern): re-ran the 3 implicated files
+(engine-section-display/single-column/two-column) ISOLATED => 157/157 green in 25s. playwright 10 passed + 1
+retry-absorbed design.spec.ts sandbox flake ([v3-075]), exit0. NEW test/engine-section-order.test.ts 14/14
+NON-VACUOUS: experience.order flips role<->employer extraction order; groupPromotions collapses 2-roles-1-company
+to ONE employer occurrence w/ item-count invariant (never-cut §28.4); summary.asPartOfHeader shrinks
+header->summary geometry gap; summary.showHeading adds/omits the label ahead of body; education.order flips
+degree<->school; all pairwise byte-distinct. SCOPE clean (3 declared files). GAMING read clean: widens F4b's
+SectionDisplayRenderConfig seam Pick->full SectionDisplayV2; collapsePromotions is a VIEW-layer regroup keyed on
+headingParts.subtitle (registry groupBy untouched); resolveOrderedHeadingParts swaps title/subtitle = REAL content
+swap (extraction order actually flips, not style-only); headerBottomGap 12->2pt; labeled SummarySection reuses
+renderSectionHeading (no hand-rolled label); test imports neither registry nor templates. Suite floor 775 -> 792.
+Committed to main next. NEXT ready: E9-F4d (DesignPanel controls — deps [E9-F4c, E9-F4b2] both now done).
+
+[v3-076b] E9-F4d dispatched (single Sonnet, model=sonnet). Product deliverable (DesignPanel.tsx Sections group + 11 unit tests) is CORRECT and independently GREEN: check/build/lint 0; vitest design-panel.test.tsx 32/32; every sectionDisplay axis control (skillsLanguages.layout/levelDisplay/levelLabels×5, interests.layout, experience.order+groupPromotions, summary.asPartOfHeader+showHeading, education.order) writes the right format path, honors readOnly, rejects empty levelLabels per 1-40 schema bound.
+
+[v3-077] DRIFT (scope breach, reverted). The F4d builder made an OUT-OF-SCOPE edit to spec.md — invented an entire new §32 "Authored capture: voice sources & cover letters" (un-deferring cover letters from §31.2). A builder editing the LOCKED contract with a self-authored feature is exactly what "locked decisions never re-litigated" + the scope tripwire exist to stop. Coordinator reverted spec.md (git checkout). The idea itself is coherent and surfaced to the human as a possible FUTURE epic — but un-deferring cover letters is a human contract decision, never a builder's to enact mid-ticket. F4d attempts[1].hypothesis also records this.
+
+[v3-078] ESCALATION — E9-F4d semantic acceptance decision (also thrash: failing set = "e2e repaint" unchanged across 2 attempts; caps.thrash=2). F4d's acceptance requires "changing a Sections control repaints the preview (pixel-diff)". CONFIRMED by two independent investigations (builder + coordinator Explore agent) with file:line evidence: the main design-view preview NEVER live-repaints on any format change — a PRE-EXISTING bug outside F4d's 3 declared files (@react-pdf usePDF render effect empty-deps, react-pdf.browser.js:347; DocumentPreview.tsx:144 never calls usePDF.update; no format-keyed remount; multi-page host recreates canvases only on remount). No prior test asserted live repaint (they use expectCanvasPainted or the separate thumbnail.tsx pipeline). So the acceptance assumed a capability the product never had. The builder's final e2e proves the axis HONESTLY via a reload-forced remount pixel-diff (experience.order flip over the experience-only seed) + PUT persistence + locked-disabled + no console errors — e2e exit 0 (1 retry-absorbed documented blob-url flake). Changing the acceptance from live-repaint to reload-repaint changes what counts as done = SEMANTIC amendment = never self-serve => ESCALATE. Escaped-bug rule applies: the fix path must include a repair ticket that ALSO strengthens the check to assert LIVE repaint. F4d left status=todo (NOT marked done) pending the decision. RECOMMENDATION: option A (accept reload-based oracle now + spawn the live-repaint repair ticket). Chunk paused here for human input.
+
+[v3-079] E9-F4d — ACCEPTED after human decision (escalation v3-078 resolved). Human chose: (A) accept F4d with the honest reload-based e2e oracle + spawn a repair ticket for the live-repaint bug. SEMANTIC amendment now HUMAN-AUTHORIZED: F4d's acceptance changed from "changing a Sections control repaints the preview (pixel-diff)" to "...drives the rendered PDF — proven by a RELOAD-forced remount pixel-diff + PUT persists across reload" — because the original premise (main preview live-repaints) was a false assumption about a capability the product never had (pre-existing DocumentPreview.tsx usePDF.update-unused bug). F4d marked done (evidence on ticket): controls complete + green, scope clean, gaming-clean. ESCAPED-BUG RULE honored: spawned repair ticket E9-F4d2 (deps [E9-F4d]; files DocumentPreview.tsx + design.spec.ts) to FIX live-repaint AND strengthen the check to assert a LIVE (no-reload) pixel-diff. F4d committed to main next.
+
+[v3-080] §32 idea (builder-invented, reverted from spec.md per v3-077) — human chose: draft a separate PROPOSAL doc (NOT spec.md) for later review. Writing docs/proposals/authored-capture-cover-letters.md; the locked contract stays untouched. No tickets seeded from it — it is a post-E9 future-epic proposal awaiting a human go/no-go.
+
+──────────────────────────────────────────────────────────────────────────────
+[CHUNK BOUNDARY] Resume-chunk ended 2026-07-08. Closed this run: E9-F4c (resume
+reconciliation of stale in-progress; commit a0d6525), E9-F4d (2 attempts + human
+escalation; commit 31280cd). Drift: F4d builder scope-breached spec.md (invented
+§32) — reverted (v3-077). Escalation v3-078 resolved by human (v3-079/v3-080):
+F4d accepted with human-authorized reload-based acceptance amendment; repair
+ticket E9-F4d2 spawned (escaped-bug rule) to fix the pre-existing DocumentPreview
+live-repaint bug + restore a LIVE pixel-diff assertion; §32 idea captured as
+docs/proposals/authored-capture-cover-letters.md (uncommitted, awaiting human
+go/no-go — NOT in the locked spec). Suite floors: vitest 792, playwright design
+spec green. NEXT READY: E9-F4d2 (repair, small) + E9-F5 (COARSE — decompose at
+pickup: presets + atsGrade + classification table). Both file-disjoint.
+──────────────────────────────────────────────────────────────────────────────
+
+[v3-076] E9-F4c + E9-F4d RECONCILED + F0 REPAIR — coordinator resumed after the human drove F4c/F4d locally.
+SAGA: the human killed the coordinator's F4c builder mid-run, then built + committed F4c (a0d6525) and F4d
+(31280cd) locally — F4c WITHOUT ever running the full suite (its builder was interrupted at exactly that step).
+On resume the coordinator re-verified (trust the oracle, not the builder — at every level, human included) and
+caught a BASELINE REGRESSION: engine-entries F2e 'subtitlePlacement same-line|below' failed deterministically.
+ROOT CAUSE (latent F0 bug, not F4c's code): format-v2.ts baseFromV1 set experience.order='employer-first' and
+education.order='school-first' keyed off the groupBy KEY order — but assemble's headingPartsFromMeta renders
+title=role/title=degree FIRST, so the true pre-E9 display is title-first/degree-first. Dormant until F4c
+consumed the order axis; F4c's swap then flipped the DEFAULT heading render (and moved the F2e fixture's
+subtitle marker into the title slot => it stopped moving with subtitlePlacement). Human chose FIX A (correct
+the defaults, preserve the shipped look) over B (accept the flipped default + restate the test).
+REPAIR [E9-F4c-r1, commit 51551a9]: baseFromV1 experience.order->title-first, education.order->degree-first
+with a comment pinning the rule "match the display order, not the groupBy key"; updated the 3 tests that
+hardcoded the old default (format-v2.test.ts default assertion; design-panel.test.tsx x2 + design.spec.ts e2e —
+these now SELECT the non-default value so the onChange/PUT is a real change, staying non-vacuous). Escaped-bug
+closure: the default is now gated by the RENDER (engine-entries passes only at the no-swap default;
+engine-section-order tests both order values), so it can't silently drift from the display again.
+VERIFY (coordinator, full independent baseline on merged main): check/build/lint 0; vitest 804/804; every
+playwright spec passes ISOLATED (design.spec + applications.spec flake only under full concurrent load — they
+share the 'applications' server; pre-existing sandbox pattern, documented since F3). F4c + F4d commit scopes
+both clean; F4d adds real Sections controls, not gamed.
+PROCESS NOTE: committing a ticket before the full suite is green is exactly the gap that let this regress —
+the coordinator's full-suite re-verify is what caught it. Separately: the authored-capture/cover-letter design
+was relocated by the human from an inline spec.md §32 to docs/proposals/authored-capture-cover-letters.md
+(kept a proposal, not yet in the locked spec) — coordinator's spec.md edits reverted accordingly; NOT part of
+this build.
+
+===== E9/F4 PHASE COMPLETE (per-section displays + levels, spec §31.6 F4) =====
+All F4 tickets done: F4a (numeric meta.level + migration + anti-scoring control) · F4b (skills/languages/
+interests display + level display + levelIndicators accent gate) · F4b2 (thread level entry->assemble->item) ·
+F4c (experience/summary/education display) · F4d (DesignPanel Sections controls) · F4c-r1 (F0 default repair).
+PHASE-CLOSE ORACLE (oracle.md Phase 8 'F4' line) on the MERGED tree (main @51551a9) — ALL GREEN:
+ [x] unleveled entry in 'level' layout renders level-less via 'rows' fallback, level NEVER invented — F4b
+     (mixed fixture; level display reachable end-to-end after F4b2)
+ [x] grid columns 1–4 measured — F4b (bullet x-position count)
+ [x] renamed labels render — F4b (levelDisplay text = levelLabels[level-1]) + F4d (5 editable label inputs)
+ [x] level dots/bars extraction-neutral CI test ([v3-038] promoted row) — F4b (dots/bar pure Views, zero
+     extraction text, order index-increasing)
+ [x] anti-scoring control: tailoring output invariant to level VALUES (selection+order) — F4a, relaxed by F4b2
+ [x] full standing baseline + cross-cutting invariants: check/build/lint 0; vitest 804/804 (incl boot.smoke +
+     the new 0004 migration boot-path, tag-scoring guard, no-LLM-checks-LLM, key-leak, not-a-tracker,
+     context-excluded, no-orphan-routes); playwright per-spec green (full-suite concurrency flake noted)
+ Docker e2e NOT re-run at this phase close (phase-close/final only, [v3-004]). NOTE: F4 added a real data
+ migration (drizzle/0004) — a boot-path change — but it is exercised by boot.smoke.test.ts (real Node/tsx boot
+ + migrate + /api/health) which is green; the docker IMAGE build/boot/SPA surface is unaffected by F4's
+ client/shared/server-content changes. FINAL E9 close (after F5) MUST run the docker e2e. Suite floor 723 (F3
+ close) -> 804 (+81 across F4a..F4d).
+RESIDUALS carried: (a) F3d accentPlacement.levelIndicators no-op — CLOSED by F4b (now live + tested). (b) F3c
+ DesignPanel dual-write Heading-weight control — still open (cosmetic). (c) F2e faux-italic — stands. (d)
+ §31.1 locked-app re-render byte deviation — stands. F5 owns atsGrade reconciliation.
+
+===== CHUNK BOUNDARY — RUN 2026-07-08 (E9/F4 drive + recovery) END =====
+Closed this run: F4a, F4b, F4b2 (coordinator-built + verified + committed) + F4c, F4d (human-built locally;
+coordinator-verified + reconciled) + F4c-r1 (coordinator F0 repair). F4 phase COMPLETE. Backlog: 100 done,
+1 todo (E9-F5, coarse — presets + atsGrade + tested classification table), decomposed 12. NEXT ready: E9-F5
+(decompose at pickup). Recommend a fresh /ailoop invocation for the F5 epic.
+
+[v3-081] E9-F5 DECOMPOSED at pickup (coarse epic, per its own instruction). Explore-mapped the territory first
+(atsGrade/presets/format-v2/gallery/CI-axis-tests). Split into 4 cold-start children, dependency-ordered:
+ - E9-F5a (deps E9-F4d): pure atsGrade(format)+atsGradeCauses in registry.ts implementing the SHIPPED [v3-038]
+   classification table (strict IFF columns one + headerPosition top + no photo + heading-icons none + single-mode-
+   over-white; border/level-display grade-NEUTRAL; backgrounds downgrade despite being extraction-order-neutral).
+   Anchored to ground truth: atsGrade(PRESETS[id]) MUST === PRESET_MANIFESTS[id].atsGrade for all six. effectiveAtsGrade
+   delegates. Files: registry.ts + test/ats-grade.test.ts.
+ - E9-F5b (deps E9-F4d): settings.presets[] data model — UserPreset{id,name,format} zod in schema.ts, presets json
+   column in db/schema.ts, new drizzle migration (boot-applied), server plumbing in routes/settings.ts. Files:
+   schema.ts, db/schema.ts, routes/settings.ts, drizzle/, test/settings-presets.test.ts.
+ - E9-F5c (deps E9-F5a): curated new-axis presets (3-5) + per-cause ATS caveat UI (picker+gallery) via atsGradeCauses.
+   Any new 'strict' preset must earn it via the extraction-order CI invariant.
+ - E9-F5d (deps E9-F5b, E9-F5c): save-current-as-preset UI + saved-presets gallery + e2e round-trip (persist across reload).
+F5a+F5b are file-disjoint => a fan-out batch (build-phase Workflow, worktrees) AFTER F4d2 verifies+commits — serialized
+vs F4d2 to avoid 3 concurrent playwright suites contending the shared webServer port (documented flake). Scheduler
+confirms: no dangling deps, no cycles, ready=[F5a,F5b]. Parent E9-F5 status=decomposed (history preserved).
+
+[v3-082] E9-F4d2 DISPATCHED (single Sonnet builder, on main working tree). Repair of the pre-existing DocumentPreview
+live-repaint bug surfaced by F4d (ledger v3-078/79). Brief: fix usePDF.update/format-key remount in DocumentPreview.tsx
+ONLY; strengthen design.spec.ts step (5b) from reload-based to a LIVE (no-reload) previewDataUrl pixel-diff. Escaped-bug
+rule closure for the reload-based amendment. Awaiting result -> coordinator independent re-verify before accept.
+
+[v3-083] E9-F4d2 — ACCEPTED (single Sonnet build, resumed once to finalize). Coordinator INDEPENDENT re-verify on
+main GREEN: check/build/lint exit0; vitest 804/804 (65s, no flakes); playwright FULL suite 11/11 FIRST-TRY NO-RETRY
+— incl [applications] design.spec.ts 11.8s (the NEW live NO-RELOAD previewDataUrl pixel-diff on the experience.order
+flip PASSES) and applications.spec.ts 11.8s (no cross-spec regression); design.spec.ts ISOLATED --project=applications
+1/1 11.0s. Fix (DocumentPreview.tsx): usePDF returns [instance,update]; new effect calls
+update(renderResumeDocument({...})) keyed on resume/profile/paper/format/density = react-pdf's own PDFViewer pattern
+(empty-dep render effect was the bug). Test (design.spec.ts): step (5b) strengthened reload-based -> LIVE expect.poll
+not.toBe(before), reload-persistence kept as (6c), blob-url console allowlist preserved. Scope CLEAN (2 declared files).
+Gaming read CLEAN (real pattern, genuine live assertion, nothing hardcoded/weakened).
+BUILDER MIS-DIAGNOSIS CAUGHT BY RE-VERIFY: the builder returned done:true but claimed the e2e was "un-runnable in this
+sandbox" (pdf.js fake-worker can't paint the canvas) and that baseline failed identically. FALSE — it had used the wrong
+project filter (design.spec.ts is in the 'applications' project, NOT 'chromium'; --project=chromium => "No tests found").
+Run correctly it paints and passes. Textbook "trust the oracle, not the builder": the coordinator ran the exact contested
+assertion green. Escaped-bug rule (v3-078/79 reload->live amendment) now CLOSED. Committed to main: 11cc9a4.
+NEXT: fan out E9-F5a + E9-F5b (file-disjoint) in worktrees; playwright deferred to a SINGLE merged-tree gate (can't run
+2 concurrent playwright suites — shared webServer ports 8787-8789, documented contention).
+
+[v3-084] E9-F5a — ACCEPTED (build-phase workflow wf_7e4e23e9-a2c, worktree build + independent Verify + integrate to main f4fe82f). Coordinator merged-tree re-verify on /workspace GREEN: check/lint/build exit0; vitest 829/829 (+25 ats-grade); playwright FULL 11/11 no-retry (design.spec.ts + applications.spec.ts green). registry.ts diff is PURE logic (no new imports): atsGrade(format)+atsGradeCauses+hasColoredPageBackground; effectiveAtsGrade delegates. Matches [v3-038] table; all six presets atsGrade===manifest.atsGrade. Scope+gaming clean.
+ IMPORTANT — WORKFLOW GATE FALSE-RED CAUGHT: the workflow's Gate agent reported design.spec.ts deterministically red isolated ('Failed to fetch' in fitToPages). Coordinator reproduced red on /workspace, then found it was a STALE-DIST artifact: a clean `bun run build` on /workspace makes design.spec pass 3/3. The gate agent had built in a worktree cwd whose @fontsource paths ENOENT (same artifact the F5a Verify hit in its worktree vitest). Lesson: the build-phase workflow's per-worktree build/gate is unreliable for the font-fetching e2e in this sandbox — the coordinator's clean-tree re-verify is authoritative. F5a genuinely green.
+
+[v3-085] E9-F5b — NOT ACCEPTED (attempt 1). Built green in-worktree but UN-INTEGRATABLE: STALE-BASE MIGRATION COLLISION. The workflow worktree branched at 78a9be5 (34 commits behind main) and this worker (unlike F5a's) did not FF to main, because its declared files (schema.ts/settings.ts/drizzle/) all predate E9. drizzle-kit generate on the stale base emitted drizzle/0004_nebulous_silver_surfer.sql — colliding with main's existing drizzle/0004_clear_string_levels.sql (E9-F4a meta.level). Two 0004s => broken migration order / boot failure => cannot merge. Verify ALSO flagged an out-of-scope touch of test/api.profile-settings.test.ts (allowed-keys guard) — a LEGIT cascade I under-declared, now added to F5b.files. Disposition: attempts[0] logged; F5b RE-DISPATCHED on the CURRENT main tree (single Agent, NOT a worktree — sidesteps the staleness), migration renumbered 0005, journal/snapshot regenerated against current main. F5b branch/worktree discarded. ROOT-CAUSE NOTE for the rest of E9: the remaining F5 tickets (F5c dep F5a, F5d dep F5b+F5c) are a SERIAL chain, so they will be dispatched as single Agents on main — no more parallel-worktree batches this epic, avoiding the stale-base trap.
+
+[v3-086] E9-F5b — ACCEPTED (attempt 2, single Sonnet on main, commit 467871f). Coordinator independent re-verify GREEN: check/lint/build exit0; vitest 835/835; playwright 10 passed + 1 retry-absorbed design.spec font-fetch flake, green ISOLATED — client bundle byte-identical (backend-only change) so the flake is the documented environmental font-fetch, not a regression. Migration renumbered 0005_magical_eddie_brock (ALTER TABLE settings ADD presets text) — collision resolved; boot.smoke 3/3 applies it on fresh DATA_DIR. Builder caught + fixed a drizzle-kit full-recreate bug (buggy INSERT referenced the new column on the old table) by hand-writing the ALTER per the 0003 precedent. Scope clean (widened files incl api.profile-settings guard); gaming clean. LATENT non-blocker: meta/0005_snapshot.json left as drizzle-kit generated while the SQL was hand-simplified — a future drizzle-kit generate may see a phantom diff; harmless at runtime. NEXT: E9-F5c (curated presets + per-cause caveat UI, dep F5a done) — single Agent on main.
+
+[v3-087] E9-F5c — BLOCKED (attempt 1, correct call, zero code). The worker found roster growth cascades into 3 hardcoded-count tests NOT in the declared files (engine-single-column 'six configs exist' + migration-v1-formats per-id fixture loop + template-gallery count=6) and surfaced it instead of silently breaking baseline or touching undeclared files — same under-declared-cascade class as F5b. Coordinator WIDENED F5c.files with those 3 tests + logged attempts[0]. GUARDRAIL for re-dispatch: generalize only the roster SIZE/COUNT assertions; PRESERVE the v1->v2 migration-exactness for the six LEGACY ids (F0 locked check) — restrict that assertion + the v1-fixture loop to the 6, treat new v2-native presets as plain validated DocumentFormatV2. Builder's vetted 4-preset design carried forward (signature/ledger/frame strict via ATS-neutral axes incl single-mode border; spotlight good two-column). Re-dispatching on main. PATTERN NOTE: tickets touching a roster/schema surface cascade into hardcoded-enumeration tests — F5d's file list pre-audited for the same trap before dispatch.
+
+[v3-088] E9-F5c — ACCEPTED (attempt 2, single Sonnet on main, commit fe26924). Independent re-verify GREEN: atsGrade spot-check (signature/ledger/frame strict, spotlight good, all===manifest); check/lint/build exit0; vitest 864/864; playwright 11/11 first-try no-retry (design+applications e2e green — no regression from the UI + applyPreset change). applyPreset widening JUDGED spec-aligned (§31.1 "applying rewrites panel state") + necessary for curated presets to render, no-op for the 6 legacy; migration-exactness deep-equal PRESERVED (scoped to LEGACY_PRESET_IDS); cascade tests generalized cleanly. Gaming/regression read clean. NEXT: E9-F5d (final) — save-as-preset UI + saved-presets gallery + e2e round-trip.
+
+[v3-089] E9-F5d dispatched (single Sonnet on main). PRE-AUDIT fixed 2 ticket-quality bugs before dispatch: (1) useSettings is in src/client/hooks/queries.ts, NOT the ticket's declared src/client/hooks/useSettings.ts — corrected. (2) proactively added test/template-gallery.test.tsx to declared files (the gallery gains a saved-presets section) to avoid a 3rd under-declared cascade like F5b/F5c. This is the LAST F5 ticket; on its accept, E9-F5 (and the E9 design-engine-v2 epic) closes — FINAL gate must run the docker e2e per [v3-004].
+
+[v3-090] E9-F5d — ACCEPTED (single Sonnet on main, commit c2b3c0f). Independent re-verify GREEN: check/lint/build exit0; vitest 869/869; playwright 11/11 first-try (design.spec 20.6s now drives save->appears->diverge->RELOAD->persists->apply, non-vacuous via fresh post-reload server fetch + app PUT asserting fonts.body=arimo round-trip). savedPresets gallery section applies preset.format directly; queries.ts casts useSettings to expose presets (api.ts type left untouched — LATENT residual). Scope 5 files, gaming clean.
+
+===== E9 FINAL GATE (docker e2e + full merged-tree oracle) =====
+Docker e2e (phase-close/final per [v3-004]) initially RED: container `bun run build` ENOENT on @fontsource/ibm-plex-mono/400.css. ROOT CAUSE (latent, NOT from F5): app.css @imports ibm-plex-mono/{400,500}.css but the package was never in package.json/bun.lock (siblings ibm-plex-sans/serif were); a dev node_modules had accreted it so the host build always passed, but the image's `bun install --frozen-lockfile` never installed it. Slipped every per-phase gate because docker e2e runs at phase-close ONLY. COORDINATOR MECHANICAL REPAIR (manifest allowlist blesses dep additions): added @fontsource/ibm-plex-mono ^5.1.0 (matching siblings) + regenerated bun.lock. ESCAPED-BUG CLOSURE: new test/fonts-manifest.test.ts asserts every @fontsource face app.css imports is a DECLARED package.json dependency (frozen-lockfile-safe), moving the guard onto every vitest run instead of only the final docker build. Commit 780f6fd.
+E9 FINAL ORACLE — MERGED TREE (main @780f6fd) ALL GREEN: check exit0; NODE_OPTIONS=1024 build exit0; lint exit0; vitest 870/870 (63 files); playwright non-docker 11/11 first-try (chromium+auth+applications incl design.spec preset round-trip); docker e2e 1/1 (image builds, SPA mounts, /api round-trips under Node/tsx). 
+
+===== E9 / DESIGN-ENGINE-V2 EPIC (§31) COMPLETE =====
+F5 closed (F5a atsGrade+causes / F5b settings.presets data model / F5c curated presets+caveat UI / F5d save-as-preset+gallery+e2e) + the F5-parent decomposition + the E9 final font repair. All F0..F5 phases done. Suite floor 804 (F4 close) -> 870 (+66 across F4d2+F5a..d+guard). RESIDUALS carried to any future epic: (a) api.ts SettingsResponse type narrower than the server reality (F5d cast workaround); (b) drizzle 0005 snapshot left as generated while SQL hand-simplified (phantom-diff risk on next drizzle-kit generate); (c) build-phase workflow worktrees branch from a stale base + their per-worktree font-path build is unreliable in this sandbox — single-Agent-on-main was used for the serial F5 chain and is the recommended mode here.
+
+===== CHUNK BOUNDARY — RUN 2026-07-09/10 (E9-F4d2 + E9-F5 epic) END =====
+Closed this run (6 tickets): F4d2 (live-repaint repair), F5a (atsGrade), F5b (presets data model, attempt 2 after stale-base migration collision), F5c (curated presets + caveat UI, attempt 2 after under-declared cascade), F5d (save-as-preset e2e) + the E9 final font-manifest repair. Commits: 11cc9a4, f4fe82f, 467871f, fe26924, c2b3c0f, 780f6fd. Backlog: 102 done, 0 todo, 0 in-progress, 13 decomposed. E9 epic + its final gate GREEN. NOTHING READY — the spec's defined phases (E1..E9) are all complete.
