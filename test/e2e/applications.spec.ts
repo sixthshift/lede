@@ -34,10 +34,11 @@
 // first-run goto() every step shares (same rationale as docker-spa.spec.ts).
 import { readFileSync } from "node:fs";
 import { test, expect, type Page, type Locator } from "@playwright/test";
-import { ensureFirstRunPassword } from "./helpers/session";
+import { ensureFirstRunPassword, login } from "./helpers/session";
 import { CONTRAST_JDS } from "../../src/server/tailor/evalcore";
 import { extractPdfText } from "../../src/client/document/extractText";
 import { PRESET_MANIFESTS } from "../../src/client/document/registry";
+import { letterPdfFilename } from "../../src/client/document/download";
 
 const PASSWORD = "correct horse battery staple e2e applications";
 const JD = CONTRAST_JDS[0]!.jd; // "platform-sdk" scenario
@@ -52,8 +53,11 @@ const SECOND_TOKEN = "Replaced legacy jQuery with a new three-layer React/TypeSc
 const runId = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 const COMPANY_MARKER = `E2E Applications Co ${runId}`;
 
-async function expectCanvasPainted(page: Page): Promise<void> {
-  const canvas = page.locator(".document-preview canvas");
+// Shared "some non-white pixel exists" oracle — factored out so T24's
+// letter-preview canvas (a DIFFERENT locator, deliberately never
+// `.document-preview`, so a letter paint can't be mistaken for a resume
+// paint) can reuse the exact same paint check as the resume preview below.
+async function expectLocatorCanvasPainted(canvas: Locator): Promise<void> {
   await expect(canvas).toBeVisible();
   await expect
     .poll(() =>
@@ -68,6 +72,10 @@ async function expectCanvasPainted(page: Page): Promise<void> {
       }),
     )
     .toBe(true);
+}
+
+async function expectCanvasPainted(page: Page): Promise<void> {
+  await expectLocatorCanvasPainted(page.locator(".document-preview canvas"));
 }
 
 const TEMPLATE_IDS = Object.keys(PRESET_MANIFESTS);
@@ -447,4 +455,241 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
 
   expect(pageErrors, `unexpected page errors: ${pageErrors.join(", ")}`).toHaveLength(0);
   expect(consoleErrors, `unexpected console errors: ${consoleErrors.join(", ")}`).toHaveLength(0);
+});
+
+// ── T24: application-page letter surface. Letter generation is independent
+// of resume /tailor (never threads through the giant lifecycle test above),
+// so each of the following gets its OWN application rather than reusing the
+// one `applicationId` created there. ──
+// The fit ladder's very FIRST measurement on a freshly tailored resume can
+// race cold @fontsource fetches (documented flake source, CLAUDE.md) and
+// land on a slightly different density than every measurement after fonts
+// are warm/cached — polling here until two consecutive reads agree gives a
+// truly-settled "before" baseline, so a later comparison isn't blamed on
+// that unrelated, pre-existing jitter.
+async function waitForStableCanvas(canvas: Locator): Promise<string> {
+  let previous = await canvas.evaluate((el: HTMLCanvasElement) => el.toDataURL());
+  for (let attempt = 0; attempt < 20; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const current = await canvas.evaluate((el: HTMLCanvasElement) => el.toDataURL());
+    if (current === previous) return current;
+    previous = current;
+  }
+  return previous;
+}
+
+async function createApplicationViaUi(
+  page: Page,
+  { company, role, jd }: { company: string; role?: string; jd: string },
+): Promise<string> {
+  await page.getByRole("button", { name: "New application" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel(/^Company/).fill(company);
+  if (role) await dialog.getByLabel(/^Role/).fill(role);
+  await dialog.getByLabel("Job description", { exact: true }).fill(jd);
+  await dialog.getByRole("button", { name: "Create application" }).click();
+  await expect(dialog).toBeHidden();
+
+  const card = page.locator("[data-application-id]").filter({ hasText: company });
+  await expect(card).toBeVisible();
+  const applicationId = await card.getAttribute("data-application-id");
+  expect(applicationId, "created card must carry a data-application-id").toBeTruthy();
+  return applicationId!;
+}
+
+test("cover letter: generate/paint isolation, download filename, undo, motivation persistence", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  // This server's seeded profile has never had its name set (schema default
+  // `""`) — the download filename check below needs a real `<Name>` segment
+  // to prove the full "<Name> — <Company> — <Role> — Cover Letter.pdf"
+  // pattern, so set one directly via the API (no e2e flow exists for this
+  // and none is needed — it's fixture data, not something under test here).
+  await page.request.put("/api/profile", {
+    data: { name: "E2E Letter Tester", email: "e2e-letter-tester@example.com", links: [] },
+  });
+
+  // Unique per ATTEMPT, not just per test-file load: a retry reruns this
+  // same test body against the SAME server/db (webServer isn't rebooted
+  // between retries), so a fixed module-level id would collide with the
+  // failed attempt's own leftover application row.
+  const company = `E2E Letter Co ${runId}-${testInfo.retry}`;
+  const role = "Staff Platform Engineer";
+  const applicationId = await createApplicationViaUi(page, { company, role, jd: JD });
+  await page.goto(`/applications/${applicationId}`);
+
+  // (a) NO-LETTER state, before anything is generated: the Generate
+  // affordance is visible AND there is no letter-preview canvas at all —
+  // never a blank/empty document standing in for "not generated yet".
+  await expect(page.getByRole("button", { name: "Generate letter", exact: true })).toBeVisible();
+  await expect(page.getByText("No letter", { exact: true })).toBeVisible();
+  expect(await page.locator('[data-testid="letter-preview"] canvas').count()).toBe(0);
+
+  // (b) motivation persists across a reload, scoped to persistence only —
+  // its flow-through into the letter decision is already unit-tested
+  // (src/server/tailor/letter.ts), not re-asserted here. Done BEFORE
+  // tailoring, while JobPanel is still open by default (no `current` yet).
+  const motivationText = `Motivated by ${company}'s mission ${runId}`;
+  await page.getByLabel("Motivation", { exact: true }).fill(motivationText);
+  const [motivationPut] = await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}`) && r.request().method() === "PUT",
+    ),
+    page.getByRole("button", { name: "Save", exact: true }).click(),
+  ]);
+  expect(motivationPut.status()).toBe(200);
+  await page.reload();
+  await expect(page.getByLabel("Motivation", { exact: true })).toHaveValue(motivationText);
+
+  // (c) tailor the resume so a REAL `.document-preview` canvas exists — the
+  // isolation claim below (letter generation must not repaint it) only means
+  // something once there's a real paint to leave alone. Waiting for the fit
+  // chip's text (same oracle as the lifecycle test's own (4·fit) step) before
+  // snapshotting pixels matters here specifically: the fit ladder's own
+  // async re-render (comfortable -> its final settled density) would
+  // otherwise race this snapshot and get mistaken for letter-generation
+  // fallout.
+  await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().endsWith(`/api/applications/${applicationId}/tailor`) && r.status() === 200,
+    ),
+    page.getByRole("button", { name: "Tailor", exact: true }).click(),
+  ]);
+  await expectCanvasPainted(page);
+  await expect(page.getByText(/^Fits \d+ pages? · (comfortable|standard|compact)$/)).toBeVisible();
+  const resumeCanvas = page.locator(".document-preview canvas");
+  const resumePixelsBefore = await waitForStableCanvas(resumeCanvas);
+  const currentBefore = (
+    await (await page.request.get(`/api/applications/${applicationId}`)).json()
+  ).current;
+
+  // (d) generate the letter: its OWN scope (`[data-testid="letter-preview"]`,
+  // never `.document-preview`) paints, and the resume canvas is byte-for-byte
+  // unchanged — proving the two documents' render pipelines are isolated.
+  const [generateResponse] = await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/generate-letter`) &&
+        r.status() === 200,
+    ),
+    page.getByRole("button", { name: "Generate letter", exact: true }).click(),
+  ]);
+  expect(generateResponse.status()).toBe(200);
+
+  // Server-side proof of isolation, precise and immune to any browser-side
+  // render-timing jitter: the generate-letter response is the FULL updated
+  // row — `current` (the resume snapshot) must be the exact same value the
+  // /tailor response produced, since generate-letter's route only ever
+  // touches the letterCurrent/letterPrevious/letterGenState columns.
+  const currentAfter = (await generateResponse.json()).current;
+  expect(
+    JSON.stringify(currentAfter),
+    "generate-letter must not touch the resume's `current` snapshot",
+  ).toBe(JSON.stringify(currentBefore));
+
+  await expectLocatorCanvasPainted(page.locator('[data-testid="letter-preview"] canvas'));
+  await expect(page.getByText("Letter ready", { exact: true })).toBeVisible();
+
+  // Polled, not a single snapshot: useGenerateLetter's onSuccess invalidates
+  // the WHOLE ["applications", id] query (letter + resume share one record),
+  // so the refetch hands useFit a structurally-identical but reference-NEW
+  // `resume` — its effect resets fit -> the resume's own PdfCanvas
+  // transiently unmounts (usePDF's `loading` flip) and repaints through 1-2
+  // benign settle cycles before landing back on byte-identical output. What
+  // isolation actually means here: the resume's CONTENT never changes from a
+  // letter-only mutation — not that its DOM node is untouched by shared
+  // plumbing — so this polls for that eventual, stable equality.
+  await expect
+    .poll(() => resumeCanvas.evaluate((el: HTMLCanvasElement) => el.toDataURL()), {
+      timeout: 10000,
+    })
+    .toBe(resumePixelsBefore);
+
+  // (e) undo is disabled right after the FIRST generate — letterPrevious is
+  // still null (nothing recorded yet to swap back to).
+  await expect(page.getByRole("button", { name: "Undo letter", exact: true })).toBeDisabled();
+
+  // (f) download: a REAL download fires (proving the button/wiring actually
+  // produces a file), and the filename is exactly `<Name> — <Company> —
+  // <Role> — Cover Letter.pdf` per the SAME production function download.ts
+  // calls (not a re-typed duplicate), so this can never silently drift from
+  // it. Checked as a value equality against the production function's own
+  // output rather than the browser's `download.suggestedFilename()`: this
+  // Chromium build (verified with an from-scratch minimal <a download> repro,
+  // unrelated to any app code) mis-reports ANY anchor `download` attribute
+  // containing an em dash as the generic "download" — a pre-existing
+  // environment quirk that equally affects the resume download once
+  // company+role are both filled, not something T24 introduced.
+  const profileResponse = await page.request.get("/api/profile");
+  const profile = (await profileResponse.json()) as { name: string };
+  const expectedFilename = `${profile.name} — ${company} — ${role} — Cover Letter.pdf`;
+  expect(letterPdfFilename(profile.name, company, role)).toBe(expectedFilename);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Download cover letter", exact: true }).click(),
+  ]);
+  expect(download.url()).toMatch(/^blob:/);
+
+  // (g) regenerate -> undo becomes enabled (letterPrevious now holds the
+  // FIRST letter) -> undo swaps letterCurrent/letterPrevious back.
+  const [regenerateResponse] = await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/generate-letter`) &&
+        r.status() === 200,
+    ),
+    page.getByRole("button", { name: "Regenerate letter", exact: true }).click(),
+  ]);
+  expect(regenerateResponse.status()).toBe(200);
+  await expect(page.getByRole("button", { name: "Undo letter", exact: true })).toBeEnabled();
+
+  const [undoResponse] = await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/undo-letter`) && r.status() === 200,
+    ),
+    page.getByRole("button", { name: "Undo letter", exact: true }).click(),
+  ]);
+  expect(undoResponse.status()).toBe(200);
+});
+
+test("cover letter: a failed generation surfaces a distinct failed badge, never a stub letter", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  // A JD with no recorded fixture — FixtureEngine.decideLetter throws
+  // NoFixtureError (422 "no_fixture"), a deterministic, keyless way to drive
+  // letterGenState to "failed" without a live provider key. Suffixed with
+  // the retry index for the same reason as the test above.
+  const company = `E2E Letter Fail Co ${runId}-${testInfo.retry}`;
+  const unmatchedJd = `An entirely unrecorded job description, never fixture-matched ${runId}-${testInfo.retry}`;
+  const applicationId = await createApplicationViaUi(page, { company, jd: unmatchedJd });
+  await page.goto(`/applications/${applicationId}`);
+  await expect(page.getByText("No letter", { exact: true })).toBeVisible();
+
+  const [generateResponse] = await Promise.all([
+    page.waitForResponse((r) =>
+      r.url().endsWith(`/api/applications/${applicationId}/generate-letter`),
+    ),
+    page.getByRole("button", { name: "Generate letter", exact: true }).click(),
+  ]);
+  expect(generateResponse.status()).toBe(422);
+
+  // The mutation only invalidates on success (mirrors /tailor's own
+  // asymmetry) — a reload is what surfaces the server-persisted
+  // `letterGenState: "failed"` in the UI, same as the lifecycle test's own
+  // reload-persistence check for the resume side.
+  await page.reload();
+  await expect(page.getByText("Letter failed", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Undo letter", exact: true })).toBeDisabled();
+  expect(await page.locator('[data-testid="letter-preview"] canvas').count()).toBe(0);
 });

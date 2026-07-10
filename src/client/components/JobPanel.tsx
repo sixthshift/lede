@@ -20,6 +20,7 @@ function fieldsFrom(application: Application) {
     role: application.role ?? "",
     jobDescription: application.jobDescription,
     context: application.context ?? "",
+    motivation: application.motivation ?? "",
   };
 }
 
@@ -46,6 +47,7 @@ export function JobPanel({ application }: { application: Application }) {
         role: fields.role.trim() || null,
         jobDescription: fields.jobDescription.trim(),
         context: fields.context.trim() || null,
+        motivation: fields.motivation.trim() || null,
       },
     });
   }
@@ -106,6 +108,17 @@ export function JobPanel({ application }: { application: Application }) {
                 placeholder="Guides emphasis only — never a fact source"
                 value={fields.context}
                 onChange={(e) => setFields((prev) => ({ ...prev, context: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="job-panel-motivation">Motivation</Label>
+              <Textarea
+                id="job-panel-motivation"
+                rows={3}
+                placeholder="Why this role — reaches only the cover letter, never the resume"
+                value={fields.motivation}
+                onChange={(e) => setFields((prev) => ({ ...prev, motivation: e.target.value }))}
               />
             </div>
 

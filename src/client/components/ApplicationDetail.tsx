@@ -8,13 +8,15 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
 import type { Paper, Profile, TailoredResume } from "@shared/types";
-import { downloadResumePdf, downloadResumeText } from "../document/download";
+import { downloadLetterPdf, downloadResumePdf, downloadResumeText } from "../document/download";
 import { fitToPages, type FitResult } from "../document/fit";
 import { useProfile, useSettings } from "../hooks/queries";
 import {
   useApplication,
+  useGenerateLetter,
   useLockApplication,
   useTailorApplication,
+  useUndoLetter,
   useUnlockApplication,
   useUpdateApplication,
 } from "../queries/useApplications";
@@ -23,6 +25,7 @@ import { DesignPanel } from "./DesignPanel";
 import { FitChip } from "./FitChip";
 import { GenStateBadge } from "./GenStateBadge";
 import { JobPanel } from "./JobPanel";
+import { LetterPreview } from "./LetterPreview";
 import { ResultView } from "./ResultView";
 import { TemplateGallery } from "./TemplateGallery";
 import { TemplatePicker } from "./TemplatePicker";
@@ -93,6 +96,8 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   const { data: profile } = useProfile();
   const { data: settings } = useSettings();
   const tailorApplication = useTailorApplication();
+  const generateLetter = useGenerateLetter();
+  const undoLetter = useUndoLetter();
   const lockApplication = useLockApplication();
   const unlockApplication = useUnlockApplication();
   const updateApplication = useUpdateApplication();
@@ -150,6 +155,10 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
 
   const isTailoring = tailorApplication.isPending || application.genState === "tailoring";
   const tailorLabel = application.genState === "untailored" ? "Tailor" : "Re-tailor";
+
+  const isLetterGenerating = generateLetter.isPending || application.letterGenState === "tailoring";
+  const letterLabel =
+    application.letterGenState === "untailored" ? "Generate letter" : "Regenerate letter";
 
   const handleFormatChange = (next: DocumentFormatV2) => {
     if (isLocked) return;
@@ -242,6 +251,79 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
       </div>
 
       <JobPanel application={application} />
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-md">Cover letter</CardTitle>
+              <CardDescription>
+                Generated independently of the resume — its own draw on your Library, this job's JD,
+                and Motivation above.
+              </CardDescription>
+            </div>
+            <GenStateBadge state={application.letterGenState} kind="letter" />
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {isLetterGenerating ? (
+              <span className="text-sm text-muted-foreground">Generating…</span>
+            ) : null}
+            <Button
+              onClick={() => generateLetter.mutate(application.id)}
+              disabled={isLetterGenerating}
+            >
+              {letterLabel}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => undoLetter.mutate(application.id)}
+              disabled={!application.letterPrevious || undoLetter.isPending}
+            >
+              Undo letter
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!application.letterCurrent || !profile}
+              onClick={() =>
+                profile &&
+                application.letterCurrent &&
+                downloadLetterPdf({
+                  letter: application.letterCurrent,
+                  profile,
+                  paper,
+                  format: resolvedFormat,
+                  company: application.company,
+                  role: application.role,
+                })
+              }
+            >
+              Download cover letter
+            </Button>
+          </div>
+
+          {application.letterCurrent ? (
+            <div data-testid="letter-preview">
+              <LetterPreview letter={application.letterCurrent} format={resolvedFormat} />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border-strong py-12 text-center">
+              <BookOpen
+                aria-hidden
+                className="h-8 w-8 text-muted-foreground/60"
+                strokeWidth={1.5}
+              />
+              <div>
+                <p className="text-sm font-medium">No cover letter yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Generate pulls from your Library, this job's JD, and Motivation above.
+                </p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
