@@ -326,6 +326,35 @@ export const TailorDecisionZ = z.object({
   ),
 });
 
+// ── T31 per-part resume edit — text-level only, BY CONSTRUCTION: a part is
+// addressed by a stable path (the summary, or one item's position), carrying
+// ONLY a replacement string. `.strict()` on both the outer body and every
+// path variant is load-bearing: default zod silently STRIPS unknown keys, so
+// a structural field riding along (entryId/rank/groundedOn/level/structure)
+// would be silently ignored (200) rather than rejected. Strict makes
+// structural change unrepresentable by this schema, not merely
+// runtime-ignored — no field here can ever add/remove/reorder an item or
+// touch anything but one item's/the summary's text (editing is text-level
+// only on the resume; structure stays the model's — locked decision).
+const resumePartPathZ = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("summary") }).strict(),
+  z
+    .object({
+      kind: z.literal("item"),
+      section: z.enum(SECTION_VALUES),
+      group: z.number().int().min(0),
+      index: z.number().int().min(0),
+    })
+    .strict(),
+]);
+
+export const resumePartPatchZ = z
+  .object({
+    path: resumePartPathZ,
+    text: z.string(),
+  })
+  .strict();
+
 // ── the letter's flat output contract — model returns judgment only, mirrors
 // TailorDecisionZ; body paragraphs' groundedOn holds entry ID strings only,
 // never fact text/motivation/context/voice (v2 §grounding) ──

@@ -5,9 +5,14 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { APICallError, NoObjectGeneratedError } from "ai";
 
-import { applicationCreate, applicationUpdate, documentFormatZ } from "@shared/schema";
+import {
+  applicationCreate,
+  applicationUpdate,
+  documentFormatZ,
+  resumePartPatchZ,
+} from "@shared/schema";
 import { resolveStoredFormat } from "@shared/format-v2";
-import type { Entry, ProviderId, Section } from "@shared/types";
+import type { Entry, ProviderId, Section, TailoredResume } from "@shared/types";
 import type { Db } from "../db";
 import { applications, entries, profile, settings, secrets } from "../db/schema";
 import { loadConfig, type Config } from "../config";
@@ -56,6 +61,46 @@ function mapTailorError(err: unknown): { status: number; body: { error: string }
     return { status: 502, body: { error: "model_off_contract" } };
 
   return { status: 502, body: { error: "provider_error" } };
+}
+
+// Resolves a resumePartPatchZ path against a TailoredResume and returns a
+// resume with ONLY that part's text replaced — a fresh object, never a
+// mutation of the input (structuredClone at the call site handles the
+// snapshot-isolation half; this half handles "which one string changes").
+// Returns null when the path doesn't resolve (unknown section/removed group/
+// index past the end) — the route turns that into 400, never a silent
+// append or no-op 200.
+function applyResumePartPatch(
+  resume: TailoredResume,
+  path: { kind: "summary" } | { kind: "item"; section: Section; group: number; index: number },
+  text: string,
+): TailoredResume | null {
+  if (path.kind === "summary") {
+    return { ...resume, summary: text };
+  }
+
+  const sectionIndex = resume.sections.findIndex((s) => s.section === path.section);
+  if (sectionIndex === -1) return null;
+  const group = resume.sections[sectionIndex]!.groups[path.group];
+  if (!group) return null;
+  if (!group.items[path.index]) return null;
+
+  return {
+    ...resume,
+    sections: resume.sections.map((section, si) => {
+      if (si !== sectionIndex) return section;
+      return {
+        ...section,
+        groups: section.groups.map((g, gi) => {
+          if (gi !== path.group) return g;
+          return {
+            ...g,
+            items: g.items.map((item, ii) => (ii === path.index ? { ...item, text } : item)),
+          };
+        }),
+      };
+    }),
+  };
 }
 
 // applicationCreate/Update (@shared/schema) don't own DocumentFormat —
@@ -402,6 +447,54 @@ export function applicationsRoutes(
         letterPrevious: existing.letterCurrent,
         updatedAt: Date.now(),
       };
+      db.update(applications).set(row).where(eq(applications.id, existing.id)).run();
+      return reply.code(200).send(row);
+    },
+  );
+
+  // ── per-part text edit (T31) — hand-authored, trusted-authorship changes to
+  // ONE part of `current` (the summary, or one item's text), never the
+  // letter (a separate ticket's job) and never structure: resumePartPatchZ is
+  // .strict() so a structural field can't ride along. Edits mutate `current`
+  // IN PLACE — they never displace snapshots — and are NOT fabrication-
+  // validated (locked decision: hand-edits are trusted authorship). A locked
+  // application 409s, mirroring /tailor and /generate-letter's in-flight 409s
+  // as "this application's documents are not editable right now". ──
+  app.patch<{ Params: { id: string } }>(
+    "/api/applications/:id/resume-part",
+    async (request, reply) => {
+      const parsed = resumePartPatchZ.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "invalid_body", issues: parsed.error.issues });
+      }
+
+      const existingRow = db
+        .select()
+        .from(applications)
+        .where(eq(applications.id, request.params.id))
+        .get();
+      if (!existingRow) {
+        return reply.code(404).send({ error: "not_found" });
+      }
+      const existing = migrateStoredApplicationFormats(existingRow);
+
+      if (existing.locked !== null) {
+        return reply.code(409).send({ error: "locked" });
+      }
+      if (existing.current === null) {
+        return reply.code(400).send({ error: "invalid_path" });
+      }
+
+      const updatedCurrent = applyResumePartPatch(
+        existing.current,
+        parsed.data.path,
+        parsed.data.text,
+      );
+      if (updatedCurrent === null) {
+        return reply.code(400).send({ error: "invalid_path" });
+      }
+
+      const row = { ...existing, current: updatedCurrent, updatedAt: Date.now() };
       db.update(applications).set(row).where(eq(applications.id, existing.id)).run();
       return reply.code(200).send(row);
     },
