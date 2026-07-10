@@ -6,11 +6,19 @@ import { generateObject } from "ai";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import type { Entry, Layout, ProviderId, TailorDecision, TailoredResume } from "@shared/types";
+import type {
+  Entry,
+  Layout,
+  LetterDecision,
+  ProviderId,
+  TailorDecision,
+  TailoredResume,
+} from "@shared/types";
 import { SECTIONS } from "@shared/sections";
 import { resolveModel, providerOptionsFor } from "@shared/providers";
-import { TailorDecisionZ } from "@shared/schema";
+import { LetterDecisionZ, TailorDecisionZ } from "@shared/schema";
 import { SYSTEM_PROMPT, renderLibrary } from "./prompt";
+import { LETTER_SYSTEM_PROMPT, buildLetterUserPrompt } from "./letter-prompt";
 import { assemble } from "./assemble";
 import { validateNoFabrication } from "./validate";
 import { hashKey } from "./evalcore";
@@ -22,6 +30,14 @@ export interface TailorEngine {
     context?: string | null,
     budget?: string | null,
   ): Promise<TailorDecision>;
+
+  decideLetter(
+    jd: string,
+    entries: Entry[],
+    motivation?: string | null,
+    context?: string | null,
+    voice?: string | null,
+  ): Promise<LetterDecision>;
 }
 
 // The exact user message ProviderEngine sends. With no context and no budget,
@@ -87,6 +103,41 @@ export class ProviderEngine implements TailorEngine {
     });
     return object;
   }
+
+  async decideLetter(
+    jd: string,
+    entries: Entry[],
+    motivation?: string | null,
+    context?: string | null,
+    voice?: string | null,
+  ): Promise<LetterDecision> {
+    try {
+      return await this.attemptLetter(jd, entries, motivation, context, voice);
+    } catch {
+      // retry exactly once; a second failure propagates (route maps it to 502)
+      return await this.attemptLetter(jd, entries, motivation, context, voice);
+    }
+  }
+
+  private async attemptLetter(
+    jd: string,
+    entries: Entry[],
+    motivation?: string | null,
+    context?: string | null,
+    voice?: string | null,
+  ): Promise<LetterDecision> {
+    const model = resolveModel(this.cfg);
+    const { object } = await generateObject({
+      model,
+      schema: LetterDecisionZ,
+      system: `${LETTER_SYSTEM_PROMPT}\n\n${renderLibrary(entries)}`,
+      prompt: buildLetterUserPrompt(jd, motivation, context, voice),
+      providerOptions: providerOptionsFor(this.cfg.provider) as Parameters<
+        typeof generateObject
+      >[0]["providerOptions"],
+    });
+    return object;
+  }
 }
 
 // ── keyless — replays a recorded decision (tests / CI / demo); no API key, no cost ──
@@ -104,11 +155,16 @@ export class NoFixtureError extends Error {
 }
 
 type FixtureFile = { key: string; name?: string; decision: TailorDecision };
+type LetterFixtureFile = { key: string; name?: string; decision: LetterDecision };
 
 const DEFAULT_FIXTURES_DIR = path.join(process.cwd(), "test/fixtures/decisions");
+export const DEFAULT_LETTER_FIXTURES_DIR = path.join(process.cwd(), "test/fixtures/letters");
 
 export class FixtureEngine implements TailorEngine {
-  constructor(private dir: string = DEFAULT_FIXTURES_DIR) {}
+  constructor(
+    private dir: string = DEFAULT_FIXTURES_DIR,
+    private letterDir: string = DEFAULT_LETTER_FIXTURES_DIR,
+  ) {}
 
   async decide(
     jd: string,
@@ -131,24 +187,50 @@ export class FixtureEngine implements TailorEngine {
     return match.decision;
   }
 
+  async decideLetter(
+    jd: string,
+    entries: Entry[],
+    _motivation?: string | null,
+    _context?: string | null,
+    _voice?: string | null,
+  ): Promise<LetterDecision> {
+    // Recorded fixtures key on (jd, entries) only — motivation/context/voice
+    // never affect replay matching, exactly like decide() ignores
+    // context/budget for fixture matching.
+    const key = hashKey(jd, entries);
+    const fixtures = this.loadFixturesFrom<LetterFixtureFile>(this.letterDir);
+    const match = fixtures.find((f) => f.key === key);
+    if (!match) {
+      throw new NoFixtureError(
+        key,
+        fixtures.map((f) => f.name ?? f.key),
+      );
+    }
+    return match.decision;
+  }
+
   private loadFixtures(): FixtureFile[] {
+    return this.loadFixturesFrom<FixtureFile>(this.dir);
+  }
+
+  private loadFixturesFrom<T>(dir: string): T[] {
     let files: string[];
     try {
-      files = readdirSync(this.dir).filter((f) => f.endsWith(".json"));
+      files = readdirSync(dir).filter((f) => f.endsWith(".json"));
     } catch {
       return [];
     }
-    const fixtures: FixtureFile[] = [];
+    const fixtures: T[] = [];
     for (const f of files) {
       try {
-        fixtures.push(JSON.parse(readFileSync(path.join(this.dir, f), "utf-8")) as FixtureFile);
+        fixtures.push(JSON.parse(readFileSync(path.join(dir, f), "utf-8")) as T);
       } catch (err) {
         // A concurrent writer/deleter in the shared fixtures dir can leave this file
         // partial, empty, or gone between readdirSync and readFileSync — skip it rather
         // than aborting the whole scan. A genuinely corrupt recorded fixture still
         // surfaces here, in logs, instead of being silently dropped.
         console.warn(
-          `FixtureEngine: skipping unreadable fixture ${path.join(this.dir, f)}: ${(err as Error).message}`,
+          `FixtureEngine: skipping unreadable fixture ${path.join(dir, f)}: ${(err as Error).message}`,
         );
       }
     }
