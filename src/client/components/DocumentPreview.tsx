@@ -40,7 +40,18 @@ async function renderPageToCanvas(
   await page.render({ canvas, canvasContext: context, viewport }).promise;
 }
 
-function PdfCanvas({ url }: { url: string }) {
+// className defaults to the resume preview's own — the optional override
+// exists solely so LetterPreview (T23) can reuse this same canvas-painting
+// effect under its own letter-scoped class, without touching how the resume
+// preview renders (every existing call site omits the prop, so it keeps its
+// original class unchanged).
+export function PdfCanvas({
+  url,
+  className = "document-preview__canvas",
+}: {
+  url: string;
+  className?: string;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -58,7 +69,7 @@ function PdfCanvas({ url }: { url: string }) {
     };
   }, [url]);
 
-  return <canvas ref={canvasRef} className="document-preview__canvas" />;
+  return <canvas ref={canvasRef} className={className} />;
 }
 
 // Every page, not just page 1 (E9-F1a's design view: a resume that overflows
