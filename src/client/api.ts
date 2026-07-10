@@ -3,7 +3,15 @@
 // the server's `error` string verbatim (e.g. "key_invalid", "no_api_key") so
 // later tickets can switch on it (401→LoginGate, 400 no_api_key→Settings).
 
-import type { Entry, Profile, Layout, Section, Application, Paper } from "@shared/types";
+import type {
+  Entry,
+  Profile,
+  Layout,
+  Section,
+  Application,
+  Paper,
+  VoiceSource,
+} from "@shared/types";
 import type { DocumentFormatV2 } from "@shared/format-v2";
 import type { z } from "zod";
 import type {
@@ -220,6 +228,31 @@ export async function removeLetterParagraph(id: string, index: number): Promise<
     )}`,
     { method: "DELETE" },
   );
+}
+
+// ── T32 blank letter creation — the retroactive-import entry point (no model
+// call; src/server/routes/applications.ts's /letter-blank). ──
+export async function createBlankLetter(id: string): Promise<Application> {
+  return request<Application>(
+    `/api/applications/${encodeURIComponent(id)}/letter-blank`,
+    jsonInit("POST", {}),
+  );
+}
+
+// ── T42/T44 voice sources — flagging an application's own output is the
+// ONLY door into profile.voiceSources (no paste-in add exists client-side);
+// deleting is the only door back out. ──
+export async function flagVoice(id: string, kind: "cover-letter" | "resume"): Promise<VoiceSource> {
+  return request<VoiceSource>(
+    `/api/applications/${encodeURIComponent(id)}/flag-voice`,
+    jsonInit("POST", { kind }),
+  );
+}
+
+export async function deleteVoiceSource(vid: string): Promise<Profile> {
+  return request<Profile>(`/api/profile/voice-sources/${encodeURIComponent(vid)}`, {
+    method: "DELETE",
+  });
 }
 
 // ── auth (spec.md §7/§8) — single-user password gate, never accounts ──

@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import type { Profile } from "@shared/types";
 import type { ProfileInput } from "../api";
-import { useProfile, useUpdateProfile } from "../hooks/queries";
+import { useDeleteVoiceSource, useProfile, useUpdateProfile } from "../hooks/queries";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Input } from "./ui/input";
@@ -38,6 +38,59 @@ function toFormState(profile: Profile | undefined): FormState {
     links: profile?.links ? [...profile.links] : [],
     baseSummary: profile?.baseSummary ?? "",
   };
+}
+
+// ── voice sources (§ voice-source epic, T44) — LOCKED: flagging an
+// application's own resume/letter output is the ONLY door in (see
+// ApplicationDetail.tsx's "Use as a voice source" buttons); there is
+// deliberately no add-by-typing affordance here, unlike the Links list above
+// this replicates the shape of (list existing + delete each) but never the
+// add-a-blank-row half of that pattern. Reads straight off the live
+// `profile` query rather than the form's local `state` — a delete is its own
+// round-trip, not something the Save-profile submit batches. ──
+function VoiceSourcesSection({ profile }: { profile: Profile | undefined }) {
+  const deleteVoiceSource = useDeleteVoiceSource();
+  const sources = profile?.voiceSources ?? [];
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Label>Voice sources</Label>
+      <p className="text-xs text-muted-foreground">
+        Captured by flagging a cover letter or resume from an application — there's no way to add
+        one directly here.
+      </p>
+
+      {sources.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No voice sources yet.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {sources.map((source) => (
+            <div
+              key={source.id}
+              data-testid={`voice-source-${source.id}`}
+              className="flex items-center gap-2"
+            >
+              <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                {source.kind}
+              </span>
+              <span className="flex-1 truncate text-sm">{source.text.slice(0, 80)}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={`Delete voice source (${source.kind})`}
+                data-testid={`delete-voice-source-${source.id}`}
+                disabled={deleteVoiceSource.isPending}
+                onClick={() => deleteVoiceSource.mutate(source.id)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function ProfileEditor({
@@ -229,6 +282,8 @@ export function ProfileEditor({
               onChange={(e) => setState((prev) => ({ ...prev, baseSummary: e.target.value }))}
             />
           </div>
+
+          <VoiceSourcesSection profile={profile} />
 
           {error ? (
             <p role="alert" className="text-sm text-destructive">

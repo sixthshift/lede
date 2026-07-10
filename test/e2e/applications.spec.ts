@@ -875,3 +875,282 @@ test("in-place text editing: resume + letter edits persist and reach the artifac
   expect(pageErrors, `unexpected page errors: ${pageErrors.join(", ")}`).toHaveLength(0);
   expect(consoleErrors, `unexpected console errors: ${consoleErrors.join(", ")}`).toHaveLength(0);
 });
+
+// ── T44: voice UI — capture is a byproduct of normal use (edit -> flag),
+// NEVER a paste-in form. The retroactive-import path proves the ONLY door
+// in: create app -> blank letter (a REAL UI click, never a DB/API backdoor)
+// -> hand-author via T34's in-place letter editing -> flag -> the server's
+// OWN stored text, read via a fresh (non-cache) fetch, exact-matches this
+// test's own literal constant — including the server's "\n\n" part-join
+// delimiter (letterProse, src/server/routes/applications.ts). ──
+function voiceSpecErrorListeners(page: Page): {
+  pageErrors: unknown[];
+  consoleErrors: string[];
+  markLoggedIn: () => void;
+} {
+  const pageErrors: unknown[] = [];
+  const consoleErrors: string[] = [];
+  let loggedIn = false;
+  page.on("pageerror", (err) => pageErrors.push(err));
+  page.on("console", (msg) => {
+    if (msg.type() !== "error") return;
+    // Same exact-match allowlist as the tests above: LoginForm always tries
+    // POST /api/auth/setup first, which 401/409s on every test after the
+    // very first one on this server (the password is already set by then)
+    // before it falls back to /api/auth/login — both expected, pre-login only.
+    if (
+      !loggedIn &&
+      msg.text() ===
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ) {
+      return;
+    }
+    if (
+      !loggedIn &&
+      msg.text() === "Failed to load resource: the server responded with a status of 409 (Conflict)"
+    ) {
+      return;
+    }
+    if (msg.text() === "Failed to load resource: net::ERR_FILE_NOT_FOUND") {
+      return;
+    }
+    consoleErrors.push(msg.text());
+  });
+  return {
+    pageErrors,
+    consoleErrors,
+    markLoggedIn: () => {
+      loggedIn = true;
+    },
+  };
+}
+
+test("retroactive import: blank letter -> hand-authored via in-place editing -> flag -> exact voice-source text (server-verified)", async ({
+  page,
+}, testInfo) => {
+  const { pageErrors, consoleErrors, markLoggedIn } = voiceSpecErrorListeners(page);
+
+  await page.goto("/");
+  await login(page, PASSWORD);
+  markLoggedIn();
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const marker = `${runId}-${testInfo.retry}`;
+  const company = `E2E Retro Import Co ${marker}`;
+  const applicationId = await createApplicationViaUi(page, {
+    company,
+    jd: "Retroactive-import test JD — no tailoring happens in this test.",
+  });
+  await page.goto(`/applications/${applicationId}`);
+
+  // (1) blank letter — via the actual UI affordance (data-testid
+  // "create-blank-letter"), never a DB/API backdoor.
+  await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/letter-blank`) && r.status() === 200,
+    ),
+    page.getByTestId("create-blank-letter").click(),
+  ]);
+
+  // (2) hand-author DISTINCTIVE whitespace/punctuation across greeting, TWO
+  // body paragraphs, and closing — via T34's in-place letter editing.
+  const greeting = `Dear   Hiring Team --- it's a pleasure to write (${marker})!`;
+  const paragraph1 = `First:\tI've shipped systems end-to-end,\nacross a line break too (${marker}).`;
+  const paragraph2 = `Second — em-dash, ellipsis... and "quoted" text (${marker}).`;
+  const closing = `Warmly,\n  Jason  (${marker})`;
+
+  await page.getByTestId("letter-edit-greeting").fill(greeting);
+  await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/letter-part`) &&
+        r.request().method() === "PATCH",
+    ),
+    page.getByTestId("letter-edit-greeting").press("Tab"),
+  ]);
+
+  await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/letter-part/paragraph`) &&
+        r.request().method() === "POST",
+    ),
+    page.getByTestId("letter-insert-paragraph-0").click(),
+  ]);
+  await page.getByTestId("letter-edit-paragraph-0").fill(paragraph1);
+  await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/letter-part`) &&
+        r.request().method() === "PATCH",
+    ),
+    page.getByTestId("letter-edit-paragraph-0").press("Tab"),
+  ]);
+
+  await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/letter-part/paragraph`) &&
+        r.request().method() === "POST",
+    ),
+    page.getByTestId("letter-insert-paragraph-1").click(),
+  ]);
+  await page.getByTestId("letter-edit-paragraph-1").fill(paragraph2);
+  await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/letter-part`) &&
+        r.request().method() === "PATCH",
+    ),
+    page.getByTestId("letter-edit-paragraph-1").press("Tab"),
+  ]);
+
+  await page.getByTestId("letter-edit-closing").fill(closing);
+  await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/letter-part`) &&
+        r.request().method() === "PATCH",
+    ),
+    page.getByTestId("letter-edit-closing").press("Tab"),
+  ]);
+
+  // (3) flag as a voice source.
+  const [flagResponse] = await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/flag-voice`) && r.status() === 200,
+    ),
+    page.getByTestId("flag-voice-letter").click(),
+  ]);
+  const flagged = await flagResponse.json();
+  expect(flagged.kind).toBe("cover-letter");
+
+  // (4) a FRESH server fetch (not the query cache) proves the stored text
+  // exact-equals this test's own literal, joined with the server's own
+  // "\n\n" delimiter (letterProse: greeting, each body paragraph, closing).
+  const expectedText = [greeting, paragraph1, paragraph2, closing].join("\n\n");
+  const freshProfile = await (await page.request.get("/api/profile")).json();
+  const stored = freshProfile.voiceSources.find((s: { id: string }) => s.id === flagged.id);
+  expect(stored, "the flagged source must be present in a fresh /api/profile fetch").toBeTruthy();
+  expect(stored.text).toBe(expectedText);
+
+  // Cleanup — voiceSources is a shared, cap-5 (server-enforced) singleton
+  // list, so tests keep it net-neutral for later runs/tests rather than
+  // accumulating toward the cap.
+  await page.request.delete(`/api/profile/voice-sources/${stored.id}`);
+
+  expect(pageErrors, `unexpected page errors: ${pageErrors.join(", ")}`).toHaveLength(0);
+  expect(consoleErrors, `unexpected console errors: ${consoleErrors.join(", ")}`).toHaveLength(0);
+});
+
+test("flagging a locked application's resume as a voice source is permitted: a real 200, not merely an enabled button", async ({
+  page,
+}, testInfo) => {
+  const { pageErrors, consoleErrors, markLoggedIn } = voiceSpecErrorListeners(page);
+
+  await page.goto("/");
+  await login(page, PASSWORD);
+  markLoggedIn();
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `E2E Locked Voice Co ${runId}-${testInfo.retry}`;
+  const applicationId = await createApplicationViaUi(page, { company, jd: JD });
+  await page.goto(`/applications/${applicationId}`);
+
+  await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().endsWith(`/api/applications/${applicationId}/tailor`) && r.status() === 200,
+    ),
+    page.getByRole("button", { name: "Tailor", exact: true }).click(),
+  ]);
+  await expectCanvasPainted(page);
+
+  await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().endsWith(`/api/applications/${applicationId}/lock`) && r.status() === 200,
+    ),
+    page.getByRole("button", { name: "Lock final", exact: true }).click(),
+  ]);
+  await expect(page.getByRole("button", { name: "Unlock", exact: true })).toBeVisible();
+
+  const before = await (await page.request.get("/api/profile")).json();
+
+  // The button stays enabled on a locked app (flagging copies, never
+  // edits) — but the point of this test is the CLICK's real server effect,
+  // not the disabled attribute.
+  await expect(page.getByTestId("flag-voice-resume")).toBeEnabled();
+  const [flagResponse] = await Promise.all([
+    page.waitForResponse((r) => r.url().endsWith(`/api/applications/${applicationId}/flag-voice`)),
+    page.getByTestId("flag-voice-resume").click(),
+  ]);
+  expect(flagResponse.status()).toBe(200);
+  const flagged = await flagResponse.json();
+  expect(flagged.kind).toBe("resume");
+
+  const after = await (await page.request.get("/api/profile")).json();
+  expect(after.voiceSources.length).toBe(before.voiceSources.length + 1);
+  expect(after.voiceSources.some((s: { id: string }) => s.id === flagged.id)).toBe(true);
+
+  await page.request.delete(`/api/profile/voice-sources/${flagged.id}`);
+
+  expect(pageErrors, `unexpected page errors: ${pageErrors.join(", ")}`).toHaveLength(0);
+  expect(consoleErrors, `unexpected console errors: ${consoleErrors.join(", ")}`).toHaveLength(0);
+});
+
+test("deleting a voice source in Profile removes it server-side, not just from the DOM", async ({
+  page,
+}, testInfo) => {
+  const { pageErrors, consoleErrors, markLoggedIn } = voiceSpecErrorListeners(page);
+
+  await page.goto("/");
+  await login(page, PASSWORD);
+  markLoggedIn();
+  await expect(page).toHaveURL(/\/applications$/);
+
+  // Seed one voice source via the same server plumbing the earlier tests
+  // drive through the UI — DELETE is what's under test here, not the flag
+  // path itself.
+  const marker = `DELETE-TEST-${runId}-${testInfo.retry}`;
+  const seedApp = await (
+    await page.request.post("/api/applications", {
+      data: { jobDescription: "Delete-test seed JD." },
+    })
+  ).json();
+  await page.request.post(`/api/applications/${seedApp.id}/letter-blank`);
+  await page.request.patch(`/api/applications/${seedApp.id}/letter-part`, {
+    data: { path: { kind: "greeting" }, text: marker },
+  });
+  const seeded = await (
+    await page.request.post(`/api/applications/${seedApp.id}/flag-voice`, {
+      data: { kind: "cover-letter" },
+    })
+  ).json();
+
+  await page.goto("/library");
+  await page.getByRole("button", { name: "Edit profile" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByTestId(`voice-source-${seeded.id}`)).toBeVisible();
+  await expect(dialog.getByTestId(`voice-source-${seeded.id}`)).toContainText(marker);
+
+  await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/profile/voice-sources/${seeded.id}`) &&
+        r.request().method() === "DELETE" &&
+        r.status() === 200,
+    ),
+    dialog.getByTestId(`delete-voice-source-${seeded.id}`).click(),
+  ]);
+
+  // Reload + a FRESH /api/profile fetch — proves this is a server-side
+  // deletion, not merely an optimistic DOM removal.
+  await page.reload();
+  const after = await (await page.request.get("/api/profile")).json();
+  expect(after.voiceSources.some((s: { id: string }) => s.id === seeded.id)).toBe(false);
+
+  expect(pageErrors, `unexpected page errors: ${pageErrors.join(", ")}`).toHaveLength(0);
+  expect(consoleErrors, `unexpected console errors: ${consoleErrors.join(", ")}`).toHaveLength(0);
+});

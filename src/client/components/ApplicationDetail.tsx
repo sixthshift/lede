@@ -8,11 +8,14 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
 import type { Paper, Profile, TailoredResume } from "@shared/types";
+import { ApiError } from "../api";
 import { downloadLetterPdf, downloadResumePdf, downloadResumeText } from "../document/download";
 import { fitToPages, type FitResult } from "../document/fit";
 import { useProfile, useSettings } from "../hooks/queries";
 import {
   useApplication,
+  useCreateBlankLetter,
+  useFlagVoice,
   useGenerateLetter,
   useLockApplication,
   useTailorApplication,
@@ -91,6 +94,16 @@ export function useFit(args: {
   return { fit, fitError };
 }
 
+// A flag mutation's error surfaced next to its button — the cap (§ voice-
+// source epic, VOICE_SOURCES_CAP=5, server-enforced) is the one expected
+// failure worth naming distinctly; anything else is a generic retry prompt.
+function flagVoiceErrorMessage(error: unknown): string {
+  if (error instanceof ApiError && error.code === "voice_cap") {
+    return "Voice source cap reached (5) — delete one in Profile to flag another.";
+  }
+  return "Couldn't flag as a voice source.";
+}
+
 export function ApplicationDetail({ applicationId }: { applicationId: string }) {
   const { data: application, isLoading, isError } = useApplication(applicationId);
   const { data: profile } = useProfile();
@@ -101,6 +114,11 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   const lockApplication = useLockApplication();
   const unlockApplication = useUnlockApplication();
   const updateApplication = useUpdateApplication();
+  const createBlankLetter = useCreateBlankLetter();
+  // Two independent mutation instances — one per output — so a cap-409 on
+  // one (e.g. the resume) never renders its error under the other's button.
+  const flagVoiceResume = useFlagVoice();
+  const flagVoiceLetter = useFlagVoice();
 
   // Preview vs "what the ATS sees" (§28.6) — a view toggle, not a route:
   // both read the SAME current resume + resolvedFormat/density computed
@@ -246,8 +264,21 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
             >
               Plain text
             </Button>
+            <Button
+              variant="outline"
+              disabled={!application.current || flagVoiceResume.isPending}
+              data-testid="flag-voice-resume"
+              onClick={() => flagVoiceResume.mutate({ id: application.id, kind: "resume" })}
+            >
+              Use as a voice source
+            </Button>
           </div>
         </div>
+        {flagVoiceResume.isError ? (
+          <p role="alert" className="mt-2 text-right text-xs text-destructive">
+            {flagVoiceErrorMessage(flagVoiceResume.error)}
+          </p>
+        ) : null}
       </div>
 
       <JobPanel application={application} />
@@ -301,7 +332,20 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
             >
               Download cover letter
             </Button>
+            <Button
+              variant="outline"
+              disabled={!application.letterCurrent || flagVoiceLetter.isPending}
+              data-testid="flag-voice-letter"
+              onClick={() => flagVoiceLetter.mutate({ id: application.id, kind: "cover-letter" })}
+            >
+              Use as a voice source
+            </Button>
           </div>
+          {flagVoiceLetter.isError ? (
+            <p role="alert" className="text-xs text-destructive">
+              {flagVoiceErrorMessage(flagVoiceLetter.error)}
+            </p>
+          ) : null}
 
           {application.letterCurrent ? (
             <div data-testid="letter-preview">
@@ -322,9 +366,19 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
               <div>
                 <p className="text-sm font-medium">No cover letter yet</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Generate pulls from your Library, this job's JD, and Motivation above.
+                  Generate pulls from your Library, this job's JD, and Motivation above — or{" "}
+                  hand-author one from scratch.
                 </p>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isLocked || createBlankLetter.isPending}
+                data-testid="create-blank-letter"
+                onClick={() => createBlankLetter.mutate(application.id)}
+              >
+                Create blank letter
+              </Button>
             </div>
           )}
         </CardContent>
