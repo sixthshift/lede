@@ -231,11 +231,26 @@ export function applicationsRoutes(
     }
     const existing = migrateStoredApplicationFormats(existingRow);
 
+    // ── cross-document in-flight guard (T14): ONE generation at a time per
+    // application, across BOTH the resume and letter routes. A real
+    // server-side check on persisted state — never client-only. ──
+    if (existing.genState === "tailoring" || existing.letterGenState === "tailoring") {
+      return reply.code(409).send({ error: "generation_in_flight" });
+    }
+
     const config: Config = { ...loadConfig(), ...deps?.config };
     const engine = resolveEngine(db, config, deps);
     if ("error" in engine) {
       return reply.code(400).send({ error: engine.error });
     }
+
+    // Flag lands BEFORE the await so a concurrent request's guard check
+    // above observes it (better-sqlite3 is synchronous; this commits
+    // immediately, prior to yielding the event loop at the engine await).
+    db.update(applications)
+      .set({ genState: "tailoring", updatedAt: Date.now() })
+      .where(eq(applications.id, existing.id))
+      .run();
 
     try {
       const jdEntries = db.select().from(entries).all().map(rowToEntry);
@@ -309,11 +324,23 @@ export function applicationsRoutes(
       }
       const existing = migrateStoredApplicationFormats(existingRow);
 
+      // ── cross-document in-flight guard (T14): mirrors /tailor's guard —
+      // ONE generation at a time per application, across both documents. ──
+      if (existing.genState === "tailoring" || existing.letterGenState === "tailoring") {
+        return reply.code(409).send({ error: "generation_in_flight" });
+      }
+
       const config: Config = { ...loadConfig(), ...deps?.config };
       const engine = resolveEngine(db, config, deps);
       if ("error" in engine) {
         return reply.code(400).send({ error: engine.error });
       }
+
+      // Flag lands BEFORE the await — see /tailor's identical comment.
+      db.update(applications)
+        .set({ letterGenState: "tailoring", updatedAt: Date.now() })
+        .where(eq(applications.id, existing.id))
+        .run();
 
       try {
         const jdEntries = db.select().from(entries).all().map(rowToEntry);
