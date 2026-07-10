@@ -5,7 +5,14 @@
 import { sqliteTable, text, integer, check } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
-import type { EntryMeta, Paper, ProviderId, Section, TailoredResume } from "@shared/types";
+import type {
+  CoverLetter,
+  EntryMeta,
+  Paper,
+  ProviderId,
+  Section,
+  TailoredResume,
+} from "@shared/types";
 import type { DocumentFormatV2 } from "@shared/format-v2";
 import { DEFAULT_FORMAT_V2 } from "@shared/format-v2";
 import type { UserPreset } from "@shared/schema";
@@ -85,6 +92,7 @@ export const applications = sqliteTable("applications", {
   role: text("role"),
   jobDescription: text("job_description").notNull(),
   context: text("context"), // guides emphasis only — never a fact source
+  motivation: text("motivation"), // dedicated letter-only field, beside context — excluded from grounding
   targetPages: integer("target_pages").notNull().default(1).$type<1 | 2>(), // page budget for this role (§28.1)
   format: text("format", { mode: "json" }).$type<DocumentFormatV2 | null>(), // per-app override of settings.defaultFormat (§28.3)
   current: text("current", { mode: "json" }).$type<TailoredResume | null>(),
@@ -96,6 +104,13 @@ export const applications = sqliteTable("applications", {
     provider: ProviderId;
     model: string;
   } | null>(),
+  // ── cover letter storage mirrors the resume lifecycle above: current/previous
+  // (not current/locked — one-level undo, overwrite-on-regenerate, no lock step)
+  // plus its own genState taxonomy, independent of the resume's (§ letter epic) ──
+  letterCurrent: text("letter_current", { mode: "json" }).$type<CoverLetter | null>(),
+  letterPrevious: text("letter_previous", { mode: "json" }).$type<CoverLetter | null>(),
+  letterGenState: text("letter_gen_state").notNull().default("untailored"), // 'untailored'|'tailoring'|'tailored'|'failed'
+  letterFailedReason: text("letter_failed_reason"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });

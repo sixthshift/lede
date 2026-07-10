@@ -220,6 +220,7 @@ export type Application = {
   role?: string;
   jobDescription: string;
   context?: string; // guides emphasis only — never a fact source
+  motivation?: string; // dedicated letter-only field, beside context — excluded from grounding
   targetPages: 1 | 2; // page budget for this role, default 1 (§28.1)
   format: DocumentFormatV2 | null; // per-app override of settings.defaultFormat (§28.3, v2 since E9-F0d1)
   current: TailoredResume | null;
@@ -227,6 +228,12 @@ export type Application = {
   lockedFormat: LockedFormat | null; // frozen at lock time (§28.3)
   genState: "untailored" | "tailoring" | "tailored" | "failed";
   currentMeta: { at: number; provider: ProviderId; model: string } | null;
+  // ── cover letter storage mirrors the resume lifecycle: current/previous,
+  // overwrite-on-regenerate, one-level undo; own genState taxonomy ──
+  letterCurrent: CoverLetter | null;
+  letterPrevious: CoverLetter | null;
+  letterGenState: "untailored" | "tailoring" | "tailored" | "failed";
+  letterFailedReason: string | null;
   createdAt: number;
   updatedAt: number;
 };

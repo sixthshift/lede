@@ -5,11 +5,28 @@
 // native addon Bun's embedded V8 cannot dlopen.
 import { describe, it, expect, afterEach } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtempSync, existsSync, readdirSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  existsSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { createServer } from "node:net";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
+
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+
+import { openDb, migrateDb } from "../src/server/db";
+import { applications } from "../src/server/db/schema";
+import * as schema from "../src/server/db/schema";
+import type { CoverLetter } from "../src/shared/types";
 
 const TSX_BIN = path.join(process.cwd(), "node_modules/.bin/tsx");
 const ENTRYPOINT = path.join(process.cwd(), "src/server/index.ts");
@@ -153,4 +170,161 @@ describe("boot refusal: missing/malformed operator secrets never boot, never wri
     expect(existsSync(dataDir)).toBe(true);
     expect(readdirSync(dataDir)).toEqual([]);
   }, 20_000);
+});
+
+// ── drizzle/0006 (T11): motivation + letter snapshot columns on `applications` ──
+
+const projectDrizzleDir = path.join(process.cwd(), "drizzle");
+
+function freshTmpDir(): string {
+  const dir = mkdtempSync(path.join(tmpdir(), "lede-migration-0006-"));
+  return dir;
+}
+
+describe("drizzle/0006 — motivation + letter snapshot columns", () => {
+  it("fresh boot applies through 0006: __drizzle_migrations records it, applications has the 5 new columns", () => {
+    const dataDir = freshTmpDir();
+    const { db, sqlite } = openDb(dataDir);
+    migrateDb(db);
+
+    const journal = JSON.parse(
+      readFileSync(path.join(projectDrizzleDir, "meta", "_journal.json"), "utf-8"),
+    );
+    const entry0006 = journal.entries.find((e: { idx: number }) => e.idx === 6);
+    expect(entry0006, "0006 must be registered in meta/_journal.json").toBeDefined();
+    expect(entry0006.tag).toBe("0006_letter_snapshots");
+
+    const migrationRows = sqlite
+      .prepare("SELECT created_at FROM __drizzle_migrations ORDER BY created_at")
+      .all() as { created_at: number }[];
+    expect(migrationRows.map((r) => r.created_at)).toContain(entry0006.when);
+
+    const columns = sqlite
+      .prepare("PRAGMA table_info(applications)")
+      .all()
+      .map((c) => (c as { name: string }).name);
+    expect(columns).toEqual(
+      expect.arrayContaining([
+        "motivation",
+        "letter_current",
+        "letter_previous",
+        "letter_gen_state",
+        "letter_failed_reason",
+      ]),
+    );
+
+    sqlite.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it("UPGRADE PATH: a DATA_DIR migrated only through 0005 applies 0006 additively, pre-existing row survives with new-column defaults", () => {
+    const journal = JSON.parse(
+      readFileSync(path.join(projectDrizzleDir, "meta", "_journal.json"), "utf-8"),
+    );
+    const priorEntries = journal.entries.filter((e: { idx: number }) => e.idx <= 5);
+
+    const priorDir = mkdtempSync(path.join(tmpdir(), "lede-prior-migrations-0006-"));
+    mkdirSync(path.join(priorDir, "meta"));
+    for (const e of priorEntries) {
+      writeFileSync(
+        path.join(priorDir, `${e.tag}.sql`),
+        readFileSync(path.join(projectDrizzleDir, `${e.tag}.sql`)),
+      );
+    }
+    writeFileSync(
+      path.join(priorDir, "meta", "_journal.json"),
+      JSON.stringify({ version: journal.version, dialect: journal.dialect, entries: priorEntries }),
+    );
+
+    const dbFile = path.join(freshTmpDir(), "lede.sqlite");
+    const sqlite = new Database(dbFile);
+    const db = drizzle(sqlite, { schema });
+
+    migrate(db, { migrationsFolder: priorDir });
+
+    const now = Date.now();
+    sqlite
+      .prepare(
+        `INSERT INTO applications (id, job_description, gen_state, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run("pre-0006-app", "A pre-existing job description.", "untailored", now, now);
+
+    // Now migrate against the REAL project drizzle/ folder — 0000-0005 are
+    // already applied (by timestamp), so only 0006 runs.
+    migrate(db, { migrationsFolder: "drizzle" });
+
+    const rows = db.select().from(applications).all();
+    const row = rows.find((r) => r.id === "pre-0006-app");
+    expect(row, "the pre-existing row must survive the 0006 upgrade").toBeDefined();
+    expect(row!.jobDescription).toBe("A pre-existing job description.");
+    expect(row!.letterGenState).toBe("untailored");
+    expect(row!.letterCurrent).toBeNull();
+    expect(row!.letterPrevious).toBeNull();
+    expect(row!.letterFailedReason).toBeNull();
+    expect(row!.motivation).toBeNull();
+
+    sqlite.close();
+  });
+
+  it("SQL DEFAULTS: inserting a row omitting the 5 new fields reads back letter_gen_state='untailored' and null snapshots", () => {
+    const dataDir = freshTmpDir();
+    const { db, sqlite } = openDb(dataDir);
+    migrateDb(db);
+
+    const now = Date.now();
+    db.insert(applications)
+      .values({
+        id: "defaults-app",
+        jobDescription: "Some job description.",
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+
+    const rows = db.select().from(applications).all();
+    const row = rows.find((r) => r.id === "defaults-app")!;
+    expect(row.letterGenState).toBe("untailored");
+    expect(row.letterCurrent).toBeNull();
+    expect(row.letterPrevious).toBeNull();
+    expect(row.letterFailedReason).toBeNull();
+    expect(row.motivation).toBeNull();
+
+    sqlite.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it("CONTRAST: a row with letterCurrent set round-trips the JSON (non-null)", () => {
+    const dataDir = freshTmpDir();
+    const { db, sqlite } = openDb(dataDir);
+    migrateDb(db);
+
+    const letter: CoverLetter = {
+      greeting: "Dear Hiring Manager,",
+      body: [{ text: "I'm excited to apply.", groundedOn: ["entry-1"] }],
+      closing: "Sincerely,",
+    };
+
+    const now = Date.now();
+    db.insert(applications)
+      .values({
+        id: "letter-app",
+        jobDescription: "Some job description.",
+        motivation: "Genuinely excited about this team's mission.",
+        letterCurrent: letter,
+        letterGenState: "tailored",
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+
+    const rows = db.select().from(applications).all();
+    const row = rows.find((r) => r.id === "letter-app")!;
+    expect(row.letterCurrent).toEqual(letter);
+    expect(row.letterGenState).toBe("tailored");
+    expect(row.motivation).toBe("Genuinely excited about this team's mission.");
+
+    sqlite.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  });
 });
