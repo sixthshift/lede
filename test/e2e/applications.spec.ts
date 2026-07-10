@@ -1757,3 +1757,54 @@ test("locked sweep (protocol D): every edit affordance individually disabled/409
   expect(pageErrors, `unexpected page errors: ${pageErrors.join(", ")}`).toHaveLength(0);
   expect(consoleErrors, `unexpected console errors: ${consoleErrors.join(", ")}`).toHaveLength(0);
 });
+
+// ── T020: de-modal NewApplication ── the create panel on the /applications
+// list page is now a non-modal role="dialog" (Radix `modal={false}`, no
+// DialogPortal/overlay — src/client/components/NewApplication.tsx), not the
+// former modal Dialog. Reuses assertNoModalOverlay (the same aria-modal +
+// oversized-fixed/absolute-overlay check the WorkspaceShell protocol-B test
+// above already established as this repo's definition of "non-modal").
+test("NewApplication (v3-T020): the create panel is non-modal, the underlying list stays clickable, focus opens into the panel, and Escape returns focus to the trigger", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  // A background application gives a real underlying list control to click
+  // while the panel is open — it lands in the grid's first (leftmost) cell,
+  // which a right-anchored dropdown panel off the header's "New
+  // application" button can never cover.
+  const backgroundCompany = `E2E T020 Background Co ${runId}-${testInfo.retry}`;
+  await createApplication(page, { company: backgroundCompany, jd: JD });
+
+  const trigger = page.getByRole("button", { name: "New application" });
+  await trigger.click();
+  const panel = page.getByRole("dialog");
+  await expect(panel).toBeVisible();
+
+  // Modality ban: no aria-modal, no oversized fixed/absolute overlay.
+  await assertNoModalOverlay(page);
+
+  // Focus opens INTO the panel (the first field), not left on the trigger.
+  await expect(page.getByLabel(/^Company/)).toBeFocused();
+
+  // The underlying list stays genuinely interactive: a real, un-forced
+  // click on the background card navigates (react-router Link) — proof
+  // nothing invisible intercepts it, not merely that the element "exists".
+  const backgroundCard = page
+    .locator("[data-application-id]")
+    .filter({ hasText: backgroundCompany });
+  await backgroundCard.click();
+  await expect(page).toHaveURL(/\/applications\/[^/]+$/);
+
+  // Back to the list: reopening then pressing Escape closes the panel AND
+  // returns focus to the invoking trigger control.
+  await page.goBack();
+  await expect(page).toHaveURL(/\/applications$/);
+  await trigger.click();
+  await expect(panel).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(panel).toBeHidden();
+  await expect(trigger).toBeFocused();
+});

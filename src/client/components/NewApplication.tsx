@@ -1,10 +1,24 @@
 // Create control for a new tailoring record — spec.md §27. JD is the only
 // required field; company/role/context are optional framing metadata.
+//
+// Non-modal by construction (v3-T020): built directly on
+// @radix-ui/react-dialog's `modal={false}` mode rather than the shared
+// ui/dialog.tsx wrapper (which is hardwired modal for its other consumers —
+// gallery/voice-source dialogs that are legitimately modal). `modal={false}`
+// is what makes this genuinely non-modal, not a cosmetic change on top of a
+// trapped dialog: Radix skips the overlay entirely (DialogOverlay is a
+// no-op when `!modal`), disables the focus trap and outside-pointer lock, and
+// still restores focus to the trigger on close — the exact shape "de-modal"
+// asks for. It renders in place (no DialogPortal) as a `relative`-anchored
+// dropdown under the trigger, so it's a true inline panel, not a
+// screen-centered overlay, and the rest of the list stays in the tab order
+// and clickable underneath it.
 
 import { useState } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { X } from "lucide-react";
 import { useCreateApplication } from "../queries/useApplications";
 import { Button } from "./ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
@@ -49,68 +63,89 @@ export function NewApplication() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <Button size="sm" onClick={() => handleOpenChange(true)}>
-        New application
-      </Button>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>New application</DialogTitle>
-        </DialogHeader>
+    <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange} modal={false}>
+      <div className="relative inline-block text-left">
+        <DialogPrimitive.Trigger asChild>
+          <Button size="sm">New application</Button>
+        </DialogPrimitive.Trigger>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="new-application-company">Company (optional)</Label>
-            <Input
-              id="new-application-company"
-              value={state.company}
-              onChange={(e) => setState((prev) => ({ ...prev, company: e.target.value }))}
-            />
+        <DialogPrimitive.Content
+          className="absolute right-0 top-full z-20 mt-2 flex max-h-[70vh] w-[28rem] max-w-[90vw] flex-col gap-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg"
+          onOpenAutoFocus={(e) => {
+            // Land focus on the first field rather than the panel container.
+            e.preventDefault();
+            document.getElementById("new-application-company")?.focus();
+          }}
+        >
+          <div className="flex items-start justify-between">
+            <DialogPrimitive.Title className="text-lg font-semibold leading-none tracking-tight text-foreground">
+              New application
+            </DialogPrimitive.Title>
+            <DialogPrimitive.Close asChild>
+              <button
+                type="button"
+                className="rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </button>
+            </DialogPrimitive.Close>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="new-application-role">Role (optional)</Label>
-            <Input
-              id="new-application-role"
-              value={state.role}
-              onChange={(e) => setState((prev) => ({ ...prev, role: e.target.value }))}
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="new-application-company">Company (optional)</Label>
+              <Input
+                id="new-application-company"
+                value={state.company}
+                onChange={(e) => setState((prev) => ({ ...prev, company: e.target.value }))}
+              />
+            </div>
 
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="new-application-jd">Job description</Label>
-            <Textarea
-              id="new-application-jd"
-              rows={8}
-              value={state.jobDescription}
-              onChange={(e) => setState((prev) => ({ ...prev, jobDescription: e.target.value }))}
-            />
-          </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="new-application-role">Role (optional)</Label>
+              <Input
+                id="new-application-role"
+                value={state.role}
+                onChange={(e) => setState((prev) => ({ ...prev, role: e.target.value }))}
+              />
+            </div>
 
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="new-application-context">Context (optional)</Label>
-            <Textarea
-              id="new-application-context"
-              rows={3}
-              placeholder="Guides emphasis only — never a fact source"
-              value={state.context}
-              onChange={(e) => setState((prev) => ({ ...prev, context: e.target.value }))}
-            />
-          </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="new-application-jd">Job description</Label>
+              <Textarea
+                id="new-application-jd"
+                rows={8}
+                value={state.jobDescription}
+                onChange={(e) => setState((prev) => ({ ...prev, jobDescription: e.target.value }))}
+              />
+            </div>
 
-          {error ? (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          ) : null}
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="new-application-context">Context (optional)</Label>
+              <Textarea
+                id="new-application-context"
+                rows={3}
+                placeholder="Guides emphasis only — never a fact source"
+                value={state.context}
+                onChange={(e) => setState((prev) => ({ ...prev, context: e.target.value }))}
+              />
+            </div>
 
-          <DialogFooter>
-            <Button type="submit" disabled={createApplication.isPending}>
-              Create application
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+            {error ? (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-2">
+              <Button type="submit" disabled={createApplication.isPending}>
+                Create application
+              </Button>
+            </div>
+          </form>
+        </DialogPrimitive.Content>
+      </div>
+    </DialogPrimitive.Root>
   );
 }

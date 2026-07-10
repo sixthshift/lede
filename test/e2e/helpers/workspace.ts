@@ -19,9 +19,12 @@ export async function firstRunLogin(page: Page, password: string): Promise<void>
   await ensureFirstRunPassword(page, password);
 }
 
-// ── Create application ── the "New application" -> dialog -> fill -> submit
+// ── Create application ── the "New application" -> panel -> fill -> submit
 // flow, identical across every call site (the main lifecycle test, T24's
-// letter tests, and design.spec.ts's own setup).
+// letter tests, and design.spec.ts's own setup). Since v3-T020, the panel is
+// a non-modal `role="dialog"` (Radix `modal={false}`, no overlay/focus-trap)
+// rather than a modal Dialog — same accessible role/labels/button text, so
+// this helper's selectors are unchanged; only the underlying surface is.
 export interface CreateApplicationParams {
   company: string;
   role?: string;
