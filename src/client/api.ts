@@ -144,6 +144,20 @@ export async function tailorApplication(id: string): Promise<Application> {
   );
 }
 
+export async function generateLetter(id: string): Promise<Application> {
+  return request<Application>(
+    `/api/applications/${encodeURIComponent(id)}/generate-letter`,
+    jsonInit("POST", {}),
+  );
+}
+
+export async function undoLetter(id: string): Promise<Application> {
+  return request<Application>(
+    `/api/applications/${encodeURIComponent(id)}/undo-letter`,
+    jsonInit("POST", {}),
+  );
+}
+
 export async function lockApplication(id: string): Promise<Application> {
   return request<Application>(
     `/api/applications/${encodeURIComponent(id)}/lock`,

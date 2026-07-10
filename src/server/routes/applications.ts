@@ -21,6 +21,7 @@ import {
 } from "../tailor/engine";
 import { FabricationError } from "../tailor/validate";
 import { deriveContentBudget } from "../tailor/budget";
+import { tailorLetter } from "../tailor/letter";
 
 // Row -> domain Entry — same shape/key-order as index.ts's rowToEntry, kept
 // in lockstep so hashKey() (FixtureEngine's replay key) matches identically
@@ -118,7 +119,9 @@ function resolveEngine(
 }
 
 // The LIST payload omits the heavy current/locked TailoredResume snapshots
-// (§9 "no heavy snapshots") — only metadata + genState + currentMeta.
+// (§9 "no heavy snapshots") — only metadata + genState + currentMeta. The
+// letter snapshots (letterCurrent/letterPrevious) are the same kind of heavy
+// document payload and are omitted here for the same reason (§ letter epic).
 const LIST_COLUMNS = {
   id: applications.id,
   company: applications.company,
@@ -200,6 +203,7 @@ export function applicationsRoutes(
       ...(input.role !== undefined ? { role: input.role ?? null } : {}),
       ...(input.jobDescription !== undefined ? { jobDescription: input.jobDescription } : {}),
       ...(input.context !== undefined ? { context: input.context ?? null } : {}),
+      ...(input.motivation !== undefined ? { motivation: input.motivation ?? null } : {}),
       ...(input.targetPages !== undefined ? { targetPages: input.targetPages } : {}),
       ...(input.format !== undefined ? { format: input.format ?? null } : {}),
       updatedAt: Date.now(),
@@ -285,6 +289,96 @@ export function applicationsRoutes(
       return reply.code(status).send(body);
     }
   });
+
+  // ── application-scoped letter generation — independent of /tailor (§ letter
+  // epic): re-tailor never regenerates the letter and vice versa; each draws
+  // on the live Library + JD (+ motivation/context) at its own generate time.
+  // Mirrors /tailor's shape but writes the letterCurrent/letterPrevious/
+  // letterGenState/letterFailedReason columns only — `current` (the resume
+  // snapshot) is never touched here. ──
+  app.post<{ Params: { id: string } }>(
+    "/api/applications/:id/generate-letter",
+    async (request, reply) => {
+      const existingRow = db
+        .select()
+        .from(applications)
+        .where(eq(applications.id, request.params.id))
+        .get();
+      if (!existingRow) {
+        return reply.code(404).send({ error: "not_found" });
+      }
+      const existing = migrateStoredApplicationFormats(existingRow);
+
+      const config: Config = { ...loadConfig(), ...deps?.config };
+      const engine = resolveEngine(db, config, deps);
+      if ("error" in engine) {
+        return reply.code(400).send({ error: engine.error });
+      }
+
+      try {
+        const jdEntries = db.select().from(entries).all().map(rowToEntry);
+
+        // Voice conditioning is a later ticket — omitted (undefined) here.
+        const letter = await tailorLetter(
+          engine,
+          existing.jobDescription,
+          jdEntries,
+          existing.motivation,
+          existing.context,
+        );
+
+        const row = {
+          ...existing,
+          letterPrevious: existing.letterCurrent,
+          letterCurrent: letter,
+          letterGenState: "tailored" as const,
+          letterFailedReason: null,
+          updatedAt: Date.now(),
+        };
+        db.update(applications).set(row).where(eq(applications.id, existing.id)).run();
+        return reply.code(200).send(row);
+      } catch (err) {
+        const { status, body } = mapTailorError(err);
+        db.update(applications)
+          .set({
+            letterGenState: "failed",
+            letterFailedReason: body.error,
+            updatedAt: Date.now(),
+          })
+          .where(eq(applications.id, existing.id))
+          .run();
+
+        if (status >= 500) app.log.error(err);
+        return reply.code(status).send(body);
+      }
+    },
+  );
+
+  // One-level undo, letter-only: swaps letterCurrent <-> letterPrevious, so
+  // applying it twice returns to the starting state.
+  app.post<{ Params: { id: string } }>(
+    "/api/applications/:id/undo-letter",
+    async (request, reply) => {
+      const existingRow = db
+        .select()
+        .from(applications)
+        .where(eq(applications.id, request.params.id))
+        .get();
+      if (!existingRow) {
+        return reply.code(404).send({ error: "not_found" });
+      }
+      const existing = migrateStoredApplicationFormats(existingRow);
+
+      const row = {
+        ...existing,
+        letterCurrent: existing.letterPrevious,
+        letterPrevious: existing.letterCurrent,
+        updatedAt: Date.now(),
+      };
+      db.update(applications).set(row).where(eq(applications.id, existing.id)).run();
+      return reply.code(200).send(row);
+    },
+  );
 
   // ── lock/unlock (§27 integrity invariant) — `locked` is a deep copy of
   // `current`'s content at lock time, never a reference to it or to the

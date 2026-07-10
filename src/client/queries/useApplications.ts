@@ -9,6 +9,8 @@ import {
   updateApplication,
   deleteApplication,
   tailorApplication,
+  generateLetter,
+  undoLetter,
   lockApplication,
   unlockApplication,
 } from "../api";
@@ -62,6 +64,26 @@ export function useTailorApplication() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => tailorApplication(id),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["applications", updated.id] });
+    },
+  });
+}
+
+export function useGenerateLetter() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => generateLetter(id),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["applications", updated.id] });
+    },
+  });
+}
+
+export function useUndoLetter() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => undoLetter(id),
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ["applications", updated.id] });
     },
