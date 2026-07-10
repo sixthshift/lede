@@ -89,7 +89,7 @@ export default defineConfig({
     },
     {
       name: "applications",
-      testMatch: /(applications|design)\.spec\.ts/,
+      testMatch: /(applications|design|mutation-probe)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject
