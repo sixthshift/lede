@@ -265,7 +265,12 @@ describe("ApplicationDetail fit wiring (§28.4)", () => {
 
     renderDetail("overflow-1");
 
-    await screen.findByText(new RegExp(`renders at ${expected.pageCount} pages`));
+    // fitToPages runs a real react-pdf render across the density ladder inside
+    // the component's effect; under fork-parallel CPU contention that can
+    // exceed findByText's default 1s poll window, so wait the full render out.
+    await screen.findByText(new RegExp(`renders at ${expected.pageCount} pages`), undefined, {
+      timeout: 15000,
+    });
     // the full, un-cut item set is still what's handed to the preview
     expect(previewProps.resume?.sections[0].groups[0].items).toHaveLength(40);
 
