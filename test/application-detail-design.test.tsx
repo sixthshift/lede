@@ -1,16 +1,14 @@
 // @vitest-environment jsdom
-// DesignView shell — E9-F1a, spec.md §28.3. Covers the three behaviors this
-// ticket's build items call out that ApplicationDetail's inline card never
-// had to: onChange DEBOUNCED before it reaches the network (rapid knob
-// changes coalesce into one PUT), and a locked application's controls going
-// fully read-only while the preview host still mounts (and stays live).
-//
-// DocumentPreview's real react-pdf -> pdf.js paint needs a browser bundle
-// jsdom doesn't provide (§28.0's real coverage is test/e2e/design.spec.ts) —
-// usePDF is stubbed to its own documented loading shape, same convention
-// test/applications-ui.test.tsx uses, so this file only has to prove the
-// preview HOST mounts (and what format/props it was handed), not that pdf.js
-// painted pixels.
+// ApplicationDetail's Design card — v3-T012 folded the former dedicated
+// design view (E9-F1a, spec.md §28.3) into this workspace card instead of a
+// separate /applications/:id/design route. This file covers the THREE
+// behaviors that view's own removed unit tests (test/design-view.test.tsx)
+// proved and that folding must not lose: onChange DEBOUNCED before it
+// reaches the network (rapid knob changes coalesce into one PUT), a locked
+// application's design controls going fully read-only while the preview host
+// still mounts and stays live, and an overflowing render painting one canvas
+// per pdf.js page. The full e2e coverage (real pdf.js paint, deep-link
+// redirect, persistence across reload) lives in test/e2e/design.spec.ts.
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach, beforeAll, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, within, waitFor } from "@testing-library/react";
@@ -19,7 +17,7 @@ import { MemoryRouter } from "react-router-dom";
 import type { Application, Profile, TailoredResume } from "@shared/types";
 import { DEFAULT_FORMAT_V2 } from "@shared/format-v2";
 
-import { DesignView } from "../src/client/components/DesignView";
+import { ApplicationDetail } from "../src/client/components/ApplicationDetail";
 import type { SettingsResponse } from "../src/client/api";
 
 // A mutable, per-test-settable stand-in for usePDF's return shape — most
@@ -43,8 +41,8 @@ vi.mock("@react-pdf/renderer", async (importOriginal) => {
 });
 
 // A fake 3-page document — enough to prove DocumentPreview's allPages host
-// paints ONE canvas per pdf.js page (Build item 5), without depending on any
-// real resume's content actually overflowing in a real react-pdf layout.
+// paints ONE canvas per pdf.js page, without depending on any real resume's
+// content actually overflowing in a real react-pdf layout.
 vi.mock("pdfjs-dist", () => ({
   GlobalWorkerOptions: {},
   getDocument: vi.fn(() => ({
@@ -149,7 +147,7 @@ function applicationFixture(overrides: Partial<Application>): Application {
     createdAt: 1,
     updatedAt: 1,
     ...overrides,
-  };
+  } as Application;
 }
 
 function mockFetch(application: Application) {
@@ -190,12 +188,12 @@ function mockFetch(application: Application) {
   return fetchMock;
 }
 
-function renderDesignView(applicationId = "app-1") {
+function renderApplicationDetail(applicationId = "app-1") {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[`/applications/${applicationId}/design`]}>
-        <DesignView applicationId={applicationId} />
+      <MemoryRouter initialEntries={[`/applications/${applicationId}`]}>
+        <ApplicationDetail applicationId={applicationId} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -207,10 +205,10 @@ function putCalls(fetchMock: ReturnType<typeof mockFetch>) {
   );
 }
 
-describe("DesignView", () => {
-  it("renders DesignPanel's controls and the preview host, unlocked", async () => {
+describe("ApplicationDetail — Design card (v3-T012 fold-in)", () => {
+  it("renders DesignPanel's controls and the preview host in the same workspace, unlocked", async () => {
     mockFetch(applicationFixture({}));
-    renderDesignView();
+    renderApplicationDetail();
 
     expect(await screen.findByRole("combobox", { name: "Body font" })).toBeInTheDocument();
     expect(document.querySelector(".document-preview")).toBeTruthy();
@@ -218,7 +216,7 @@ describe("DesignView", () => {
 
   it("debounces onChange: N rapid changes within the 300ms window produce exactly ONE updateApplication PUT", async () => {
     const fetchMock = mockFetch(applicationFixture({}));
-    renderDesignView();
+    renderApplicationDetail();
 
     await screen.findByRole("combobox", { name: "Body font" });
     vi.useFakeTimers();
@@ -245,7 +243,7 @@ describe("DesignView", () => {
     );
   });
 
-  it("locked: every control is disabled, but the preview host still mounts and stays live", async () => {
+  it("locked: every design control is disabled, but the preview host still mounts and stays live", async () => {
     mockFetch(
       applicationFixture({
         locked: resumeFixture(),
@@ -256,7 +254,7 @@ describe("DesignView", () => {
         },
       }),
     );
-    renderDesignView();
+    renderApplicationDetail();
 
     const bodyFont = await screen.findByRole("combobox", { name: "Body font" });
     expect(bodyFont).toBeDisabled();
@@ -264,18 +262,18 @@ describe("DesignView", () => {
     for (const button of screen.getAllByRole("button", { name: /ATS:/ })) {
       expect(button).toBeDisabled();
     }
+    expect(screen.getByRole("button", { name: "Save current design as preset" })).toBeDisabled();
 
     // The preview host is still mounted and rendering (usePDF's stubbed
     // loading state, per this file's module-level mock) — locked freezes
     // editing, never the preview.
     expect(document.querySelector(".document-preview")).toBeTruthy();
-    expect(screen.getByText("Rendering preview…")).toBeInTheDocument();
   });
 
   it("an overflowing render (numPages > 1) paints one canvas per page, visibly separated", async () => {
     usePdfState = { loading: false, url: "blob:fixture-multipage", error: null };
     mockFetch(applicationFixture({}));
-    renderDesignView();
+    renderApplicationDetail();
 
     await screen.findByRole("combobox", { name: "Body font" });
 

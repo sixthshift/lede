@@ -14,7 +14,6 @@
 // choice immediately.
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { cn } from "../lib/utils";
 import {
   PRESET_MANIFESTS,
@@ -52,7 +51,6 @@ export function TemplateGallery({
   resume = null,
   profile,
   paper = "letter",
-  applicationId,
   savedPresets = [],
 }: {
   format: DocumentFormatV2;
@@ -61,16 +59,11 @@ export function TemplateGallery({
   resume?: TailoredResume | null;
   profile?: Profile;
   paper?: Paper;
-  // When provided, the dialog offers a way into the E9-F1a design view (a
-  // bigger surface than this dialog) — omitted wherever the gallery is used
-  // with no application to navigate to (e.g. SettingsView's default-format
-  // editor has no /applications/:id to point at).
-  applicationId?: string;
   // User-saved format snapshots (E9-F5d, settings.presets) — rendered as
   // their own section below the built-in roster. Passed in rather than
   // fetched here: the gallery stays a pure view over whatever preset list
-  // its caller has (DesignView reads useSettings() once; a settings-less
-  // caller simply passes none).
+  // its caller has (ApplicationDetail's Design card reads useSettings() once;
+  // a settings-less caller simply passes none).
   savedPresets?: UserPreset[];
 }) {
   const [open, setOpen] = useState(false);
@@ -86,18 +79,7 @@ export function TemplateGallery({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
           <DialogHeader>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <DialogTitle>Browse templates</DialogTitle>
-              {applicationId ? (
-                <Link
-                  to={`/applications/${applicationId}/design`}
-                  onClick={() => setOpen(false)}
-                  className="text-sm text-primary underline-offset-4 hover:underline"
-                >
-                  Open design view
-                </Link>
-              ) : null}
-            </div>
+            <DialogTitle>Browse templates</DialogTitle>
             <DialogDescription>
               {readOnly
                 ? "Locked — this application's look is frozen. Unlock to change templates."

@@ -134,13 +134,6 @@ export async function switchPreviewDoc(page: Page, doc: "resume" | "letter"): Pr
   await page.getByTestId("preview-pane").getByRole("button", { name: label, exact: true }).click();
 }
 
-// ── Design view ──
-export async function openDesignView(page: Page, applicationId: string): Promise<void> {
-  await page.getByRole("link", { name: "Open design view" }).click();
-  await expect(page).toHaveURL(`/applications/${applicationId}/design`);
-  await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
-}
-
 // ── Preview canvases ── `.document-preview` hosts the resume's pdf.js
 // canvas (single-page in the application detail view, N pages in the design
 // view's multi-page host — `.first()` is correct, and a harmless no-op, in

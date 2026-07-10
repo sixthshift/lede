@@ -140,6 +140,7 @@ export function ResultView({
   density,
   applicationId,
   readOnly = false,
+  allPages = false,
 }: {
   resume: TailoredResume;
   format?: DocumentFormatV2;
@@ -149,11 +150,15 @@ export function ResultView({
   // before — the editor only mounts once an applicationId is actually given.
   applicationId?: string;
   readOnly?: boolean;
+  // Every rendered page, not just the first — the workspace's Design card
+  // folded the former dedicated design view's overflow visibility in here
+  // (v3-T012) rather than losing it when that route dropped.
+  allPages?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="result-view">
-        <DocumentPreview resume={resume} format={format} density={density} />
+        <DocumentPreview resume={resume} format={format} density={density} allPages={allPages} />
         <ReasoningPanel resume={resume} />
       </div>
       {applicationId ? (

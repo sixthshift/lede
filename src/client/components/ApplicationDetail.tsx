@@ -13,14 +13,15 @@
 // editor pane instead, since they aren't the artifact itself.
 
 import { ArrowLeft, BookOpen, Clock } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
+import type { UserPreset } from "@shared/schema";
 import type { Paper, Profile, TailoredResume } from "@shared/types";
 import { ApiError } from "../api";
 import { downloadLetterPdf, downloadResumePdf, downloadResumeText } from "../document/download";
 import { fitToPages, type FitResult } from "../document/fit";
-import { useProfile, useSettings } from "../hooks/queries";
+import { useProfile, useSettings, useUpdateSettings } from "../hooks/queries";
 import {
   useApplication,
   useCreateBlankLetter,
@@ -46,6 +47,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/
 import { Skeleton } from "./ui/skeleton";
 import { WorkspaceShell } from "./WorkspaceShell";
 
+// Same 300ms coalescing window the former dedicated design view used for its
+// format PUTs (v3-T012 carries that behavior into this card).
+const DEBOUNCE_MS = 300;
+
 function formatStaleDate(at: number): string {
   return new Date(at).toLocaleDateString(undefined, {
     year: "numeric",
@@ -64,9 +69,9 @@ function formatStaleDate(at: number): string {
 // so a broken render can't hide behind the same blank state overflow never
 // produces (that swallow is exactly how this feature went silently broken in
 // the browser once already).
-// Exported so DesignView (E9-F1a) can drive the SAME fit-ladder walk off
-// its own resolvedFormat/paper/targetPages — the chip/preview on that view
-// must agree with this one, not run a second, possibly-diverging copy.
+// Exported as a named hook rather than inlined below purely for readability;
+// v3-T012 dropped its one other consumer, the dedicated design view (its own
+// fit computation folded into this same hook call below).
 export function useFit(args: {
   resume: TailoredResume | null;
   profile: Profile | undefined;
@@ -124,6 +129,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   const lockApplication = useLockApplication();
   const unlockApplication = useUnlockApplication();
   const updateApplication = useUpdateApplication();
+  const updateSettings = useUpdateSettings();
   const createBlankLetter = useCreateBlankLetter();
   // Two independent mutation instances — one per output — so a cap-409 on
   // one (e.g. the resume) never renders its error under the other's button.
@@ -140,6 +146,23 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   // matters once the resume side is showing).
   const [docTab, setDocTab] = useState<"resume" | "letter">("resume");
 
+  // Rapid design-knob changes (a stepper's repeated clicks, a color swatch
+  // tried a few times) coalesce into ONE PUT instead of one per change — the
+  // same 300ms debounce the former dedicated design view used, carried over
+  // now that its controls live in this card instead (v3-T012). The panel and
+  // preview echo every change immediately (a controlled input lagging behind
+  // its own keystrokes would feel broken); only the PUT that persists it is
+  // debounced. `draftFormat` is the in-flight, not-yet-confirmed value — null
+  // once nothing is pending, at which point both fall back to resolvedFormat.
+  const [draftFormat, setDraftFormat] = useState<DocumentFormatV2 | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
   // Locked freezes the look along with the resume — editing a locked app's
   // format is out of scope (it froze what was actually sent), so the design
   // panel reflects lockedFormat.format/paper read-only rather than the live
@@ -154,6 +177,11 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
     ? (application?.lockedFormat?.paper ?? settings?.paper ?? "letter")
     : (settings?.paper ?? "letter");
   const targetPages = application?.targetPages ?? 1;
+
+  // The design controls/preview echo the in-flight draft immediately; once
+  // its debounced PUT resolves (or there is no pending edit) this collapses
+  // back to resolvedFormat.
+  const displayFormat = draftFormat ?? resolvedFormat;
 
   // Fit once, here — the SAME FitResult drives the chip, the preview, and
   // the download, so the density the chip claims is the density the file
@@ -195,7 +223,25 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
 
   const handleFormatChange = (next: DocumentFormatV2) => {
     if (isLocked) return;
-    updateApplication.mutate({ id: applicationId, input: { format: next } });
+    setDraftFormat(next);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      updateApplication.mutate(
+        { id: applicationId, input: { format: next } },
+        { onSuccess: () => setDraftFormat(null) },
+      );
+    }, DEBOUNCE_MS);
+  };
+
+  // Saves the FULL current in-memory format as a new named preset
+  // (settings.presets, §9/E9-F5b) — a complete DocumentFormatV2 snapshot, not
+  // a composition delta, so selecting it back later applies it directly
+  // (TemplateGallery's onChange(savedPreset.format), never applyPreset).
+  const handleSaveAsPreset = () => {
+    const name = window.prompt("Name this preset")?.trim();
+    if (!name) return;
+    const preset: UserPreset = { id: crypto.randomUUID(), name, format: displayFormat };
+    updateSettings.mutate({ presets: [...(settings?.presets ?? []), preset] });
   };
 
   const rail = (
@@ -394,35 +440,38 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
 
       <Card>
         <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <CardTitle className="text-md">Design</CardTitle>
-              <CardDescription>
-                {isLocked
-                  ? "Locked — this reflects the look frozen at lock time. Unlock to edit."
-                  : "Template and formatting for this application's document. Changes repaint the preview live."}
-              </CardDescription>
-            </div>
-            <Button asChild variant="outline" size="sm">
-              <Link to={`/applications/${applicationId}/design`}>Open design view</Link>
-            </Button>
+          <div>
+            <CardTitle className="text-md">Design</CardTitle>
+            <CardDescription>
+              {isLocked
+                ? "Locked — this reflects the look frozen at lock time. Unlock to edit."
+                : "Template and formatting for this application's document. Changes repaint the preview live."}
+            </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
           <div className="flex flex-col gap-3">
-            <div className="flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isLocked}
+                onClick={handleSaveAsPreset}
+              >
+                Save current design as preset
+              </Button>
               <TemplateGallery
-                format={resolvedFormat}
+                format={displayFormat}
                 onChange={handleFormatChange}
                 readOnly={isLocked}
                 resume={application.current}
                 profile={profile}
                 paper={paper}
-                applicationId={applicationId}
+                savedPresets={settings?.presets ?? []}
               />
             </div>
             <TemplatePicker
-              format={resolvedFormat}
+              format={displayFormat}
               onChange={handleFormatChange}
               readOnly={isLocked}
               resume={application.current}
@@ -430,7 +479,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
               paper={paper}
             />
           </div>
-          <DesignPanel format={resolvedFormat} onChange={handleFormatChange} readOnly={isLocked} />
+          <DesignPanel format={displayFormat} onChange={handleFormatChange} readOnly={isLocked} />
         </CardContent>
       </Card>
 
@@ -529,17 +578,18 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
               <AtsView
                 resume={application.current}
                 profile={profile}
-                format={resolvedFormat}
+                format={displayFormat}
                 paper={paper}
                 density={density}
               />
             ) : (
               <ResultView
                 resume={application.current}
-                format={resolvedFormat}
+                format={displayFormat}
                 density={density}
                 applicationId={applicationId}
                 readOnly={isLocked}
+                allPages
               />
             )}
           </div>

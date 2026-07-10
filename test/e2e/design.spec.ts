@@ -1,16 +1,22 @@
-// Design view shell — E9-F1a, spec.md §28.3. Follows applications.spec.ts's
-// own conventions (same "applications" project/server: real first-run
-// set-password -> login, LEDE_TAILOR_ENGINE=fixture so tailoring replays a
-// recorded decision with no API key) — see that file's header comment for
-// why CONTRAST_JDS[0].jd is used byte-for-byte rather than retyped.
+// Design controls — v3-T012, folded into the workspace's Design card
+// (ApplicationDetail, spec.md §27/§28.3) rather than a dedicated
+// /applications/:id/design route (E9-F1a, now dropped). Follows
+// applications.spec.ts's own conventions (same "applications" project/
+// server: real first-run set-password -> login, LEDE_TAILOR_ENGINE=fixture
+// so tailoring replays a recorded decision with no API key) — see that
+// file's header comment for why CONTRAST_JDS[0].jd is used byte-for-byte
+// rather than retyped.
 //
-// This spec is scoped to what's NEW here: the /applications/:id/design
-// route resolving via a real page load (not the SPA fallback's redirect),
-// the debounced-then-persisted format PUT, the multi-page preview host, and
-// locked read-only controls with a still-live preview. The full
-// tailor/lock/download lifecycle is already covered by applications.spec.ts
-// — this file drives just enough of that lifecycle to reach a tailored
-// (and, later, locked) application to open the design view against.
+// This spec is scoped to what design.spec.ts always covered, re-homed onto
+// the workspace: reaching the design controls WITHOUT leaving
+// /applications/:id, the debounced-then-persisted format PUT, the preview
+// host (now always an allPages host, folded in rather than lost), locked
+// read-only controls with a still-live preview, and the stale
+// /applications/:id/design deep link now REDIRECTING to the same
+// application's workspace instead of 404ing. The full tailor/lock/download
+// lifecycle is already covered by applications.spec.ts — this file drives
+// just enough of that lifecycle to reach a tailored (and, later, locked)
+// application.
 import { test, expect } from "@playwright/test";
 import { CONTRAST_JDS } from "../../src/server/tailor/evalcore";
 import {
@@ -18,7 +24,6 @@ import {
   createApplication,
   tailor,
   lockFinal,
-  openDesignView,
   resumePreviewCanvas,
   expectResumeCanvasPainted,
   canvasSnapshot,
@@ -39,12 +44,12 @@ const COMPANY_MARKER = `E2E Design Co ${runId}`;
 
 // expectResumeCanvasPainted (test/e2e/helpers/workspace.ts) is the same
 // non-white-pixel oracle applications.spec.ts uses — its `.first()` on
-// `.document-preview canvas` is what makes it correct here too, against this
-// view's multi-page preview host.
+// `.document-preview canvas` is what makes it correct here too, against the
+// preview pane's (now always allPages) host.
 
 // Pixel-diff pattern (E8-B1, applications.spec.ts's thumbnailDataUrl) applied
-// to the pinned main preview canvas rather than a template-card thumbnail —
-// a snapshot of the actual painted pixels (canvasSnapshot, workspace.ts),
+// to the pinned preview canvas rather than a template-card thumbnail — a
+// snapshot of the actual painted pixels (canvasSnapshot, workspace.ts),
 // compared before/after a Sections control change to prove the change
 // repainted the real PDF rather than just flipping a control's own on-screen
 // state.
@@ -54,7 +59,7 @@ function previewDataUrl(page: import("@playwright/test").Page): Promise<string> 
 
 const expectCanvasPainted = expectResumeCanvasPainted;
 
-test("design view: deep link, debounced persistence, multi-page host, locked read-only", async ({
+test("design controls: reachable in-workspace, debounced persistence, preview host, locked read-only", async ({
   page,
 }) => {
   const pageErrors: unknown[] = [];
@@ -69,8 +74,9 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
     // blob:url revocation race against a still-in-flight pdf.js range
     // fetch) — see that file's comments for the full rationale. This spec
     // hits the SAME races: it drives the SAME login arc, and its preview
-    // host is the SAME usePDF -> pdf.js pipeline (now painting N pages
-    // instead of one).
+    // host is the SAME usePDF -> pdf.js pipeline (now painting every page,
+    // not just the first, since the design view's allPages host folded
+    // into this one).
     if (
       !loggedIn &&
       msg.text() ===
@@ -90,6 +96,8 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
     consoleErrors.push(msg.text());
   });
 
+  await page.setViewportSize({ width: 1280, height: 900 });
+
   // (1) fresh boot -> set-password -> logged in.
   await page.goto("/");
   await firstRunLogin(page, PASSWORD);
@@ -104,11 +112,13 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
   await tailor(page, applicationId);
   await expect(page.getByRole("button", { name: "Re-tailor", exact: true })).toBeVisible();
 
-  // (3) entry point: the Design card's "Open design view" link lands on the
-  // real route (client-side nav).
-  await openDesignView(page, applicationId);
+  // (3) the design controls are reachable WITHOUT leaving /applications/:id
+  // — the Design card's own heading/controls, never a separate route.
+  await expect(page).toHaveURL(`/applications/${applicationId}`);
+  await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Body font" })).toBeVisible();
 
-  // (4) the preview host painted a real PDF.
+  // (4) the co-visible preview host painted a real PDF.
   await expectCanvasPainted(page);
   await expect(page.getByText(/^Fits \d+ pages? · (comfortable|standard|compact)$/)).toBeVisible();
 
@@ -126,17 +136,18 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
   expect((await fontPutResponse.json()).format.fonts.body).toBe("arimo");
   await expectCanvasPainted(page);
 
-  // (6) reload — the body-font change persists. This freshly mounts the
-  // pinned preview at the persisted format (arimo, experience title-first —
-  // the seed default, [v3-076]), which is the baseline for the Sections
-  // pixel-diff below.
+  // (6) reload — the body-font change persists, still without ever having
+  // left /applications/:id. This freshly mounts the pinned preview at the
+  // persisted format (arimo, experience title-first — the seed default,
+  // [v3-076]), which is the baseline for the Sections pixel-diff below.
   await page.reload();
+  await expect(page).toHaveURL(`/applications/${applicationId}`);
   await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Body font" })).toHaveText(/Arimo/);
   await expectCanvasPainted(page);
   const previewBeforeOrderChange = await previewDataUrl(page);
 
-  // (6b) a new "Sections" control (E9-F4d) drives the rendered artifact AND
+  // (6b) the "Sections" control (E9-F4d) drives the rendered artifact AND
   // persists. sectionDisplay.experience.order is the axis exercised: the §22
   // seed profile this fresh server tailors is entirely Experience entries, so
   // it is the one Sections axis guaranteed to relayout the rendered page —
@@ -144,24 +155,18 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
   // asserts at the byte level.
   //
   // The proof is a LIVE pixel-diff (E8-B1's toDataURL pattern) taken with NO
-  // reload in between (E9-F4d2 repair): the pinned preview repaints in place
-  // on a format change — DocumentPreview re-renders the PDF bytes in an
-  // effect keyed on resume/format/density and re-paints the same canvas,
-  // rather than requiring a remount. Asserting the diff live (not just after
-  // (6c)'s reload below) is what actually proves that repaint wiring, with
-  // the body font held fixed so only experience.order differs between the
-  // two captures.
-  //
-  // The full-page preview canvas renders at its native ~918px width, wider
-  // than its half of the max-w-5xl (1024px) two-column grid, so it overflows
-  // its centered column back over the RIGHT portion of the control panel.
-  // The Sections group sits low in that panel, so its full-width combobox is
-  // partly under that overflow. Both nudges below keep this a real user
-  // interaction (never a forced click): center it vertically to clear the
-  // sticky header, then click its LEFT edge, which is clear of the overflow.
+  // reload in between: the pinned preview repaints in place on a format
+  // change — DocumentPreview re-renders the PDF bytes in an effect keyed on
+  // resume/format/density and re-paints the same canvas, rather than
+  // requiring a remount. Asserting the diff live (not just after (6c)'s
+  // reload below) is what actually proves that repaint wiring, with the body
+  // font held fixed so only experience.order differs between the two
+  // captures. The workspace's editor/preview panes are separate columns
+  // (never overlapping, unlike the former dedicated design view's two-column
+  // grid), so this is a plain click — no scroll/position workaround needed.
   const experienceOrderCombobox = page.getByRole("combobox", { name: "Experience order" });
-  await experienceOrderCombobox.evaluate((el) => el.scrollIntoView({ block: "center" }));
-  await experienceOrderCombobox.click({ position: { x: 8, y: 8 } });
+  await experienceOrderCombobox.scrollIntoViewIfNeeded();
+  await experienceOrderCombobox.click();
   // default experience order is now "title-first" ([v3-076]) — pick the OTHER value so
   // this is a real change that fires a PUT (selecting the current value is a no-op).
   const [orderPutResponse] = await Promise.all([
@@ -186,6 +191,7 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
   // differ from the pre-change baseline, with the body font unchanged
   // between the two.
   await page.reload();
+  await expect(page).toHaveURL(`/applications/${applicationId}`);
   await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Body font" })).toHaveText(/Arimo/);
   await expect(page.getByRole("combobox", { name: "Experience order" })).toHaveText(
@@ -196,11 +202,14 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
     .poll(() => previewDataUrl(page), { timeout: 15000 })
     .not.toBe(previewBeforeOrderChange);
 
-  // (7) the deep URL, opened by a FRESH server round-trip (not client-side
-  // router push), resolves to the SAME design view via the SPA fallback —
-  // never the catch-all's redirect to /applications.
+  // (7) a stale deep link to the FORMER dedicated design route, opened by a
+  // FRESH server round-trip (not client-side router push), REDIRECTS to the
+  // SAME application's workspace — never a 404, never the generic
+  // /applications catch-all — and the workspace's real content is there.
   await page.goto(`/applications/${applicationId}/design`);
-  await expect(page).toHaveURL(`/applications/${applicationId}/design`);
+  await expect(page).toHaveURL(`/applications/${applicationId}`);
+  await expect(page.getByTestId("workspace-shell")).toBeVisible();
+  await expect(page.getByText(COMPANY_MARKER)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Body font" })).toBeVisible();
 
@@ -273,23 +282,21 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
   await expect(page.getByRole("combobox", { name: "Body font" })).toHaveText(/Arimo/);
   await expectCanvasPainted(page);
 
-  // (8) lock the application (back on the detail page — DesignView itself
-  // carries no lock/unlock action, spec.md §28.3) — every control on the
-  // design view goes read-only, but the preview stays live.
-  await page.goto(`/applications/${applicationId}`);
+  // (8) lock the application — right here, without navigating anywhere —
+  // every design control goes read-only, but the preview stays live.
   await lockFinal(page, applicationId);
   await expect(page.getByRole("button", { name: "Unlock", exact: true })).toBeVisible();
 
-  await page.goto(`/applications/${applicationId}/design`);
   await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Body font" })).toBeDisabled();
   await expect(page.getByLabel("Show photo on resume")).toBeDisabled();
   for (const button of await page.getByRole("button", { name: /ATS:/ }).all()) {
     await expect(button).toBeDisabled();
   }
-  // Locked read-only reaches the new Sections group too.
+  // Locked read-only reaches the Sections group too.
   await expect(page.getByRole("combobox", { name: "Skills & languages layout" })).toBeDisabled();
   await expect(page.getByLabel("Group promotions")).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Save current design as preset" })).toBeDisabled();
   await expectCanvasPainted(page);
 
   expect(pageErrors, `unexpected page errors: ${pageErrors.join(", ")}`).toHaveLength(0);
