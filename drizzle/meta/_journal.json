@@ -50,6 +50,13 @@
       "when": 1783728575875,
       "tag": "0006_letter_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1783814975875,
+      "tag": "0007_voice_sources",
+      "breakpoints": true
     }
   ]
 }

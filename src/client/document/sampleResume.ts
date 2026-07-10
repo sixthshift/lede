@@ -18,6 +18,7 @@ export const SAMPLE_PROFILE: Profile = {
   phone: "555-0100",
   location: "Remote",
   links: [{ type: "github", label: "github.com/alexsample", url: "https://github.com/alexsample" }],
+  voiceSources: [],
 };
 
 export const SAMPLE_RESUME: TailoredResume = {

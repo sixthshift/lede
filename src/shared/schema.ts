@@ -241,6 +241,19 @@ const profileLinkZ = z.object({
   url: z.string().min(1).max(120),
 });
 
+// ── voice-source epic: a frozen prose snapshot the letter conditions its
+// voice on. cap = 5 is a CODE CONSTANT (VOICE_SOURCES_CAP below), never
+// user-configurable; the zod .max(5) on profileInput is a SECONDARY guard —
+// the primary cap enforcement is the flag route (T42). 'other' is CUT. ──
+export const voiceSourceZ = z.object({
+  id: z.string(),
+  kind: z.enum(["cover-letter", "resume"]),
+  text: z.string(),
+  at: z.number(),
+});
+
+export const VOICE_SOURCES_CAP = 5;
+
 export const profileInput = z.object({
   name: z.string().min(1).max(120),
   headline: z.string().min(1).max(120).nullish(),
@@ -248,6 +261,7 @@ export const profileInput = z.object({
   phone: z.string().min(1).max(120).nullish(),
   location: z.string().min(1).max(120).nullish(),
   links: z.array(profileLinkZ).max(8),
+  voiceSources: z.array(voiceSourceZ).max(VOICE_SOURCES_CAP).optional(),
   baseSummary: z.string().min(1).max(2000).nullish(),
   photoUrl: z.string().optional(), // asset is identity; display lives on DocumentFormat.photo (§28.3)
 });

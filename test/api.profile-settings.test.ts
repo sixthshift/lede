@@ -31,7 +31,7 @@ describe("GET/PUT /api/profile", () => {
 
     const getRes = await app.inject({ method: "GET", url: "/api/profile" });
     expect(getRes.statusCode).toBe(200);
-    expect(getRes.json()).toMatchObject({ name: "", email: "", links: [] });
+    expect(getRes.json()).toMatchObject({ name: "", email: "", links: [], voiceSources: [] });
 
     const payload = {
       name: "Jane Doe",
@@ -43,12 +43,15 @@ describe("GET/PUT /api/profile", () => {
       baseSummary: "Ships platform SDKs.",
       photoUrl: "https://example.com/jane.jpg",
     };
+    // voice_sources (T41) isn't in the PUT payload — it's a column default, not
+    // route-writable yet (flag/delete routes are T42) — so the response carries
+    // it back as [] alongside the payload's own fields.
     const putRes = await app.inject({ method: "PUT", url: "/api/profile", payload });
     expect(putRes.statusCode).toBe(200);
-    expect(putRes.json()).toEqual(payload);
+    expect(putRes.json()).toEqual({ ...payload, voiceSources: [] });
 
     const getAfter = await app.inject({ method: "GET", url: "/api/profile" });
-    expect(getAfter.json()).toEqual(payload);
+    expect(getAfter.json()).toEqual({ ...payload, voiceSources: [] });
   });
 
   it("PUT with a bad body -> 400", async () => {

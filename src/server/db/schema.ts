@@ -12,6 +12,7 @@ import type {
   ProviderId,
   Section,
   TailoredResume,
+  VoiceSource,
 } from "@shared/types";
 import type { DocumentFormatV2 } from "@shared/format-v2";
 import { DEFAULT_FORMAT_V2 } from "@shared/format-v2";
@@ -54,6 +55,12 @@ export const profile = sqliteTable(
     links: text("links", { mode: "json" })
       .notNull()
       .$type<{ type: "github" | "linkedin" | "site" | "other"; label: string; url: string }[]>()
+      .default([]),
+    // frozen prose snapshots the letter conditions its voice on (§ voice-source
+    // epic) — bounded set, cap enforced at the flag route (T42), not here.
+    voiceSources: text("voice_sources", { mode: "json" })
+      .notNull()
+      .$type<VoiceSource[]>()
       .default([]),
     baseSummary: text("base_summary"), // optional; AI reworks it, else fully generated
     photoUrl: text("photo_url"), // asset is identity; display lives on DocumentFormat.photo (§28.3)

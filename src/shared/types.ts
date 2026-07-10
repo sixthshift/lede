@@ -77,6 +77,16 @@ export type Entry = {
   sortKey: number; // YYYYMM(DD) int → deterministic recency/manual order
 };
 
+// ── a frozen prose snapshot the letter conditions its voice on (§ voice-source
+// epic) — cap = 5, a CODE CONSTANT not user-configurable (@shared/schema
+// VOICE_SOURCES_CAP). Always prose; 'other' is CUT. ──
+export type VoiceSource = {
+  id: string;
+  kind: "cover-letter" | "resume";
+  text: string;
+  at: number;
+};
+
 // ── identity (§4.2) ──
 export type Profile = {
   name: string;
@@ -85,6 +95,7 @@ export type Profile = {
   phone?: string;
   location?: string;
   links: { type: "github" | "linkedin" | "site" | "other"; label: string; url: string }[];
+  voiceSources: VoiceSource[];
   baseSummary?: string; // optional; AI reworks it, else fully generated
   photoUrl?: string; // asset is identity; display (shown/size/shape) lives on DocumentFormat.photo (§28.3)
 };
