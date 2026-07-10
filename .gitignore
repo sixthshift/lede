@@ -9,3 +9,6 @@ playwright-report/
 
 # ailoop transient agent worktrees
 .claude/worktrees/
+
+# playwright MCP session artifacts
+.playwright-mcp/
