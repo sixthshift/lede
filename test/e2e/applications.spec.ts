@@ -55,6 +55,7 @@ import {
   distinctColorCount,
   canvasSnapshot,
   pixelDiffFraction,
+  interactiveDescendants,
 } from "./helpers/workspace";
 
 const PASSWORD = "correct horse battery staple e2e applications";
@@ -1951,6 +1952,18 @@ test("dashboard quick actions (T031, OQ4b): open routes to the workspace; duplic
   // untailored app has no resume/letter at all; the ready app has both.
   await expect(untailoredCard.getByTestId("application-card-download")).toBeDisabled();
   await expect(readyCard.getByTestId("application-card-download")).toBeEnabled();
+
+  // (3b) NOT A TRACKER, enforced as an ALLOWLIST (T032, red-team H8): a
+  // dashboard card at rest has EXACTLY 4 interactive descendants — the Open
+  // anchor + Duplicate + Download + Delete controls — no more. This is a
+  // CONTRAST check (nothing beyond the allowlist is interactive), not an
+  // existence check, so it's asserted on BOTH cards even though they carry
+  // different pill/badge counts: the untailored card shows only a resume
+  // pill, the ready card additionally shows a letter pill and a Locked
+  // badge — none of which may add to the interactive count, since Badge
+  // (ui/badge.tsx) renders a plain non-interactive <div>.
+  await expect(interactiveDescendants(untailoredCard)).toHaveCount(4);
+  await expect(interactiveDescendants(readyCard)).toHaveCount(4);
 
   // (4) DOWNLOAD — a real browser download event, a non-empty file that is
   // an actual PDF (starts with the %PDF magic bytes), client-rendered via

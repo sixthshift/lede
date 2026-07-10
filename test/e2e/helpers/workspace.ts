@@ -353,3 +353,16 @@ export async function openEditFor(page: Page, optionLabel: string): Promise<Loca
 export function cardFor(page: Page, text: string): Locator {
   return page.locator("[data-entry-id]").filter({ hasText: text });
 }
+
+// ── Not-a-tracker allowlist (T032, red-team H8) ── a dashboard card's DOM
+// may contain ONLY the four quick actions (Open/Duplicate/Delete/Download)
+// as interactive elements; status pills/badges are display-only. This is the
+// shared "what counts as interactive" oracle, scoped per-card, so a future
+// pill/badge that's accidentally made clickable (e.g. a <button> instead of
+// a <div>) shows up as a count regression rather than passing silently.
+const INTERACTIVE_DESCENDANTS_SELECTOR =
+  'button, a, input, select, [role="button"], [tabindex]:not([tabindex="-1"])';
+
+export function interactiveDescendants(card: Locator): Locator {
+  return card.locator(INTERACTIVE_DESCENDANTS_SELECTOR);
+}
