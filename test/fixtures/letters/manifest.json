@@ -1,0 +1,58 @@
+{
+  "model": "gemini-2.5-flash",
+  "provider": "google",
+  "recordedAt": "2026-07-10T07:30:41.047Z",
+  "usage": {
+    "total": {
+      "inputTokens": 4039,
+      "outputTokens": 5305,
+      "totalTokens": 9344
+    },
+    "perCall": [
+      {
+        "name": "platform-sdk",
+        "usage": {
+          "inputTokens": 1349,
+          "outputTokens": 1139,
+          "totalTokens": 2488
+        }
+      },
+      {
+        "name": "rules-engine",
+        "usage": {
+          "inputTokens": 1349,
+          "outputTokens": 1677,
+          "totalTokens": 3026
+        }
+      },
+      {
+        "name": "frontend-rewrite",
+        "usage": {
+          "inputTokens": 1341,
+          "outputTokens": 2489,
+          "totalTokens": 3830
+        }
+      }
+    ]
+  },
+  "fixtures": [
+    {
+      "name": "platform-sdk",
+      "key": "428e546ea2761f54c3c1abd9ca73716f01158bd70eda577d49964de7c952582d",
+      "leadingEntryId": "cloudcase-platform-sdk",
+      "attempts": 1
+    },
+    {
+      "name": "rules-engine",
+      "key": "c2ca42df2cefb552692a52be41c07dac273ad6880fe01640c99d33f1dbf3f3e8",
+      "leadingEntryId": "cloudcase-rules-engine",
+      "attempts": 1
+    },
+    {
+      "name": "frontend-rewrite",
+      "key": "70724608fc7b8ddbc31ce6e4a50310d72b1307fb9ac95c80b493d403cc9d00d2",
+      "leadingEntryId": "cloudcase-frontend-rewrite",
+      "attempts": 1
+    }
+  ]
+}

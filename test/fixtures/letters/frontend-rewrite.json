@@ -1,0 +1,18 @@
+{
+  "key": "70724608fc7b8ddbc31ce6e4a50310d72b1307fb9ac95c80b493d403cc9d00d2",
+  "name": "frontend-rewrite",
+  "decision": {
+    "greeting": "Dear Hiring Manager,",
+    "body": [
+      {
+        "text": "My experience leading the technical direction of web applications aligns well with the Frontend Platform Lead role. At Cloudcase, I directly addressed the challenges of an outdated UI by replacing a legacy jQuery system, much like the problem your team is looking to solve.",
+        "groundedOn": ["cloudcase-frontend-rewrite"]
+      },
+      {
+        "text": "I spearheaded the initiative to implement a modern three-layer React/TypeScript architecture. This foundation included building a comprehensive component library alongside a platform SDK and React app, a system on which our team now ships all feature work.",
+        "groundedOn": ["cloudcase-frontend-rewrite"]
+      }
+    ],
+    "closing": "Thank you for your time and consideration."
+  }
+}

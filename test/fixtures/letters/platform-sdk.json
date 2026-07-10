@@ -1,0 +1,18 @@
+{
+  "key": "428e546ea2761f54c3c1abd9ca73716f01158bd70eda577d49964de7c952582d",
+  "name": "platform-sdk",
+  "decision": {
+    "greeting": "Dear Hiring Team,",
+    "body": [
+      {
+        "text": "My experience aligns closely with your need for an engineer to open your product to outside developers; at Cloudcase, I built a platform SDK that exposed the platform programmatically for the first time.",
+        "groundedOn": ["cloudcase-platform-sdk"]
+      },
+      {
+        "text": "This SDK was adopted across all internal project teams and now serves as the integration path offered to new external clients, directly addressing the challenge of enabling partners to build on your platform with confidence.",
+        "groundedOn": ["cloudcase-platform-sdk"]
+      }
+    ],
+    "closing": "Thank you for your time and consideration."
+  }
+}

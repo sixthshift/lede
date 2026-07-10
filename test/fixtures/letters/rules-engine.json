@@ -1,0 +1,22 @@
+{
+  "key": "c2ca42df2cefb552692a52be41c07dac273ad6880fe01640c99d33f1dbf3f3e8",
+  "name": "rules-engine",
+  "decision": {
+    "greeting": "Dear Hiring Team,",
+    "body": [
+      {
+        "text": "Your description of a core decisioning system that has become sprawling and hard-to-navigate immediately resonated with my experience at Cloudcase. I led an initiative to address a similar challenge with a rules engine, which had grown to ~30k lines of unstructured rules and caused developers to spend ~50% of their time navigating the codebase.",
+        "groundedOn": ["cloudcase-rules-engine"]
+      },
+      {
+        "text": "To impose structure and improve manageability, I built a lifecycle framework that introduced schemas, lifecycle management, and consistent patterns for the rules engine. This directly parallels your goal of implementing clearer conventions, well-defined ownership boundaries, and guardrails within your system.",
+        "groundedOn": ["cloudcase-rules-engine"]
+      },
+      {
+        "text": "The impact of this work was significant: onboarding for new developers dropped from days to 1 day, and we observed a decrease in bug incidence. These outcomes align precisely with your objectives of achieving shorter ramp-up times for new engineers and reducing surprise regressions in production.",
+        "groundedOn": ["cloudcase-rules-engine"]
+      }
+    ],
+    "closing": "Thank you for your time and consideration."
+  }
+}
