@@ -24,9 +24,10 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 
 import { openDb, migrateDb } from "../src/server/db";
-import { applications } from "../src/server/db/schema";
+import { applications, profile } from "../src/server/db/schema";
 import * as schema from "../src/server/db/schema";
-import type { CoverLetter } from "../src/shared/types";
+import type { CoverLetter, VoiceSource } from "../src/shared/types";
+import { voiceSourceZ, profileInput, VOICE_SOURCES_CAP } from "../src/shared/schema";
 
 const TSX_BIN = path.join(process.cwd(), "node_modules/.bin/tsx");
 const ENTRYPOINT = path.join(process.cwd(), "src/server/index.ts");
@@ -326,5 +327,183 @@ describe("drizzle/0006 — motivation + letter snapshot columns", () => {
 
     sqlite.close();
     rmSync(dataDir, { recursive: true, force: true });
+  });
+});
+
+// ── drizzle/0007 (T41): profile.voice_sources column ──
+
+describe("drizzle/0007 — profile.voice_sources column", () => {
+  it("fresh boot applies through 0007: __drizzle_migrations records it, profile has voice_sources", () => {
+    const dataDir = freshTmpDir();
+    const { db, sqlite } = openDb(dataDir);
+    migrateDb(db);
+
+    const journal = JSON.parse(
+      readFileSync(path.join(projectDrizzleDir, "meta", "_journal.json"), "utf-8"),
+    );
+    const entry0007 = journal.entries.find((e: { idx: number }) => e.idx === 7);
+    expect(entry0007, "0007 must be registered in meta/_journal.json").toBeDefined();
+    expect(entry0007.tag).toBe("0007_voice_sources");
+
+    const migrationRows = sqlite
+      .prepare("SELECT created_at FROM __drizzle_migrations ORDER BY created_at")
+      .all() as { created_at: number }[];
+    expect(migrationRows.map((r) => r.created_at)).toContain(entry0007.when);
+
+    const columns = sqlite
+      .prepare("PRAGMA table_info(profile)")
+      .all()
+      .map((c) => (c as { name: string }).name);
+    expect(columns).toEqual(expect.arrayContaining(["voice_sources"]));
+
+    sqlite.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it("UPGRADE PATH: a DATA_DIR migrated only through 0006 applies 0007 additively, pre-existing row survives with the new column's default", () => {
+    const journal = JSON.parse(
+      readFileSync(path.join(projectDrizzleDir, "meta", "_journal.json"), "utf-8"),
+    );
+    const priorEntries = journal.entries.filter((e: { idx: number }) => e.idx <= 6);
+
+    const priorDir = mkdtempSync(path.join(tmpdir(), "lede-prior-migrations-0007-"));
+    mkdirSync(path.join(priorDir, "meta"));
+    for (const e of priorEntries) {
+      writeFileSync(
+        path.join(priorDir, `${e.tag}.sql`),
+        readFileSync(path.join(projectDrizzleDir, `${e.tag}.sql`)),
+      );
+    }
+    writeFileSync(
+      path.join(priorDir, "meta", "_journal.json"),
+      JSON.stringify({ version: journal.version, dialect: journal.dialect, entries: priorEntries }),
+    );
+
+    const dbFile = path.join(freshTmpDir(), "lede.sqlite");
+    const sqlite = new Database(dbFile);
+    const db = drizzle(sqlite, { schema });
+
+    migrate(db, { migrationsFolder: priorDir });
+
+    const now = Date.now();
+    sqlite
+      .prepare(`INSERT INTO profile (id, name, email, updated_at) VALUES (1, ?, ?, ?)`)
+      .run("Pre-0007 Person", "pre-0007@example.com", now);
+
+    // Now migrate against the REAL project drizzle/ folder — 0000-0006 are
+    // already applied (by timestamp), so only 0007 runs.
+    migrate(db, { migrationsFolder: "drizzle" });
+
+    const rows = db.select().from(profile).all();
+    const row = rows.find((r) => r.id === 1);
+    expect(row, "the pre-existing row must survive the 0007 upgrade").toBeDefined();
+    expect(row!.name).toBe("Pre-0007 Person");
+    expect(row!.voiceSources).toEqual([]);
+
+    sqlite.close();
+  });
+
+  it("SQL DEFAULT: inserting a profile row OMITTING voiceSources reads back voiceSources as [] (the default resolves on read, not merely pragma-visible)", () => {
+    const dataDir = freshTmpDir();
+    const { db, sqlite } = openDb(dataDir);
+    migrateDb(db);
+
+    const now = Date.now();
+    db.insert(profile)
+      .values({
+        id: 1,
+        name: "Defaults Person",
+        email: "defaults@example.com",
+        updatedAt: now,
+      })
+      .run();
+
+    const rows = db.select().from(profile).all();
+    const row = rows.find((r) => r.id === 1)!;
+    expect(row.voiceSources).toEqual([]);
+
+    sqlite.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it("CONTRAST: a row with voiceSources set round-trips the JSON (non-empty)", () => {
+    const dataDir = freshTmpDir();
+    const { db, sqlite } = openDb(dataDir);
+    migrateDb(db);
+
+    const sources: VoiceSource[] = [
+      { id: "vs-1", kind: "cover-letter", text: "I write in a direct, plain-spoken voice.", at: 1 },
+    ];
+
+    const now = Date.now();
+    db.insert(profile)
+      .values({
+        id: 1,
+        name: "Voiced Person",
+        email: "voiced@example.com",
+        voiceSources: sources,
+        updatedAt: now,
+      })
+      .run();
+
+    const rows = db.select().from(profile).all();
+    const row = rows.find((r) => r.id === 1)!;
+    expect(row.voiceSources).toEqual(sources);
+
+    sqlite.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+});
+
+// ── voiceSourceZ + profileInput.voiceSources + VOICE_SOURCES_CAP (T41) ──
+
+describe("voiceSourceZ", () => {
+  function validSource() {
+    return { id: "vs-1", kind: "cover-letter" as const, text: "Direct and plain-spoken.", at: 1 };
+  }
+
+  it("accepts kind:'cover-letter'", () => {
+    expect(voiceSourceZ.safeParse(validSource()).success).toBe(true);
+  });
+
+  it("accepts kind:'resume'", () => {
+    expect(voiceSourceZ.safeParse({ ...validSource(), kind: "resume" }).success).toBe(true);
+  });
+
+  it("REJECTS kind:'other' ('other' is CUT)", () => {
+    expect(voiceSourceZ.safeParse({ ...validSource(), kind: "other" }).success).toBe(false);
+  });
+
+  it("REJECTS any non-enum kind", () => {
+    expect(voiceSourceZ.safeParse({ ...validSource(), kind: "bio" }).success).toBe(false);
+  });
+});
+
+describe("profileInput.voiceSources (secondary guard; primary cap enforcement is T42)", () => {
+  function baseProfile() {
+    return { name: "Jane Doe", email: "jane@example.com", links: [] as never[] };
+  }
+  function source(i: number) {
+    return { id: `vs-${i}`, kind: "cover-letter" as const, text: `source ${i}`, at: i };
+  }
+
+  it(`accepts exactly ${VOICE_SOURCES_CAP} voiceSources`, () => {
+    const voiceSources = Array.from({ length: VOICE_SOURCES_CAP }, (_, i) => source(i));
+    expect(profileInput.safeParse({ ...baseProfile(), voiceSources }).success).toBe(true);
+  });
+
+  it(`REJECTS ${VOICE_SOURCES_CAP + 1} voiceSources (zod .max(${VOICE_SOURCES_CAP}))`, () => {
+    const voiceSources = Array.from({ length: VOICE_SOURCES_CAP + 1 }, (_, i) => source(i));
+    expect(profileInput.safeParse({ ...baseProfile(), voiceSources }).success).toBe(false);
+  });
+
+  it("is omittable (existing PUT /api/profile payloads without voiceSources still validate)", () => {
+    expect(profileInput.safeParse(baseProfile()).success).toBe(true);
+  });
+});
+
+describe("VOICE_SOURCES_CAP", () => {
+  it("is exported as the code constant 5 (cap ENFORCEMENT is T42, not proven here)", () => {
+    expect(VOICE_SOURCES_CAP).toBe(5);
   });
 });
