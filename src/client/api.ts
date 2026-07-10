@@ -155,6 +155,15 @@ export async function deleteApplication(id: string): Promise<void> {
   });
 }
 
+// T031 CO-2 — deep-copies the full application row server-side; the client
+// only needs the new id (a fresh GET/list refetch surfaces the rest).
+export async function duplicateApplication(id: string): Promise<{ id: string }> {
+  return request<{ id: string }>(
+    `/api/applications/${encodeURIComponent(id)}/duplicate`,
+    jsonInit("POST", {}),
+  );
+}
+
 export async function tailorApplication(id: string): Promise<Application> {
   return request<Application>(
     `/api/applications/${encodeURIComponent(id)}/tailor`,

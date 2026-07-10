@@ -8,6 +8,7 @@ import {
   getApplication,
   updateApplication,
   deleteApplication,
+  duplicateApplication,
   tailorApplication,
   generateLetter,
   undoLetter,
@@ -65,6 +66,19 @@ export function useDeleteApplication() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteApplication(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["applications"] });
+    },
+  });
+}
+
+// T031 (dashboard quick actions, OQ4b/CO-2) — the response is just the new
+// id; the list refetch (invalidated below) is what surfaces the duplicate's
+// full card content, same pattern as useCreateApplication.
+export function useDuplicateApplication() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => duplicateApplication(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["applications"] });
     },

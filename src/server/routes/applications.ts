@@ -374,6 +374,39 @@ export function applicationsRoutes(
     return reply.code(200).send({ ok: true });
   });
 
+  // ── T031 CO-2 duplicate (Phase 3, OQ4b's dashboard "duplicate" action) —
+  // deep-copies the FULL row (company/role/jd/context/motivation/
+  // targetPages/format, the current+locked tailored snapshots and
+  // lockedFormat, the letter's current+previous+genState, gen/letter state)
+  // into a fresh id, structuredClone'd so the new row shares no nested
+  // object with the source (editing the duplicate can never mutate the
+  // original's snapshots). Only id/createdAt/updatedAt are fresh — an
+  // editable clone, not a reference. ──
+  app.post<{ Params: { id: string } }>(
+    "/api/applications/:id/duplicate",
+    async (request, reply) => {
+      const existingRow = db
+        .select()
+        .from(applications)
+        .where(eq(applications.id, request.params.id))
+        .get();
+      if (!existingRow) {
+        return reply.code(404).send({ error: "not_found" });
+      }
+      const existing = migrateStoredApplicationFormats(existingRow);
+
+      const now = Date.now();
+      const row = {
+        ...structuredClone(existing),
+        id: randomUUID(),
+        createdAt: now,
+        updatedAt: now,
+      };
+      db.insert(applications).values(row).run();
+      return reply.code(201).send({ id: row.id });
+    },
+  );
+
   // ── application-scoped tailor (§27) — purely additive alongside the
   // stateless /api/tailor; persists the result on the application record
   // instead of returning it bare ──

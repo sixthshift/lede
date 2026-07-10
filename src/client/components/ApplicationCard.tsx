@@ -2,11 +2,24 @@
 // tailoring records, not a hiring tracker: the only status surfaced here is
 // genState (untailored/tailoring/tailored/failed) — never applied/interviewing/
 // rejected or any kanban-style hiring status.
+//
+// T031 (Phase 3, OQ4b): four quick actions — open/duplicate/delete/download —
+// live in their own row BELOW the card's Link (never nested inside it: an
+// anchor can't legally contain another interactive element), so the card
+// keeps exactly the four controls the "not a tracker" allowlist (spec.md
+// red-team H8) counts, no more.
 
+import { useState } from "react";
 import type { ApplicationSummary } from "@shared/types";
+import { DEFAULT_FORMAT_V2 } from "@shared/format-v2";
 import { Link } from "react-router-dom";
+import { getApplication } from "../api";
+import { downloadLetterPdf, downloadResumePdf } from "../document/download";
+import { useProfile, useSettings } from "../hooks/queries";
+import { useDeleteApplication, useDuplicateApplication } from "../queries/useApplications";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
 import { GenStateBadge } from "./GenStateBadge";
 
 const JD_PREVIEW_LENGTH = 160;
@@ -24,15 +37,81 @@ function formatUpdatedAt(updatedAt: number): string {
   });
 }
 
+// The list payload omits the heavy current/letterCurrent snapshots (§9), so
+// "does a document exist" has to ride a proxy already present on
+// ApplicationSummary: `currentMeta` is only ever set alongside a successful
+// `current` and is never cleared afterward (the same field ApplicationDetail
+// reads for its staleness banner), and `letterGenState !== "untailored"` is
+// the identical "a letter exists" proxy the letter pill above already uses
+// (T030) — reused here rather than a second, parallel existence check.
+function hasDownloadableDocument(application: ApplicationSummary): boolean {
+  return Boolean(application.currentMeta) || application.letterGenState !== "untailored";
+}
+
 export function ApplicationCard({ application }: { application: ApplicationSummary }) {
+  const { data: profile } = useProfile();
+  const { data: settings } = useSettings();
+  const deleteApplication = useDeleteApplication();
+  const duplicateApplication = useDuplicateApplication();
+  const [deleteArmed, setDeleteArmed] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const canDownload = hasDownloadableDocument(application) && Boolean(profile) && !downloading;
+
+  // Fetches the ONE full record this card's summary doesn't carry (current/
+  // locked/letterCurrent/format), renders whichever document(s) exist via
+  // the SAME render→blob→download pattern ApplicationDetail's Download
+  // buttons use, then discards the fetched record — nothing here
+  // reimplements the duplicate endpoint's copy semantics or any other
+  // server logic, it only reads.
+  async function handleDownload() {
+    if (!profile || downloading) return;
+    setDownloading(true);
+    try {
+      const full = await getApplication(application.id);
+      const isLocked = Boolean(full.locked);
+      const format = isLocked
+        ? (full.lockedFormat?.format ?? DEFAULT_FORMAT_V2)
+        : (full.format ?? settings?.defaultFormat ?? DEFAULT_FORMAT_V2);
+      const paper = isLocked
+        ? (full.lockedFormat?.paper ?? settings?.paper ?? "letter")
+        : (settings?.paper ?? "letter");
+      const resume = isLocked ? full.locked : full.current;
+
+      if (resume) {
+        await downloadResumePdf({
+          resume,
+          profile,
+          company: full.company,
+          role: full.role,
+          format,
+          paper,
+        });
+      }
+      if (full.letterCurrent) {
+        await downloadLetterPdf({
+          letter: full.letterCurrent,
+          profile,
+          format,
+          paper,
+          company: full.company,
+          role: full.role,
+        });
+      }
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
-    <Link
-      to={`/applications/${application.id}`}
-      className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    <Card
+      data-application-id={application.id}
+      className="flex h-full flex-col transition-shadow hover:shadow-md"
     >
-      <Card
-        data-application-id={application.id}
-        className="flex h-full flex-col transition-shadow hover:shadow-md"
+      <Link
+        to={`/applications/${application.id}`}
+        data-testid="application-card-open"
+        className="flex flex-1 flex-col rounded-t-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         <CardHeader className="gap-1 space-y-0 pb-3">
           {application.company ? (
@@ -49,19 +128,65 @@ export function ApplicationCard({ application }: { application: ApplicationSumma
             {jdPreview(application.jobDescription)}
           </p>
         </CardContent>
-        <CardFooter className="mt-auto justify-between border-t border-border/60 py-3">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <GenStateBadge state={application.genState} />
-            {application.letterGenState !== "untailored" ? (
-              <GenStateBadge state={application.letterGenState} kind="letter" />
-            ) : null}
-            {application.locked ? <Badge variant="secondary">Locked</Badge> : null}
-          </div>
-          <span className="text-xs text-muted-foreground">
-            Updated {formatUpdatedAt(application.updatedAt)}
-          </span>
-        </CardFooter>
-      </Card>
-    </Link>
+      </Link>
+
+      <CardFooter className="justify-between border-t border-border/60 py-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <GenStateBadge state={application.genState} />
+          {application.letterGenState !== "untailored" ? (
+            <GenStateBadge state={application.letterGenState} kind="letter" />
+          ) : null}
+          {application.locked ? <Badge variant="secondary">Locked</Badge> : null}
+        </div>
+        <span className="text-xs text-muted-foreground">
+          Updated {formatUpdatedAt(application.updatedAt)}
+        </span>
+      </CardFooter>
+
+      {/* Quick actions (T031, OQ4b) — a sibling row of the Link above, never
+          nested inside it. Exactly four controls: Duplicate/Download stay
+          mounted; Delete is a single two-step button (label/variant toggle,
+          never a second control) so the resting-state count never exceeds
+          four (spec.md red-team H8's allowlist). */}
+      <div className="flex items-center justify-end gap-1.5 border-t border-border/60 px-6 py-3">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          data-testid="application-card-duplicate"
+          disabled={duplicateApplication.isPending}
+          onClick={() => duplicateApplication.mutate(application.id)}
+        >
+          Duplicate
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          data-testid="application-card-download"
+          disabled={!canDownload}
+          onClick={handleDownload}
+        >
+          Download PDF
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={deleteArmed ? "destructive" : "destructive-ghost"}
+          data-testid="application-card-delete"
+          disabled={deleteApplication.isPending}
+          onBlur={() => setDeleteArmed(false)}
+          onClick={() => {
+            if (deleteArmed) {
+              deleteApplication.mutate(application.id);
+            } else {
+              setDeleteArmed(true);
+            }
+          }}
+        >
+          {deleteArmed ? "Confirm delete" : "Delete"}
+        </Button>
+      </div>
+    </Card>
   );
 }

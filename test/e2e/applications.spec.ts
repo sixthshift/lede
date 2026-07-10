@@ -1904,3 +1904,105 @@ test("dashboard card content (T030, OQ4a): resume pills differ and match server 
     expect(html).not.toContain(forbidden);
   }
 });
+
+// ── T031 (Phase 3, OQ4b): dashboard quick actions — open/duplicate/delete/
+// download, all client-only against EXISTING routes (duplicate is CO-2's new
+// one, server-verified below same as delete). ──
+test("dashboard quick actions (T031, OQ4b): open routes to the workspace; duplicate/delete are server-verified; download produces a real PDF; disabled states match document existence", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const marker = `${runId}-${testInfo.retry}`;
+  const untailoredCompany = `E2E T031 Untailored Co ${marker}`;
+  const readyCompany = `E2E T031 Ready Co ${marker}`;
+
+  // (1) one application left untailored (proves the download-disabled case
+  // and is the one this test deletes), one driven to tailored + letter +
+  // locked (proves the download-enabled case and is the one this test
+  // duplicates).
+  const untailoredId = await createApplication(page, { company: untailoredCompany, jd: JD });
+  const readyId = await createApplication(page, { company: readyCompany, jd: JD });
+
+  await page.goto(`/applications/${readyId}`);
+  await tailor(page, readyId);
+  await expectCanvasPainted(page);
+  await generateLetter(page, readyId, { status: 200 });
+  await lockFinal(page, readyId);
+  await expect(page.getByRole("button", { name: "Unlock", exact: true })).toBeVisible();
+
+  await page.goto("/applications");
+  let untailoredCard = page.locator("[data-application-id]").filter({ hasText: untailoredCompany });
+  let readyCard = page.locator("[data-application-id]").filter({ hasText: readyCompany });
+  await expect(untailoredCard).toBeVisible();
+  await expect(readyCard).toBeVisible();
+
+  // (2) OPEN — routes to the workspace; the shell is visible.
+  await untailoredCard.getByTestId("application-card-open").click();
+  await expect(page).toHaveURL(new RegExp(`/applications/${untailoredId}$`));
+  await expect(page.getByTestId("workspace-shell")).toBeVisible();
+  await page.goto("/applications");
+  untailoredCard = page.locator("[data-application-id]").filter({ hasText: untailoredCompany });
+  readyCard = page.locator("[data-application-id]").filter({ hasText: readyCompany });
+
+  // (3) DOWNLOAD disabled/enabled states match document existence — the
+  // untailored app has no resume/letter at all; the ready app has both.
+  await expect(untailoredCard.getByTestId("application-card-download")).toBeDisabled();
+  await expect(readyCard.getByTestId("application-card-download")).toBeEnabled();
+
+  // (4) DOWNLOAD — a real browser download event, a non-empty file that is
+  // an actual PDF (starts with the %PDF magic bytes), client-rendered via
+  // @react-pdf/renderer from the fetched full record (never the list's
+  // heavy-snapshot-omitting summary).
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    readyCard.getByTestId("application-card-download").click(),
+  ]);
+  const downloadPath = await download.path();
+  expect(downloadPath, "Download must produce a real saved file").toBeTruthy();
+  const pdfBytes = readFileSync(downloadPath!);
+  expect(pdfBytes.length).toBeGreaterThan(0);
+  expect(pdfBytes.subarray(0, 4).toString("latin1")).toBe("%PDF");
+
+  // (5) DELETE — inline two-step confirm (a single button toggling
+  // label/variant, never a modal): arming it holds the modality checks
+  // (zero aria-modal, no >50% overlay), and only the SECOND click actually
+  // deletes. A fresh GET /api/applications shows the id gone.
+  const deleteButton = untailoredCard.getByTestId("application-card-delete");
+  await deleteButton.click();
+  await expect(deleteButton).toHaveText("Confirm delete");
+  await assertNoModalOverlay(page);
+  await deleteButton.click();
+  await expect(untailoredCard).toHaveCount(0);
+
+  const afterDelete = (await (await page.request.get("/api/applications")).json()) as Array<{
+    id: string;
+  }>;
+  expect(afterDelete.some((a) => a.id === untailoredId)).toBe(false);
+
+  // (6) DUPLICATE — existing-route semantics (CO-2), verified server-side: a
+  // fresh GET returns n+1 including the new id, and the new row's
+  // genState/locked/letterGenState match the source's (the full-copy proof).
+  const beforeDup = (await (await page.request.get("/api/applications")).json()) as Array<{
+    id: string;
+  }>;
+  await readyCard.getByTestId("application-card-duplicate").click();
+  await expect
+    .poll(async () => (await (await page.request.get("/api/applications")).json()).length)
+    .toBe(beforeDup.length + 1);
+
+  const afterDup = (await (await page.request.get("/api/applications")).json()) as Array<{
+    id: string;
+    genState: string;
+    locked: boolean;
+    letterGenState: string;
+  }>;
+  const beforeIds = new Set(beforeDup.map((a) => a.id));
+  const newRow = afterDup.find((a) => !beforeIds.has(a.id));
+  expect(newRow, "duplicate must appear as a new row in the list").toBeTruthy();
+  expect(newRow!.genState).toBe("tailored");
+  expect(newRow!.locked).toBe(true);
+  expect(newRow!.letterGenState).toBe("tailored");
+});

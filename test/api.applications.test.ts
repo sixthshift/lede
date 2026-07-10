@@ -9,6 +9,7 @@ import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/server/index";
 import { initDb } from "../src/server/db";
 import { applications } from "../src/server/db/schema";
+import { DEFAULT_FORMAT_V2 } from "../src/shared/format-v2";
 import type { TailoredResume } from "../src/shared/types";
 
 const tmpDirs: string[] = [];
@@ -135,6 +136,74 @@ describe("persistence: survives a fresh db connection against the same on-disk d
     expect(getRes.statusCode).toBe(200);
     expect(getRes.json().id).toBe(created.id);
     expect(getRes.json().company).toBe("Acme Corp");
+  });
+});
+
+describe("T031 CO-2: POST /api/applications/:id/duplicate deep-copies a tailored+locked application", () => {
+  it("the duplicate's genState/locked/letterGenState match the source, under a NEW id", async () => {
+    const dataDir = freshDataDir();
+    const { db } = initDb(dataDir);
+
+    const now = Date.now();
+    const letter = {
+      greeting: "Dear team,",
+      body: [{ text: "Body.", groundedOn: [] }],
+      closing: "Best,",
+    };
+    const row = {
+      id: "source-app",
+      company: "Acme Corp",
+      role: "Staff Engineer",
+      jobDescription: "Build widgets at scale.",
+      context: "Emphasize backend depth.",
+      current: fakeResume,
+      locked: fakeResume,
+      lockedFormat: {
+        format: DEFAULT_FORMAT_V2,
+        resolvedDensity: "comfortable" as const,
+        paper: "letter" as const,
+      },
+      genState: "tailored" as const,
+      currentMeta: { at: now, provider: "anthropic" as const, model: "claude-opus-4-8" },
+      letterCurrent: letter,
+      letterPrevious: null,
+      letterGenState: "tailored" as const,
+      createdAt: now,
+      updatedAt: now,
+    };
+    db.insert(applications).values(row).run();
+
+    const app = appOn(dataDir);
+    const dupRes = await app.inject({
+      method: "POST",
+      url: "/api/applications/source-app/duplicate",
+    });
+    expect(dupRes.statusCode).toBe(201);
+    const { id: newId } = dupRes.json();
+    expect(newId).toBeTruthy();
+    expect(newId).not.toBe("source-app");
+
+    const listRes = await app.inject({ method: "GET", url: "/api/applications" });
+    const list = listRes.json();
+    expect(list).toHaveLength(2); // n+1
+    expect(list.map((a: { id: string }) => a.id)).toContain(newId);
+
+    const getRes = await app.inject({ method: "GET", url: `/api/applications/${newId}` });
+    expect(getRes.statusCode).toBe(200);
+    const duplicated = getRes.json();
+    expect(duplicated.id).toBe(newId);
+    expect(duplicated.genState).toBe(row.genState);
+    expect(duplicated.locked).toEqual(row.locked);
+    expect(duplicated.letterGenState).toBe(row.letterGenState);
+    expect(duplicated.letterCurrent).toEqual(row.letterCurrent);
+    expect(duplicated.current).toEqual(row.current);
+    expect(duplicated.company).toBe(row.company);
+  });
+
+  it("unknown id -> 404", async () => {
+    const app = appOn(freshDataDir());
+    const res = await app.inject({ method: "POST", url: "/api/applications/nope/duplicate" });
+    expect(res.statusCode).toBe(404);
   });
 });
 
