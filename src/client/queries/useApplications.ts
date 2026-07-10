@@ -13,8 +13,17 @@ import {
   undoLetter,
   lockApplication,
   unlockApplication,
+  patchResumePart,
+  patchLetterPart,
+  insertLetterParagraph,
+  removeLetterParagraph,
 } from "../api";
-import type { ApplicationCreateInput, ApplicationUpdateInput } from "../api";
+import type {
+  ApplicationCreateInput,
+  ApplicationUpdateInput,
+  ResumePartPatchInput,
+  LetterPartPatchInput,
+} from "../api";
 
 export function useApplications() {
   return useQuery({ queryKey: ["applications"] as const, queryFn: listApplications });
@@ -104,6 +113,53 @@ export function useUnlockApplication() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => unlockApplication(id),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["applications", updated.id] });
+    },
+  });
+}
+
+// ── T31/T32 in-place text editing — each mutation invalidates only the one
+// application's detail query (mirrors useTailorApplication/useLockApplication
+// above): the PATCH/POST/DELETE response is the full updated row, so
+// invalidating triggers exactly the refetch the UI needs to reflect it. ──
+export function usePatchResumePart() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: ResumePartPatchInput }) =>
+      patchResumePart(id, input),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["applications", updated.id] });
+    },
+  });
+}
+
+export function usePatchLetterPart() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: LetterPartPatchInput }) =>
+      patchLetterPart(id, input),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["applications", updated.id] });
+    },
+  });
+}
+
+export function useInsertLetterParagraph() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, position, text }: { id: string; position: number; text: string }) =>
+      insertLetterParagraph(id, position, text),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["applications", updated.id] });
+    },
+  });
+}
+
+export function useRemoveLetterParagraph() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, index }: { id: string; index: number }) => removeLetterParagraph(id, index),
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ["applications", updated.id] });
     },

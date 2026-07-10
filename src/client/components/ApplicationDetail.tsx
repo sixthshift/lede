@@ -305,7 +305,12 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
 
           {application.letterCurrent ? (
             <div data-testid="letter-preview">
-              <LetterPreview letter={application.letterCurrent} format={resolvedFormat} />
+              <LetterPreview
+                letter={application.letterCurrent}
+                format={resolvedFormat}
+                applicationId={applicationId}
+                readOnly={isLocked}
+              />
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border-strong py-12 text-center">
@@ -443,7 +448,13 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
               density={density}
             />
           ) : (
-            <ResultView resume={application.current} format={resolvedFormat} density={density} />
+            <ResultView
+              resume={application.current}
+              format={resolvedFormat}
+              density={density}
+              applicationId={applicationId}
+              readOnly={isLocked}
+            />
           )}
         </div>
       ) : (

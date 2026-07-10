@@ -12,6 +12,8 @@ import type {
   settingsInput,
   applicationCreate,
   applicationUpdate,
+  resumePartPatchZ,
+  letterPartPatchZ,
 } from "@shared/schema";
 
 export type EntryInput = z.infer<typeof entryInput>;
@@ -19,6 +21,11 @@ export type ProfileInput = z.infer<typeof profileInput>;
 export type SettingsInput = z.infer<typeof settingsInput>;
 export type ApplicationCreateInput = z.infer<typeof applicationCreate>;
 export type ApplicationUpdateInput = z.infer<typeof applicationUpdate>;
+// T31/T32 — per-part text-edit request bodies, inferred straight off the
+// server's own `.strict()` zod contracts so a schema change can never drift
+// silently out of sync with what the client sends.
+export type ResumePartPatchInput = z.infer<typeof resumePartPatchZ>;
+export type LetterPartPatchInput = z.infer<typeof letterPartPatchZ>;
 // The list endpoint omits the heavy current/locked TailoredResume snapshots (§9).
 export type ApplicationListItem = Omit<Application, "current" | "locked">;
 export type SettingsResponse = {
@@ -169,6 +176,50 @@ export async function unlockApplication(id: string): Promise<Application> {
   return request<Application>(`/api/applications/${encodeURIComponent(id)}/lock`, {
     method: "DELETE",
   });
+}
+
+// ── T31/T32 in-place text editing (spec.md §27) — every route 409s on a
+// locked application; the server is the sole enforcer, these are thin
+// wrappers matching the routes' exact paths/methods (src/server/routes/
+// applications.ts). ──
+export async function patchResumePart(
+  id: string,
+  input: ResumePartPatchInput,
+): Promise<Application> {
+  return request<Application>(
+    `/api/applications/${encodeURIComponent(id)}/resume-part`,
+    jsonInit("PATCH", input),
+  );
+}
+
+export async function patchLetterPart(
+  id: string,
+  input: LetterPartPatchInput,
+): Promise<Application> {
+  return request<Application>(
+    `/api/applications/${encodeURIComponent(id)}/letter-part`,
+    jsonInit("PATCH", input),
+  );
+}
+
+export async function insertLetterParagraph(
+  id: string,
+  position: number,
+  text: string,
+): Promise<Application> {
+  return request<Application>(
+    `/api/applications/${encodeURIComponent(id)}/letter-part/paragraph`,
+    jsonInit("POST", { position, text }),
+  );
+}
+
+export async function removeLetterParagraph(id: string, index: number): Promise<Application> {
+  return request<Application>(
+    `/api/applications/${encodeURIComponent(id)}/letter-part/paragraph/${encodeURIComponent(
+      String(index),
+    )}`,
+    { method: "DELETE" },
+  );
 }
 
 // ── auth (spec.md §7/§8) — single-user password gate, never accounts ──
