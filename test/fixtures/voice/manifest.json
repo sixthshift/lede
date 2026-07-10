@@ -1,0 +1,36 @@
+{
+  "model": "gemini-2.5-flash",
+  "provider": "google",
+  "temperature": 0,
+  "recordedAt": "2026-07-10T12:24:06.233Z",
+  "jd": "Senior Software Engineer, Platform\n\nWe're looking for a senior engineer to lead the modernization of our core\nrules engine and internal developer platform. You'll own architecture\ndecisions, mentor engineers, and drive delivery of high-impact projects that\ncut onboarding time and improve reliability. Strong background in platform\narchitecture, lifecycle frameworks, and shipping under ambiguity required.",
+  "voiceExemplar": "I build things that work — no fluff, no throat-clearing. I shipped the\nthing, it cut the number that mattered, and I moved to the next hard problem.\nI don't pad. I ship, I measure, I fix it at 2am, I write the postmortem nobody\nasked for. Short sentences. Plain words. Say the result, then stop.",
+  "usage": {
+    "resume": {
+      "inputTokens": 4073,
+      "outputTokens": 3205,
+      "totalTokens": 7278
+    },
+    "letter": {
+      "inputTokens": 2717,
+      "outputTokens": 3877,
+      "totalTokens": 6594
+    },
+    "total": {
+      "inputTokens": 6790,
+      "outputTokens": 7082,
+      "totalTokens": 13872
+    }
+  },
+  "result": {
+    "resumeSelectionIdentical": true,
+    "resumeCutIdentical": true,
+    "resumePhrasingDiffers": true,
+    "resumeItemsReworded": 3,
+    "resumeItemsTotal": 3,
+    "resumeSummaryChanged": true,
+    "letterGroundingIdentical": true,
+    "letterPhrasingDiffers": true,
+    "pass": true
+  }
+}
