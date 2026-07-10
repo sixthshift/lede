@@ -15,6 +15,7 @@
 import { pdf } from "@react-pdf/renderer";
 import type { Profile, TailoredResume } from "@shared/types";
 import { plainText } from "./plainText";
+import { renderLetterToBlob, type RenderLetterArgs } from "./renderLetter";
 import { renderResumeDocument, type RenderResumeArgs } from "./renderResume";
 
 const COMBINING_DIACRITICS = /[̀-ͯ]/g;
@@ -47,6 +48,14 @@ export function textFilename(input: PdfFilenameInput): string {
   return slugFilename(input, "txt");
 }
 
+// Same {name, company, role} slugging as pdfFilename, with a " — Cover
+// Letter" suffix inserted before the extension — stripping that suffix from
+// this function's output reproduces pdfFilename's output exactly, since it's
+// derived from it rather than a second, parallel sanitizer.
+export function letterPdfFilename(name: string, company?: string, role?: string): string {
+  return pdfFilename({ name, company, role }).replace(/\.pdf$/, " — Cover Letter.pdf");
+}
+
 // The browser hands a download off to its own download manager
 // asynchronously after `link.click()` returns — revoking the object URL in
 // the same tick can race that handoff and turn the save into a silent
@@ -68,6 +77,25 @@ export async function downloadResumePdf(args: DownloadResumePdfArgs): Promise<vo
   const link = document.createElement("a");
   link.href = url;
   link.download = pdfFilename({ name: args.profile.name, company: args.company, role: args.role });
+  link.click();
+  revokeObjectUrlSoon(url);
+}
+
+export type DownloadLetterPdfArgs = RenderLetterArgs & {
+  profile: Profile;
+  company?: string;
+  role?: string;
+};
+
+// Same blob+anchor pattern as downloadResumePdf, but rendering a CoverLetter
+// via renderLetterToBlob (imported, so it's spy-able) rather than a
+// TailoredResume.
+export async function downloadLetterPdf(args: DownloadLetterPdfArgs): Promise<void> {
+  const blob = await renderLetterToBlob(args);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = letterPdfFilename(args.profile.name, args.company, args.role);
   link.click();
   revokeObjectUrlSoon(url);
 }
