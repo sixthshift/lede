@@ -11,52 +11,48 @@
 // tailor/lock/download lifecycle is already covered by applications.spec.ts
 // — this file drives just enough of that lifecycle to reach a tailored
 // (and, later, locked) application to open the design view against.
-import { test, expect, type Page } from "@playwright/test";
-import { ensureFirstRunPassword } from "./helpers/session";
+import { test, expect } from "@playwright/test";
 import { CONTRAST_JDS } from "../../src/server/tailor/evalcore";
+import {
+  firstRunLogin,
+  createApplication,
+  tailor,
+  lockFinal,
+  openDesignView,
+  resumePreviewCanvas,
+  expectResumeCanvasPainted,
+  canvasSnapshot,
+} from "./helpers/workspace";
 
 // MUST match applications.spec.ts's PASSWORD exactly (playwright.config.ts:
 // this spec shares that file's "applications" server/project, and the auth
 // gate's password is a single server-wide secret). Whichever of the two
 // spec files runs first sets it via LoginForm's real first-run flow; the
-// other's identical ensureFirstRunPassword call then hits the SAME
-// setup-409-then-login fallback LoginForm always runs, succeeding because
-// the value matches what's already set.
+// other's identical firstRunLogin call then hits the SAME setup-409-then-login
+// fallback LoginForm always runs, succeeding because the value matches what's
+// already set.
 const PASSWORD = "correct horse battery staple e2e applications";
 const JD = CONTRAST_JDS[0]!.jd; // "platform-sdk" scenario — same recorded fixture applications.spec.ts uses
 
 const runId = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 const COMPANY_MARKER = `E2E Design Co ${runId}`;
 
-async function expectCanvasPainted(page: Page): Promise<void> {
-  const canvas = page.locator(".document-preview canvas").first();
-  await expect(canvas).toBeVisible();
-  await expect
-    .poll(() =>
-      canvas.evaluate((el: HTMLCanvasElement) => {
-        const ctx = el.getContext("2d");
-        if (!ctx || el.width === 0) return false;
-        const { data } = ctx.getImageData(0, 0, el.width, el.height);
-        for (let i = 0; i < data.length; i += 4) {
-          if (data[i] !== 255 || data[i + 1] !== 255 || data[i + 2] !== 255) return true;
-        }
-        return false;
-      }),
-    )
-    .toBe(true);
-}
+// expectResumeCanvasPainted (test/e2e/helpers/workspace.ts) is the same
+// non-white-pixel oracle applications.spec.ts uses — its `.first()` on
+// `.document-preview canvas` is what makes it correct here too, against this
+// view's multi-page preview host.
 
 // Pixel-diff pattern (E8-B1, applications.spec.ts's thumbnailDataUrl) applied
 // to the pinned main preview canvas rather than a template-card thumbnail —
-// a snapshot of the actual painted pixels, compared before/after a Sections
-// control change to prove the change repainted the real PDF rather than
-// just flipping a control's own on-screen state.
-function previewDataUrl(page: Page): Promise<string> {
-  return page
-    .locator(".document-preview canvas")
-    .first()
-    .evaluate((el: HTMLCanvasElement) => el.toDataURL());
+// a snapshot of the actual painted pixels (canvasSnapshot, workspace.ts),
+// compared before/after a Sections control change to prove the change
+// repainted the real PDF rather than just flipping a control's own on-screen
+// state.
+function previewDataUrl(page: import("@playwright/test").Page): Promise<string> {
+  return canvasSnapshot(resumePreviewCanvas(page));
 }
+
+const expectCanvasPainted = expectResumeCanvasPainted;
 
 test("design view: deep link, debounced persistence, multi-page host, locked read-only", async ({
   page,
@@ -96,40 +92,21 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
 
   // (1) fresh boot -> set-password -> logged in.
   await page.goto("/");
-  await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
-  await ensureFirstRunPassword(page, PASSWORD);
+  await firstRunLogin(page, PASSWORD);
   loggedIn = true;
   await expect(page).toHaveURL(/\/applications$/);
 
   // (2) create + tailor an application (same recorded fixture as
   // applications.spec.ts — see that file's header for why this exact JD).
-  await page.getByRole("button", { name: "New application" }).click();
-  const createDialog = page.getByRole("dialog");
-  await expect(createDialog).toBeVisible();
-  await createDialog.getByLabel(/^Company/).fill(COMPANY_MARKER);
-  await createDialog.getByLabel("Job description", { exact: true }).fill(JD);
-  await createDialog.getByRole("button", { name: "Create application" }).click();
-  await expect(createDialog).toBeHidden();
-
-  const card = page.locator("[data-application-id]").filter({ hasText: COMPANY_MARKER });
-  await expect(card).toBeVisible();
-  const applicationId = await card.getAttribute("data-application-id");
-  expect(applicationId, "created card must carry a data-application-id").toBeTruthy();
+  const applicationId = await createApplication(page, { company: COMPANY_MARKER, jd: JD });
 
   await page.goto(`/applications/${applicationId}`);
-  await Promise.all([
-    page.waitForResponse(
-      (r) => r.url().endsWith(`/api/applications/${applicationId}/tailor`) && r.status() === 200,
-    ),
-    page.getByRole("button", { name: "Tailor", exact: true }).click(),
-  ]);
+  await tailor(page, applicationId);
   await expect(page.getByRole("button", { name: "Re-tailor", exact: true })).toBeVisible();
 
   // (3) entry point: the Design card's "Open design view" link lands on the
   // real route (client-side nav).
-  await page.getByRole("link", { name: "Open design view" }).click();
-  await expect(page).toHaveURL(`/applications/${applicationId}/design`);
-  await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
+  await openDesignView(page, applicationId);
 
   // (4) the preview host painted a real PDF.
   await expectCanvasPainted(page);
@@ -300,12 +277,7 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
   // carries no lock/unlock action, spec.md §28.3) — every control on the
   // design view goes read-only, but the preview stays live.
   await page.goto(`/applications/${applicationId}`);
-  await Promise.all([
-    page.waitForResponse(
-      (r) => r.url().endsWith(`/api/applications/${applicationId}/lock`) && r.status() === 200,
-    ),
-    page.getByRole("button", { name: "Lock final", exact: true }).click(),
-  ]);
+  await lockFinal(page, applicationId);
   await expect(page.getByRole("button", { name: "Unlock", exact: true })).toBeVisible();
 
   await page.goto(`/applications/${applicationId}/design`);

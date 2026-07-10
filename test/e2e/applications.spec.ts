@@ -34,11 +34,24 @@
 // first-run goto() every step shares (same rationale as docker-spa.spec.ts).
 import { readFileSync } from "node:fs";
 import { test, expect, type Page, type Locator } from "@playwright/test";
-import { ensureFirstRunPassword, login } from "./helpers/session";
 import { CONTRAST_JDS } from "../../src/server/tailor/evalcore";
 import { extractPdfText } from "../../src/client/document/extractText";
 import { PRESET_MANIFESTS } from "../../src/client/document/registry";
 import { letterPdfFilename } from "../../src/client/document/download";
+import {
+  firstRunLogin,
+  login,
+  createApplication,
+  tailor,
+  retailor,
+  lockFinal,
+  generateLetter,
+  regenerateLetter,
+  resumePreviewCanvas,
+  letterPreviewCanvas,
+  expectResumeCanvasPainted,
+  expectLetterCanvasPainted,
+} from "./helpers/workspace";
 
 const PASSWORD = "correct horse battery staple e2e applications";
 const JD = CONTRAST_JDS[0]!.jd; // "platform-sdk" scenario
@@ -53,30 +66,12 @@ const SECOND_TOKEN = "Replaced legacy jQuery with a new three-layer React/TypeSc
 const runId = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 const COMPANY_MARKER = `E2E Applications Co ${runId}`;
 
-// Shared "some non-white pixel exists" oracle — factored out so T24's
-// letter-preview canvas (a DIFFERENT locator, deliberately never
+// Shared "some non-white pixel exists" oracle (test/e2e/helpers/workspace.ts)
+// — T24's letter-preview canvas (a DIFFERENT locator, deliberately never
 // `.document-preview`, so a letter paint can't be mistaken for a resume
-// paint) can reuse the exact same paint check as the resume preview below.
-async function expectLocatorCanvasPainted(canvas: Locator): Promise<void> {
-  await expect(canvas).toBeVisible();
-  await expect
-    .poll(() =>
-      canvas.evaluate((el: HTMLCanvasElement) => {
-        const ctx = el.getContext("2d");
-        if (!ctx || el.width === 0) return false;
-        const { data } = ctx.getImageData(0, 0, el.width, el.height);
-        for (let i = 0; i < data.length; i += 4) {
-          if (data[i] !== 255 || data[i + 1] !== 255 || data[i + 2] !== 255) return true;
-        }
-        return false;
-      }),
-    )
-    .toBe(true);
-}
-
-async function expectCanvasPainted(page: Page): Promise<void> {
-  await expectLocatorCanvasPainted(page.locator(".document-preview canvas"));
-}
+// paint) reuses the exact same paint check as the resume preview below via
+// expectLetterCanvasPainted.
+const expectCanvasPainted = expectResumeCanvasPainted;
 
 const TEMPLATE_IDS = Object.keys(PRESET_MANIFESTS);
 
@@ -202,25 +197,13 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   // (main.tsx's index route, post E6-B2's nav cutover — not /tailor, which
   // that ticket removed).
   await page.goto("/");
-  await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
-  await ensureFirstRunPassword(page, PASSWORD);
+  await firstRunLogin(page, PASSWORD);
   loggedIn = true;
   await expect(page).toHaveURL(/\/applications$/);
   await expect(page.getByRole("button", { name: "New application" })).toBeVisible();
 
   // (2) create an Application with the exact recorded fixture JD.
-  await page.getByRole("button", { name: "New application" }).click();
-  const createDialog = page.getByRole("dialog");
-  await expect(createDialog).toBeVisible();
-  await createDialog.getByLabel(/^Company/).fill(COMPANY_MARKER);
-  await createDialog.getByLabel("Job description", { exact: true }).fill(JD);
-  await createDialog.getByRole("button", { name: "Create application" }).click();
-  await expect(createDialog).toBeHidden();
-
-  const card = page.locator("[data-application-id]").filter({ hasText: COMPANY_MARKER });
-  await expect(card).toBeVisible();
-  const applicationId = await card.getAttribute("data-application-id");
-  expect(applicationId, "created card must carry a data-application-id").toBeTruthy();
+  const applicationId = await createApplication(page, { company: COMPANY_MARKER, jd: JD });
 
   // (3) navigate to the detail page (no in-app link from the list to a
   // detail route exists yet — same direct-navigation approach auth.spec.ts
@@ -234,12 +217,7 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   await expect(thumbnailCanvas(page, "strict")).toBeVisible();
   expect(await page.getByText("Sample content").count()).toBe(TEMPLATE_IDS.length);
 
-  const [tailorResponse] = await Promise.all([
-    page.waitForResponse(
-      (r) => r.url().endsWith(`/api/applications/${applicationId}/tailor`) && r.status() === 200,
-    ),
-    page.getByRole("button", { name: "Tailor", exact: true }).click(),
-  ]);
+  const tailorResponse = await tailor(page, applicationId!);
   expect(tailorRequests).toHaveLength(1);
   expect(JSON.stringify(await tailorResponse.json())).toContain(RESUME_TOKEN);
 
@@ -429,12 +407,7 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   expect(tailorRequests, "the gallery reload must not trigger a re-tailor").toHaveLength(1);
 
   // (6) re-tailor.
-  const [retailorResponse] = await Promise.all([
-    page.waitForResponse(
-      (r) => r.url().endsWith(`/api/applications/${applicationId}/tailor`) && r.status() === 200,
-    ),
-    page.getByRole("button", { name: "Re-tailor", exact: true }).click(),
-  ]);
+  const retailorResponse = await retailor(page, applicationId!);
   expect(tailorRequests).toHaveLength(2);
   expect(JSON.stringify(await retailorResponse.json())).toContain(RESUME_TOKEN);
   await expectCanvasPainted(page);
@@ -443,12 +416,7 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   // only locked-state UI, src/client/components/JobPanel.tsx) flips to
   // "Unlock", and the resume content (still driven by `current`, which lock
   // deep-copies rather than replaces) stays visible.
-  const [lockResponse] = await Promise.all([
-    page.waitForResponse(
-      (r) => r.url().endsWith(`/api/applications/${applicationId}/lock`) && r.status() === 200,
-    ),
-    page.getByRole("button", { name: "Lock final", exact: true }).click(),
-  ]);
+  const lockResponse = await lockFinal(page, applicationId!);
   await expect(page.getByRole("button", { name: "Unlock", exact: true })).toBeVisible();
   expect(JSON.stringify(await lockResponse.json())).toContain(RESUME_TOKEN);
   await expectCanvasPainted(page);
@@ -478,26 +446,6 @@ async function waitForStableCanvas(canvas: Locator): Promise<string> {
   return previous;
 }
 
-async function createApplicationViaUi(
-  page: Page,
-  { company, role, jd }: { company: string; role?: string; jd: string },
-): Promise<string> {
-  await page.getByRole("button", { name: "New application" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await dialog.getByLabel(/^Company/).fill(company);
-  if (role) await dialog.getByLabel(/^Role/).fill(role);
-  await dialog.getByLabel("Job description", { exact: true }).fill(jd);
-  await dialog.getByRole("button", { name: "Create application" }).click();
-  await expect(dialog).toBeHidden();
-
-  const card = page.locator("[data-application-id]").filter({ hasText: company });
-  await expect(card).toBeVisible();
-  const applicationId = await card.getAttribute("data-application-id");
-  expect(applicationId, "created card must carry a data-application-id").toBeTruthy();
-  return applicationId!;
-}
-
 test("cover letter: generate/paint isolation, download filename, undo, motivation persistence", async ({
   page,
 }, testInfo) => {
@@ -520,7 +468,7 @@ test("cover letter: generate/paint isolation, download filename, undo, motivatio
   // failed attempt's own leftover application row.
   const company = `E2E Letter Co ${runId}-${testInfo.retry}`;
   const role = "Staff Platform Engineer";
-  const applicationId = await createApplicationViaUi(page, { company, role, jd: JD });
+  const applicationId = await createApplication(page, { company, role, jd: JD });
   await page.goto(`/applications/${applicationId}`);
 
   // (a) NO-LETTER state, before anything is generated: the Generate
@@ -528,7 +476,7 @@ test("cover letter: generate/paint isolation, download filename, undo, motivatio
   // never a blank/empty document standing in for "not generated yet".
   await expect(page.getByRole("button", { name: "Generate letter", exact: true })).toBeVisible();
   await expect(page.getByText("No letter", { exact: true })).toBeVisible();
-  expect(await page.locator('[data-testid="letter-preview"] canvas').count()).toBe(0);
+  expect(await letterPreviewCanvas(page).count()).toBe(0);
 
   // (b) motivation persists across a reload, scoped to persistence only —
   // its flow-through into the letter decision is already unit-tested
@@ -555,15 +503,10 @@ test("cover letter: generate/paint isolation, download filename, undo, motivatio
   // async re-render (comfortable -> its final settled density) would
   // otherwise race this snapshot and get mistaken for letter-generation
   // fallout.
-  await Promise.all([
-    page.waitForResponse(
-      (r) => r.url().endsWith(`/api/applications/${applicationId}/tailor`) && r.status() === 200,
-    ),
-    page.getByRole("button", { name: "Tailor", exact: true }).click(),
-  ]);
+  await tailor(page, applicationId!);
   await expectCanvasPainted(page);
   await expect(page.getByText(/^Fits \d+ pages? · (comfortable|standard|compact)$/)).toBeVisible();
-  const resumeCanvas = page.locator(".document-preview canvas");
+  const resumeCanvas = resumePreviewCanvas(page);
   const resumePixelsBefore = await waitForStableCanvas(resumeCanvas);
   const currentBefore = (
     await (await page.request.get(`/api/applications/${applicationId}`)).json()
@@ -572,14 +515,7 @@ test("cover letter: generate/paint isolation, download filename, undo, motivatio
   // (d) generate the letter: its OWN scope (`[data-testid="letter-preview"]`,
   // never `.document-preview`) paints, and the resume canvas is byte-for-byte
   // unchanged — proving the two documents' render pipelines are isolated.
-  const [generateResponse] = await Promise.all([
-    page.waitForResponse(
-      (r) =>
-        r.url().endsWith(`/api/applications/${applicationId}/generate-letter`) &&
-        r.status() === 200,
-    ),
-    page.getByRole("button", { name: "Generate letter", exact: true }).click(),
-  ]);
+  const generateResponse = await generateLetter(page, applicationId!, { status: 200 });
   expect(generateResponse.status()).toBe(200);
 
   // Server-side proof of isolation, precise and immune to any browser-side
@@ -593,7 +529,7 @@ test("cover letter: generate/paint isolation, download filename, undo, motivatio
     "generate-letter must not touch the resume's `current` snapshot",
   ).toBe(JSON.stringify(currentBefore));
 
-  await expectLocatorCanvasPainted(page.locator('[data-testid="letter-preview"] canvas'));
+  await expectLetterCanvasPainted(page);
   await expect(page.getByText("Letter ready", { exact: true })).toBeVisible();
 
   // Polled, not a single snapshot: useGenerateLetter's onSuccess invalidates
@@ -638,14 +574,7 @@ test("cover letter: generate/paint isolation, download filename, undo, motivatio
 
   // (g) regenerate -> undo becomes enabled (letterPrevious now holds the
   // FIRST letter) -> undo swaps letterCurrent/letterPrevious back.
-  const [regenerateResponse] = await Promise.all([
-    page.waitForResponse(
-      (r) =>
-        r.url().endsWith(`/api/applications/${applicationId}/generate-letter`) &&
-        r.status() === 200,
-    ),
-    page.getByRole("button", { name: "Regenerate letter", exact: true }).click(),
-  ]);
+  const regenerateResponse = await regenerateLetter(page, applicationId!, { status: 200 });
   expect(regenerateResponse.status()).toBe(200);
   await expect(page.getByRole("button", { name: "Undo letter", exact: true })).toBeEnabled();
 
@@ -672,16 +601,11 @@ test("cover letter: a failed generation surfaces a distinct failed badge, never 
   // the retry index for the same reason as the test above.
   const company = `E2E Letter Fail Co ${runId}-${testInfo.retry}`;
   const unmatchedJd = `An entirely unrecorded job description, never fixture-matched ${runId}-${testInfo.retry}`;
-  const applicationId = await createApplicationViaUi(page, { company, jd: unmatchedJd });
+  const applicationId = await createApplication(page, { company, jd: unmatchedJd });
   await page.goto(`/applications/${applicationId}`);
   await expect(page.getByText("No letter", { exact: true })).toBeVisible();
 
-  const [generateResponse] = await Promise.all([
-    page.waitForResponse((r) =>
-      r.url().endsWith(`/api/applications/${applicationId}/generate-letter`),
-    ),
-    page.getByRole("button", { name: "Generate letter", exact: true }).click(),
-  ]);
+  const generateResponse = await generateLetter(page, applicationId!);
   expect(generateResponse.status()).toBe(422);
 
   // The mutation only invalidates on success (mirrors /tailor's own
@@ -691,7 +615,7 @@ test("cover letter: a failed generation surfaces a distinct failed badge, never 
   await page.reload();
   await expect(page.getByText("Letter failed", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Undo letter", exact: true })).toBeDisabled();
-  expect(await page.locator('[data-testid="letter-preview"] canvas').count()).toBe(0);
+  expect(await letterPreviewCanvas(page).count()).toBe(0);
 });
 
 // ── T07 (coverage-audit repair): the spec's Phase 2 claims a typography
@@ -738,36 +662,22 @@ test("cover letter: a typography format change re-renders the letter preview (pi
   await expect(page).toHaveURL(/\/applications$/);
 
   const company = `E2E Letter Typography Co ${runId}-${testInfo.retry}`;
-  const applicationId = await createApplicationViaUi(page, { company, jd: JD });
+  const applicationId = await createApplication(page, { company, jd: JD });
   await page.goto(`/applications/${applicationId}`);
 
   // (1) tailor the resume + generate the letter, so the letter preview has
   // real, painted content.
-  await Promise.all([
-    page.waitForResponse(
-      (r) => r.url().endsWith(`/api/applications/${applicationId}/tailor`) && r.status() === 200,
-    ),
-    page.getByRole("button", { name: "Tailor", exact: true }).click(),
-  ]);
+  await tailor(page, applicationId!);
   await expectCanvasPainted(page);
 
-  await Promise.all([
-    page.waitForResponse(
-      (r) =>
-        r.url().endsWith(`/api/applications/${applicationId}/generate-letter`) &&
-        r.status() === 200,
-    ),
-    page.getByRole("button", { name: "Generate letter", exact: true }).click(),
-  ]);
+  await generateLetter(page, applicationId!, { status: 200 });
 
   // (2) the before-capture must be of a PAINTED (non-blank) letter canvas —
   // proves the diff below is real content changing, not a blank canvas
   // trivially differing from itself.
-  const letterPreviewCanvas = page.locator('[data-testid="letter-preview"] canvas');
-  await expectLocatorCanvasPainted(letterPreviewCanvas);
-  const letterBefore = await letterPreviewCanvas.evaluate((el: HTMLCanvasElement) =>
-    el.toDataURL(),
-  );
+  const letterCanvas = letterPreviewCanvas(page);
+  await expectLetterCanvasPainted(page);
+  const letterBefore = await letterCanvas.evaluate((el: HTMLCanvasElement) => el.toDataURL());
 
   // (3) the ONLY change between captures: a DesignPanel typography control
   // (Body font), mirroring design.spec.ts's own body-font change — never a
@@ -788,7 +698,7 @@ test("cover letter: a typography format change re-renders the letter preview (pi
   // (4) the LETTER canvas — not the resume `.document-preview` canvas —
   // repaints in response to that typography-only change.
   await expect
-    .poll(() => letterPreviewCanvas.evaluate((el: HTMLCanvasElement) => el.toDataURL()), {
+    .poll(() => letterCanvas.evaluate((el: HTMLCanvasElement) => el.toDataURL()), {
       timeout: 15000,
     })
     .not.toBe(letterBefore);
@@ -836,29 +746,17 @@ test("in-place text editing: resume + letter edits persist and reach the artifac
   await expect(page).toHaveURL(/\/applications$/);
 
   const company = `E2E Edit Co ${runId}-${testInfo.retry}`;
-  const applicationId = await createApplicationViaUi(page, { company, jd: JD });
+  const applicationId = await createApplication(page, { company, jd: JD });
   await page.goto(`/applications/${applicationId}`);
 
   // (1) tailor the resume + generate the letter, so both have real, editable
   // content.
-  await Promise.all([
-    page.waitForResponse(
-      (r) => r.url().endsWith(`/api/applications/${applicationId}/tailor`) && r.status() === 200,
-    ),
-    page.getByRole("button", { name: "Tailor", exact: true }).click(),
-  ]);
+  await tailor(page, applicationId!);
   await expectCanvasPainted(page);
 
-  await Promise.all([
-    page.waitForResponse(
-      (r) =>
-        r.url().endsWith(`/api/applications/${applicationId}/generate-letter`) &&
-        r.status() === 200,
-    ),
-    page.getByRole("button", { name: "Generate letter", exact: true }).click(),
-  ]);
-  const letterPreviewCanvas = page.locator('[data-testid="letter-preview"] canvas');
-  await expectLocatorCanvasPainted(letterPreviewCanvas);
+  await generateLetter(page, applicationId!, { status: 200 });
+  const letterCanvas = letterPreviewCanvas(page);
+  await expectLetterCanvasPainted(page);
 
   // (2) capture the PRE-EDIT baseline for the first resume item and the
   // first letter paragraph, so the later reload assertion can prove the
@@ -877,9 +775,7 @@ test("in-place text editing: resume + letter edits persist and reach the artifac
   const resumeEditedText = `${resumeBaseline} ${resumeMarker}`;
   const letterEditedText = `${letterBaseline} ${letterMarker}`;
 
-  const letterPixelsBefore = await letterPreviewCanvas.evaluate((el: HTMLCanvasElement) =>
-    el.toDataURL(),
-  );
+  const letterPixelsBefore = await letterCanvas.evaluate((el: HTMLCanvasElement) => el.toDataURL());
 
   // (3) type the markers in and blur (Tab) each field — the PATCH fires and
   // 200s.
@@ -909,7 +805,7 @@ test("in-place text editing: resume + letter edits persist and reach the artifac
   // pdf.js-painted canvas repaints (pixel-diff), proving this isn't just a
   // stale canvas that happens to still show something.
   await expect
-    .poll(() => letterPreviewCanvas.evaluate((el: HTMLCanvasElement) => el.toDataURL()), {
+    .poll(() => letterCanvas.evaluate((el: HTMLCanvasElement) => el.toDataURL()), {
       timeout: 10000,
     })
     .not.toBe(letterPixelsBefore);
@@ -941,12 +837,7 @@ test("in-place text editing: resume + letter edits persist and reach the artifac
   );
 
   // (6) lock — every edit affordance disables.
-  await Promise.all([
-    page.waitForResponse(
-      (r) => r.url().endsWith(`/api/applications/${applicationId}/lock`) && r.status() === 200,
-    ),
-    page.getByRole("button", { name: "Lock final", exact: true }).click(),
-  ]);
+  await lockFinal(page, applicationId!);
   await expect(page.getByRole("button", { name: "Unlock", exact: true })).toBeVisible();
 
   // (a) the resume text-edit control.
@@ -1040,7 +931,7 @@ test("retroactive import: blank letter -> hand-authored via in-place editing -> 
 
   const marker = `${runId}-${testInfo.retry}`;
   const company = `E2E Retro Import Co ${marker}`;
-  const applicationId = await createApplicationViaUi(page, {
+  const applicationId = await createApplication(page, {
     company,
     jd: "Retroactive-import test JD — no tailoring happens in this test.",
   });
@@ -1159,23 +1050,13 @@ test("flagging a locked application's resume as a voice source is permitted: a r
   await expect(page).toHaveURL(/\/applications$/);
 
   const company = `E2E Locked Voice Co ${runId}-${testInfo.retry}`;
-  const applicationId = await createApplicationViaUi(page, { company, jd: JD });
+  const applicationId = await createApplication(page, { company, jd: JD });
   await page.goto(`/applications/${applicationId}`);
 
-  await Promise.all([
-    page.waitForResponse(
-      (r) => r.url().endsWith(`/api/applications/${applicationId}/tailor`) && r.status() === 200,
-    ),
-    page.getByRole("button", { name: "Tailor", exact: true }).click(),
-  ]);
+  await tailor(page, applicationId!);
   await expectCanvasPainted(page);
 
-  await Promise.all([
-    page.waitForResponse(
-      (r) => r.url().endsWith(`/api/applications/${applicationId}/lock`) && r.status() === 200,
-    ),
-    page.getByRole("button", { name: "Lock final", exact: true }).click(),
-  ]);
+  await lockFinal(page, applicationId!);
   await expect(page.getByRole("button", { name: "Unlock", exact: true })).toBeVisible();
 
   const before = await (await page.request.get("/api/profile")).json();
