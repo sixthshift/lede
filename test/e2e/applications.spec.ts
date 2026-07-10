@@ -693,3 +693,185 @@ test("cover letter: a failed generation surfaces a distinct failed badge, never 
   await expect(page.getByRole("button", { name: "Undo letter", exact: true })).toBeDisabled();
   expect(await page.locator('[data-testid="letter-preview"] canvas').count()).toBe(0);
 });
+
+// ── T34: in-place text editing (resume + letter) and locked read-only. Own
+// application, same rationale as the letter tests above (generation/editing
+// is independent of the main lifecycle test's applicationId). ──
+test("in-place text editing: resume + letter edits persist and reach the artifact; locked disables every affordance and 409s", async ({
+  page,
+}, testInfo) => {
+  const pageErrors: unknown[] = [];
+  const consoleErrors: string[] = [];
+  let loggedIn = false;
+  page.on("pageerror", (err) => pageErrors.push(err));
+  page.on("console", (msg) => {
+    if (msg.type() !== "error") return;
+    // Same exact-match allowlist as the tests above — see that comment for
+    // the full rationale of each entry.
+    if (
+      !loggedIn &&
+      msg.text() ===
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ) {
+      return;
+    }
+    if (
+      !loggedIn &&
+      msg.text() === "Failed to load resource: the server responded with a status of 409 (Conflict)"
+    ) {
+      return;
+    }
+    if (msg.text() === "Failed to load resource: net::ERR_FILE_NOT_FOUND") {
+      return;
+    }
+    consoleErrors.push(msg.text());
+  });
+
+  await page.goto("/");
+  await login(page, PASSWORD);
+  loggedIn = true;
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `E2E Edit Co ${runId}-${testInfo.retry}`;
+  const applicationId = await createApplicationViaUi(page, { company, jd: JD });
+  await page.goto(`/applications/${applicationId}`);
+
+  // (1) tailor the resume + generate the letter, so both have real, editable
+  // content.
+  await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().endsWith(`/api/applications/${applicationId}/tailor`) && r.status() === 200,
+    ),
+    page.getByRole("button", { name: "Tailor", exact: true }).click(),
+  ]);
+  await expectCanvasPainted(page);
+
+  await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/generate-letter`) &&
+        r.status() === 200,
+    ),
+    page.getByRole("button", { name: "Generate letter", exact: true }).click(),
+  ]);
+  const letterPreviewCanvas = page.locator('[data-testid="letter-preview"] canvas');
+  await expectLocatorCanvasPainted(letterPreviewCanvas);
+
+  // (2) capture the PRE-EDIT baseline for the first resume item and the
+  // first letter paragraph, so the later reload assertion can prove the
+  // edit is non-vacuous (a no-op would leave these identical).
+  const resumeItemField = page.locator('[data-testid="resume-edit-item-0"]');
+  const letterParagraphField = page.locator('[data-testid="letter-edit-paragraph-0"]');
+  await expect(resumeItemField).toBeVisible();
+  await expect(letterParagraphField).toBeVisible();
+
+  const resumeBaseline = await resumeItemField.inputValue();
+  const letterBaseline = await letterParagraphField.inputValue();
+
+  const runUniqueMarker = `${runId}-${testInfo.retry}`;
+  const resumeMarker = `RESUME EDIT MARKER ${runUniqueMarker}`;
+  const letterMarker = `LETTER EDIT MARKER ${runUniqueMarker}`;
+  const resumeEditedText = `${resumeBaseline} ${resumeMarker}`;
+  const letterEditedText = `${letterBaseline} ${letterMarker}`;
+
+  const letterPixelsBefore = await letterPreviewCanvas.evaluate((el: HTMLCanvasElement) =>
+    el.toDataURL(),
+  );
+
+  // (3) type the markers in and blur (Tab) each field — the PATCH fires and
+  // 200s.
+  await resumeItemField.fill(resumeEditedText);
+  const [resumePatchResponse] = await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/resume-part`) &&
+        r.request().method() === "PATCH",
+    ),
+    resumeItemField.press("Tab"),
+  ]);
+  expect(resumePatchResponse.status()).toBe(200);
+
+  await letterParagraphField.fill(letterEditedText);
+  const [letterPatchResponse] = await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/letter-part`) &&
+        r.request().method() === "PATCH",
+    ),
+    letterParagraphField.press("Tab"),
+  ]);
+  expect(letterPatchResponse.status()).toBe(200);
+
+  // (4) the edited ARTIFACT reflects the edit — the letter preview's OWN
+  // pdf.js-painted canvas repaints (pixel-diff), proving this isn't just a
+  // stale canvas that happens to still show something.
+  await expect
+    .poll(() => letterPreviewCanvas.evaluate((el: HTMLCanvasElement) => el.toDataURL()), {
+      timeout: 10000,
+    })
+    .not.toBe(letterPixelsBefore);
+
+  // ...and the resume side: a REAL downloaded PDF (not merely "a canvas
+  // painted") extracts to text containing the resume marker — same
+  // extractPdfText proof the lifecycle test's (4a) step uses.
+  const [resumeDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Download PDF" }).click(),
+  ]);
+  const resumeDownloadPath = await resumeDownload.path();
+  expect(resumeDownloadPath, "Download PDF must produce a real saved file").toBeTruthy();
+  const resumeExtractedText = (await extractPdfText(readFileSync(resumeDownloadPath!))).join(" ");
+  expect(resumeExtractedText, "the edited resume PDF must contain the marker").toContain(
+    resumeMarker,
+  );
+
+  // (5) reload — the edits persist VERBATIM, and each differs from its
+  // captured pre-edit baseline (non-vacuous).
+  await page.reload();
+  await expect(page.locator('[data-testid="resume-edit-item-0"]')).toHaveValue(resumeEditedText);
+  await expect(page.locator('[data-testid="resume-edit-item-0"]')).not.toHaveValue(resumeBaseline);
+  await expect(page.locator('[data-testid="letter-edit-paragraph-0"]')).toHaveValue(
+    letterEditedText,
+  );
+  await expect(page.locator('[data-testid="letter-edit-paragraph-0"]')).not.toHaveValue(
+    letterBaseline,
+  );
+
+  // (6) lock — every edit affordance disables.
+  await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().endsWith(`/api/applications/${applicationId}/lock`) && r.status() === 200,
+    ),
+    page.getByRole("button", { name: "Lock final", exact: true }).click(),
+  ]);
+  await expect(page.getByRole("button", { name: "Unlock", exact: true })).toBeVisible();
+
+  // (a) the resume text-edit control.
+  await expect(page.locator('[data-testid="resume-edit-item-0"]')).toBeDisabled();
+  // (b) the letter text-edit control.
+  await expect(page.locator('[data-testid="letter-edit-paragraph-0"]')).toBeDisabled();
+  // (c) the insert button.
+  await expect(page.locator('[data-testid="letter-insert-paragraph-0"]')).toBeDisabled();
+  // (d) the remove button.
+  await expect(page.locator('[data-testid="letter-remove-paragraph-0"]')).toBeDisabled();
+
+  // (7) a WELL-FORMED PATCH to the (now locked) resume-part route 409s, and
+  // a GET shows the row byte-unchanged by the failed attempt.
+  const lockedRowBefore = await (
+    await page.request.get(`/api/applications/${applicationId}`)
+  ).json();
+
+  const lockedPatchResponse = await page.request.patch(
+    `/api/applications/${applicationId}/resume-part`,
+    { data: { path: { kind: "summary" }, text: "must never be written — locked" } },
+  );
+  expect(lockedPatchResponse.status()).toBe(409);
+
+  const lockedRowAfter = await (
+    await page.request.get(`/api/applications/${applicationId}`)
+  ).json();
+  expect(JSON.stringify(lockedRowAfter)).toBe(JSON.stringify(lockedRowBefore));
+
+  expect(pageErrors, `unexpected page errors: ${pageErrors.join(", ")}`).toHaveLength(0);
+  expect(consoleErrors, `unexpected console errors: ${consoleErrors.join(", ")}`).toHaveLength(0);
+});
