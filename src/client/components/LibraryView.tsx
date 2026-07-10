@@ -1,7 +1,7 @@
 // Browse/delete entries, grouped by Section — spec.md §13. Grouping/labels
 // come from the section registry only; never from tag-based scoring (§1).
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { Entry, Section } from "@shared/types";
 import { SECTIONS, SECTION_VALUES } from "@shared/sections";
 import { useEntries, useDeleteEntry } from "../hooks/queries";
@@ -44,12 +44,20 @@ export function LibraryView() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [layoutOpen, setLayoutOpen] = useState(false);
 
+  // Whichever control (Add entry / Edit selected) most recently opened
+  // EntryEditor — a non-modal panel with no owned trigger of its own (see
+  // EntryEditor.tsx). Captured at click time so EntryEditor can focus it back
+  // on close, regardless of which of the two buttons invoked it.
+  const editorTriggerRef = useRef<HTMLElement | null>(null);
+
   function openCreate() {
+    editorTriggerRef.current = document.activeElement as HTMLElement | null;
     setEditingEntry(undefined);
     setEditorOpen(true);
   }
 
   function openEdit(entry: Entry) {
+    editorTriggerRef.current = document.activeElement as HTMLElement | null;
     setEditingEntry(entry);
     setEditorOpen(true);
   }
@@ -139,7 +147,12 @@ export function LibraryView() {
         )}
       </div>
 
-      <EntryEditor open={editorOpen} onOpenChange={setEditorOpen} entry={editingEntry} />
+      <EntryEditor
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        entry={editingEntry}
+        triggerRef={editorTriggerRef}
+      />
       <ProfileEditor open={profileOpen} onOpenChange={setProfileOpen} />
       <LayoutEditor open={layoutOpen} onOpenChange={setLayoutOpen} />
     </div>

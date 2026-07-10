@@ -12,6 +12,7 @@ import {
   submitAndClose,
   openEditFor,
   cardFor,
+  assertNoModalOverlay,
 } from "./helpers/workspace";
 
 // Unique per test run so assertions never collide with seeded data
@@ -59,6 +60,74 @@ test.describe("experience section", () => {
   test("delete: removing the entry drops it from the list", async ({ page }) => {
     await cardFor(page, edited).getByRole("button", { name: "Delete" }).click();
     await expect(page.getByText(edited, { exact: true })).toHaveCount(0);
+  });
+});
+
+// ── v3-T021: de-modal EntryEditor ── the Add-entry and Edit-selected panels
+// are non-modal (Radix `modal={false}`, no owned DialogTrigger — see
+// EntryEditor.tsx): no aria-modal, no oversized overlay, the underlying page
+// stays genuinely clickable, focus opens into the panel, and Escape returns
+// focus to whichever button invoked it. Same bar v3-T020 set for
+// NewApplication (applications.spec.ts), reused here via assertNoModalOverlay.
+test.describe("de-modal EntryEditor (v3-T021)", () => {
+  test("Add entry panel: non-modal, underlying toolbar stays clickable, focus opens into the panel, Escape returns focus to the trigger", async ({
+    page,
+  }) => {
+    const trigger = page.getByRole("button", { name: "Add entry" });
+    await trigger.click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    await assertNoModalOverlay(page);
+
+    // Focus opens INTO the panel (the Section field), not left on the trigger.
+    await expect(dialog.getByRole("combobox", { name: "Section" })).toBeFocused();
+
+    // The underlying toolbar stays genuinely interactive: a real, un-forced
+    // click on Import synchronously opens a native file chooser (via a
+    // hidden <input type=file>'s own .click()) — proof nothing invisible is
+    // intercepting the click, not merely that the element "exists".
+    const [fileChooser] = await Promise.all([
+      page.waitForEvent("filechooser"),
+      page.getByRole("button", { name: "Import" }).click(),
+    ]);
+    expect(fileChooser.isMultiple()).toBe(false);
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
+  test("Edit selected panel: non-modal, focus opens into the panel, Escape returns focus to the trigger", async ({
+    page,
+  }) => {
+    const created = `E2E modality fact ${runId}`;
+
+    const createDialog = await openAddEntry(page);
+    await createDialog.getByLabel(/^Company/).fill("Modality E2E Co");
+    await createDialog.getByLabel(/^Role/).fill("Engineer");
+    await createDialog.getByLabel(/^Period/).fill("2021-2022");
+    await createDialog.getByLabel("Facts 1", { exact: true }).fill(created);
+    await submitAndClose(createDialog, "Create entry");
+
+    await page.getByRole("combobox", { name: "Choose entry to edit" }).click();
+    await page.getByRole("option", { name: `Experience: ${created}`, exact: true }).click();
+    const trigger = page.getByRole("button", { name: "Edit selected" });
+    await trigger.click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    await assertNoModalOverlay(page);
+    await expect(dialog.getByRole("combobox", { name: "Section" })).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+
+    // Scratch entry cleanup — keeps this test's fixture out of any other
+    // test's list assertions.
+    await cardFor(page, created).getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByText(created, { exact: true })).toHaveCount(0);
   });
 });
 

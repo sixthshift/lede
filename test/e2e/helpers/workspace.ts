@@ -293,10 +293,37 @@ export async function distinctColorCount(canvas: Locator): Promise<number> {
   });
 }
 
-// ── Library CRUD ── LibraryView's add/edit-entry dialog flow (spec.md §13),
+// ── Modality ban ── the shared "non-modal" oracle: no aria-modal, and no
+// fixed/absolute-positioned element covers more than half the viewport.
+// Ported from applications.spec.ts's own local assertNoModalOverlay (the
+// definition v3-T020 established for NewApplication) so library-crud.spec.ts
+// can hold EntryEditor (v3-T021) to the identical bar.
+export async function assertNoModalOverlay(page: Page): Promise<void> {
+  expect(await page.locator('[aria-modal="true"]').count()).toBe(0);
+  const viewport = page.viewportSize();
+  expect(viewport, "viewport size must be known").toBeTruthy();
+  const oversizedOverlayCount = await page.evaluate((viewportArea) => {
+    const elements = Array.from(document.querySelectorAll("body *"));
+    return elements.filter((el) => {
+      const style = getComputedStyle(el);
+      if (style.position !== "fixed" && style.position !== "absolute") return false;
+      const rect = el.getBoundingClientRect();
+      return (rect.width * rect.height) / viewportArea > 0.5;
+    }).length;
+  }, viewport!.width * viewport!.height);
+  expect(
+    oversizedOverlayCount,
+    "no fixed/absolute-positioned element may cover more than half the viewport",
+  ).toBe(0);
+}
+
+// ── Library CRUD ── LibraryView's add/edit-entry panel flow (spec.md §13),
 // lifted verbatim from library-crud.spec.ts. Edit's entry point is a
 // `${section label}: ${entry.facts[0]}` picker option, since EntryCard's own
-// Edit button is a disabled stub.
+// Edit button is a disabled stub. Since v3-T021, the panel is a non-modal
+// `role="dialog"` (Radix `modal={false}`, no overlay/focus-trap — see
+// EntryEditor.tsx) rather than the former modal Dialog; same accessible
+// role/labels/button text, so these selectors are unchanged.
 export async function openAddEntry(page: Page): Promise<Locator> {
   await page.getByRole("button", { name: "Add entry" }).click();
   const dialog = page.getByRole("dialog");

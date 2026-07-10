@@ -1,16 +1,33 @@
-// ONE Dialog for create + edit, for every Section — spec.md §13. The section
+// ONE panel for create + edit, for every Section — spec.md §13. The section
 // registry (@shared/sections) + META_FIELDS (SectionMetaFields) decide which
 // fields render; there is no per-section editor. Selection/ordering is out of
 // scope here — this only edits an Entry's own facts/tags/meta (§1: never
 // derived from tags).
-
+//
+// Non-modal by construction (v3-T021, same approach as v3-T020's
+// NewApplication): built directly on @radix-ui/react-dialog's `modal={false}`
+// mode rather than the shared ui/dialog.tsx wrapper (which stays modal for
+// its other, legitimately-modal consumers). `modal={false}` skips the overlay
+// entirely and disables the focus trap/outside-pointer lock.
+//
+// Unlike NewApplication, this panel has no single owned trigger — LibraryView
+// opens it from two different buttons ("Add entry" and "Edit selected"), so
+// it can't rely on Radix's own DialogTrigger/triggerRef plumbing (that ref is
+// a single slot; two independent trigger buttons would fight over it). The
+// caller instead passes `triggerRef`, a ref it points at whichever control
+// was just clicked (document.activeElement at click time), and this
+// component focuses that element back manually on close — the same
+// return-focus contract NewApplication gets for free from Radix, reproduced
+// by hand for the two-trigger case. For the same reason the panel docks to a
+// fixed viewport corner rather than anchoring under one particular trigger.
 import { useEffect, useState } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { X } from "lucide-react";
 import type { Entry, EntryMeta, Section } from "@shared/types";
 import { SECTIONS, SECTION_VALUES } from "@shared/sections";
 import type { EntryInput } from "../api";
 import { useCreateEntry, useUpdateEntry } from "../hooks/queries";
 import { Button } from "./ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -122,11 +139,15 @@ export function EntryEditor({
   onOpenChange,
   entry,
   defaultSection = "experience",
+  triggerRef,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   entry?: Entry;
   defaultSection?: Section;
+  /** The control that opened this instance, captured by the caller at click
+   * time — focused back manually on close (see file header comment). */
+  triggerRef?: React.RefObject<HTMLElement | null>;
 }) {
   const [state, setState] = useState<FormState>(() => buildInitialState(entry, defaultSection));
   const [errors, setErrors] = useState<string[]>([]);
@@ -186,11 +207,35 @@ export function EntryEditor({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{entry ? "Edit entry" : "Add entry"}</DialogTitle>
-        </DialogHeader>
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} modal={false}>
+      <DialogPrimitive.Content
+        className="fixed right-6 top-6 z-20 flex max-h-[85vh] w-[30rem] max-w-[90vw] flex-col gap-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg"
+        onOpenAutoFocus={(e) => {
+          // Land focus on the first field rather than the panel container.
+          e.preventDefault();
+          document.getElementById("entry-section")?.focus();
+        }}
+        onCloseAutoFocus={(e) => {
+          // No owned DialogTrigger to auto-restore to (see file header) —
+          // return focus to whichever control the caller says opened us.
+          e.preventDefault();
+          triggerRef?.current?.focus();
+        }}
+      >
+        <div className="flex items-start justify-between">
+          <DialogPrimitive.Title className="text-lg font-semibold leading-none tracking-tight text-foreground">
+            {entry ? "Edit entry" : "Add entry"}
+          </DialogPrimitive.Title>
+          <DialogPrimitive.Close asChild>
+            <button
+              type="button"
+              className="rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </button>
+          </DialogPrimitive.Close>
+        </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
@@ -270,13 +315,13 @@ export function EntryEditor({
             </ul>
           ) : null}
 
-          <DialogFooter>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-2">
             <Button type="submit" disabled={isPending}>
               {entry ? "Save changes" : "Create entry"}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Root>
   );
 }
