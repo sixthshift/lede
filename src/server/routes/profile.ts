@@ -42,4 +42,33 @@ export function profileRoutes(app: FastifyInstance, db: Db): void {
     } = db.select().from(profile).where(eq(profile.id, 1)).get()!;
     return reply.code(200).send(rest);
   });
+
+  // ── delete a voice source (§ voice-source epic) — the flag route (T42,
+  // routes/applications.ts) is the ONLY door IN; this is the door OUT. A
+  // missing id is a 404 (mirrors applications.ts's not_found idiom) rather
+  // than a silent no-op 200, so a client can distinguish "already gone" from
+  // "deleted just now". ──
+  app.delete<{ Params: { vid: string } }>(
+    "/api/profile/voice-sources/:vid",
+    async (request, reply) => {
+      const row = db.select().from(profile).where(eq(profile.id, 1)).get()!;
+      const index = row.voiceSources.findIndex((source) => source.id === request.params.vid);
+      if (index === -1) {
+        return reply.code(404).send({ error: "not_found" });
+      }
+
+      const voiceSources = row.voiceSources.filter((_, i) => i !== index);
+      db.update(profile)
+        .set({ voiceSources, updatedAt: Date.now() })
+        .where(eq(profile.id, 1))
+        .run();
+
+      const {
+        id: _id,
+        updatedAt: _updatedAt,
+        ...rest
+      } = db.select().from(profile).where(eq(profile.id, 1)).get()!;
+      return reply.code(200).send(rest);
+    },
+  );
 }

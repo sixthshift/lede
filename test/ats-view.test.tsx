@@ -16,7 +16,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
 import type { Profile, TailoredResume } from "@shared/types";
 import { AtsView } from "../src/client/components/AtsView";
-import { plainText } from "../src/client/document/plainText";
+import { plainText } from "@shared/plainText";
 
 afterEach(() => {
   cleanup();

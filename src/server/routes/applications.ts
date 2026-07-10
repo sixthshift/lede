@@ -3,6 +3,7 @@
 import type { FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 import { APICallError, NoObjectGeneratedError } from "ai";
 
 import {
@@ -13,9 +14,18 @@ import {
   letterPartPatchZ,
   letterParagraphInsertZ,
   letterParagraphRemoveZ,
+  VOICE_SOURCES_CAP,
 } from "@shared/schema";
 import { resolveStoredFormat } from "@shared/format-v2";
-import type { CoverLetter, Entry, ProviderId, Section, TailoredResume } from "@shared/types";
+import { plainText } from "@shared/plainText";
+import type {
+  CoverLetter,
+  Entry,
+  Profile,
+  ProviderId,
+  Section,
+  TailoredResume,
+} from "@shared/types";
 import type { Db } from "../db";
 import { applications, entries, profile, settings, secrets } from "../db/schema";
 import { loadConfig, type Config } from "../config";
@@ -45,6 +55,26 @@ function rowToEntry(row: typeof entries.$inferSelect): Entry {
   };
   if (row.framings) entry.framings = row.framings;
   return entry;
+}
+
+// Row -> domain Profile — the db column set carries nulls for unset optional
+// fields (drizzle's nullable column convention); Profile's optional fields
+// are `undefined`-shaped instead, so this mirrors rowToEntry's row->domain
+// adapter to bridge that at the one call site (flag-voice) that needs a real
+// Profile to hand plainText, rather than passing the raw row through.
+function rowToProfile(row: typeof profile.$inferSelect): Profile {
+  const p: Profile = {
+    name: row.name,
+    email: row.email,
+    links: row.links,
+    voiceSources: row.voiceSources,
+  };
+  if (row.headline) p.headline = row.headline;
+  if (row.phone) p.phone = row.phone;
+  if (row.location) p.location = row.location;
+  if (row.baseSummary) p.baseSummary = row.baseSummary;
+  if (row.photoUrl) p.photoUrl = row.photoUrl;
+  return p;
 }
 
 // Maps a tailor() failure to its distinct HTTP status — identical to
@@ -159,6 +189,20 @@ function removeLetterParagraph(letter: CoverLetter, index: number): CoverLetter 
 // extended here with the bounded documentFormatZ validator (§28.3).
 const applicationCreateWithFormat = applicationCreate.extend({ format: documentFormatZ.nullish() });
 const applicationUpdateWithFormat = applicationUpdate.extend({ format: documentFormatZ.nullish() });
+
+// ── T42 flag-voice body — the ONLY door into profile.voiceSources. .strict()
+// so an unknown kind (e.g. a cut 'other') is a 400, not silently ignored. ──
+const flagVoiceBodyZ = z.object({ kind: z.enum(["cover-letter", "resume"]) }).strict();
+
+// Joins a CoverLetter's parts into one prose string — greeting, each body
+// paragraph's text, then closing — the same deterministic join every flag
+// call produces, so the resulting voice source reads as one letter's prose
+// rather than a structural dump of {greeting,body,closing}.
+function letterProse(letter: CoverLetter): string {
+  return [letter.greeting, ...letter.body.map((paragraph) => paragraph.text), letter.closing].join(
+    "\n\n",
+  );
+}
 
 // ── stored-format read boundary (§31.1 migration, ticket E9-F0d2) ──
 // A pre-cutover database may still hold v1 JSON in these two nullable
@@ -714,6 +758,61 @@ export function applicationsRoutes(
       const row = { ...existing, letterCurrent: blankLetter, updatedAt: Date.now() };
       db.update(applications).set(row).where(eq(applications.id, existing.id)).run();
       return reply.code(200).send(row);
+    },
+  );
+
+  // ── T42 flag-voice — the ONLY door into profile.voiceSources. Flagging
+  // COPIES a FROZEN prose snapshot; it never points at the mutable
+  // `current`/`letterCurrent` (a plain string, computed once here, achieves
+  // that — nothing downstream can make it track later edits). LOCKED-
+  // PERMITTED: no `existing.locked` gate — locking blocks generation/editing,
+  // never flagging. Cap enforcement happens BEFORE append: at exactly 5
+  // sources a 6th flag 409s and the computed text is discarded, never
+  // stored — no ring-buffer eviction. ──
+  app.post<{ Params: { id: string } }>(
+    "/api/applications/:id/flag-voice",
+    async (request, reply) => {
+      const parsed = flagVoiceBodyZ.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "invalid_body", issues: parsed.error.issues });
+      }
+
+      const existingRow = db
+        .select()
+        .from(applications)
+        .where(eq(applications.id, request.params.id))
+        .get();
+      if (!existingRow) {
+        return reply.code(404).send({ error: "not_found" });
+      }
+      const existing = migrateStoredApplicationFormats(existingRow);
+      const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get()!;
+
+      let text: string;
+      if (parsed.data.kind === "resume") {
+        if (existing.current === null) {
+          return reply.code(400).send({ error: "no_source" });
+        }
+        text = plainText(existing.current, rowToProfile(profileRow));
+      } else {
+        if (existing.letterCurrent === null) {
+          return reply.code(400).send({ error: "no_source" });
+        }
+        text = letterProse(existing.letterCurrent);
+      }
+
+      if (profileRow.voiceSources.length >= VOICE_SOURCES_CAP) {
+        return reply.code(409).send({ error: "voice_cap" });
+      }
+
+      const source = { id: randomUUID(), kind: parsed.data.kind, text, at: Date.now() };
+      const voiceSources = [...profileRow.voiceSources, source];
+      db.update(profile)
+        .set({ voiceSources, updatedAt: Date.now() })
+        .where(eq(profile.id, 1))
+        .run();
+
+      return reply.code(200).send(source);
     },
   );
 

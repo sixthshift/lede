@@ -14,7 +14,7 @@
 
 import { pdf } from "@react-pdf/renderer";
 import type { Profile, TailoredResume } from "@shared/types";
-import { plainText } from "./plainText";
+import { plainText } from "@shared/plainText";
 import { renderLetterToBlob, type RenderLetterArgs } from "./renderLetter";
 import { renderResumeDocument, type RenderResumeArgs } from "./renderResume";
 
