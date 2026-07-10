@@ -25,6 +25,7 @@ import type {
   ProviderId,
   Section,
   TailoredResume,
+  VoiceSource,
 } from "@shared/types";
 import type { Db } from "../db";
 import { applications, entries, profile, settings, secrets } from "../db/schema";
@@ -75,6 +76,15 @@ function rowToProfile(row: typeof profile.$inferSelect): Profile {
   if (row.baseSummary) p.baseSummary = row.baseSummary;
   if (row.photoUrl) p.photoUrl = row.photoUrl;
   return p;
+}
+
+// voiceSources -> the one voice block both /tailor and /generate-letter ride
+// on the user message (T43). No sources ⇒ undefined, never an empty-string
+// block — that's what keeps the byte-identity guard (buildUserPrompt /
+// buildLetterUserPrompt's `!voice` short-circuit) intact for the common case.
+function voicePrompt(sources: VoiceSource[]): string | undefined {
+  if (sources.length === 0) return undefined;
+  return sources.map((s) => s.text).join("\n\n---\n\n");
 }
 
 // Maps a tailor() failure to its distinct HTTP status — identical to
@@ -419,6 +429,7 @@ export function applicationsRoutes(
         profileRow?.baseSummary,
         existing.context,
         budget,
+        voicePrompt(profileRow?.voiceSources ?? []),
       );
 
       const row = {
@@ -485,14 +496,15 @@ export function applicationsRoutes(
 
       try {
         const jdEntries = db.select().from(entries).all().map(rowToEntry);
+        const profileRow = db.select().from(profile).where(eq(profile.id, 1)).get();
 
-        // Voice conditioning is a later ticket — omitted (undefined) here.
         const letter = await tailorLetter(
           engine,
           existing.jobDescription,
           jdEntries,
           existing.motivation,
           existing.context,
+          voicePrompt(profileRow?.voiceSources ?? []),
         );
 
         const row = {
