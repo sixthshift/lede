@@ -694,6 +694,109 @@ test("cover letter: a failed generation surfaces a distinct failed badge, never 
   expect(await page.locator('[data-testid="letter-preview"] canvas').count()).toBe(0);
 });
 
+// ── T07 (coverage-audit repair): the spec's Phase 2 claims a typography
+// change on the application format visibly re-renders the LETTER preview
+// (pixel-diff, the established pattern) — this was previously only proven
+// via a mocked re-render + a real letter-canvas pixel-diff on a TEXT-EDIT
+// trigger (T34 below) + the RESUME typography pixel-diff (design.spec.ts /
+// the lifecycle test's own (4b) step). Nothing asserted a typography change
+// against the letter canvas directly. Own application, same rationale as the
+// other letter tests. ──
+test("cover letter: a typography format change re-renders the letter preview (pixel-diff)", async ({
+  page,
+}, testInfo) => {
+  const pageErrors: unknown[] = [];
+  const consoleErrors: string[] = [];
+  let loggedIn = false;
+  page.on("pageerror", (err) => pageErrors.push(err));
+  page.on("console", (msg) => {
+    if (msg.type() !== "error") return;
+    // Same exact-match allowlist as the tests above — see that comment for
+    // the full rationale of each entry.
+    if (
+      !loggedIn &&
+      msg.text() ===
+        "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ) {
+      return;
+    }
+    if (
+      !loggedIn &&
+      msg.text() === "Failed to load resource: the server responded with a status of 409 (Conflict)"
+    ) {
+      return;
+    }
+    if (msg.text() === "Failed to load resource: net::ERR_FILE_NOT_FOUND") {
+      return;
+    }
+    consoleErrors.push(msg.text());
+  });
+
+  await page.goto("/");
+  await login(page, PASSWORD);
+  loggedIn = true;
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `E2E Letter Typography Co ${runId}-${testInfo.retry}`;
+  const applicationId = await createApplicationViaUi(page, { company, jd: JD });
+  await page.goto(`/applications/${applicationId}`);
+
+  // (1) tailor the resume + generate the letter, so the letter preview has
+  // real, painted content.
+  await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().endsWith(`/api/applications/${applicationId}/tailor`) && r.status() === 200,
+    ),
+    page.getByRole("button", { name: "Tailor", exact: true }).click(),
+  ]);
+  await expectCanvasPainted(page);
+
+  await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/generate-letter`) &&
+        r.status() === 200,
+    ),
+    page.getByRole("button", { name: "Generate letter", exact: true }).click(),
+  ]);
+
+  // (2) the before-capture must be of a PAINTED (non-blank) letter canvas —
+  // proves the diff below is real content changing, not a blank canvas
+  // trivially differing from itself.
+  const letterPreviewCanvas = page.locator('[data-testid="letter-preview"] canvas');
+  await expectLocatorCanvasPainted(letterPreviewCanvas);
+  const letterBefore = await letterPreviewCanvas.evaluate((el: HTMLCanvasElement) =>
+    el.toDataURL(),
+  );
+
+  // (3) the ONLY change between captures: a DesignPanel typography control
+  // (Body font), mirroring design.spec.ts's own body-font change — never a
+  // letter regenerate, never a text edit. The application format PUT is the
+  // one shared axis both the resume preview AND the letter preview
+  // (ApplicationDetail.tsx, both driven by the same `resolvedFormat`) read.
+  const applicationPut = (r: import("@playwright/test").Response) =>
+    r.url().endsWith(`/api/applications/${applicationId}`) && r.request().method() === "PUT";
+
+  await page.getByRole("combobox", { name: "Body font" }).click();
+  const [fontPutResponse] = await Promise.all([
+    page.waitForResponse(applicationPut),
+    page.getByRole("option", { name: "Arimo (Arial)" }).click(),
+  ]);
+  expect(fontPutResponse.status()).toBe(200);
+  expect((await fontPutResponse.json()).format.fonts.body).toBe("arimo");
+
+  // (4) the LETTER canvas — not the resume `.document-preview` canvas —
+  // repaints in response to that typography-only change.
+  await expect
+    .poll(() => letterPreviewCanvas.evaluate((el: HTMLCanvasElement) => el.toDataURL()), {
+      timeout: 15000,
+    })
+    .not.toBe(letterBefore);
+
+  expect(pageErrors, `unexpected page errors: ${pageErrors.join(", ")}`).toHaveLength(0);
+  expect(consoleErrors, `unexpected console errors: ${consoleErrors.join(", ")}`).toHaveLength(0);
+});
+
 // ── T34: in-place text editing (resume + letter) and locked read-only. Own
 // application, same rationale as the letter tests above (generation/editing
 // is independent of the main lifecycle test's applicationId). ──
