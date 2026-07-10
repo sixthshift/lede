@@ -31,6 +31,7 @@ import { SEED_ENTRIES } from "../src/server/seed";
 const MODEL = "gemini-2.5-flash";
 const PROVIDER = "google" as const;
 const FIXTURES_DIR = path.join(process.cwd(), "test/fixtures/letters");
+const MAX_ATTEMPTS = 5;
 
 type Usage = {
   inputTokens?: number;
@@ -102,7 +103,12 @@ async function main() {
 
   mkdirSync(FIXTURES_DIR, { recursive: true });
 
-  const manifestFixtures: { name: string; key: string; leadingEntryId: string }[] = [];
+  const manifestFixtures: {
+    name: string;
+    key: string;
+    leadingEntryId: string;
+    attempts: number;
+  }[] = [];
   const failures: string[] = [];
   const calls: { name: string; usage: Usage }[] = [];
   const { withName } = makeUsageTrackingEngine(apiKey, calls);
@@ -110,10 +116,25 @@ async function main() {
   for (const { name, jd, target } of CONTRAST_JDS) {
     console.log(`\n[${name}] requesting live letter decision for target "${target}"...`);
 
-    const result = await recordOneLetter(withName(name), jd, SEED_ENTRIES, target);
-    if (!result.ok) {
-      failures.push(`${name}: ${result.reason}`);
-      console.error(`[${name}] FAIL: ${result.reason}`);
+    let result: Awaited<ReturnType<typeof recordOneLetter>> | undefined;
+    let attempts = 0;
+    for (; attempts < MAX_ATTEMPTS; attempts++) {
+      const attemptResult = await recordOneLetter(withName(name), jd, SEED_ENTRIES, target);
+      if (attemptResult.ok) {
+        result = attemptResult;
+        attempts += 1;
+        break;
+      }
+      console.error(
+        `[${name}] attempt ${attempts + 1}/${MAX_ATTEMPTS} FAIL: ${attemptResult.reason}`,
+      );
+      result = attemptResult;
+    }
+
+    if (!result?.ok) {
+      const reason = result?.ok === false ? result.reason : "unknown failure";
+      failures.push(`${name}: ${reason} (after ${attempts} attempt${attempts === 1 ? "" : "s"})`);
+      console.error(`[${name}] FAIL after ${attempts} attempts: ${reason}`);
       continue;
     }
 
@@ -123,8 +144,10 @@ async function main() {
       fixturePath,
       `${JSON.stringify({ key, name, decision: result.decision }, null, 2)}\n`,
     );
-    manifestFixtures.push({ name, key, leadingEntryId: target });
-    console.log(`[${name}] PASS: lead paragraph cites "${target}". Wrote ${fixturePath}`);
+    manifestFixtures.push({ name, key, leadingEntryId: target, attempts });
+    console.log(
+      `[${name}] PASS on attempt ${attempts}/${MAX_ATTEMPTS}: lead paragraph cites "${target}". Wrote ${fixturePath}`,
+    );
   }
 
   const manifest = {
