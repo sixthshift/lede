@@ -370,3 +370,49 @@ export const LetterDecisionZ = z.object({
     .min(1),
   closing: z.string(),
 });
+
+// ── T32 letter-part edit — mirrors resumePartPatchZ's shape/rationale
+// exactly: a part is addressed by a stable path, carrying ONLY a replacement
+// string. `.strict()` on both the outer body and every path variant keeps a
+// structural field (groundedOn included) unrepresentable here — this PATCH
+// can only ever change one paragraph's/greeting's/closing's text, never
+// insert/remove/reorder (that's letterParagraphInsertZ/RemoveZ below). ──
+const letterPartPathZ = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("greeting") }).strict(),
+  z.object({ kind: z.literal("body"), index: z.number().int().min(0) }).strict(),
+  z.object({ kind: z.literal("closing") }).strict(),
+]);
+
+export const letterPartPatchZ = z
+  .object({
+    path: letterPartPathZ,
+    text: z.string(),
+  })
+  .strict();
+
+// ── T32 paragraph insert — the letter's one structural allowance (locked
+// decision: the letter, unlike the resume, permits paragraph insert/remove
+// since prose structure IS the user's). `groundedOn` IS declared here (so a
+// client that naively mirrors CoverLetter's shape gets a clean 200, not a
+// baffling 400 for a field that shape-matches storage) but the route ALWAYS
+// overwrites it to `[]` when constructing the stored paragraph — never
+// trusts this value — closing the hand-authored-laundering vector at the
+// point of construction rather than leaving it to schema omission alone. ──
+export const letterParagraphInsertZ = z
+  .object({
+    position: z.number().int().min(0),
+    text: z.string(),
+    groundedOn: z.array(z.string()).optional(),
+  })
+  .strict();
+
+// ── T32 paragraph remove — index-addressed via a route param (DELETE has no
+// conventional body in this codebase's other routes), hence z.coerce: Fastify
+// params always arrive as strings. Out-of-range (or non-numeric) is the
+// route's 400 to raise (mirrors resumePartPatchZ's out-of-range-index
+// handling). ──
+export const letterParagraphRemoveZ = z
+  .object({
+    index: z.coerce.number().int().min(0),
+  })
+  .strict();

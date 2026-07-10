@@ -10,9 +10,12 @@ import {
   applicationUpdate,
   documentFormatZ,
   resumePartPatchZ,
+  letterPartPatchZ,
+  letterParagraphInsertZ,
+  letterParagraphRemoveZ,
 } from "@shared/schema";
 import { resolveStoredFormat } from "@shared/format-v2";
-import type { Entry, ProviderId, Section, TailoredResume } from "@shared/types";
+import type { CoverLetter, Entry, ProviderId, Section, TailoredResume } from "@shared/types";
 import type { Db } from "../db";
 import { applications, entries, profile, settings, secrets } from "../db/schema";
 import { loadConfig, type Config } from "../config";
@@ -101,6 +104,55 @@ function applyResumePartPatch(
       };
     }),
   };
+}
+
+// Resolves a letterPartPatchZ path against a CoverLetter and returns a
+// letter with ONLY that part's text replaced — a fresh object, never a
+// mutation of the input. Editing a body paragraph preserves its groundedOn
+// untouched (mirrors applyResumePartPatch's text-only-replacement contract).
+// Returns null when the path doesn't resolve (body index past the end) —
+// the route turns that into 400.
+function applyLetterPartPatch(
+  letter: CoverLetter,
+  path: { kind: "greeting" } | { kind: "body"; index: number } | { kind: "closing" },
+  text: string,
+): CoverLetter | null {
+  if (path.kind === "greeting") return { ...letter, greeting: text };
+  if (path.kind === "closing") return { ...letter, closing: text };
+
+  if (!letter.body[path.index]) return null;
+  return {
+    ...letter,
+    body: letter.body.map((paragraph, i) =>
+      i === path.index ? { ...paragraph, text } : paragraph,
+    ),
+  };
+}
+
+// Inserts a new hand-authored body paragraph at `position` (0..body.length,
+// inclusive — position === body.length appends). ALWAYS stores
+// `groundedOn: []` regardless of whatever the client's request carried under
+// that key (letterParagraphInsertZ declares it only so a client isn't 400'd
+// for a field that mirrors CoverLetter's own shape) — a hand-added paragraph
+// is authored, not validated, and can never launder a fabricated groundedOn
+// claim through this path. Returns null when position is out of range.
+function insertLetterParagraph(
+  letter: CoverLetter,
+  position: number,
+  text: string,
+): CoverLetter | null {
+  if (position > letter.body.length) return null;
+  const body = letter.body.slice();
+  body.splice(position, 0, { text, groundedOn: [] });
+  return { ...letter, body };
+}
+
+// Removes the body paragraph at `index`. Returns null when out of range.
+function removeLetterParagraph(letter: CoverLetter, index: number): CoverLetter | null {
+  if (!letter.body[index]) return null;
+  const body = letter.body.slice();
+  body.splice(index, 1);
+  return { ...letter, body };
 }
 
 // applicationCreate/Update (@shared/schema) don't own DocumentFormat —
@@ -495,6 +547,171 @@ export function applicationsRoutes(
       }
 
       const row = { ...existing, current: updatedCurrent, updatedAt: Date.now() };
+      db.update(applications).set(row).where(eq(applications.id, existing.id)).run();
+      return reply.code(200).send(row);
+    },
+  );
+
+  // ── T32 letter-part text edit — richer than the resume's (LOCKED decision:
+  // letter prose structure IS the user's), but this route itself is
+  // text-level only, mirroring /resume-part exactly: letterPartPatchZ is
+  // .strict() so a structural field (groundedOn included) can't ride along.
+  // Editing a body paragraph preserves its groundedOn untouched. Mutates
+  // `letterCurrent` IN PLACE — never touches `current`/letterPrevious/
+  // letterGenState — and is NOT fabrication-validated (hand-edits are
+  // trusted authorship). A locked application 409s, same as /resume-part. ──
+  app.patch<{ Params: { id: string } }>(
+    "/api/applications/:id/letter-part",
+    async (request, reply) => {
+      const parsed = letterPartPatchZ.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "invalid_body", issues: parsed.error.issues });
+      }
+
+      const existingRow = db
+        .select()
+        .from(applications)
+        .where(eq(applications.id, request.params.id))
+        .get();
+      if (!existingRow) {
+        return reply.code(404).send({ error: "not_found" });
+      }
+      const existing = migrateStoredApplicationFormats(existingRow);
+
+      if (existing.locked !== null) {
+        return reply.code(409).send({ error: "locked" });
+      }
+      if (existing.letterCurrent === null) {
+        return reply.code(400).send({ error: "invalid_path" });
+      }
+
+      const updatedLetter = applyLetterPartPatch(
+        existing.letterCurrent,
+        parsed.data.path,
+        parsed.data.text,
+      );
+      if (updatedLetter === null) {
+        return reply.code(400).send({ error: "invalid_path" });
+      }
+
+      const row = { ...existing, letterCurrent: updatedLetter, updatedAt: Date.now() };
+      db.update(applications).set(row).where(eq(applications.id, existing.id)).run();
+      return reply.code(200).send(row);
+    },
+  );
+
+  // ── T32 letter paragraph insert — the letter's one structural allowance:
+  // a hand-added paragraph ALWAYS carries groundedOn:[] (see
+  // insertLetterParagraph's comment) — server-forced, not client-trusted.
+  // Position out of range / locked / no letterCurrent -> 400/409, mirroring
+  // /letter-part. ──
+  app.post<{ Params: { id: string } }>(
+    "/api/applications/:id/letter-part/paragraph",
+    async (request, reply) => {
+      const parsed = letterParagraphInsertZ.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "invalid_body", issues: parsed.error.issues });
+      }
+
+      const existingRow = db
+        .select()
+        .from(applications)
+        .where(eq(applications.id, request.params.id))
+        .get();
+      if (!existingRow) {
+        return reply.code(404).send({ error: "not_found" });
+      }
+      const existing = migrateStoredApplicationFormats(existingRow);
+
+      if (existing.locked !== null) {
+        return reply.code(409).send({ error: "locked" });
+      }
+      if (existing.letterCurrent === null) {
+        return reply.code(400).send({ error: "invalid_path" });
+      }
+
+      const updatedLetter = insertLetterParagraph(
+        existing.letterCurrent,
+        parsed.data.position,
+        parsed.data.text,
+      );
+      if (updatedLetter === null) {
+        return reply.code(400).send({ error: "invalid_path" });
+      }
+
+      const row = { ...existing, letterCurrent: updatedLetter, updatedAt: Date.now() };
+      db.update(applications).set(row).where(eq(applications.id, existing.id)).run();
+      return reply.code(200).send(row);
+    },
+  );
+
+  // ── T32 letter paragraph remove — index out of range / locked / no
+  // letterCurrent -> 400/409, mirroring /letter-part. Index rides the URL
+  // (a route param, coerced by letterParagraphRemoveZ) rather than a DELETE
+  // body, matching this route's REST shape (index addresses a resource, it
+  // isn't a field being written). ──
+  app.delete<{ Params: { id: string; index: string } }>(
+    "/api/applications/:id/letter-part/paragraph/:index",
+    async (request, reply) => {
+      const parsed = letterParagraphRemoveZ.safeParse({ index: request.params.index });
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "invalid_body", issues: parsed.error.issues });
+      }
+
+      const existingRow = db
+        .select()
+        .from(applications)
+        .where(eq(applications.id, request.params.id))
+        .get();
+      if (!existingRow) {
+        return reply.code(404).send({ error: "not_found" });
+      }
+      const existing = migrateStoredApplicationFormats(existingRow);
+
+      if (existing.locked !== null) {
+        return reply.code(409).send({ error: "locked" });
+      }
+      if (existing.letterCurrent === null) {
+        return reply.code(400).send({ error: "invalid_path" });
+      }
+
+      const updatedLetter = removeLetterParagraph(existing.letterCurrent, parsed.data.index);
+      if (updatedLetter === null) {
+        return reply.code(400).send({ error: "invalid_path" });
+      }
+
+      const row = { ...existing, letterCurrent: updatedLetter, updatedAt: Date.now() };
+      db.update(applications).set(row).where(eq(applications.id, existing.id)).run();
+      return reply.code(200).send(row);
+    },
+  );
+
+  // ── T32 blank letter creation — the retroactive-import entry point: a
+  // letter draft may be created blank, with NO model call / engine
+  // resolution at all (locked decision). letterGenState stays "untailored"
+  // (the non-generated value) — this is not a generation, so it never enters
+  // the tailoring/tailored/failed taxonomy that /generate-letter drives.
+  // letterPrevious is left untouched: this route only ever writes
+  // letterCurrent, mirroring how /resume-part touches only `current`. ──
+  app.post<{ Params: { id: string } }>(
+    "/api/applications/:id/letter-blank",
+    async (request, reply) => {
+      const existingRow = db
+        .select()
+        .from(applications)
+        .where(eq(applications.id, request.params.id))
+        .get();
+      if (!existingRow) {
+        return reply.code(404).send({ error: "not_found" });
+      }
+      const existing = migrateStoredApplicationFormats(existingRow);
+
+      if (existing.locked !== null) {
+        return reply.code(409).send({ error: "locked" });
+      }
+
+      const blankLetter: CoverLetter = { greeting: "", body: [], closing: "" };
+      const row = { ...existing, letterCurrent: blankLetter, updatedAt: Date.now() };
       db.update(applications).set(row).where(eq(applications.id, existing.id)).run();
       return reply.code(200).send(row);
     },
