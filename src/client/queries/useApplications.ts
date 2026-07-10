@@ -17,6 +17,8 @@ import {
   patchLetterPart,
   insertLetterParagraph,
   removeLetterParagraph,
+  createBlankLetter,
+  flagVoice,
 } from "../api";
 import type {
   ApplicationCreateInput,
@@ -162,6 +164,34 @@ export function useRemoveLetterParagraph() {
     mutationFn: ({ id, index }: { id: string; index: number }) => removeLetterParagraph(id, index),
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ["applications", updated.id] });
+    },
+  });
+}
+
+// ── T32 blank letter — the retroactive-import entry point (create app ->
+// blank letter -> hand-author -> flag). No model call. ──
+export function useCreateBlankLetter() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => createBlankLetter(id),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["applications", updated.id] });
+    },
+  });
+}
+
+// ── T44 flag-voice — the ONLY door into profile.voiceSources. Permitted on a
+// locked application (flagging copies, never edits), so this is never gated
+// on isLocked by its callers. Invalidates ['profile'] (not the application,
+// which flagging never mutates) so ProfileEditor's voice-sources list
+// refreshes. ──
+export function useFlagVoice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, kind }: { id: string; kind: "cover-letter" | "resume" }) =>
+      flagVoice(id, kind),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
     },
   });
 }

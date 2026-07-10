@@ -11,6 +11,7 @@ import {
   updateEntry,
   fetchProfile,
   updateProfile,
+  deleteVoiceSource,
   fetchSettings,
   updateSettings,
   authSetup,
@@ -74,6 +75,20 @@ export function useUpdateProfile() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: ProfileInput) => updateProfile(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
+  });
+}
+
+// ── T42/T44 voice sources — the delete route is the ONLY door OUT (the
+// flag-voice route, src/client/queries/useApplications.ts's useFlagVoice, is
+// the only door IN); success invalidates ['profile'] so ProfileEditor's list
+// refreshes off the server's own updated row. ──
+export function useDeleteVoiceSource() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vid: string) => deleteVoiceSource(vid),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
     },
