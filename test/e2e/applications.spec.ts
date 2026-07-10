@@ -53,6 +53,7 @@ import {
   expectLetterCanvasPainted,
   switchPreviewDoc,
   distinctColorCount,
+  canvasSnapshot,
 } from "./helpers/workspace";
 
 const PASSWORD = "correct horse battery staple e2e applications";
@@ -1357,4 +1358,141 @@ test("WorkspaceShell drawer: below 1280px the preview pane starts non-co-visible
   const canvas = resumePreviewCanvas(page);
   await expectResumeCanvasPainted(page);
   await expect.poll(() => distinctColorCount(canvas), { timeout: 10000 }).toBeGreaterThan(1);
+});
+
+// ── v3-T013: rail-driven navigation + collapse over the editor pane's three
+// sections (Job details / Cover letter / Design — WORKSPACE_SECTIONS in
+// ApplicationDetail.tsx). Own applications, same rationale as the
+// WorkspaceShell tests above. ──
+
+test("rail nav (v3-T013): activating an out-of-view section scrolls/focuses its heading without touching the URL, remounting the preview, or repainting it", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `E2E Rail Nav Co ${runId}-${testInfo.retry}`;
+  const applicationId = await createApplication(page, { company, jd: JD });
+  await page.goto(`/applications/${applicationId}`);
+  await tailor(page, applicationId);
+  await expectCanvasPainted(page);
+
+  const canvas = resumePreviewCanvas(page);
+  const canvasBefore = await canvasSnapshot(canvas);
+
+  // Mark the canvas's own DOM node — surviving the nav click below (rather
+  // than a fresh node with no marker) is the proof nav is a pure scroll/
+  // focus, never a remount of the preview.
+  await canvas.evaluate((el) => {
+    (el as unknown as Record<string, string>).__t013CanvasMarker = "same-node";
+  });
+
+  // Design is the LAST of the three editor sections — with the editor
+  // pane scrolled to its top, its heading starts below the fold (out of
+  // the page viewport) without any extra scrolling.
+  const editorPane = page.getByTestId("editor-pane");
+  await editorPane.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  const designHeading = page.getByTestId("workspace-section-heading-design");
+  await expect(designHeading).not.toBeInViewport();
+
+  const urlBefore = page.url();
+
+  await page.getByTestId("rail-nav-design").click();
+
+  // Positive: the heading is unconditionally in the viewport. Since nav
+  // also focuses it, activeElement is this same heading — which must be
+  // visible too (it always is: collapse only folds `children`, never the
+  // heading itself).
+  await expect(designHeading).toBeInViewport();
+  await expect(designHeading).toBeVisible();
+  const activeTestId = await page.evaluate(
+    () => document.activeElement?.getAttribute("data-testid") ?? null,
+  );
+  expect(activeTestId).toBe("workspace-section-heading-design");
+
+  expect(page.url()).toBe(urlBefore);
+
+  const markerSurvived = await canvas.evaluate(
+    (el) => (el as unknown as Record<string, string>).__t013CanvasMarker === "same-node",
+  );
+  expect(markerSurvived, "rail nav must not remount the preview canvas").toBe(true);
+
+  const canvasAfter = await canvasSnapshot(canvas);
+  expect(canvasAfter, "rail nav must not repaint/disrupt the preview").toBe(canvasBefore);
+});
+
+test("rail collapse (v3-T013, protocol E): folding a section is local view-state only — zero application/settings network writes, a localStorage collapse key, a pixel-identical preview, and untouched settings.layout/application.format", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `E2E Rail Collapse Co ${runId}-${testInfo.retry}`;
+  const applicationId = await createApplication(page, { company, jd: JD });
+  await page.goto(`/applications/${applicationId}`);
+  await tailor(page, applicationId);
+  await expectCanvasPainted(page);
+
+  const applicationBefore = await (
+    await page.request.get(`/api/applications/${applicationId}`)
+  ).json();
+  const settingsBefore = await (await page.request.get("/api/settings")).json();
+
+  const canvas = resumePreviewCanvas(page);
+  const canvasBefore = await canvasSnapshot(canvas);
+
+  const writes: string[] = [];
+  page.on("request", (req) => {
+    const method = req.method();
+    const url = req.url();
+    if (
+      (method === "PUT" || method === "PATCH" || method === "POST") &&
+      (/\/api\/applications\//.test(url) || /\/api\/settings/.test(url))
+    ) {
+      writes.push(`${method} ${url}`);
+    }
+  });
+
+  const letterBody = page.getByTestId("workspace-section-body-letter");
+  await expect(letterBody).toBeVisible();
+
+  await page.getByTestId("rail-collapse-letter").click();
+
+  await expect(letterBody).toBeHidden();
+  await expect(page.getByTestId("rail-collapse-letter")).toHaveAttribute("aria-expanded", "false");
+
+  // The toggle's own handler is synchronous (setState + a localStorage
+  // write) — this beat is only to let an ACCIDENTAL fire-and-forget
+  // request surface before asserting zero, not to await a legitimate one.
+  await page.waitForTimeout(300);
+  expect(writes, "collapsing a section must never write to the server").toEqual([]);
+
+  const storageValue = await page.evaluate(
+    (id) => window.localStorage.getItem(`lede.workspace.sectionCollapse.${id}`),
+    applicationId,
+  );
+  expect(storageValue, "collapse state must be persisted to localStorage").toBeTruthy();
+  expect(JSON.parse(storageValue!)).toMatchObject({ letter: true });
+
+  const canvasAfter = await canvasSnapshot(canvas);
+  expect(canvasAfter, "collapsing an editor section must not disrupt the preview").toBe(
+    canvasBefore,
+  );
+
+  const applicationAfter = await (
+    await page.request.get(`/api/applications/${applicationId}`)
+  ).json();
+  const settingsAfter = await (await page.request.get("/api/settings")).json();
+  expect(applicationAfter.format, "collapse must never mutate the application's format").toEqual(
+    applicationBefore.format,
+  );
+  expect(settingsAfter.layout, "collapse must never mutate settings.layout").toEqual(
+    settingsBefore.layout,
+  );
 });

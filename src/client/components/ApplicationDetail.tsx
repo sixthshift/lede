@@ -12,8 +12,8 @@
 // card's controls (never its preview), and the design card all live in the
 // editor pane instead, since they aren't the artifact itself.
 
-import { ArrowLeft, BookOpen, Clock } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, BookOpen, ChevronDown, Clock } from "lucide-react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
 import type { UserPreset } from "@shared/schema";
@@ -22,6 +22,7 @@ import { ApiError } from "../api";
 import { downloadLetterPdf, downloadResumePdf, downloadResumeText } from "../document/download";
 import { fitToPages, type FitResult } from "../document/fit";
 import { useProfile, useSettings, useUpdateSettings } from "../hooks/queries";
+import { cn } from "../lib/utils";
 import {
   useApplication,
   useCreateBlankLetter,
@@ -107,6 +108,80 @@ export function useFit(args: {
   }, [resume, profile, format, paper, targetPages]);
 
   return { fit, fitError };
+}
+
+// v3-T013: the rail's own list of navigable/collapsible editor regions —
+// deliberately the SAME three cards the editor pane already renders in this
+// fixed JSX order (Job details -> Cover letter -> Design). This registry
+// only supplies labels for the rail; it is not a second ordering source —
+// section ORDER still comes from the JSX below (which itself defers to
+// sectionDisplay.order/settings.layout for anything document-facing).
+const WORKSPACE_SECTIONS = [
+  { key: "job", label: "Job details" },
+  { key: "letter", label: "Cover letter" },
+  { key: "design", label: "Design" },
+] as const;
+type WorkspaceSectionKey = (typeof WORKSPACE_SECTIONS)[number]["key"];
+
+// Collapse is editor VIEW-STATE only (§ locked constraints) — persisted to
+// localStorage, scoped per application, and NEVER written to the server:
+// settings.layout/sectionDisplay/format stay untouched by anything in this
+// file.
+function collapseStorageKey(applicationId: string): string {
+  return `lede.workspace.sectionCollapse.${applicationId}`;
+}
+
+function readCollapsedSections(
+  applicationId: string,
+): Partial<Record<WorkspaceSectionKey, boolean>> {
+  try {
+    const raw = window.localStorage.getItem(collapseStorageKey(applicationId));
+    return raw ? (JSON.parse(raw) as Partial<Record<WorkspaceSectionKey, boolean>>) : {};
+  } catch {
+    return {};
+  }
+}
+
+// A collapsible editor region: the heading stays mounted and focusable
+// regardless of collapse state (it's the rail's scroll/focus target — a
+// collapsed section must still be navigable-TO, just folded once you get
+// there), and only `children` folds away. Deliberately NOT a heading role —
+// the cards it wraps (Cover letter, Design) already carry their own real
+// CardTitle heading, so a second element with an overlapping accessible
+// name would break any `getByRole("heading", { name: ... })` lookup against
+// them. This is a rail/nav landmark, not new document outline content — the
+// label reuses the rail's own company/eyebrow token treatment rather than
+// introducing a new style.
+function EditorSection({
+  sectionKey,
+  label,
+  collapsed,
+  headingRef,
+  children,
+}: {
+  sectionKey: WorkspaceSectionKey;
+  label: string;
+  collapsed: boolean;
+  headingRef: (el: HTMLDivElement | null) => void;
+  children: ReactNode;
+}) {
+  return (
+    <section data-testid={`workspace-section-${sectionKey}`} className="flex flex-col gap-3">
+      <div
+        ref={headingRef}
+        tabIndex={-1}
+        data-testid={`workspace-section-heading-${sectionKey}`}
+        className="font-mono text-xs uppercase tracking-wider text-muted-foreground outline-none"
+      >
+        {label}
+      </div>
+      {collapsed ? null : (
+        <div data-testid={`workspace-section-body-${sectionKey}`} className="flex flex-col gap-6">
+          {children}
+        </div>
+      )}
+    </section>
+  );
 }
 
 // A flag mutation's error surfaced next to its button — the cap (§ voice-
@@ -198,6 +273,44 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   });
   const density = fit?.density;
 
+  // v3-T013: rail-driven nav + collapse over the editor pane's sections
+  // (above). Computed ahead of the isLoading/isError early returns for the
+  // same reason as useFit — hooks can't be called conditionally — even
+  // though `application` itself isn't needed yet: `applicationId` alone is
+  // enough to key the localStorage-persisted collapse state.
+  const [collapsedSections, setCollapsedSections] = useState<
+    Partial<Record<WorkspaceSectionKey, boolean>>
+  >(() => readCollapsedSections(applicationId));
+  const headingRefs = useRef<Partial<Record<WorkspaceSectionKey, HTMLDivElement | null>>>({});
+
+  // Reseed collapse state whenever a different application is loaded.
+  useEffect(() => {
+    setCollapsedSections(readCollapsedSections(applicationId));
+  }, [applicationId]);
+
+  function setHeadingRef(key: WorkspaceSectionKey, el: HTMLDivElement | null) {
+    headingRefs.current[key] = el;
+  }
+
+  // Collapse never reaches the server — the toggle only flips local state
+  // and re-serializes it to localStorage; nothing here calls a mutation.
+  function toggleSection(key: WorkspaceSectionKey) {
+    setCollapsedSections((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      window.localStorage.setItem(collapseStorageKey(applicationId), JSON.stringify(next));
+      return next;
+    });
+  }
+
+  // Scrolls the section's heading to the top of the editor pane's scroll
+  // container and focuses it — never touches the URL or the preview pane.
+  function navigateToSection(key: WorkspaceSectionKey) {
+    const el = headingRefs.current[key];
+    if (!el) return;
+    el.scrollIntoView({ block: "start" });
+    el.focus();
+  }
+
   if (isLoading) {
     return (
       <div className="flex flex-col gap-6 p-6">
@@ -268,6 +381,42 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
           {isTailoring ? <span className="text-xs text-muted-foreground">Tailoring…</span> : null}
         </div>
       </div>
+
+      {/* v3-T013: one row per editor section — order follows the SAME fixed
+          JSX order the editor pane below renders in (no second ordering
+          source). Each row navigates (scrolls/focuses the section's
+          heading, never the URL) and collapses (view-state only,
+          localStorage-persisted, never a server write). */}
+      <nav aria-label="Sections" data-testid="rail-nav" className="flex flex-col gap-1">
+        {WORKSPACE_SECTIONS.map((section) => {
+          const collapsed = Boolean(collapsedSections[section.key]);
+          return (
+            <div key={section.key} className="flex items-center gap-1">
+              <button
+                type="button"
+                data-testid={`rail-nav-${section.key}`}
+                onClick={() => navigateToSection(section.key)}
+                className="flex-1 truncate rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {section.label}
+              </button>
+              <button
+                type="button"
+                aria-expanded={!collapsed}
+                aria-label={`${collapsed ? "Expand" : "Collapse"} ${section.label}`}
+                data-testid={`rail-collapse-${section.key}`}
+                onClick={() => toggleSection(section.key)}
+                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <ChevronDown
+                  aria-hidden
+                  className={cn("h-3.5 w-3.5 transition-transform", collapsed && "-rotate-90")}
+                />
+              </button>
+            </div>
+          );
+        })}
+      </nav>
     </div>
   );
 
@@ -344,144 +493,165 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
         ) : null}
       </div>
 
-      <JobPanel application={application} />
+      <EditorSection
+        sectionKey="job"
+        label="Job details"
+        collapsed={Boolean(collapsedSections.job)}
+        headingRef={(el) => setHeadingRef("job", el)}
+      >
+        <JobPanel application={application} />
+      </EditorSection>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
+      <EditorSection
+        sectionKey="letter"
+        label="Cover letter"
+        collapsed={Boolean(collapsedSections.letter)}
+        headingRef={(el) => setHeadingRef("letter", el)}
+      >
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle className="text-md">Cover letter</CardTitle>
+                <CardDescription>
+                  Generated independently of the resume — its own draw on your Library, this job's
+                  JD, and Motivation above.
+                </CardDescription>
+              </div>
+              <GenStateBadge state={application.letterGenState} kind="letter" />
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              {isLetterGenerating ? (
+                <span className="text-sm text-muted-foreground">Generating…</span>
+              ) : null}
+              <Button
+                onClick={() => generateLetter.mutate(application.id)}
+                disabled={isLetterGenerating}
+              >
+                {letterLabel}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => undoLetter.mutate(application.id)}
+                disabled={!application.letterPrevious || undoLetter.isPending}
+              >
+                Undo letter
+              </Button>
+              <Button
+                variant="outline"
+                disabled={!application.letterCurrent || !profile}
+                onClick={() =>
+                  profile &&
+                  application.letterCurrent &&
+                  downloadLetterPdf({
+                    letter: application.letterCurrent,
+                    profile,
+                    paper,
+                    format: resolvedFormat,
+                    company: application.company,
+                    role: application.role,
+                  })
+                }
+              >
+                Download cover letter
+              </Button>
+              <Button
+                variant="outline"
+                disabled={!application.letterCurrent || flagVoiceLetter.isPending}
+                data-testid="flag-voice-letter"
+                onClick={() => flagVoiceLetter.mutate({ id: application.id, kind: "cover-letter" })}
+              >
+                Use as a voice source
+              </Button>
+            </div>
+            {flagVoiceLetter.isError ? (
+              <p role="alert" className="text-xs text-destructive">
+                {flagVoiceErrorMessage(flagVoiceLetter.error)}
+              </p>
+            ) : null}
+
+            {!application.letterCurrent ? (
+              <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border-strong py-12 text-center">
+                <BookOpen
+                  aria-hidden
+                  className="h-8 w-8 text-muted-foreground/60"
+                  strokeWidth={1.5}
+                />
+                <div>
+                  <p className="text-sm font-medium">No cover letter yet</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Generate pulls from your Library, this job's JD, and Motivation above — or{" "}
+                    hand-author one from scratch.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isLocked || createBlankLetter.isPending}
+                  data-testid="create-blank-letter"
+                  onClick={() => createBlankLetter.mutate(application.id)}
+                >
+                  Create blank letter
+                </Button>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      </EditorSection>
+
+      <EditorSection
+        sectionKey="design"
+        label="Design"
+        collapsed={Boolean(collapsedSections.design)}
+        headingRef={(el) => setHeadingRef("design", el)}
+      >
+        <Card>
+          <CardHeader>
             <div>
-              <CardTitle className="text-md">Cover letter</CardTitle>
+              <CardTitle className="text-md">Design</CardTitle>
               <CardDescription>
-                Generated independently of the resume — its own draw on your Library, this job's JD,
-                and Motivation above.
+                {isLocked
+                  ? "Locked — this reflects the look frozen at lock time. Unlock to edit."
+                  : "Template and formatting for this application's document. Changes repaint the preview live."}
               </CardDescription>
             </div>
-            <GenStateBadge state={application.letterGenState} kind="letter" />
-          </div>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-2">
-            {isLetterGenerating ? (
-              <span className="text-sm text-muted-foreground">Generating…</span>
-            ) : null}
-            <Button
-              onClick={() => generateLetter.mutate(application.id)}
-              disabled={isLetterGenerating}
-            >
-              {letterLabel}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => undoLetter.mutate(application.id)}
-              disabled={!application.letterPrevious || undoLetter.isPending}
-            >
-              Undo letter
-            </Button>
-            <Button
-              variant="outline"
-              disabled={!application.letterCurrent || !profile}
-              onClick={() =>
-                profile &&
-                application.letterCurrent &&
-                downloadLetterPdf({
-                  letter: application.letterCurrent,
-                  profile,
-                  paper,
-                  format: resolvedFormat,
-                  company: application.company,
-                  role: application.role,
-                })
-              }
-            >
-              Download cover letter
-            </Button>
-            <Button
-              variant="outline"
-              disabled={!application.letterCurrent || flagVoiceLetter.isPending}
-              data-testid="flag-voice-letter"
-              onClick={() => flagVoiceLetter.mutate({ id: application.id, kind: "cover-letter" })}
-            >
-              Use as a voice source
-            </Button>
-          </div>
-          {flagVoiceLetter.isError ? (
-            <p role="alert" className="text-xs text-destructive">
-              {flagVoiceErrorMessage(flagVoiceLetter.error)}
-            </p>
-          ) : null}
-
-          {!application.letterCurrent ? (
-            <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border-strong py-12 text-center">
-              <BookOpen
-                aria-hidden
-                className="h-8 w-8 text-muted-foreground/60"
-                strokeWidth={1.5}
-              />
-              <div>
-                <p className="text-sm font-medium">No cover letter yet</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Generate pulls from your Library, this job's JD, and Motivation above — or{" "}
-                  hand-author one from scratch.
-                </p>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-6">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isLocked}
+                  onClick={handleSaveAsPreset}
+                >
+                  Save current design as preset
+                </Button>
+                <TemplateGallery
+                  format={displayFormat}
+                  onChange={handleFormatChange}
+                  readOnly={isLocked}
+                  resume={application.current}
+                  profile={profile}
+                  paper={paper}
+                  savedPresets={settings?.presets ?? []}
+                />
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isLocked || createBlankLetter.isPending}
-                data-testid="create-blank-letter"
-                onClick={() => createBlankLetter.mutate(application.id)}
-              >
-                Create blank letter
-              </Button>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div>
-            <CardTitle className="text-md">Design</CardTitle>
-            <CardDescription>
-              {isLocked
-                ? "Locked — this reflects the look frozen at lock time. Unlock to edit."
-                : "Template and formatting for this application's document. Changes repaint the preview live."}
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-6">
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isLocked}
-                onClick={handleSaveAsPreset}
-              >
-                Save current design as preset
-              </Button>
-              <TemplateGallery
+              <TemplatePicker
                 format={displayFormat}
                 onChange={handleFormatChange}
                 readOnly={isLocked}
                 resume={application.current}
                 profile={profile}
                 paper={paper}
-                savedPresets={settings?.presets ?? []}
               />
             </div>
-            <TemplatePicker
-              format={displayFormat}
-              onChange={handleFormatChange}
-              readOnly={isLocked}
-              resume={application.current}
-              profile={profile}
-              paper={paper}
-            />
-          </div>
-          <DesignPanel format={displayFormat} onChange={handleFormatChange} readOnly={isLocked} />
-        </CardContent>
-      </Card>
+            <DesignPanel format={displayFormat} onChange={handleFormatChange} readOnly={isLocked} />
+          </CardContent>
+        </Card>
+      </EditorSection>
 
       {application.currentMeta ? (
         <p className="flex items-center gap-2 rounded-lg bg-warn-soft px-4 py-2.5 text-sm text-warn">
