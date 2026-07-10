@@ -49,6 +49,8 @@ export function LibraryView() {
   // EntryEditor.tsx). Captured at click time so EntryEditor can focus it back
   // on close, regardless of which of the two buttons invoked it.
   const editorTriggerRef = useRef<HTMLElement | null>(null);
+  // Same contract for LayoutEditor's single "Edit layout" trigger (v3-T022).
+  const layoutTriggerRef = useRef<HTMLElement | null>(null);
 
   function openCreate() {
     editorTriggerRef.current = document.activeElement as HTMLElement | null;
@@ -60,6 +62,11 @@ export function LibraryView() {
     editorTriggerRef.current = document.activeElement as HTMLElement | null;
     setEditingEntry(entry);
     setEditorOpen(true);
+  }
+
+  function openLayout() {
+    layoutTriggerRef.current = document.activeElement as HTMLElement | null;
+    setLayoutOpen(true);
   }
 
   return (
@@ -79,7 +86,7 @@ export function LibraryView() {
           <Button size="sm" variant="outline" onClick={() => setProfileOpen(true)}>
             Edit profile
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setLayoutOpen(true)}>
+          <Button size="sm" variant="outline" onClick={openLayout}>
             Edit layout
           </Button>
           <Button size="sm" onClick={openCreate}>
@@ -154,7 +161,7 @@ export function LibraryView() {
         triggerRef={editorTriggerRef}
       />
       <ProfileEditor open={profileOpen} onOpenChange={setProfileOpen} />
-      <LayoutEditor open={layoutOpen} onOpenChange={setLayoutOpen} />
+      <LayoutEditor open={layoutOpen} onOpenChange={setLayoutOpen} triggerRef={layoutTriggerRef} />
     </div>
   );
 }

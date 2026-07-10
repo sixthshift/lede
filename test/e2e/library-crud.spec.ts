@@ -131,6 +131,107 @@ test.describe("de-modal EntryEditor (v3-T021)", () => {
   });
 });
 
+// ── v3-T022: de-modal LayoutEditor ── same bar v3-T020/T021 set for
+// NewApplication/EntryEditor: no aria-modal, no oversized overlay, the
+// underlying page stays genuinely clickable, focus opens into the panel, and
+// Escape returns focus to the "Edit layout" button that invoked it.
+test.describe("de-modal LayoutEditor (v3-T022)", () => {
+  test("Edit layout panel: opens with rows, non-modal, underlying library control stays clickable, focus opens into the panel, Escape returns focus to the trigger", async ({
+    page,
+  }) => {
+    const trigger = page.getByRole("button", { name: "Edit layout" });
+    await trigger.click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    // The panel actually opened with real rows, not an empty shell — this is
+    // the assertion attempt 1 never got past.
+    await expect(dialog.locator("[data-layout-row]").first()).toBeVisible();
+    const firstCheckbox = dialog.locator('input[type="checkbox"]').first();
+    await expect(firstCheckbox).toBeVisible();
+
+    await assertNoModalOverlay(page);
+
+    // Focus opens INTO the panel (the first row's checkbox), not left on the trigger.
+    await expect(firstCheckbox).toBeFocused();
+
+    // The underlying page stays genuinely interactive: a real, un-forced
+    // click on the toolbar's Import control synchronously opens a native
+    // file chooser (via a hidden <input type=file>'s own .click()) — proof
+    // nothing invisible is intercepting the click, not merely that the
+    // element "exists". Same proof point v3-T021 used for EntryEditor. Like
+    // EntryEditor, an outside click like this one also dismisses this
+    // non-modal panel (Radix's default outside-pointerdown dismiss), so the
+    // panel gets reopened below to test the Escape path specifically.
+    const [fileChooser] = await Promise.all([
+      page.waitForEvent("filechooser"),
+      page.getByRole("button", { name: "Import" }).click(),
+    ]);
+    expect(fileChooser.isMultiple()).toBe(false);
+    await expect(dialog).toBeHidden();
+
+    await trigger.click();
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
+  test("round-trip: toggling a section's Enable checkbox and saving persists across reload", async ({
+    page,
+  }) => {
+    await page.getByRole("button", { name: "Edit layout" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    const row = dialog.locator('[data-layout-row="interest"]');
+    const checkbox = row.locator('input[type="checkbox"]');
+    await expect(checkbox).toBeVisible();
+    const wasChecked = await checkbox.isChecked();
+
+    await checkbox.click();
+    await expect(checkbox).toBeChecked({ checked: !wasChecked });
+
+    await Promise.all([
+      page.waitForResponse(
+        (r) =>
+          r.url().endsWith("/api/settings") && r.request().method() === "PUT" && r.status() === 200,
+      ),
+      dialog.getByRole("button", { name: "Save layout" }).click(),
+    ]);
+    await expect(dialog).toBeHidden();
+
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Add entry" })).toBeVisible();
+
+    // A fresh GET (not just the UI re-reading its own cache) reflects the change.
+    const settingsAfterReload = await (await page.request.get("/api/settings")).json();
+    const persisted = settingsAfterReload.layout.find(
+      (r: { section: string }) => r.section === "interest",
+    );
+    expect(persisted.enabled).toBe(!wasChecked);
+
+    // Re-open and assert the new state renders in the UI too.
+    await page.getByRole("button", { name: "Edit layout" }).click();
+    const dialog2 = page.getByRole("dialog");
+    await expect(dialog2).toBeVisible();
+    const checkbox2 = dialog2.locator('[data-layout-row="interest"] input[type="checkbox"]');
+    await expect(checkbox2).toBeVisible();
+    await expect(checkbox2).toBeChecked({ checked: !wasChecked });
+
+    // Restore original state so this test doesn't leak a mutation to the rest of the suite.
+    await checkbox2.click();
+    await Promise.all([
+      page.waitForResponse(
+        (r) =>
+          r.url().endsWith("/api/settings") && r.request().method() === "PUT" && r.status() === 200,
+      ),
+      dialog2.getByRole("button", { name: "Save layout" }).click(),
+    ]);
+    await expect(dialog2).toBeHidden();
+  });
+});
+
 test.describe("project section", () => {
   const created = `E2E project fact ${runId}`;
   const edited = `E2E project fact EDITED ${runId}`;

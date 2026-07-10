@@ -1,14 +1,32 @@
 // Section order/visibility for the resume — spec.md §17. This orders and
 // toggles WHOLE sections (settings.layout); the tailor orders items WITHIN a
 // section (@shared/sections). Labels come from the section registry only.
-
-import { useEffect, useState } from "react";
-import { ArrowDown, ArrowUp } from "lucide-react";
+//
+// Non-modal by construction (v3-T022, same approach as v3-T020's
+// NewApplication / v3-T021's EntryEditor): built directly on
+// @radix-ui/react-dialog's `modal={false}` mode rather than the shared
+// ui/dialog.tsx wrapper (which stays modal for its other, legitimately-modal
+// consumers). `modal={false}` skips the overlay entirely and disables the
+// focus trap/outside-pointer lock.
+//
+// Like EntryEditor, this panel has no owned trigger of its own — LibraryView
+// opens it from its single "Edit layout" button and passes `triggerRef` (the
+// button captured at click time) so focus can be restored to it on close.
+//
+// Unlike EntryEditor's fields (populated synchronously from a prop), the
+// rows here come from useSettings() — settings can still be loading the
+// first time this panel opens (LibraryView never warms that query before
+// then), so `onOpenAutoFocus` firing at mount time is not reliable: the
+// checkbox may not exist yet. Focus is instead driven by an effect keyed on
+// `open` AND the row list actually being populated, so it lands as soon as
+// the first row exists, whenever that is.
+import { useEffect, useRef, useState } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { X, ArrowDown, ArrowUp } from "lucide-react";
 import type { Layout } from "@shared/types";
 import { SECTIONS } from "@shared/sections";
 import { useSettings, useUpdateSettings } from "../hooks/queries";
 import { Button } from "./ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 
 function labelFor(section: Layout[number]["section"]): string {
   return section === "summary" ? "Summary" : SECTIONS[section].label;
@@ -17,15 +35,20 @@ function labelFor(section: Layout[number]["section"]): string {
 export function LayoutEditor({
   open,
   onOpenChange,
+  triggerRef,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** The control that opened this instance, focused back manually on close
+   * (see file header comment — same contract as EntryEditor's triggerRef). */
+  triggerRef?: React.RefObject<HTMLElement | null>;
 }) {
   const { data: settings } = useSettings();
   const updateSettings = useUpdateSettings();
 
   const [layout, setLayout] = useState<Layout>([]);
   const [error, setError] = useState<string | undefined>(undefined);
+  const firstCheckboxRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -34,6 +57,14 @@ export function LayoutEditor({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, settings]);
+
+  // Land focus on the first row's checkbox once it exists — settings (and so
+  // `layout`) may still be loading at the instant the panel opens.
+  useEffect(() => {
+    if (open && layout.length > 0) {
+      firstCheckboxRef.current?.focus();
+    }
+  }, [open, layout.length]);
 
   function move(i: number, dir: -1 | 1) {
     const j = i + dir;
@@ -59,11 +90,34 @@ export function LayoutEditor({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Edit layout</DialogTitle>
-        </DialogHeader>
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} modal={false}>
+      <DialogPrimitive.Content
+        className="fixed right-6 top-6 z-20 flex max-h-[85vh] w-[26rem] max-w-[90vw] flex-col gap-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg"
+        onOpenAutoFocus={(e) => {
+          // Focus is actually driven by the effect above (rows may not exist
+          // yet at this instant) — just keep Radix from focusing the panel
+          // container itself.
+          e.preventDefault();
+        }}
+        onCloseAutoFocus={(e) => {
+          e.preventDefault();
+          triggerRef?.current?.focus();
+        }}
+      >
+        <div className="flex items-start justify-between">
+          <DialogPrimitive.Title className="text-lg font-semibold leading-none tracking-tight text-foreground">
+            Edit layout
+          </DialogPrimitive.Title>
+          <DialogPrimitive.Close asChild>
+            <button
+              type="button"
+              className="rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </button>
+          </DialogPrimitive.Close>
+        </div>
 
         <div className="flex flex-col gap-2">
           {layout.map((row, i) => (
@@ -74,6 +128,7 @@ export function LayoutEditor({
             >
               <label className="flex flex-1 items-center gap-2 text-sm">
                 <input
+                  ref={i === 0 ? firstCheckboxRef : undefined}
                   type="checkbox"
                   aria-label={`Enable ${labelFor(row.section)}`}
                   checked={row.enabled}
@@ -111,12 +166,12 @@ export function LayoutEditor({
           </p>
         ) : null}
 
-        <DialogFooter>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-2">
           <Button type="button" onClick={handleSave} disabled={updateSettings.isPending}>
             Save layout
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Root>
   );
 }
