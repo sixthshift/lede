@@ -3,6 +3,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Section } from "@shared/types";
+import type { UserPreset } from "@shared/schema";
 import {
   fetchEntries,
   deleteEntry,
@@ -18,7 +19,15 @@ import {
   setApiKey,
   deleteApiKey,
 } from "../api";
-import type { EntryInput, ProfileInput, SettingsInput } from "../api";
+import type { EntryInput, ProfileInput, SettingsInput, SettingsResponse } from "../api";
+
+// The server's GET/PUT /api/settings has round-tripped `presets` since
+// E9-F5b (src/server/routes/settings.ts's currentSettings), but api.ts's
+// SettingsResponse type — outside this ticket's declared files — was never
+// widened to say so. Widened here instead, at the query boundary, rather
+// than touching api.ts: every consumer of useSettings() sees the field its
+// server response has actually always carried.
+type SettingsWithPresets = SettingsResponse & { presets: UserPreset[] };
 
 export function useEntries(section?: Section) {
   return useQuery({
@@ -72,7 +81,10 @@ export function useUpdateProfile() {
 }
 
 export function useSettings() {
-  return useQuery({ queryKey: ["settings"] as const, queryFn: fetchSettings });
+  return useQuery({
+    queryKey: ["settings"] as const,
+    queryFn: async () => (await fetchSettings()) as SettingsWithPresets,
+  });
 }
 
 export function useUpdateSettings() {

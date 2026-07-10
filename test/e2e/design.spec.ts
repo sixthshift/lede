@@ -227,6 +227,75 @@ test("design view: deep link, debounced persistence, multi-page host, locked rea
   await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Body font" })).toBeVisible();
 
+  // (7b) E9-F5d — save-current-as-preset -> saved-presets gallery round trip.
+  // Design at this point is arimo + Employer first (persisted by (5)/(6b));
+  // that full snapshot is what gets saved and, later below, re-applied.
+  const settingsPut = (r: import("@playwright/test").Response) =>
+    r.url().endsWith("/api/settings") && r.request().method() === "PUT";
+
+  const PRESET_NAME = `E2E Preset ${runId}`;
+  page.once("dialog", (dialog) => dialog.accept(PRESET_NAME));
+  const [savePutResponse] = await Promise.all([
+    page.waitForResponse(settingsPut),
+    page.getByRole("button", { name: "Save current design as preset" }).click(),
+  ]);
+  expect(savePutResponse.status()).toBe(200);
+  const savedPresetsAfterSave = (await savePutResponse.json()).presets as Array<{
+    name: string;
+    format: { fonts: { body: string } };
+  }>;
+  const savedEntry = savedPresetsAfterSave.find((p) => p.name === PRESET_NAME);
+  expect(savedEntry, "the new preset must be in the persisted presets[]").toBeTruthy();
+  expect(savedEntry?.format.fonts.body).toBe("arimo");
+
+  // The saved preset appears in the gallery immediately (same settings query
+  // cache the mutation just invalidated), with its ATS grade badge.
+  await page.getByRole("button", { name: "Browse templates" }).click();
+  await expect(page.getByRole("heading", { name: "Browse templates" })).toBeVisible();
+  await expect(page.getByText("Your saved presets")).toBeVisible();
+  const savedPresetButton = page.getByRole("button", { name: new RegExp(`^${PRESET_NAME}`) });
+  await expect(savedPresetButton).toBeVisible();
+  await expect(savedPresetButton.getByText(/^ATS: (strict|good)$/)).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
+
+  // Diverge the live design AWAY from the saved snapshot — a different body
+  // font — so re-applying the preset below is an observable change.
+  await page.getByRole("combobox", { name: "Body font" }).click();
+  const [divergePutResponse] = await Promise.all([
+    page.waitForResponse(applicationPut),
+    page.getByRole("option", { name: "Roboto" }).click(),
+  ]);
+  expect(divergePutResponse.status()).toBe(200);
+  expect((await divergePutResponse.json()).format.fonts.body).toBe("roboto");
+  await expectCanvasPainted(page);
+
+  // Reload — both the diverged application format AND the saved preset
+  // (persisted server-side via settings) survive a fresh mount.
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Body font" })).toHaveText(/Roboto/);
+  await expectCanvasPainted(page);
+
+  await page.getByRole("button", { name: "Browse templates" }).click();
+  await expect(page.getByText("Your saved presets")).toBeVisible();
+  const savedPresetButtonAfterReload = page.getByRole("button", {
+    name: new RegExp(`^${PRESET_NAME}`),
+  });
+  await expect(savedPresetButtonAfterReload).toBeVisible();
+
+  // Selecting it applies its stored format DIRECTLY — the body font flips
+  // back to arimo (the format it held at save time), proving the round trip.
+  const [applyPutResponse] = await Promise.all([
+    page.waitForResponse(applicationPut),
+    savedPresetButtonAfterReload.click(),
+  ]);
+  expect(applyPutResponse.status()).toBe(200);
+  expect((await applyPutResponse.json()).format.fonts.body).toBe("arimo");
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(page.getByRole("combobox", { name: "Body font" })).toHaveText(/Arimo/);
+  await expectCanvasPainted(page);
+
   // (8) lock the application (back on the detail page — DesignView itself
   // carries no lock/unlock action, spec.md §28.3) — every control on the
   // design view goes read-only, but the preview stays live.

@@ -16,8 +16,9 @@ import { ArrowLeft, BookOpen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
+import type { UserPreset } from "@shared/schema";
 import type { Paper } from "@shared/types";
-import { useProfile, useSettings } from "../hooks/queries";
+import { useProfile, useSettings, useUpdateSettings } from "../hooks/queries";
 import { useApplication, useUpdateApplication } from "../queries/useApplications";
 import { useFit } from "./ApplicationDetail";
 import { DesignPanel } from "./DesignPanel";
@@ -26,6 +27,7 @@ import { FitChip } from "./FitChip";
 import { GenStateBadge } from "./GenStateBadge";
 import { TemplateGallery } from "./TemplateGallery";
 import { TemplatePicker } from "./TemplatePicker";
+import { Button } from "./ui/button";
 import { Skeleton } from "./ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
@@ -66,6 +68,7 @@ export function DesignView({ applicationId }: { applicationId: string }) {
   const { data: profile } = useProfile();
   const { data: settings } = useSettings();
   const updateApplication = useUpdateApplication();
+  const updateSettings = useUpdateSettings();
   const isNarrow = useIsNarrowViewport();
 
   // Same resolution rules as ApplicationDetail (§28.3): locked freezes the
@@ -115,6 +118,17 @@ export function DesignView({ applicationId }: { applicationId: string }) {
     }, DEBOUNCE_MS);
   }
 
+  // Saves the FULL current in-memory format as a new named preset
+  // (settings.presets, §9/E9-F5b) — a complete DocumentFormatV2 snapshot, not
+  // a composition delta, so selecting it back later applies it directly
+  // (TemplateGallery's onChange(savedPreset.format), never applyPreset).
+  function handleSaveAsPreset() {
+    const name = window.prompt("Name this preset")?.trim();
+    if (!name) return;
+    const preset: UserPreset = { id: crypto.randomUUID(), name, format: displayFormat };
+    updateSettings.mutate({ presets: [...(settings?.presets ?? []), preset] });
+  }
+
   if (isLoading) {
     return (
       <div className="flex flex-col gap-6">
@@ -133,7 +147,10 @@ export function DesignView({ applicationId }: { applicationId: string }) {
 
   const controls = (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button type="button" variant="outline" disabled={isLocked} onClick={handleSaveAsPreset}>
+          Save current design as preset
+        </Button>
         <TemplateGallery
           format={displayFormat}
           onChange={handleChange}
@@ -142,6 +159,7 @@ export function DesignView({ applicationId }: { applicationId: string }) {
           profile={profile}
           paper={paper}
           applicationId={applicationId}
+          savedPresets={settings?.presets ?? []}
         />
       </div>
       <TemplatePicker

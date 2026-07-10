@@ -10,8 +10,9 @@ import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
 import type { Profile, TailoredResume } from "@shared/types";
+import type { UserPreset } from "@shared/schema";
 import { DEFAULT_FORMAT_V2 } from "../src/shared/format-v2";
-import { atsGradeCauses, PRESET_MANIFESTS } from "../src/client/document/registry";
+import { atsGrade, atsGradeCauses, PRESET_MANIFESTS } from "../src/client/document/registry";
 import { applyPreset, PRESET_IDS } from "../src/client/document/presets";
 import { TemplateGallery } from "../src/client/components/TemplateGallery";
 
@@ -169,5 +170,130 @@ describe("TemplateGallery", () => {
     // Disabled buttons don't fire click handlers even if "clicked".
     fireEvent.click(cardButtons[0]!);
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  // E9-F5d — saved presets (settings.presets) render as their own section,
+  // distinct from the built-in roster above: a full format snapshot, not a
+  // composition delta, so selecting one applies it directly (no applyPreset).
+  describe("saved presets (E9-F5d)", () => {
+    function savedPreset(overrides: Partial<UserPreset> = {}): UserPreset {
+      return {
+        id: "user-preset-1",
+        name: "My Strict Look",
+        format: DEFAULT_FORMAT_V2,
+        ...overrides,
+      };
+    }
+
+    it("with no saved presets, no 'Your saved presets' section renders", () => {
+      render(
+        <TemplateGallery
+          format={DEFAULT_FORMAT_V2}
+          onChange={vi.fn()}
+          resume={resumeFixture()}
+          profile={profileFixture()}
+          savedPresets={[]}
+        />,
+      );
+      openGallery();
+
+      expect(screen.queryByText("Your saved presets")).not.toBeInTheDocument();
+    });
+
+    it("renders a user preset by name with its atsGrade badge when savedPresets is non-empty", () => {
+      const goodFormat = applyPreset(DEFAULT_FORMAT_V2, "sidebar-right");
+      expect(atsGrade(goodFormat)).toBe("good"); // sanity: this is the 'good' case, not 'strict'
+      const preset = savedPreset({ name: "My Sidebar", format: goodFormat });
+
+      render(
+        <TemplateGallery
+          format={DEFAULT_FORMAT_V2}
+          onChange={vi.fn()}
+          resume={resumeFixture()}
+          profile={profileFixture()}
+          savedPresets={[preset]}
+        />,
+      );
+      openGallery();
+
+      expect(screen.getByText("Your saved presets")).toBeInTheDocument();
+      expect(screen.getByText("My Sidebar")).toBeInTheDocument();
+      const card = screen.getByText("My Sidebar").closest("button") as HTMLElement;
+      expect(within(card).getByText("ATS: good")).toBeInTheDocument();
+      for (const cause of atsGradeCauses(goodFormat)) {
+        expect(within(card).getByText(cause)).toBeInTheDocument();
+      }
+    });
+
+    it("a 'strict' saved preset shows no per-cause caveat list", () => {
+      const preset = savedPreset({ name: "My Strict Look", format: DEFAULT_FORMAT_V2 });
+      render(
+        <TemplateGallery
+          format={DEFAULT_FORMAT_V2}
+          onChange={vi.fn()}
+          resume={resumeFixture()}
+          profile={profileFixture()}
+          savedPresets={[preset]}
+        />,
+      );
+      openGallery();
+
+      const card = screen.getByText("My Strict Look").closest("button") as HTMLElement;
+      expect(within(card).getByText("ATS: strict")).toBeInTheDocument();
+      expect(
+        within(card).queryByText(/strict-order ATS parsers \(Workday\/Taleo\)/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("selecting a saved preset calls onChange with its stored format DIRECTLY (not applyPreset) and closes the gallery", () => {
+      const onChange = vi.fn();
+      const currentFormat = {
+        ...DEFAULT_FORMAT_V2,
+        colors: { ...DEFAULT_FORMAT_V2.colors, accent: "#14532d" },
+      };
+      const presetFormat = applyPreset(DEFAULT_FORMAT_V2, "sidebar-right");
+      const preset = savedPreset({ name: "My Sidebar", format: presetFormat });
+
+      render(
+        <TemplateGallery
+          format={currentFormat}
+          onChange={onChange}
+          resume={resumeFixture()}
+          profile={profileFixture()}
+          savedPresets={[preset]}
+        />,
+      );
+      openGallery();
+
+      fireEvent.click(screen.getByText("My Sidebar").closest("button") as HTMLElement);
+
+      expect(onChange).toHaveBeenCalledTimes(1);
+      // The exact stored snapshot, unchanged by `currentFormat` — never
+      // applyPreset(currentFormat, ...), which would have carried over
+      // currentFormat's own accent color instead.
+      expect(onChange).toHaveBeenCalledWith(presetFormat);
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+
+    it("readOnly disables saved-preset cards too", () => {
+      const onChange = vi.fn();
+      const preset = savedPreset();
+      render(
+        <TemplateGallery
+          format={DEFAULT_FORMAT_V2}
+          onChange={onChange}
+          readOnly
+          resume={resumeFixture()}
+          profile={profileFixture()}
+          savedPresets={[preset]}
+        />,
+      );
+      openGallery();
+
+      const card = screen.getByText("My Strict Look").closest("button") as HTMLElement;
+      expect(card).toBeDisabled();
+      fireEvent.click(card);
+      expect(onChange).not.toHaveBeenCalled();
+    });
   });
 });

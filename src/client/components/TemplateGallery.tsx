@@ -16,12 +16,18 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "../lib/utils";
-import { PRESET_MANIFESTS, atsGradeCauses, effectiveAtsGrade } from "../document/registry";
+import {
+  PRESET_MANIFESTS,
+  atsGrade,
+  atsGradeCauses,
+  effectiveAtsGrade,
+} from "../document/registry";
 import { applyPreset } from "../document/presets";
 import { SAMPLE_PROFILE, SAMPLE_RESUME } from "../document/sampleResume";
 import { TemplateThumbnail } from "../document/thumbnail";
 import type { Paper, Profile, TailoredResume } from "@shared/types";
 import type { DocumentFormatV2 } from "@shared/format-v2";
+import type { UserPreset } from "@shared/schema";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
@@ -47,6 +53,7 @@ export function TemplateGallery({
   profile,
   paper = "letter",
   applicationId,
+  savedPresets = [],
 }: {
   format: DocumentFormatV2;
   onChange: (next: DocumentFormatV2) => void;
@@ -59,6 +66,12 @@ export function TemplateGallery({
   // with no application to navigate to (e.g. SettingsView's default-format
   // editor has no /applications/:id to point at).
   applicationId?: string;
+  // User-saved format snapshots (E9-F5d, settings.presets) — rendered as
+  // their own section below the built-in roster. Passed in rather than
+  // fetched here: the gallery stays a pure view over whatever preset list
+  // its caller has (DesignView reads useSettings() once; a settings-less
+  // caller simply passes none).
+  savedPresets?: UserPreset[];
 }) {
   const [open, setOpen] = useState(false);
   const isSample = !resume;
@@ -154,6 +167,59 @@ export function TemplateGallery({
               );
             })}
           </div>
+
+          {savedPresets.length > 0 ? (
+            <div className="mt-6 flex flex-col gap-3">
+              <h3 className="text-sm font-semibold text-muted-foreground">Your saved presets</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {savedPresets.map((preset) => {
+                  // A saved preset is a COMPLETE format snapshot, not a
+                  // composition delta — graded directly via atsGrade(format)
+                  // rather than effectiveAtsGrade(manifest, format), since
+                  // there is no PRESET_IDS manifest for a user preset id (and
+                  // effectiveAtsGrade only ever delegates to atsGrade anyway).
+                  const grade = atsGrade(preset.format);
+                  const causes = grade === "good" ? atsGradeCauses(preset.format) : [];
+
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      disabled={readOnly}
+                      aria-pressed={false}
+                      data-user-preset-id={preset.id}
+                      onClick={() => {
+                        onChange(preset.format);
+                        setOpen(false);
+                      }}
+                      className="rounded-xl border border-border/70 text-left transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Card className="h-full border-0 shadow-none">
+                        <CardHeader className="gap-1.5 space-y-0 pb-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <CardTitle className="text-sm">{preset.name}</CardTitle>
+                            <Badge variant={grade === "strict" ? "success" : "warn"}>
+                              ATS: {grade}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        {grade === "good" ? (
+                          <CardContent className="pt-0 text-xs text-muted-foreground">
+                            <p>{ATS_CAVEAT}</p>
+                            <ul className="list-disc space-y-0.5 pl-4">
+                              {causes.map((cause) => (
+                                <li key={cause}>{cause}</li>
+                              ))}
+                            </ul>
+                          </CardContent>
+                        ) : null}
+                      </Card>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </>
