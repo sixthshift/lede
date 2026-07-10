@@ -194,6 +194,11 @@ describe("applications table (§27)", () => {
       "target_pages",
       "format",
       "locked_format",
+      "motivation",
+      "letter_current",
+      "letter_previous",
+      "letter_gen_state",
+      "letter_failed_reason",
     ]);
     expect(columns).not.toContain("status");
     expect(columns).not.toContain("hiring_status");
