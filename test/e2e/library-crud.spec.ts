@@ -232,6 +232,106 @@ test.describe("de-modal LayoutEditor (v3-T022)", () => {
   });
 });
 
+// ── v3-T023: de-modal ProfileEditor ── same bar v3-T020/T021/T022 set for
+// NewApplication/EntryEditor/LayoutEditor: no aria-modal, no oversized
+// overlay, the underlying page stays genuinely clickable, focus opens into
+// the panel, and Escape returns focus to the "Edit profile" button that
+// invoked it.
+test.describe("de-modal ProfileEditor (v3-T023)", () => {
+  test("Edit profile panel: opens with fields, non-modal, underlying library control stays clickable, focus opens into the panel, Escape returns focus to the trigger", async ({
+    page,
+  }) => {
+    const trigger = page.getByRole("button", { name: "Edit profile" });
+    await trigger.click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    // The panel actually opened with a real field, not an empty shell — this
+    // is the assertion attempt 1 never got past.
+    const nameField = dialog.getByLabel("Name", { exact: true });
+    await expect(nameField).toBeVisible();
+
+    await assertNoModalOverlay(page);
+
+    // Focus opens INTO the panel (the Name field), not left on the trigger.
+    await expect(nameField).toBeFocused();
+
+    // The underlying page stays genuinely interactive: a real, un-forced
+    // click on the toolbar's Import control synchronously opens a native
+    // file chooser (via a hidden <input type=file>'s own .click()) — proof
+    // nothing invisible is intercepting the click, not merely that the
+    // element "exists". Same proof point v3-T021/T022 used. Like those
+    // panels, an outside click like this one also dismisses this non-modal
+    // panel (Radix's default outside-pointerdown dismiss), so the panel gets
+    // reopened below to test the Escape path specifically.
+    const [fileChooser] = await Promise.all([
+      page.waitForEvent("filechooser"),
+      page.getByRole("button", { name: "Import" }).click(),
+    ]);
+    expect(fileChooser.isMultiple()).toBe(false);
+    await expect(dialog).toBeHidden();
+
+    await trigger.click();
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
+
+  test("round-trip: editing the Headline and saving persists across reload", async ({ page }) => {
+    await page.getByRole("button", { name: "Edit profile" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    // Name + email are required by the form (§16) and the seeded profile
+    // ships both blank — fill them so the Save actually validates and PUTs,
+    // rather than tripping the "Name and email are required" inline error.
+    await dialog.getByLabel("Name", { exact: true }).fill("E2E Profile Owner");
+    await dialog.getByLabel("Email", { exact: true }).fill("owner@example.com");
+
+    const headlineField = dialog.getByLabel("Headline", { exact: true });
+    await expect(headlineField).toBeVisible();
+    const original = await headlineField.inputValue();
+    const updated = `E2E headline ${runId}`;
+
+    await headlineField.fill(updated);
+
+    await Promise.all([
+      page.waitForResponse(
+        (r) =>
+          r.url().endsWith("/api/profile") && r.request().method() === "PUT" && r.status() === 200,
+      ),
+      dialog.getByRole("button", { name: "Save profile" }).click(),
+    ]);
+    await expect(dialog).toBeHidden();
+
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Add entry" })).toBeVisible();
+
+    // A fresh GET (not just the UI re-reading its own cache) reflects the change.
+    const profileAfterReload = await (await page.request.get("/api/profile")).json();
+    expect(profileAfterReload.headline).toBe(updated);
+
+    // Re-open and assert the new state renders in the UI too.
+    await page.getByRole("button", { name: "Edit profile" }).click();
+    const dialog2 = page.getByRole("dialog");
+    await expect(dialog2).toBeVisible();
+    const headlineField2 = dialog2.getByLabel("Headline", { exact: true });
+    await expect(headlineField2).toHaveValue(updated);
+
+    // Restore original state so this test doesn't leak a mutation to the rest of the suite.
+    await headlineField2.fill(original);
+    await Promise.all([
+      page.waitForResponse(
+        (r) =>
+          r.url().endsWith("/api/profile") && r.request().method() === "PUT" && r.status() === 200,
+      ),
+      dialog2.getByRole("button", { name: "Save profile" }).click(),
+    ]);
+    await expect(dialog2).toBeHidden();
+  });
+});
+
 test.describe("project section", () => {
   const created = `E2E project fact ${runId}`;
   const edited = `E2E project fact EDITED ${runId}`;

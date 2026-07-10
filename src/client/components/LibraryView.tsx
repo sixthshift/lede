@@ -51,6 +51,8 @@ export function LibraryView() {
   const editorTriggerRef = useRef<HTMLElement | null>(null);
   // Same contract for LayoutEditor's single "Edit layout" trigger (v3-T022).
   const layoutTriggerRef = useRef<HTMLElement | null>(null);
+  // Same contract for ProfileEditor's single "Edit profile" trigger (v3-T023).
+  const profileTriggerRef = useRef<HTMLElement | null>(null);
 
   function openCreate() {
     editorTriggerRef.current = document.activeElement as HTMLElement | null;
@@ -69,6 +71,11 @@ export function LibraryView() {
     setLayoutOpen(true);
   }
 
+  function openProfile() {
+    profileTriggerRef.current = document.activeElement as HTMLElement | null;
+    setProfileOpen(true);
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -83,7 +90,7 @@ export function LibraryView() {
           <LibraryToolbar />
           <div aria-hidden className="mx-1 h-5 w-px bg-border" />
           {/* Profile identity + resume layout entry points — E1-F3. */}
-          <Button size="sm" variant="outline" onClick={() => setProfileOpen(true)}>
+          <Button size="sm" variant="outline" onClick={openProfile}>
             Edit profile
           </Button>
           <Button size="sm" variant="outline" onClick={openLayout}>
@@ -160,7 +167,11 @@ export function LibraryView() {
         entry={editingEntry}
         triggerRef={editorTriggerRef}
       />
-      <ProfileEditor open={profileOpen} onOpenChange={setProfileOpen} />
+      <ProfileEditor
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
+        triggerRef={profileTriggerRef}
+      />
       <LayoutEditor open={layoutOpen} onOpenChange={setLayoutOpen} triggerRef={layoutTriggerRef} />
     </div>
   );

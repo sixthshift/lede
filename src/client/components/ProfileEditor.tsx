@@ -1,14 +1,31 @@
 // Identity editor for the resume header — spec.md §16. Edits the Profile
 // singleton (name/headline/email/phone/location/links/baseSummary) only;
 // selection/ordering of resume content is out of scope here.
-
-import { useEffect, useState } from "react";
+//
+// Non-modal by construction (v3-T023, same approach as v3-T020's
+// NewApplication / v3-T021's EntryEditor / v3-T022's LayoutEditor): built
+// directly on @radix-ui/react-dialog's `modal={false}` mode rather than the
+// shared ui/dialog.tsx wrapper (which stays modal for its other, legitimately
+// -modal consumers). `modal={false}` skips the overlay entirely and disables
+// the focus trap/outside-pointer lock.
+//
+// Like LayoutEditor, this panel has no owned trigger of its own — LibraryView
+// opens it from its single "Edit profile" button and passes `triggerRef` (the
+// button captured at click time) so focus can be restored to it on close.
+//
+// Like LayoutEditor's rows (and unlike EntryEditor's fields, populated
+// synchronously from a prop), this form's state comes from useProfile() —
+// the profile query can still be loading the first time this panel opens
+// (LibraryView never warms that query before then). Focus is driven by an
+// effect keyed on `open` AND the profile query having resolved, so it lands
+// as soon as the form is populated with real data, whenever that is.
+import { useEffect, useRef, useState } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import type { Profile } from "@shared/types";
 import type { ProfileInput } from "../api";
 import { useDeleteVoiceSource, useProfile, useUpdateProfile } from "../hooks/queries";
 import { Button } from "./ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -96,15 +113,21 @@ function VoiceSourcesSection({ profile }: { profile: Profile | undefined }) {
 export function ProfileEditor({
   open,
   onOpenChange,
+  triggerRef,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** The control that opened this instance, focused back manually on close
+   * (see file header comment — same contract as LayoutEditor's triggerRef). */
+  triggerRef?: React.RefObject<HTMLElement | null>;
 }) {
   const { data: profile } = useProfile();
   const updateProfile = useUpdateProfile();
 
   const [state, setState] = useState<FormState>(() => toFormState(profile));
   const [error, setError] = useState<string | undefined>(undefined);
+  const nameFieldRef = useRef<HTMLInputElement>(null);
+  const profileLoaded = Boolean(profile);
 
   useEffect(() => {
     if (open) {
@@ -113,6 +136,19 @@ export function ProfileEditor({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, profile]);
+
+  // Land focus on the Name field once the profile query has actually
+  // resolved — it may still be loading at the instant the panel opens.
+  // Deferred one frame: useProfile() is usually already warm (this panel is
+  // always mounted in LibraryView), so this effect typically fires in the
+  // same commit as the panel's mount, where a synchronous focus races Radix's
+  // own mount-focus settling and gets reset. The rAF lands it after.
+  useEffect(() => {
+    if (open && profileLoaded) {
+      const raf = requestAnimationFrame(() => nameFieldRef.current?.focus());
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [open, profileLoaded]);
 
   function addLink() {
     if (state.links.length >= MAX_LINKS) return;
@@ -164,17 +200,41 @@ export function ProfileEditor({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Edit profile</DialogTitle>
-        </DialogHeader>
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} modal={false}>
+      <DialogPrimitive.Content
+        className="fixed right-6 top-6 z-20 flex max-h-[85vh] w-[30rem] max-w-[90vw] flex-col gap-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg"
+        onOpenAutoFocus={(e) => {
+          // Focus is actually driven by the effect above (the profile query
+          // may not have resolved yet at this instant) — just keep Radix
+          // from focusing the panel container itself.
+          e.preventDefault();
+        }}
+        onCloseAutoFocus={(e) => {
+          e.preventDefault();
+          triggerRef?.current?.focus();
+        }}
+      >
+        <div className="flex items-start justify-between">
+          <DialogPrimitive.Title className="text-lg font-semibold leading-none tracking-tight text-foreground">
+            Edit profile
+          </DialogPrimitive.Title>
+          <DialogPrimitive.Close asChild>
+            <button
+              type="button"
+              className="rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </button>
+          </DialogPrimitive.Close>
+        </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <Label htmlFor="profile-name">Name</Label>
             <Input
               id="profile-name"
+              ref={nameFieldRef}
               value={state.name}
               onChange={(e) => setState((prev) => ({ ...prev, name: e.target.value }))}
             />
@@ -291,13 +351,13 @@ export function ProfileEditor({
             </p>
           ) : null}
 
-          <DialogFooter>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-2">
             <Button type="submit" disabled={updateProfile.isPending}>
               Save profile
             </Button>
-          </DialogFooter>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Root>
   );
 }
