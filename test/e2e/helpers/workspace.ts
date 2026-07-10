@@ -237,3 +237,37 @@ export async function distinctColorCount(canvas: Locator): Promise<number> {
     return colors.size;
   });
 }
+
+// ── Library CRUD ── LibraryView's add/edit-entry dialog flow (spec.md §13),
+// lifted verbatim from library-crud.spec.ts. Edit's entry point is a
+// `${section label}: ${entry.facts[0]}` picker option, since EntryCard's own
+// Edit button is a disabled stub.
+export async function openAddEntry(page: Page): Promise<Locator> {
+  await page.getByRole("button", { name: "Add entry" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+export async function selectSection(dialog: Locator, page: Page, label: string): Promise<void> {
+  await dialog.getByRole("combobox", { name: "Section" }).click();
+  await page.getByRole("option", { name: label, exact: true }).click();
+}
+
+export async function submitAndClose(dialog: Locator, buttonName: string): Promise<void> {
+  await dialog.getByRole("button", { name: buttonName }).click();
+  await expect(dialog).toBeHidden();
+}
+
+export async function openEditFor(page: Page, optionLabel: string): Promise<Locator> {
+  await page.getByRole("combobox", { name: "Choose entry to edit" }).click();
+  await page.getByRole("option", { name: optionLabel, exact: true }).click();
+  await page.getByRole("button", { name: "Edit selected" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+export function cardFor(page: Page, text: string): Locator {
+  return page.locator("[data-entry-id]").filter({ hasText: text });
+}

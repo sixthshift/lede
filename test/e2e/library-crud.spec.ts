@@ -5,45 +5,19 @@
 // complement to the keyless `entries persist across restart` API test
 // (test/api.entries.test.ts) — same DATA_DIR, but proving the UI re-reads it
 // rather than the API round-tripping it.
-import { test, expect, type Page, type Locator } from "@playwright/test";
+import { test, expect } from "@playwright/test";
+import {
+  openAddEntry,
+  selectSection,
+  submitAndClose,
+  openEditFor,
+  cardFor,
+} from "./helpers/workspace";
 
 // Unique per test run so assertions never collide with seeded data
 // (SEED_ENTRIES, src/server/seed.ts) or with a previous run reusing the
 // server (`reuseExistingServer` in non-CI dev loops).
 const runId = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-
-async function openAddEntry(page: Page): Promise<Locator> {
-  await page.getByRole("button", { name: "Add entry" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  return dialog;
-}
-
-async function selectSection(dialog: Locator, page: Page, label: string): Promise<void> {
-  await dialog.getByRole("combobox", { name: "Section" }).click();
-  await page.getByRole("option", { name: label, exact: true }).click();
-}
-
-async function submitAndClose(dialog: Locator, buttonName: string): Promise<void> {
-  await dialog.getByRole("button", { name: buttonName }).click();
-  await expect(dialog).toBeHidden();
-}
-
-// LibraryView's edit entry point (§13 comment in LibraryView.tsx): a picker
-// keyed by `${section label}: ${entry.facts[0]}`, since EntryCard's own Edit
-// button is a disabled stub.
-async function openEditFor(page: Page, optionLabel: string): Promise<Locator> {
-  await page.getByRole("combobox", { name: "Choose entry to edit" }).click();
-  await page.getByRole("option", { name: optionLabel, exact: true }).click();
-  await page.getByRole("button", { name: "Edit selected" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  return dialog;
-}
-
-function cardFor(page: Page, text: string): Locator {
-  return page.locator("[data-entry-id]").filter({ hasText: text });
-}
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/library");

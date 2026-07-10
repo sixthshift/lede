@@ -11,7 +11,7 @@
 // means: the same URL renders the password form instead of app content —
 // there's no separate login route to navigate to.
 import { test, expect } from "@playwright/test";
-import { ensureFirstRunPassword, login } from "./helpers/session";
+import { firstRunLogin, login } from "./helpers/workspace";
 
 const PASSWORD = "correct horse battery staple e2e";
 // Any app route is behind the gate (App.tsx wraps everything in LoginGate);
@@ -30,7 +30,7 @@ test.describe("first-run set-password -> login -> protected route", () => {
     await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
     await expect(page.getByText("First time here? This sets your password.")).toBeVisible();
 
-    await ensureFirstRunPassword(page, PASSWORD);
+    await firstRunLogin(page, PASSWORD);
 
     // (2) redirected to the logged-in app view (index route -> /applications,
     // main.tsx, §26 IA) with the primary nav now reachable.
