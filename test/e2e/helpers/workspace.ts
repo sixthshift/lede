@@ -225,6 +225,57 @@ export async function pixelDiff(canvasA: Locator, canvasB: Locator): Promise<num
   return diffPixels;
 }
 
+/**
+ * Fraction (0..1) of pixels that differ between a canvas's CURRENT live
+ * pixels and a snapshot captured earlier via `canvasSnapshot` — the temporal
+ * counterpart to `pixelDiff` (which compares two canvases at the same
+ * instant). Needed because a canvas can remount between captures (e.g. a
+ * repaint triggered by a query invalidation), so "before" pixels have to be
+ * captured into a portable string up front rather than read from a second
+ * Locator reference at diff time.
+ */
+export async function pixelDiffFraction(canvas: Locator, beforeDataUrl: string): Promise<number> {
+  return canvas.evaluate(
+    (el: HTMLCanvasElement, before: string) =>
+      new Promise<number>((resolve, reject) => {
+        const ctx = el.getContext("2d");
+        if (!ctx || el.width === 0 || el.height === 0) {
+          resolve(1);
+          return;
+        }
+        const img = new Image();
+        img.onload = () => {
+          const off = document.createElement("canvas");
+          off.width = el.width;
+          off.height = el.height;
+          const octx = off.getContext("2d");
+          if (!octx) {
+            resolve(1);
+            return;
+          }
+          octx.drawImage(img, 0, 0, el.width, el.height);
+          const beforeData = octx.getImageData(0, 0, el.width, el.height).data;
+          const afterData = ctx.getImageData(0, 0, el.width, el.height).data;
+          let diff = 0;
+          for (let i = 0; i < afterData.length; i += 4) {
+            if (
+              beforeData[i] !== afterData[i] ||
+              beforeData[i + 1] !== afterData[i + 1] ||
+              beforeData[i + 2] !== afterData[i + 2] ||
+              beforeData[i + 3] !== afterData[i + 3]
+            ) {
+              diff++;
+            }
+          }
+          resolve(diff / (el.width * el.height));
+        };
+        img.onerror = () => reject(new Error("pixelDiffFraction: failed to decode snapshot image"));
+        img.src = before;
+      }),
+    beforeDataUrl,
+  );
+}
+
 /** Counts distinct RGBA colors painted onto a canvas. */
 export async function distinctColorCount(canvas: Locator): Promise<number> {
   return canvas.evaluate((el: HTMLCanvasElement) => {

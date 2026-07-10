@@ -54,6 +54,7 @@ import {
   switchPreviewDoc,
   distinctColorCount,
   canvasSnapshot,
+  pixelDiffFraction,
 } from "./helpers/workspace";
 
 const PASSWORD = "correct horse battery staple e2e applications";
@@ -1495,4 +1496,264 @@ test("rail collapse (v3-T013, protocol E): folding a section is local view-state
   expect(settingsAfter.layout, "collapse must never mutate settings.layout").toEqual(
     settingsBefore.layout,
   );
+});
+
+// ── T014: inline-edit-reaches-document contrast + application behavior
+// sweep on the WorkspaceShell surface (closes Phase 1). Own applications,
+// same rationale as the tests above. ──
+
+// Scoped to OVERLAY-shaped elements (fixed/absolute positioned), same
+// definition of "modal" as the protocol-B test above (CLAUDE.md's modality
+// ban is about backdrops/overlays, never plain document flow) — duplicated
+// here (rather than importing that test's local function) because it needs
+// to run WHILE an inline editor is focused/mid-edit, not just before/after.
+async function assertNoModalOverlay(page: Page): Promise<void> {
+  expect(await page.locator('[aria-modal="true"]').count()).toBe(0);
+  const viewport = page.viewportSize();
+  expect(viewport, "viewport size must be known").toBeTruthy();
+  const oversizedOverlayCount = await page.evaluate((viewportArea) => {
+    const elements = Array.from(document.querySelectorAll("body *"));
+    return elements.filter((el) => {
+      const style = getComputedStyle(el);
+      if (style.position !== "fixed" && style.position !== "absolute") return false;
+      const rect = el.getBoundingClientRect();
+      return (rect.width * rect.height) / viewportArea > 0.5;
+    }).length;
+  }, viewport!.width * viewport!.height);
+  expect(
+    oversizedOverlayCount,
+    "no fixed/absolute-positioned element may cover more than half the viewport",
+  ).toBe(0);
+}
+
+// 0.2% of the canvas's pixels — a cursor blink or a toast moves a handful of
+// pixels (a small fraction of a percent on a ~1000x1000+ px pdf.js canvas);
+// a sentinel long enough to force real rendered text changes many times
+// that many. Un-gameable: "any diff" would also pass for a blink; this floor
+// would not.
+const CANVAS_DIFF_FLOOR = 0.002;
+
+test("in-place edits reach the document: sentinel text is exportable AND the preview canvas changes by more than a floor magnitude — not merely 'any diff'; modality holds mid-edit", async ({
+  page,
+}, testInfo) => {
+  const { pageErrors, consoleErrors, markLoggedIn } = voiceSpecErrorListeners(page);
+
+  await page.goto("/");
+  await login(page, PASSWORD);
+  markLoggedIn();
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `E2E Contrast Co ${runId}-${testInfo.retry}`;
+  const applicationId = await createApplication(page, { company, jd: JD });
+  await page.goto(`/applications/${applicationId}`);
+
+  await tailor(page, applicationId!);
+  await expectCanvasPainted(page);
+  await generateLetter(page, applicationId!, { status: 200 });
+
+  // Every token stays short (<20 chars) — a long UNBROKEN token (e.g. the
+  // whole marker glued to the run id with no spaces) can get force-wrapped
+  // by the PDF renderer's line-fill with an inserted hyphen, which would
+  // split the literal substring this test looks for. Spacing the id out
+  // into its own short token avoids that without weakening distinctiveness.
+  const resumeSentinel = `zqxresumesentinel ${runId} retry${testInfo.retry} repositioning judgment engineered directly for this exact requisition end to end`;
+  const letterSentinel = `zqxlettersentinel ${runId} retry${testInfo.retry} a hand authored line proving this exact paragraph reached the rendered artifact`;
+
+  // ── Resume side ──
+  const resumeCanvas = resumePreviewCanvas(page);
+  await expectResumeCanvasPainted(page);
+  const resumeBefore = await canvasSnapshot(resumeCanvas);
+
+  const resumeItemField = page.locator('[data-testid="resume-edit-item-0"]');
+  await expect(resumeItemField).toBeVisible();
+  const resumeBaseline = await resumeItemField.inputValue();
+  await resumeItemField.fill(`${resumeBaseline} ${resumeSentinel}`);
+
+  // Modality asserted WHILE mid-edit — the field is focused/dirty, not yet
+  // blurred/persisted.
+  await expect(resumeItemField).toBeFocused();
+  await assertNoModalOverlay(page);
+
+  const [resumePatchResponse] = await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/resume-part`) &&
+        r.request().method() === "PATCH",
+    ),
+    resumeItemField.press("Tab"),
+  ]);
+  expect(resumePatchResponse.status()).toBe(200);
+
+  // (a) the un-gameable half: a REAL plain-text export contains the sentinel
+  // verbatim.
+  const [textDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Plain text" }).click(),
+  ]);
+  const textPath = await textDownload.path();
+  expect(textPath, "Plain text must produce a real saved file").toBeTruthy();
+  const exportedText = readFileSync(textPath!, "utf-8");
+  expect(exportedText, "the plain-text export must contain the resume sentinel").toContain(
+    resumeSentinel,
+  );
+
+  // (b) magnitude proof: the canvas changed by more than CANVAS_DIFF_FLOOR —
+  // not merely "some" diff, which a cursor blink or a toast would also
+  // produce.
+  const resumeDiffFraction = await pixelDiffFraction(resumeCanvas, resumeBefore);
+  expect(
+    resumeDiffFraction,
+    `resume canvas must change by more than ${CANVAS_DIFF_FLOOR * 100}% of its pixels (got ${resumeDiffFraction})`,
+  ).toBeGreaterThan(CANVAS_DIFF_FLOOR);
+
+  // ── Letter side ──
+  await switchPreviewDoc(page, "letter");
+  const letterCanvas = letterPreviewCanvas(page);
+  await expectLetterCanvasPainted(page);
+  const letterBefore = await canvasSnapshot(letterCanvas);
+
+  const letterParagraphField = page.locator('[data-testid="letter-edit-paragraph-0"]');
+  await expect(letterParagraphField).toBeVisible();
+  const letterBaseline = await letterParagraphField.inputValue();
+  await letterParagraphField.fill(`${letterBaseline} ${letterSentinel}`);
+
+  await expect(letterParagraphField).toBeFocused();
+  await assertNoModalOverlay(page);
+
+  const [letterPatchResponse] = await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}/letter-part`) &&
+        r.request().method() === "PATCH",
+    ),
+    letterParagraphField.press("Tab"),
+  ]);
+  expect(letterPatchResponse.status()).toBe(200);
+
+  // (a) the letter's own prose/download: a real downloaded cover-letter PDF
+  // extracts to text containing the sentinel.
+  const [letterDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Download cover letter" }).click(),
+  ]);
+  const letterDownloadPath = await letterDownload.path();
+  expect(letterDownloadPath, "Download cover letter must produce a real saved file").toBeTruthy();
+  const letterExtractedText = (await extractPdfText(readFileSync(letterDownloadPath!))).join(" ");
+  expect(letterExtractedText, "the cover-letter PDF must contain the letter sentinel").toContain(
+    letterSentinel,
+  );
+
+  // (b) magnitude proof, letter canvas.
+  const letterDiffFraction = await pixelDiffFraction(letterCanvas, letterBefore);
+  expect(
+    letterDiffFraction,
+    `letter canvas must change by more than ${CANVAS_DIFF_FLOOR * 100}% of its pixels (got ${letterDiffFraction})`,
+  ).toBeGreaterThan(CANVAS_DIFF_FLOOR);
+
+  expect(pageErrors, `unexpected page errors: ${pageErrors.join(", ")}`).toHaveLength(0);
+  expect(consoleErrors, `unexpected console errors: ${consoleErrors.join(", ")}`).toHaveLength(0);
+});
+
+test("locked sweep (protocol D): every edit affordance individually disabled/409'd by name; design read-only, motivation and voice-flag still work, motivation persists across reload", async ({
+  page,
+}, testInfo) => {
+  const { pageErrors, consoleErrors, markLoggedIn } = voiceSpecErrorListeners(page);
+
+  await page.goto("/");
+  await login(page, PASSWORD);
+  markLoggedIn();
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `E2E Locked Sweep Co ${runId}-${testInfo.retry}`;
+  const applicationId = await createApplication(page, { company, jd: JD });
+  await page.goto(`/applications/${applicationId}`);
+
+  await tailor(page, applicationId!);
+  await expectCanvasPainted(page);
+  await generateLetter(page, applicationId!, { status: 200 });
+
+  await lockFinal(page, applicationId!);
+  await expect(page.getByRole("button", { name: "Unlock", exact: true })).toBeVisible();
+
+  // (1) resume item edit — disabled (real attribute, not CSS-only) AND its
+  // route 409s on a direct, well-formed attempt.
+  await expect(page.locator('[data-testid="resume-edit-item-0"]')).toBeDisabled();
+  const resumePatchLocked = await page.request.patch(
+    `/api/applications/${applicationId}/resume-part`,
+    { data: { path: { kind: "summary" }, text: "must never be written — locked sweep" } },
+  );
+  expect(resumePatchLocked.status(), "resume-part must 409 while locked").toBe(409);
+
+  // (2) letter edit — its field only mounts on the letter side of the
+  // preview switch — disabled AND its route 409s.
+  await switchPreviewDoc(page, "letter");
+  await expect(page.locator('[data-testid="letter-edit-paragraph-0"]')).toBeDisabled();
+  const letterPatchLocked = await page.request.patch(
+    `/api/applications/${applicationId}/letter-part`,
+    {
+      data: {
+        path: { kind: "body", index: 0 },
+        text: "must never be written — locked sweep",
+      },
+    },
+  );
+  expect(letterPatchLocked.status(), "letter-part must 409 while locked").toBe(409);
+
+  // (3) design axis control — a real disabled attribute, enumerated here
+  // alongside the other affordances on this SAME locked application (already
+  // covered in depth by design.spec.ts's own dedicated locked test).
+  await expect(page.getByRole("combobox", { name: "Body font" })).toBeDisabled();
+
+  // (4) motivation — not a document-editing affordance (it only guides a
+  // FUTURE letter generation, itself locked-blocked via Generate/Regenerate);
+  // stays editable on a locked application, its PUT still 200s, and it
+  // persists across reload.
+  const motivationText = `Locked-sweep motivation ${runId}-${testInfo.retry}`;
+  await page.getByLabel("Motivation", { exact: true }).fill(motivationText);
+  const [motivationPut] = await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/applications/${applicationId}`) && r.request().method() === "PUT",
+    ),
+    page.getByRole("button", { name: "Save", exact: true }).click(),
+  ]);
+  expect(motivationPut.status(), "motivation must still WORK (200) on a locked application").toBe(
+    200,
+  );
+
+  // Reload — JobPanel's OWN accordion (independent of the rail's outer
+  // section collapse) defaults to collapsed once `application.current`
+  // exists, so a fresh mount post-reload needs it re-expanded before the
+  // field is reachable.
+  await page.reload();
+  // Scoped to the section body — "Job details" also names the rail's own
+  // nav/collapse buttons (a different accordion entirely), which would
+  // otherwise collide with JobPanel's own internal toggle here.
+  const jobDetailsToggle = page
+    .getByTestId("workspace-section-body-job")
+    .getByRole("button", { name: "Job details", exact: true });
+  if ((await jobDetailsToggle.getAttribute("aria-expanded")) === "false") {
+    await jobDetailsToggle.click();
+  }
+  await expect(page.getByLabel("Motivation", { exact: true })).toHaveValue(motivationText);
+
+  // (5) voice-flag — must still WORK when locked (a real 200), not merely an
+  // enabled button. The full server-side round trip (profile.voiceSources
+  // before/after) is already covered by the dedicated "flagging a locked
+  // application's resume..." test above; this is this sweep's own
+  // per-affordance entry, cleaned up immediately after (shared, cap-5
+  // singleton).
+  await expect(page.getByTestId("flag-voice-resume")).toBeEnabled();
+  const [flagResponse] = await Promise.all([
+    page.waitForResponse((r) => r.url().endsWith(`/api/applications/${applicationId}/flag-voice`)),
+    page.getByTestId("flag-voice-resume").click(),
+  ]);
+  expect(flagResponse.status(), "voice-flag must still WORK (200) on a locked application").toBe(
+    200,
+  );
+  const flagged = await flagResponse.json();
+  await page.request.delete(`/api/profile/voice-sources/${flagged.id}`);
+
+  expect(pageErrors, `unexpected page errors: ${pageErrors.join(", ")}`).toHaveLength(0);
+  expect(consoleErrors, `unexpected console errors: ${consoleErrors.join(", ")}`).toHaveLength(0);
 });
