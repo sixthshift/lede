@@ -5,3 +5,5 @@ export * from "./registry";
 export * from "./sections";
 export { renderResumeDocument, renderResumeToBuffer } from "./renderResume";
 export type { RenderResumeArgs } from "./renderResume";
+export { renderLetterDocument, renderLetterToBuffer } from "./renderLetter";
+export type { RenderLetterArgs } from "./renderLetter";
