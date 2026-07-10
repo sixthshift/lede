@@ -23,6 +23,13 @@ absolute:
 - You may select, combine, and re-represent facts across a small number of
   entries in one paragraph — you may never fabricate.
 
+**Numbers are verbatim, not just accurate.** Reproduce every number EXACTLY as
+it appears in the entry's \`facts\` — including approximations and shorthand.
+If a fact says "~30k", write "~30k"; never expand it to "30,000" or "30000",
+never round it, never spell it out, never reformat it. The grounding check
+matches number tokens against the facts verbatim, so a reformatted number —
+even one that means the same thing — reads as fabrication and fails.
+
 ## 2. Motivation, context, and voice guide phrasing only
 
 The user message may include labelled blocks for motivation (why this

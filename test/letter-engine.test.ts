@@ -61,6 +61,12 @@ describe("LETTER_SYSTEM_PROMPT — focus instruction", () => {
     );
     expect(LETTER_SYSTEM_PROMPT).toContain("groundedOn");
   });
+
+  it("instructs the model to reproduce numbers verbatim, including shorthand like ~30k", () => {
+    expect(LETTER_SYSTEM_PROMPT).toMatch(/verbatim/i);
+    expect(LETTER_SYSTEM_PROMPT).toContain("~30k");
+    expect(LETTER_SYSTEM_PROMPT).toMatch(/never (?:expand|round|spell out|reformat)/i);
+  });
 });
 
 // ── buildLetterUserPrompt — byte-identical prefix guard ──
