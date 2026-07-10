@@ -321,3 +321,19 @@ export const TailorDecisionZ = z.object({
     }),
   ),
 });
+
+// ── the letter's flat output contract — model returns judgment only, mirrors
+// TailorDecisionZ; body paragraphs' groundedOn holds entry ID strings only,
+// never fact text/motivation/context/voice (v2 §grounding) ──
+export const LetterDecisionZ = z.object({
+  greeting: z.string(),
+  body: z
+    .array(
+      z.object({
+        text: z.string(),
+        groundedOn: z.array(z.string()),
+      }),
+    )
+    .min(1),
+  closing: z.string(),
+});

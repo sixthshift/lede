@@ -116,6 +116,29 @@ export type TailorDecision = {
   cut: { entryId: string; reason: string }[]; // buried/dropped + why
 };
 
+// ── what the MODEL returns for a cover letter (schema-enforced via
+// `generateObject`) — lightly structured: greeting / body paragraphs / closing.
+// Mirrors TailorDecision's judgment-only shape (v2 §grounding). ──
+export type LetterDecision = {
+  greeting: string;
+  body: {
+    text: string;
+    groundedOn: string[]; // entry ID strings this paragraph's facts trace to; [] for a hand-added paragraph
+  }[];
+  closing: string;
+};
+
+// ── what the SERVER assembles and stores for a cover letter — same three
+// parts as LetterDecision; groundedOn survives assembly untouched. ──
+export type CoverLetter = {
+  greeting: string;
+  body: {
+    text: string;
+    groundedOn: string[];
+  }[];
+  closing: string;
+};
+
 // ── what the SERVER assembles and the UI renders ──
 // level (E9-F4b2): copied verbatim from the source entry's meta.level at
 // assemble time — skill/language only (the only EntryMeta variants that
