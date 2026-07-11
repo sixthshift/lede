@@ -274,11 +274,15 @@ describe("App — LoginGate wraps the app; /settings uses the real SettingsView 
     expect(screen.queryByText("TAILOR STUB")).not.toBeInTheDocument();
   });
 
-  it("authenticated at /settings: renders SettingsView, not the old stub", async () => {
+  it("authenticated at /settings: renders SettingsView inside WorkspaceShell, not the old stub", async () => {
     mockFetch({ authed: true });
     renderApp("/settings");
 
-    expect(await screen.findByText("Provider & model")).toBeInTheDocument();
+    // v3-T041: "Provider & model" now appears twice (rail nav + card
+    // heading) — the heading role disambiguates from the rail nav button.
+    expect(await screen.findByRole("heading", { name: "Provider & model" })).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-shell")).toBeInTheDocument();
+    expect(screen.queryByTestId("preview-pane")).not.toBeInTheDocument();
     expect(screen.queryByText("OLD SETTINGS STUB")).not.toBeInTheDocument();
   });
 });

@@ -15,11 +15,16 @@ import { SettingsView } from "./components/SettingsView";
 // v3-T040: /library joins the workspace routes — it also fills WorkspaceShell
 // (rail | editor, no preview — a non-doc surface degrades), so it needs the
 // same fixed-height frame.
+//
+// v3-T041: /settings joins too — SettingsView now fills WorkspaceShell itself
+// (rail | editor, no preview), same degrade.
 export function App() {
   const location = useLocation();
   const onSettings = location.pathname.startsWith("/settings");
   const isWorkspaceRoute =
-    /^\/applications\/[^/]+$/.test(location.pathname) || location.pathname === "/library";
+    /^\/applications\/[^/]+$/.test(location.pathname) ||
+    location.pathname === "/library" ||
+    onSettings;
 
   return (
     <LoginGate>

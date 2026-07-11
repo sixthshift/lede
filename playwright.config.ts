@@ -79,7 +79,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testMatch: /library-crud\.spec\.ts/,
+      testMatch: /(library-crud|settings)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"] },
     },
     {
