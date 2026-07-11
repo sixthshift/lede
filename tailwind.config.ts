@@ -14,6 +14,11 @@ export default {
         "border-strong": "var(--border-strong)",
         input: "var(--border)",
         ring: "var(--accent)",
+        // F104: ring-ring/25 can't resolve alpha (--accent has no
+        // <alpha-value> slot) and falls back to Tailwind's default blue.
+        // ring-weak is the pre-composed accent-at-reduced-alpha token
+        // (tokens.css) so `ring-ring-weak` is a real, per-theme utility.
+        "ring-weak": "var(--ring-weak)",
         background: "var(--background)",
         foreground: "var(--foreground)",
         primary: {

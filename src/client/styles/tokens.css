@@ -18,6 +18,10 @@
   --accent: #2643bd;
   --accent-hover: #1e35a0;
   --accent-weak: #e9edfa;
+  /* Focus-ring alpha (F104): --accent as rgba at reduced opacity, since
+     --accent itself carries no <alpha-value> slot for ring-ring/25 to
+     compose with. Inputs' focus ring reads this instead of ring-ring/25. */
+  --ring-weak: rgba(38, 67, 189, 0.25);
   --success: #15803d;
   --success-soft: #e8f5ed;
   --warn: #b45309;
@@ -81,6 +85,7 @@
   --accent: #7089f5; /* brightened so it reads on the dark canvas */
   --accent-hover: #8ba0f8;
   --accent-weak: #1e2748; /* tinted fill */
+  --ring-weak: rgba(112, 137, 245, 0.25); /* dark --accent as rgba, same reason as :root */
   --success: #47c97e;
   --success-soft: #16271d;
   --warn: #e0a52e;
