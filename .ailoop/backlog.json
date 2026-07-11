@@ -33,12 +33,22 @@
       "depends_on": [],
       "files": [
         "src/client/styles/tokens.css",
-        "src/client/styles/app.css"
+        "src/client/styles/app.css",
+        "test/ui-foundation.test.tsx"
       ],
       "origin": "spec F109 / Phase 0",
       "context": "See /workspace/SPEC.md F109 + oracle.md Locked (token-level fixes). WCAG failures: `.weight-bar__label` computes 2.56:1 light / 4.23:1 dark (`app.css:141-147`; same color on `.reasoning-panel__rationale-source`); the success pill is 4.47:1 light (`--success` on `--success-soft`, `tokens.css:21-22`); native checkboxes render UA-blue because `accent-color` is unset. FIX per Locked: move the weight-bar/rationale labels to `--ink-soft`; darken `--success` to compute ≥4.5:1 on its soft tint; add `accent-color: var(--accent)` on `:root`. Token VALUE corrections are in scope; identity (hues/families/radius/shadow) is frozen — nudge lightness for contrast only, do not re-hue. NOTE: this ticket shares tokens.css with T010 and app.css with T012 — the scheduler serializes; do not touch the ring plumbing (T010) or the ATS rule (T012).",
       "acceptance": "- Add a test (extend the design/contrast e2e or a vitest computed-style check) asserting computed contrast ratio ≥4.5:1 for: weight-bar label vs its background, rationale-source label vs its background, and success pill text vs `--success-soft` — in BOTH themes.\n- A native checkbox's computed `accent-color` equals the resolved token accent.\n- Baseline gate green.",
-      "attempts": [],
+      "attempts": [
+        {
+          "n": 1,
+          "failed": [
+            "test/ui-foundation.test.tsx"
+          ],
+          "hypothesis": "Changing --success #15803d→#137337 (the authorized WCAG fix) broke ui-foundation.test.tsx:32 which pins the §12 palette verbatim; that test file was not in the declared footprint so the change was incomplete + would fail the scope check.",
+          "fixNote": "Redo the same fix AND update test/ui-foundation.test.tsx:32 expected --success value to match the new token (the §12-verbatim assertion moves with the spec-authorized contrast fix — behavioral guarantee preserved, only the one intentionally-changed value updates). ui-foundation.test.tsx is now in your declared files. Run the FULL vitest suite yourself this time to confirm no other test pins --success."
+        }
+      ],
       "evidence": null
     },
     {
