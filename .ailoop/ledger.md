@@ -90,3 +90,9 @@ corrections.
 [0017] T013 — dispatch (build, SERIAL) · sonnet · worktree · baseSha f85e477 · attempt 1/3 · playwright.config.ts declared (registration)
   decision: continue
   why: next ready P0 (F102 gallery reposition, temporary). Serial handles the shared playwright.config.ts registration without conflict.
+
+[0018] T013 — DONE (re-verify green). Merged ab3b61b. Scope clean, gaming pass (real reposition, e2e red-then-green), baseline green (vitest 1071, pw 20/1/34). Ratchet applications 33->34.
+  evidence: .ailoop/evidence/T013.txt
+[0019] T014 — dispatch (build, SERIAL) · sonnet · worktree · baseSha (post-T013 main) · attempt 1/3 · playwright.config.ts declared
+  decision: continue
+  why: next ready P0 (F103 docked panels chrome-agnostic).

@@ -1,0 +1,11 @@
+T013 — F102 template gallery reposition (TEMPORARY) — INDEPENDENT RE-VERIFY
+merged ab3b61b (branch worktree-agent-aa64208c676f96f38 @4f482c0, baseSha f85e477)
+SCOPE: TemplateGallery.tsx (declared) + playwright.config.ts (registration-only: +gallery-bounds)
+  + new test/e2e/gallery-bounds.spec.ts. CLEAN.
+GAMING: absolute right-0 top-full → fixed left-56 top-16 (viewport-relative via shell w-56 token,
+  clears header). Non-modal (z-20, no scrim/aria-modal). e2e asserts 4-edge containment ⊆ editor
+  pane @1280×720 + non-degenerate title/first-tile + full un-shrunk tile roster; verified red-then-green. PASS.
+BASELINE: check 0; lint 0; build 0; vitest 1071/1071 (0 flakes this run);
+  playwright chromium 20; auth 1; applications 34 (+gallery-bounds).
+RATCHET: applications 33 -> 34. vitest 1071 unchanged. Non-decreasing.
+VERDICT: DONE.
