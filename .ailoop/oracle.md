@@ -138,6 +138,20 @@ builder may scope only the full-suite step to affected tests.
 Docker e2e (`bun run test:docker`) runs at the **Phase 1 chrome-merge gate**
 (red-team #16) and the **Phase 5 final gate**. Not per-ticket.
 
+**Environment adaptation (mechanical, intake 2026-07-11).** This repo's
+worktree constraints (CLAUDE.md + spec §Environment) shape HOW the baseline
+runs — not WHAT counts as done:
+- A fresh git worktree has NO `node_modules`. Every worker/verifier's FIRST step
+  in its worktree is `ln -s /workspace/node_modules node_modules` (verified: with
+  it, `bun run check` + `bun run build` exit 0 in a worktree; without it they
+  ENOENT — the "font-path ENOENT" symptom CLAUDE.md warns of).
+- Playwright projects bind fixed ports 8787–8789 and MUST NOT run concurrently.
+  Therefore dispatch is **SERIAL single-ticket** (one Agent in a worktree at a
+  time), and the coordinator self-verifies — NOT the parallel build→verify
+  fan-out (concurrent playwright would collide). File-disjoint batching still
+  informs order; it does not authorize concurrency here.
+- `bun run build` before the `applications` playwright project (stale-dist).
+
 **The v3 cohesion contracts (`applications` project, `cohesion.spec.ts`) stay
 green at EVERY phase gate.**
 
