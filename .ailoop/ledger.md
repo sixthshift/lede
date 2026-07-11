@@ -38,3 +38,16 @@ corrections.
 [0004] env probe — tested the CLAUDE.md worktree warning empirically: fresh worktree lacks node_modules (build ENOENTs); with `ln -s /workspace/node_modules node_modules` the worktree's `bun run check` + `bun run build` exit 0. Playwright binds fixed ports 8787–8789, no concurrency allowed.
   decision: amend-oracle (mechanical) — dispatch model is SERIAL single-ticket in a worktree + coordinator self-verify, NOT the parallel build-phase fan-out (concurrent playwright would collide on ports). Each worker symlinks node_modules step 0. Recorded in oracle.md Environment adaptation.
   why: mechanical (HOW checks run in this env), not semantic (WHAT counts as done is unchanged) → self-serve per amendment tiers. Honors CLAUDE.md "prefer single-agent-on-main for build tasks" while keeping worktree isolation for the scope-check diff base.
+
+[0005] T010 — dispatch (build) · sonnet worker · worktree · baseSha 9f7db25 · attempt 1/3
+  decision: continue
+  why: first ready P0 ticket (F104 focus-ring); serial dispatch per env adaptation
+
+[0006] baseline re-verify — established TRUE vitest baseline (intake only counted, never ran): full run flakes 1-4 tests (fit-ui/ats-view @fontsource timing); confirmed via isolated re-run (pass 4/4 each). Codified font-flake tolerance + worktree-staleness protocols in oracle.md.
+  decision: amend-oracle (mechanical)
+  why: HOW the vitest gate is read under this env's documented flake — not WHAT counts as done. Ground-truth baseline 1055-1056 passing.
+
+[0007] T010 — DONE (independent re-verify green). Merged ff to main d3fcec5.
+  decision: continue
+  why: scope clean (5 declared + test), gaming read pass (real per-theme --ring-weak), full baseline green (vitest 1060+1flake, pw 20/1/32), acceptance 5/5. Ratchet 1056->1061.
+  evidence: .ailoop/evidence/T010.txt

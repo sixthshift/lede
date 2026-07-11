@@ -151,6 +151,21 @@ runs — not WHAT counts as done:
   fan-out (concurrent playwright would collide). File-disjoint batching still
   informs order; it does not authorize concurrency here.
 - `bun run build` before the `applications` playwright project (stale-dist).
+- **Font-flake tolerance (mechanical, confirmed at intake).** The full vitest
+  run flakes on `@fontsource` fetch timing under concurrency — verified on the
+  untouched main tree: `fit-ui.test.tsx` / `ats-view.test.tsx` (fit-ladder
+  measurement tests) can fail in the full run but pass 4/4 in isolation. Per
+  CLAUDE.md ("retry absorbs it; isolated re-run confirms"). Protocol: a
+  full-suite failure is a real regression ONLY if it still fails on an
+  ISOLATED re-run of that file. A failure that passes in isolation is a flake,
+  not a baseline-red. The ground-truth baseline is 1055–1056 passing (the flaky
+  1–4 float). New behavior must still add real passing tests on top.
+- **Worktree staleness (mechanical, confirmed).** The Agent tool's
+  `isolation: 'worktree'` forks from a STALE base (observed: 234 commits behind
+  on T010). The worker's first duty is to reset its branch to the given
+  `baseSha` (current main tip) before building. The coordinator's scope check
+  uses `baseSha` = the captured main HEAD, and MUST confirm the branch is a
+  descendant of it (else the diff base is wrong and the ticket is re-dispatched).
 
 **The v3 cohesion contracts (`applications` project, `cohesion.spec.ts`) stay
 green at EVERY phase gate.**

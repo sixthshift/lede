@@ -1,19 +1,29 @@
 {
   "project": "lede-v4",
-  "caps": { "maxAttempts": 3, "thrash": 2, "chunk": 20 },
+  "caps": {
+    "maxAttempts": 3,
+    "thrash": 2,
+    "chunk": 20
+  },
   "tickets": [
     {
       "id": "T010",
       "title": "F104 — focus-ring token plumbing (input/textarea/select adopt accent ring)",
-      "status": "todo",
+      "status": "done",
       "phase": "P0",
       "depends_on": [],
-      "files": ["tailwind.config.ts", "src/client/styles/tokens.css", "src/client/components/ui/input.tsx", "src/client/components/ui/textarea.tsx", "src/client/components/ui/select.tsx"],
+      "files": [
+        "tailwind.config.ts",
+        "src/client/styles/tokens.css",
+        "src/client/components/ui/input.tsx",
+        "src/client/components/ui/textarea.tsx",
+        "src/client/components/ui/select.tsx"
+      ],
       "origin": "spec F104 / Phase 0",
       "context": "Lede is a React SPA (see /workspace/CLAUDE.md, /workspace/SPEC.md, /workspace/.ailoop/oracle.md — the frozen decisions live there and must NOT be re-litigated). BUG F104: form-field focus rings render Tailwind-default blue, not the accent. Root cause: `ui/input.tsx:13`, `ui/textarea.tsx:12`, `ui/select.tsx:18` use `focus-visible:ring-ring/25`, but `ring: \"var(--accent)\"` in `tailwind.config.ts` carries no `<alpha-value>` slot, so `ring-ring/25` can't resolve the alpha and falls back to rgba(59,130,246,.5) in BOTH themes. Buttons use plain `ring-ring` and are correct. FIX per oracle.md Locked (token-level fixes): make the ring alpha expressible — add an explicit `--ring-weak` token in tokens.css (or make `--accent` an RGB triple so `<alpha-value>` composes), wire tailwind.config.ts so `ring-ring/25` / a `ring-ring-weak` utility resolves to the accent at reduced alpha, and point the three inputs' focus-visible ring at it. Do NOT change the button ring language (it's correct) — converge the inputs onto the accent, don't diverge further. Visual identity is frozen: accent hue unchanged, only the plumbing.",
       "acceptance": "- Add/extend a test (vitest or the design/e2e layer) that focuses an input, a textarea, and a select and asserts the computed focus ring resolves to the accent-derived value with alpha > 0 AND ring width > 0 in BOTH light and dark themes (a missing ring must FAIL — not merely 'not Tailwind blue', red-team #20).\n- No off-palette rgba(59,130,246,...) remains on focused inputs in either theme.\n- Baseline gate green (oracle.md).",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T010.txt"
     },
     {
       "id": "T011",
@@ -21,7 +31,10 @@
       "status": "todo",
       "phase": "P0",
       "depends_on": [],
-      "files": ["src/client/styles/tokens.css", "src/client/styles/app.css"],
+      "files": [
+        "src/client/styles/tokens.css",
+        "src/client/styles/app.css"
+      ],
       "origin": "spec F109 / Phase 0",
       "context": "See /workspace/SPEC.md F109 + oracle.md Locked (token-level fixes). WCAG failures: `.weight-bar__label` computes 2.56:1 light / 4.23:1 dark (`app.css:141-147`; same color on `.reasoning-panel__rationale-source`); the success pill is 4.47:1 light (`--success` on `--success-soft`, `tokens.css:21-22`); native checkboxes render UA-blue because `accent-color` is unset. FIX per Locked: move the weight-bar/rationale labels to `--ink-soft`; darken `--success` to compute ≥4.5:1 on its soft tint; add `accent-color: var(--accent)` on `:root`. Token VALUE corrections are in scope; identity (hues/families/radius/shadow) is frozen — nudge lightness for contrast only, do not re-hue. NOTE: this ticket shares tokens.css with T010 and app.css with T012 — the scheduler serializes; do not touch the ring plumbing (T010) or the ATS rule (T012).",
       "acceptance": "- Add a test (extend the design/contrast e2e or a vitest computed-style check) asserting computed contrast ratio ≥4.5:1 for: weight-bar label vs its background, rationale-source label vs its background, and success pill text vs `--success-soft` — in BOTH themes.\n- A native checkbox's computed `accent-color` equals the resolved token accent.\n- Baseline gate green.",
@@ -34,7 +47,10 @@
       "status": "todo",
       "phase": "P0",
       "depends_on": [],
-      "files": ["src/client/components/AtsView.tsx", "src/client/styles/app.css"],
+      "files": [
+        "src/client/components/AtsView.tsx",
+        "src/client/styles/app.css"
+      ],
       "origin": "spec F101 / Phase 0",
       "context": "See /workspace/SPEC.md F101. `AtsView.tsx:104` renders `<pre class=\"ats-view__text\">` but NO CSS rule for `.ats-view__text` exists anywhere (orphan class) → UA default `white-space: pre` → measured scrollWidth 8,050px in a 351px pane; content past ~40 chars is unreachable and the pane drags sideways. FIX per oracle.md Locked (ATS view): add the `.ats-view__text` rule in app.css with `white-space: pre-wrap` (+ `overflow-wrap`/`word-break` so a long unbroken token still wraps) and mono sizing consistent with the design system (IBM Plex Mono for metadata). The rendered DOCUMENT is out of scope (react-pdf engine untouched) — this is the ATS plain-text preview chrome only. Shares app.css with T011 (scheduler serializes).",
       "acceptance": "- e2e (applications project / design layer via test/e2e/helpers): with the seeded fixture, the ATS text container's `scrollWidth ≤ clientWidth`; a 500-char unbroken token still wraps (scrollWidth stays ≤ clientWidth).\n- WRAP not CLIP: the container's rendered height GROWS with content length (a clip/`overflow:hidden`/`text-overflow:ellipsis` that shrinks scrollWidth by hiding content must FAIL).\n- PRE-WRAP not PRE-LINE: a fixture string with consecutive spaces/tabs preserves them verbatim in the DOM text (ATS fidelity — `pre-line` collapses whitespace and must fail).\n- Baseline gate green.",
@@ -47,7 +63,9 @@
       "status": "todo",
       "phase": "P0",
       "depends_on": [],
-      "files": ["src/client/components/TemplateGallery.tsx"],
+      "files": [
+        "src/client/components/TemplateGallery.tsx"
+      ],
       "origin": "spec F102 / Phase 0 (red-team #7 sequence)",
       "context": "See /workspace/SPEC.md F102 + Locked (accordion consistency, sequence pinned). `TemplateGallery.tsx:105` uses `absolute right-0 w-[42rem]` which overflows its clipping ancestor — the popover opens 49px under the left rail with its title and first tile column cut. FIX (Phase 0, TEMPORARY): reposition so the gallery's boundingBox is fully within the editor pane at 1280×720 — a bounded reposition, not a redesign. Phase 4 (T041) will DELETE this popover entirely and re-target the assertion onto the surviving inline presentation, so keep this change minimal and self-contained. De-modal ban holds at ≥lg: no scrim, no overlay >50% viewport.",
       "acceptance": "- e2e at 1280×720: the opened template gallery's boundingBox ⊆ the editor-pane box (top and left edges not clipped, first tile column visible).\n- NOT degenerate: the title element and the first tile each have nonzero rendered size and sit individually within the pane; the tile COUNT and text match the full (un-shrunk) gallery (a tiny corner-tucked popover that is 'contained' by being near-zero must FAIL).\n- No `aria-modal`, no scrim/backdrop introduced.\n- Baseline gate green.",
@@ -60,7 +78,11 @@
       "status": "todo",
       "phase": "P0",
       "depends_on": [],
-      "files": ["src/client/components/EntryEditor.tsx", "src/client/components/ProfileEditor.tsx", "src/client/components/LayoutEditor.tsx"],
+      "files": [
+        "src/client/components/EntryEditor.tsx",
+        "src/client/components/ProfileEditor.tsx",
+        "src/client/components/LayoutEditor.tsx"
+      ],
       "origin": "spec F103 / Phase 0 (red-team #1)",
       "context": "See /workspace/SPEC.md F103. The three docked panels (`EntryEditor.tsx:212`, `ProfileEditor.tsx:205`, `LayoutEditor.tsx:95`) use `fixed right-6 top-6 z-20` while the header is `z-40`, so each panel opens half-buried: title + close button sliced, close hit-area partially blocked. FIX must be CHROME-AGNOSTIC (red-team #1): make the panel title AND close control fully within the viewport and hit-testable regardless of the header — do NOT hard-code around the current header's height/z, because Phase 1 (T020) DELETES the header and this exact assertion RE-RUNS unchanged as part of that gate. Solve via correct stacking + top offset that references the viewport/shell, not the soon-dead header. De-modal ban holds: these stay non-modal docked panels (no scrim, no aria-modal).",
       "acceptance": "- e2e: with each docked panel open in turn, its title AND its close control are fully within the viewport and hit-testable via `elementFromPoint` (the point resolves to the panel's own element, not something overlapping it).\n- NOT a stacking-order trick (red-team): the panel's title box must not intersect ANY other fixed/sticky chrome element in the DOM (measured generically, no header reference — pre-Phase-1 this catches overlapping the header; post-Phase-1 it's vacuously true, so the assertion survives). A diff that merely raises `z-20`→`z-50` while leaving `fixed right-6 top-6` untouched FAILS the gaming read — the fix must reposition relative to the shell, not out-race the header's z-index.\n- No reference to a header element in the assertion (must survive the Phase 1 chrome merge and RE-RUN unchanged there).\n- Baseline gate green.",
@@ -73,7 +95,10 @@
       "status": "todo",
       "phase": "P0",
       "depends_on": [],
-      "files": ["src/client/queries/useApplications.ts", "src/client/components/ApplicationDetail.tsx"],
+      "files": [
+        "src/client/queries/useApplications.ts",
+        "src/client/components/ApplicationDetail.tsx"
+      ],
       "origin": "spec F105 / Phase 0",
       "context": "See /workspace/SPEC.md F105 + Locked (feedback layer: failures get inline errors beside their trigger, the existing `flagVoice` pattern, NOT toasts). Today a tailor 422 produces a pixel-identical screen; the 'Failed' badge only appears after an unrelated refetch. Root cause: `useTailorApplication` (`queries/useApplications.ts:88`) has no `onError` and invalidates only `onSuccess`; `ApplicationDetail.tsx:442` never reads `isError`. FIX: surface the tailor error inline next to the Tailor/Re-tailor button on the SAME screen without navigation, and invalidate on SETTLED (so the failure badge reflects immediately). Use the keyless FixtureEngine 422 path (an unmatched JD) to drive this — no API key needed. Do NOT add a toast for this failure (errors are co-located inline; only successes may be transient).",
       "acceptance": "- e2e (applications project): trigger a tailor that the fixture engine rejects with 422 (unmatched JD) ⇒ a visible inline error renders near the Tailor button WITHOUT navigation, and the failure badge reflects on the same screen.\n- RETRY transition (proves invalidate-on-SETTLED, not onError-only): after the inline error appears, trigger a second tailor that SUCCEEDS ⇒ the inline error CLEARS and the badge flips to success in the same DOM (asserted as a transition, not two independent snapshots).\n- Success path still invalidates and shows success (no regression).\n- Baseline gate green.",
@@ -86,7 +111,10 @@
       "status": "todo",
       "phase": "P0",
       "depends_on": [],
-      "files": ["src/client/components/LibraryView.tsx", "src/client/components/EntryCard.tsx"],
+      "files": [
+        "src/client/components/LibraryView.tsx",
+        "src/client/components/EntryCard.tsx"
+      ],
       "origin": "spec F106 / Phase 0",
       "context": "See /workspace/SPEC.md F106. Library entry Delete fires irreversibly on one click (`LibraryView.tsx:205`, `EntryCard.tsx:35`) with zero confirmation. FIX: reuse the armed two-step pattern the dashboard cards already implement (`ApplicationCard.tsx:172-188` — read it, mirror it): first activation arms ('Confirm delete'), second deletes; blur/Escape disarms. Destructive confirms are inline two-step per the de-modal policy — never `window.confirm`, never a modal. Do not change the delete endpoint/behavior, only gate it.",
       "acceptance": "- e2e (chromium/library-crud or applications): first Delete activation arms (no deletion, entry still present, server not called); second activation deletes with a server round-trip asserted; Escape/blur after arming disarms (entry restored, no delete).\n- PER-ROW isolation (rules out one shared boolean): arm entry A, then click Delete once on a DIFFERENT entry B ⇒ B only arms (no delete) and A auto-disarms.\n- Baseline gate green.",
@@ -99,7 +127,9 @@
       "status": "todo",
       "phase": "P0",
       "depends_on": [],
-      "files": ["src/client/components/ApplicationCard.tsx"],
+      "files": [
+        "src/client/components/ApplicationCard.tsx"
+      ],
       "origin": "spec F107 + F110 / Phase 0",
       "context": "See /workspace/SPEC.md F107, F110 + Locked (card fixes). F107: the action row (258px of buttons in a 240px card, `justify-end` spills left; `ApplicationCard.tsx:151`) overflows the card and overlaps the neighbor at 768–1024; the footer stamp breaks mid-date at 1280 (`ApplicationCard.tsx:133-142`). F110: dark-mode card hover elevation is invisible (`hover:shadow-md` alone doesn't register black-on-near-black; `ApplicationCard.tsx:109`). FIX per Locked (card fixes): action row `flex-wrap`; stamp `whitespace-nowrap`; dark card hover adds `hover:border-border-strong` alongside the shadow (border must compute to the resolved `--border-strong` and differ from rest-state — red-team #21). Note: broader card-detail fixes (Escape-disarm, dup highlight, focus-ring radius) are Phase 3 T045 — scope THIS ticket to overflow/stamp/dark-hover only.",
       "acceptance": "- e2e at 768 AND 1024: no card action element extends outside its card's boundingBox; stamp renders on one line (no wrap) AND its full expected date text is present verbatim (an ellipsis/`text-overflow` truncation that hides the date must FAIL).\n- Dark theme: on hover the card's computed border equals the resolved `--border-strong` and differs from its rest-state border.\n- Baseline gate green.",
@@ -112,21 +142,42 @@
       "status": "todo",
       "phase": "P0",
       "depends_on": [],
-      "files": ["src/server/routes/auth.ts", "src/client/api.ts", "src/client/components/LoginGate.tsx", "test/api.auth.test.ts"],
+      "files": [
+        "src/server/routes/auth.ts",
+        "src/client/api.ts",
+        "src/client/components/LoginGate.tsx",
+        "test/api.auth.test.ts"
+      ],
       "origin": "spec F108 / OQ8 / Phase 0 — v4's ONE named backend exception",
       "context": "See /workspace/SPEC.md F108 + OQ8 + oracle.md Locked (login first-run). THREE parts: (1) BACKEND (the single sanctioned server change): add `GET /api/auth/state` → `{ setup: boolean }` in `src/server/routes/auth.ts` — public (the `/api/auth/` prefix is already in PUBLIC_PREFIXES per `src/server/auth.ts:7`), NO session required, returns ONLY the boolean, leaks no secrets. `setup === true` means a password IS configured (returning user); `setup === false` means first-run pending. Compute from `db.select().from(secrets).where(eq(secrets.id,1)).get()?.auth`. Existing endpoints for shape reference: setup/login/logout in the same file. (2) CLIENT: add a `getAuthState()` call in `src/client/api.ts` (mirror the existing auth helpers at lines 272-280); in `LoginGate.tsx`, render the 'First time here? This sets your password.' microcopy (currently unconditional at line 94) ONLY when `setup === false`; map raw error codes (`invalid_credentials`) to human copy (no `_`-code string on screen); add a hidden username field (`autocomplete=\"username\"`) so password managers work. (3) TESTS: extend `test/api.auth.test.ts` for the new endpoint (answers without a session; returns only `{setup}`; reflects password-set state). This is the ONLY server change v4 permits — anything more is a scope tripwire.",
       "acceptance": "- Server test: `GET /api/auth/state` returns 200 WITHOUT a session cookie; `Object.keys(body)` deep-equals `['setup']` EXACTLY (not merely 'no key material' — no `id`/`updatedAt`/extra fields); `setup` is false pre-setup and true after a password is set. RESTART-SAFE: after setup, re-instantiate the route/DB (or restart the test server) and confirm state still reports `true` — a module-level in-memory flag that doesn't survive restart FAILS (must read the `secrets` table).\n- Unit-test the error-code→copy mapper as a PURE FUNCTION over ALL known server codes (`invalid_body`, `invalid_credentials`, `already_configured`): none returns raw/underscored text (mapping only the one live-clicked code and letting others fall through to `err.message` FAILS).\n- e2e: wrong password ⇒ human copy (no `_`-code on screen); with `setup:false` the first-run hint renders, `setup:true` it does not (auth project fresh DB → false; applications reuses one → true); the e2e intercepts network and asserts a `GET /api/auth/state` call actually fires on login-page load AND no probing `POST /api/auth/setup` fires before the user submits.\n- A hidden username input is present with computed `display !== none` (visually-hidden/clip technique, `tabindex=\"-1\"`) — a `display:none` field that autofill ignores FAILS.\n- Baseline gate green.",
       "attempts": [],
       "evidence": null
     },
-
     {
       "id": "T020",
       "title": "P1: Chrome merge (OQ1) — delete AppShell header, wordmark+utility cluster into the rail, login mini-chrome",
       "status": "todo",
       "phase": "P1",
-      "depends_on": ["T010", "T011", "T012", "T013", "T014", "T015", "T016", "T017", "T018"],
-      "files": ["src/client/App.tsx", "src/client/components/AppShell.tsx", "src/client/components/WorkspaceShell.tsx", "src/client/components/LoginGate.tsx", "src/client/components/NavTabs.tsx", "test/e2e/helpers/workspace.ts"],
+      "depends_on": [
+        "T010",
+        "T011",
+        "T012",
+        "T013",
+        "T014",
+        "T015",
+        "T016",
+        "T017",
+        "T018"
+      ],
+      "files": [
+        "src/client/App.tsx",
+        "src/client/components/AppShell.tsx",
+        "src/client/components/WorkspaceShell.tsx",
+        "src/client/components/LoginGate.tsx",
+        "src/client/components/NavTabs.tsx",
+        "test/e2e/helpers/workspace.ts"
+      ],
       "origin": "spec Phase 1 / OQ1 (red-team #3, #4). Foundational — every other P1 ticket builds on this.",
       "context": "See /workspace/SPEC.md Phase 1 + Locked (single-chrome merge) + oracle.md. Delete the header bar (`AppShell` — currently wordmark + theme toggle + logout in a 57px row). Move the wordmark to the RAIL TOP; move theme toggle + logout to the rail's BOTTOM cluster (the collapse toggle joins there in T022). `AppShell` dissolves into the shell (App.tsx/WorkspaceShell.tsx). The LOGIN page (LoginGate, outside the shell) gets its OWN standalone mini-chrome: wordmark + theme toggle above the card at every width — it must NOT lose these when the header dies and must NOT inherit shell chrome. Update the e2e helper layer (`test/e2e/helpers/workspace.ts`) so tests drive the theme/logout controls at their NEW rail location, not the dead header — re-home selectors here, never scatter them. Frozen: visual identity, three-pane model, de-modal ban. NOTE T014's F103 assertion (docked-panel-in-viewport) RE-RUNS after this merge — do not reintroduce a header that re-buries the panels. This is the campaign's core risk (v3 cohesion contracts must stay green through the restructure); keep the wordmark's DOM identity and the shell's persistence intact.",
       "acceptance": "- e2e: NO full-width fixed bar exists outside the rail on any shell surface (measured geometrically, not by `<header>` tag-name — a renamed same-size bar FAILS); the wordmark's boundingBox is geometrically contained within the rail's boundingBox; the rail's theme toggle is OPERABLE (activation flips the root theme class AND ≥2 unrelated surfaces' computed backgrounds — canvas + a card — both change); the rail's logout is OPERABLE and INVALIDATES the session (after landing on login, a subsequent app API call 401s / navigating back to a shell route redirects to login — not just a client route push).\n- Login page renders its standalone wordmark + theme toggle at 375 and 1280; `AppShell` is removed from the DOM (not CSS-hidden).\n- v3 cohesion contracts (`cohesion.spec.ts`) green on the new tree.\n- T014's F103 assertion RE-RUNS unchanged (the SAME assertion body, not skipped and not a loosened rename) and passes on the merged tree.\n- Baseline gate green + ONE docker e2e run (`bun run test:docker`) at this gate (red-team #16). Helpers updated, assertions re-homed not deleted.",
@@ -138,8 +189,14 @@
       "title": "P1: Rail design — icon+label global nav, zoning, hover states, title convention, back-link removed",
       "status": "todo",
       "phase": "P1",
-      "depends_on": ["T020"],
-      "files": ["src/client/components/NavTabs.tsx", "src/client/components/WorkspaceShell.tsx", "src/client/components/ApplicationDetail.tsx"],
+      "depends_on": [
+        "T020"
+      ],
+      "files": [
+        "src/client/components/NavTabs.tsx",
+        "src/client/components/WorkspaceShell.tsx",
+        "src/client/components/ApplicationDetail.tsx"
+      ],
       "origin": "spec Phase 1 / F201/F204/F205 (red-team #9)",
       "context": "See /workspace/SPEC.md F201/F204/F205 + Locked (rail zoning, one title convention, icons). Make the rail DESIGNED, not just wired: (1) each global nav item (NavTabs) gets a lucide-react icon + label (suggested `Files`/`BookOpen`/`Settings2`, 16px, consistent stroke — builder's choice within lucide); (2) hover state computes to a designated token and DIFFERS from rest (the original finding was an imperceptible `#fafafa`-on-white hover); (3) rail ZONING: global-nav zone / surface-context zone / section zone under a mono-caps micro-label ('SECTIONS', same style as editor kickers); (4) the '← Applications' back-link row (ApplicationDetail) is DELETED — the active global-nav item is the up-level affordance; (5) ONE title convention: surface titles live in the EDITOR PANE header on every surface; the rail never repeats the active surface's name. Depends on T020 (rail exists). Frozen: identity, de-modal.",
       "acceptance": "- e2e: each global nav item contains an `svg`; hover computes to the designated token and differs from rest (both asserted — imperceptible hover must fail); the mono-caps section-zone label renders on surfaces that have a section group; the string '← Applications' appears NOWHERE on detail; on all four surfaces the editor pane's h1 is the surface title and the rail contains no duplicate of that title.\n- Baseline gate green; v3 cohesion green.",
@@ -151,8 +208,13 @@
       "title": "P1: Collapsible rail (localStorage view-state, icon-only band, tooltips)",
       "status": "todo",
       "phase": "P1",
-      "depends_on": ["T021"],
-      "files": ["src/client/components/WorkspaceShell.tsx", "src/client/components/NavTabs.tsx"],
+      "depends_on": [
+        "T021"
+      ],
+      "files": [
+        "src/client/components/WorkspaceShell.tsx",
+        "src/client/components/NavTabs.tsx"
+      ],
       "origin": "spec Phase 1 / F207 (human-requested; red-team #22)",
       "context": "See /workspace/SPEC.md Locked (collapsible rail) + F207. Add a collapse toggle in the rail's BOTTOM cluster (with theme/logout from T020). Expanded 224px ↔ collapsed icon-only band 40–64px (builder picks within the band). Collapsed mode: icon-only global nav with tooltips; per-surface section nav hidden. State persists in `localStorage` ONLY — never a server write, never `settings.layout`/`sectionDisplay` (standing rail-collapse-is-view-state-only policy; network-zero on toggle, the v3 pattern). Width change animates within the pinned [100ms,300ms] motion band (see Phase 3 language; a transition here is fine now). Depends on T021 (rail zoning exists).",
       "acceptance": "- e2e: activating the collapse toggle transitions the rail width between expanded and the 40–64px band; in icon-only mode all three global items are operable (activation navigates); state survives a reload (localStorage) but the toggle triggers ZERO network requests (network-zero, v3 pattern); no `settings`/`sectionDisplay` write.\n- Baseline gate green; v3 cohesion green.",
@@ -164,8 +226,13 @@
       "title": "P1: Scroll-spy section nav with active state (F202) + section-row clarity (F209)",
       "status": "todo",
       "phase": "P1",
-      "depends_on": ["T021"],
-      "files": ["src/client/components/ApplicationDetail.tsx", "src/client/components/WorkspaceShell.tsx"],
+      "depends_on": [
+        "T021"
+      ],
+      "files": [
+        "src/client/components/ApplicationDetail.tsx",
+        "src/client/components/WorkspaceShell.tsx"
+      ],
       "origin": "spec Phase 1 / F202/F209 (red-team #5)",
       "context": "See /workspace/SPEC.md F202/F209 + Locked (scroll-spy rule pinned). Add scroll-spy to the section nav: active = the LAST section whose top edge has crossed a line 30% down from the viewport top; when the editor is scrolled to bottom, the FINAL section is active regardless (short-last-section escape). Exactly ONE section carries `aria-current=\"true\"` + the same accent-pill treatment as the global nav (one visual language for 'current'). Surfaces with <2 sections render NO section zone (no vacuous spy). F209: the whole section row navigates; collapse moves to the editor's section HEADERS only (not the rail) — remove the ambiguous split-button (label scrolls / chevron collapses) from the rail row. Depends on T021 (section zone exists). Shares ApplicationDetail.tsx with T024 (scheduler serializes if both ready).",
       "acceptance": "- e2e on detail (seeded fixture, 3 sections; precondition `scrollHeight > clientHeight + 500` asserted): sample ≥3 scroll positions computed PROGRAMMATICALLY from the 30%-line rule (not fixed magic scrollTops) and verify the active section matches an independently-computed expected — this rules out hardcoded per-fixture thresholds; scroll to bottom ⇒ the FINAL section's item is active (short-last-section arm); the marker provably moved.\n- Exactly ONE section carries `aria-current` AND the accent-pill computed style (background/border) is on the SAME element as `aria-current` (rules out the attribute moving while the visual pill sticks).\n- Surfaces with <2 sections render no section zone (assert non-existence / zero-bbox + not-tabbable, not merely invisible).\n- Baseline gate green; v3 cohesion green.",
@@ -177,22 +244,37 @@
       "title": "P1: Scroll restoration (F203) + route focus management + single main landmark + heading order (F208)",
       "status": "todo",
       "phase": "P1",
-      "depends_on": ["T020"],
-      "files": ["src/client/App.tsx", "src/client/components/WorkspaceShell.tsx", "src/client/components/ApplicationDetail.tsx"],
+      "depends_on": [
+        "T020"
+      ],
+      "files": [
+        "src/client/App.tsx",
+        "src/client/components/WorkspaceShell.tsx",
+        "src/client/components/ApplicationDetail.tsx"
+      ],
       "origin": "spec Phase 1 / F203/F208",
       "context": "See /workspace/SPEC.md F203/F208 + Locked (scroll restoration, route-level focus management). (1) SCROLL RESTORATION: store `editor-pane` scrollTop per `location.key`; restore on POP (browser back). (2) FOCUS: on pathname change, focus the editor pane's h1 (`tabindex=\"-1\"`). (3) LANDMARKS: demote the inner `<main>` to a `div`/`region` so exactly ONE `<main>` landmark exists (AppShell's is gone after T020; WorkspaceShell keeps the one main). (4) HEADINGS: make heading levels sequential per surface (no H1→H3 skip). Depends on T020 (shell chrome final). Shares ApplicationDetail.tsx with T023.",
       "acceptance": "- e2e: scroll editor to Y ≥ 1000 (seeded fixture guarantees room), navigate away, browser back ⇒ scrollTop within ±24px of Y; forward-nav to a fresh route ⇒ top.\n- Keyed by `location.key` NOT pathname: two navigations to the SAME pathname with different scroll targets restore independently (no cross-contamination).\n- After rail navigation, `document.activeElement` is the new surface's h1; the single-`<main>` and sequential-heading checks run on ALL FOUR shell surfaces (not one sample).\n- Baseline gate green; v3 cohesion green.",
       "attempts": [],
       "evidence": null
     },
-
     {
       "id": "T030",
       "title": "P2: Bottom tab bar below lg + rail hidden + section content folds into editor (F301)",
       "status": "todo",
       "phase": "P2",
-      "depends_on": ["T020", "T021", "T022", "T023", "T024"],
-      "files": ["src/client/components/WorkspaceShell.tsx", "src/client/components/NavTabs.tsx", "src/client/components/ApplicationDetail.tsx"],
+      "depends_on": [
+        "T020",
+        "T021",
+        "T022",
+        "T023",
+        "T024"
+      ],
+      "files": [
+        "src/client/components/WorkspaceShell.tsx",
+        "src/client/components/NavTabs.tsx",
+        "src/client/components/ApplicationDetail.tsx"
+      ],
       "origin": "spec Phase 2 / F301/F302 / OQ3 (red-team #2, #24)",
       "context": "See /workspace/SPEC.md Phase 2 + Locked (compact nav: bottom tab bar). Below `lg` (1024): hide the 224px rail entirely; global nav becomes a FIXED BOTTOM BAR with the three destinations (icon+label, ≥44px targets). NOT a hamburger-drawer (red-team #2). The rail's per-surface section content folds into the editor surface and must stay reachable there (gated at 768 AND 375). The bottom bar is persistent chrome (NOT modality per the taxonomy) and must cover no interactive content (content area bottom-padding clears it). Coarse seed — refine mid-flight if the fold-into-editor proves bigger than one session. Depends on all of P1 (reshapes the P1 shell).",
       "acceptance": "- e2e at 375×812 AND 768×1024 on all four surfaces: global nav is the fixed bottom tab bar (three items, icon+label, each ≥44px short-axis, activation navigates); no drawer/hamburger pattern in the DOM; the bar covers no interactive content.\n- Section navigation is reachable in the editor surface at 768 and 375 (rail is gone below lg).\n- Baseline gate green; ≥1280 v3 cohesion green (regression guard).",
@@ -204,8 +286,13 @@
       "title": "P2: Phone-stacked detail + no horizontal overflow at 375 (F302)",
       "status": "todo",
       "phase": "P2",
-      "depends_on": ["T030"],
-      "files": ["src/client/components/ApplicationDetail.tsx", "src/client/components/WorkspaceShell.tsx"],
+      "depends_on": [
+        "T030"
+      ],
+      "files": [
+        "src/client/components/ApplicationDetail.tsx",
+        "src/client/components/WorkspaceShell.tsx"
+      ],
       "origin": "spec Phase 2 / F302 (red-team #13)",
       "context": "See /workspace/SPEC.md Phase 2 + Locked (phone layout). At 375 the detail editor pane is 29px wide and opening preview renders it off-viewport (x=341–725). FIX: detail stacks vertically at phone width; no descendant outside whitelisted intentional scroll containers overflows. The preview becomes a full-width SHEET layer below lg (sanctioned by OQ2's exception — dismissible via Escape + visible close, focus-managed) — but the preview sheet mechanics land in T033; THIS ticket owns the stacked detail layout + overflow elimination. Coarse seed. Depends on T030 (bottom bar / rail-hidden regime).",
       "acceptance": "- e2e at 375×812 on the detail surface: `document.documentElement.scrollWidth === 375` AND no descendant outside whitelisted scroll containers has `scrollWidth > clientWidth + 1` (red-team #13 — the inner-clip-wrapper cheat must fail); detail content is vertically stacked and reachable.\n- Baseline gate green.",
@@ -217,8 +304,13 @@
       "title": "P2: NewApplication as inline in-flow panel (OQ7), desktop + full-width below sm (F304)",
       "status": "todo",
       "phase": "P2",
-      "depends_on": ["T030"],
-      "files": ["src/client/components/NewApplication.tsx", "src/client/components/ApplicationsDashboard.tsx"],
+      "depends_on": [
+        "T030"
+      ],
+      "files": [
+        "src/client/components/NewApplication.tsx",
+        "src/client/components/ApplicationsDashboard.tsx"
+      ],
       "origin": "spec Phase 2 / F304 / OQ7 (red-team #11)",
       "context": "See /workspace/SPEC.md Locked (NewApplication inline). The anchored popover (`absolute right-0 w-[28rem]`) anchors off-screen at 375 and floats over cards at desktop. Replace with an INLINE panel inserted ABOVE the card grid, pushing cards down — nothing floats, nothing covered. Phone renders the SAME panel full-width below `sm`. The anchored popover variant must be GONE from the DOM. Verify the real component/parent filenames first (declared files are best-guess — NewApplication + its dashboard parent; correct them if the scope check would flag). Depends on T030. Frozen: de-modal (this removes a floating overlay — good).",
       "acceptance": "- e2e desktop 1280 (red-team #11): opening the form displaces the first card row downward (boundingBox y-delta > 0) and covers no card (`elementFromPoint` on card corners returns the card); no floating/anchored variant exists in the DOM.\n- Below `sm` (375): the same panel renders full-width.\n- Baseline gate green.",
@@ -230,8 +322,12 @@
       "title": "P2: Pane arbitration below xl (swap, never sliver) + proportional preview width (F303/F306/F207)",
       "status": "todo",
       "phase": "P2",
-      "depends_on": ["T030"],
-      "files": ["src/client/components/WorkspaceShell.tsx"],
+      "depends_on": [
+        "T030"
+      ],
+      "files": [
+        "src/client/components/WorkspaceShell.tsx"
+      ],
       "origin": "spec Phase 2 / F303/F306/F207 (red-team #10)",
       "context": "See /workspace/SPEC.md Phase 2 + Locked (tablet arbitration, preview width). Below `xl`: preview open ⇒ editor HIDDEN (pane swap), never a coexisting sliver (today at 768 'Show preview' crushes the editor to a 43px sliver). Replace the dead full-height toggle-strip gutter with a slim tab affordance or an action-bar toggle. Preview width becomes PROPORTIONAL with clamps at ≥`xl` (e.g. `minmax(384px, ~40%)`) so wide screens grow the artifact. Below lg the preview is the full-width sheet (from T031's regime); this ticket owns the ≥lg swap + proportional clamp. Depends on T030. Shares WorkspaceShell.tsx with several P2 tickets (serialize).",
       "acceptance": "- e2e at 768×1024 with preview open: editor pane is NOT rendered/visible (swap asserted), preview canvas ≥60% viewport width and paints non-uniform pixels; toggle returns the editor.\n- Proportional preview (red-team #10): at 1512×900 the preview pane is WIDER than 384px and within its clamp; at 1280 it is ≥384px.\n- Regime edges: 1023 vs 1024 behave as their respective regimes.\n- Baseline gate green.",
@@ -243,22 +339,43 @@
       "title": "P2: Coarse-pointer 44px tap targets (audited set) + single-column fields below sm (F305)",
       "status": "todo",
       "phase": "P2",
-      "depends_on": ["T030", "T031", "T032", "T033"],
-      "files": ["src/client/components/EntryEditor.tsx", "src/client/components/ApplicationDetail.tsx", "src/client/components/ApplicationCard.tsx", "src/client/components/NavTabs.tsx"],
+      "depends_on": [
+        "T030",
+        "T031",
+        "T032",
+        "T033"
+      ],
+      "files": [
+        "src/client/components/EntryEditor.tsx",
+        "src/client/components/ApplicationDetail.tsx",
+        "src/client/components/ApplicationCard.tsx",
+        "src/client/components/NavTabs.tsx"
+      ],
       "origin": "spec Phase 2 / F305 (red-team #6)",
       "context": "See /workspace/SPEC.md Locked (touch targets — audited set enumerated). Under 375×812 + `(pointer: coarse)`: ≥44px short-axis for the ENUMERATED set — bottom-tab-bar items; every control in the four gated phone flows (create application, tailor-failure error affordance, entry edit via Library, letter view + preview sheet open/close); dashboard card actions; the detail action strip; panel submit/close controls. EXCLUDED (do NOT enlarge): inline prose links, options inside open listboxes, per-paragraph icon actions inside dense editors. EntryEditor fields single-column below `sm`. This ticket runs LAST in P2 (depends on the other P2 tickets that create the controls). Declared files are the likely homes; correct if the scope check flags. Coarse seed.",
       "acceptance": "- e2e coarse-pointer emulation (375×812 + `pointer: coarse`): every control in the enumerated audited set measures ≥44px on its short axis; the excluded set is not forced to 44px.\n- EntryEditor fields render single-column below `sm`.\n- Baseline gate green.",
       "attempts": [],
       "evidence": null
     },
-
     {
       "id": "T040",
       "title": "P3: Mount Toaster + enumerated success toasts + inline failure surfacing (F401)",
       "status": "todo",
       "phase": "P3",
-      "depends_on": ["T030", "T031", "T032", "T033", "T034"],
-      "files": ["src/client/App.tsx", "src/client/queries/useApplications.ts", "src/client/components/LibraryView.tsx", "src/client/components/SettingsView.tsx", "src/client/components/ProfileEditor.tsx"],
+      "depends_on": [
+        "T030",
+        "T031",
+        "T032",
+        "T033",
+        "T034"
+      ],
+      "files": [
+        "src/client/App.tsx",
+        "src/client/queries/useApplications.ts",
+        "src/client/components/LibraryView.tsx",
+        "src/client/components/SettingsView.tsx",
+        "src/client/components/ProfileEditor.tsx"
+      ],
       "origin": "spec Phase 3 / F401 (red-team #15)",
       "context": "See /workspace/SPEC.md Phase 3 + Locked (feedback layer). Mount sonner's `<Toaster>` ONCE in `App` (the primitive `ui/sonner.tsx` exists but nothing is mounted and zero `toast()` calls exist). Fire exactly ONE auto-dismissing success toast on EACH named mutation: create, duplicate, delete, profile save, entry save, layout save, import, export. Mutation FAILURES get INLINE errors beside their trigger (the `flagVoice` pattern — tailor is already done in Phase 0 T015; extend to duplicate/delete/import), NOT toasts. Toast coverage is ENUMERATED not sampled (red-team #15). Declared files are the likely mutation homes; correct via scope check. This is a broad ticket — decompose mid-flight if it exceeds one session. Depends on P2.",
       "acceptance": "- e2e (all fixture-drivable): each named success mutation (create, duplicate, delete, profile save, entry save, layout save, import, export) fires exactly ONE toast that auto-dismisses.\n- Failure contrast on ≥2 mutations (fixture 422 / invalid import): NO success toast; an inline error renders near the trigger instead.\n- Baseline gate green; v3 cohesion green (toasts are non-modal chrome per the taxonomy).",
@@ -270,8 +387,13 @@
       "title": "P3: Export busy state — disabled + label-swap, double-fire guarded (F402)",
       "status": "todo",
       "phase": "P3",
-      "depends_on": ["T040"],
-      "files": ["src/client/components/ApplicationDetail.tsx", "src/client/components/ApplicationCard.tsx"],
+      "depends_on": [
+        "T040"
+      ],
+      "files": [
+        "src/client/components/ApplicationDetail.tsx",
+        "src/client/components/ApplicationCard.tsx"
+      ],
       "origin": "spec Phase 3 / F402",
       "context": "See /workspace/SPEC.md Phase 3 + Locked (busy pattern). PDF/plain-text export from detail has no pending state — double-click renders twice (`ApplicationDetail.tsx:445-462`); card download disables silently with no label change. FIX: shared disabled + label-swap ('Preparing…') for exports and other non-instant mutations; double-fire guarded by the pending flag. No global spinner framework. Shares ApplicationDetail/ApplicationCard with other tickets (serialize). Depends on T040 (feedback layer conventions).",
       "acceptance": "- e2e: during a slowed PDF render (CDP throttle or a test hook), the control is disabled with a swapped label; double-activation produces exactly ONE download event.\n- Baseline gate green.",
@@ -283,8 +405,16 @@
       "title": "P3: Motion language — panel/section animation in [100ms,300ms] + motion-reduce + select hover (F403/F404)",
       "status": "todo",
       "phase": "P3",
-      "depends_on": ["T040"],
-      "files": ["src/client/components/EntryEditor.tsx", "src/client/components/ProfileEditor.tsx", "src/client/components/LayoutEditor.tsx", "src/client/components/ApplicationDetail.tsx", "src/client/components/ui/select.tsx"],
+      "depends_on": [
+        "T040"
+      ],
+      "files": [
+        "src/client/components/EntryEditor.tsx",
+        "src/client/components/ProfileEditor.tsx",
+        "src/client/components/LayoutEditor.tsx",
+        "src/client/components/ApplicationDetail.tsx",
+        "src/client/components/ui/select.tsx"
+      ],
       "origin": "spec Phase 3 / F403/F404 (red-team #22)",
       "context": "See /workspace/SPEC.md Phase 3 + Locked (motion language). Panels currently pop at 0ms while `ui/dialog.tsx`/selects have `animate-in`. FIX: the docked panels adopt `ui/dialog.tsx`'s existing `animate-in fade zoom`; section collapse animates via grid-rows; EVERY structural animation has a duration in the pinned band [100ms,300ms] (a 1ms token-pop must FAIL — red-team #22) and a `motion-reduce:` variant (computed animation IS none under reduced motion). Selects get `hover:bg-muted transition-colors` (F404). Do NOT edit ui/dialog.tsx's existing motion (it's the reference). Coarse seed. Depends on T040.",
       "acceptance": "- e2e: on the animated set (panels open, section collapse) computed animation/transition duration ∈ [100ms,300ms] (a 1ms value fails); with `prefers-reduced-motion: reduce` emulated, computed animation IS none.\n- Select trigger shows a computed hover background change + a transition.\n- Baseline gate green.",
@@ -296,8 +426,12 @@
       "title": "P3: Letter empty state parity with resume (dashed card + CTA) (F405)",
       "status": "todo",
       "phase": "P3",
-      "depends_on": ["T040"],
-      "files": ["src/client/components/LetterPreview.tsx"],
+      "depends_on": [
+        "T040"
+      ],
+      "files": [
+        "src/client/components/LetterPreview.tsx"
+      ],
       "origin": "spec Phase 3 / F405",
       "context": "See /workspace/SPEC.md F405 + Locked (empty states). The letter-tab empty preview is bare text ('Nothing to preview yet.') while the resume side gets a designed dashed card + CTA. FIX: give the letter empty state the same dashed-card + CTA treatment as the resume empty state; the CTA arrow must not wrap onto its own line. Mirror the resume empty-state structure (find it in the resume preview/DocumentPreview and reuse its shape). Depends on T040.",
       "acceptance": "- e2e: the letter empty state has structural parity with the resume empty card (dashed card + CTA present); the CTA arrow glyph is PRESENT (count == 1 — deleting the arrow to stop it wrapping FAILS) and shares the same line-box/offsetTop as the CTA text.\n- Baseline gate green.",
@@ -309,22 +443,35 @@
       "title": "P3: Card detail set — Escape disarms, dup highlight, error border/focus, focus-ring radius (F406)",
       "status": "todo",
       "phase": "P3",
-      "depends_on": ["T040"],
-      "files": ["src/client/components/ApplicationCard.tsx", "src/client/components/NewApplication.tsx"],
+      "depends_on": [
+        "T040"
+      ],
+      "files": [
+        "src/client/components/ApplicationCard.tsx",
+        "src/client/components/NewApplication.tsx"
+      ],
       "origin": "spec Phase 3 / F406",
       "context": "See /workspace/SPEC.md F406 + Locked (card fixes). Four items: (1) Escape disarms the card's armed 'Confirm delete'; (2) duplicate scrolls the new card into view with a brief highlight (today it appears unhighlighted at list end with no locating feedback); (3) NewApplication required-field error renders beside the RIGHT field with a red border + focus (today detached below the wrong field); (4) card focus ring uses the FULL card radius (today follows `rounded-t-xl` → square bottom corners mid-card). Verify NewApplication's real filename (from T032). Shares ApplicationCard with T017/T042 (serialize). Depends on T040.",
       "acceptance": "- e2e: Escape disarms an armed card delete (card restored, no delete); after duplicate, the new card is scrolled into view with a transient highlight class/attr; a NewApplication required-field error renders adjacent to its field with a red border and moves focus there; the card focus ring computes to the full card radius (all four corners equal).\n- Baseline gate green.",
       "attempts": [],
       "evidence": null
     },
-
     {
       "id": "T041",
       "title": "P4: Accordion consistency + template gallery consolidation (delete popover, re-target F102)",
       "status": "todo",
       "phase": "P4",
-      "depends_on": ["T040", "T042", "T043", "T044", "T045"],
-      "files": ["src/client/components/ApplicationDetail.tsx", "src/client/components/TemplateGallery.tsx"],
+      "depends_on": [
+        "T040",
+        "T042",
+        "T043",
+        "T044",
+        "T045"
+      ],
+      "files": [
+        "src/client/components/ApplicationDetail.tsx",
+        "src/client/components/TemplateGallery.tsx"
+      ],
       "origin": "spec Phase 4 / F505 (red-team #7, #8)",
       "context": "See /workspace/SPEC.md F505 + Locked (accordion consistency). All three detail sections collapsible, DEFAULT EXPANDED (red-team #8 — never collapsed-by-default sections); Design's INTERNAL control groups default COLLAPSED (that is what retires the ~5,400px scroll). Per-section collapse state is view-state (localStorage at most; network-zero; preview pixel-identical — the v3 H2 pattern). Consolidate the template presentation: the Design card duplicates the template gallery (same 10 templates inline AND in the popover) — DELETE the popover (the T013 temporary reposition) and re-target the F102 assertion onto the SURVIVING inline presentation: 'exactly one template-choice presentation exists on the surface, fully within the editor pane'. Re-homed, not deleted (red-team #7). Depends on P3. Coarse seed — decompose if accordion + gallery is too big for one session.",
       "acceptance": "- e2e: all three sections collapsible, default EXPANDED; collapse is view-state (network-zero, preview pixel-identical); exactly ONE template-choice presentation exists on the surface, fully within the editor pane (re-targeted F102); the popover variant is gone from the DOM.\n- Phase-1 scroll-spy/restoration tests re-run green with their scroll-room precondition still satisfied on the default-expanded surface.\n- Baseline gate green.",
@@ -336,8 +483,17 @@
       "title": "P4: Letter editing re-homed into the editor pane (OQ5), preview view-only (F501)",
       "status": "todo",
       "phase": "P4",
-      "depends_on": ["T040", "T042", "T043", "T044", "T045"],
-      "files": ["src/client/components/ApplicationDetail.tsx", "src/client/components/LetterPreview.tsx"],
+      "depends_on": [
+        "T040",
+        "T042",
+        "T043",
+        "T044",
+        "T045"
+      ],
+      "files": [
+        "src/client/components/ApplicationDetail.tsx",
+        "src/client/components/LetterPreview.tsx"
+      ],
       "origin": "spec Phase 4 / F501 / OQ5 (red-team #17)",
       "context": "See /workspace/SPEC.md F501 + OQ5 + Locked (letter editing re-homed). Today paragraph draft editing lives in the 384px preview rail below the letter page (~90px textareas clip mid-word; scrolling to Paragraph 2 scrolls the letter out of view — you edit blind). MOVE paragraph draft editing into the Cover-letter SECTION of the wide EDITOR pane (joining Regenerate/Undo); the preview pane becomes VIEW-ONLY for letters, exactly as for resumes. The v2 behavioral contracts (paragraph edit round-trip, undo, blank-letter, part-edit) MIGRATE UNCHANGED to the new home (re-home the assertions via the helper layer, never delete). Per-paragraph Remove/Insert pairs currently outweigh content — right-size them. Depends on P3. Coarse seed.",
       "acceptance": "- e2e at 1280×720 (red-team #17): while a paragraph textarea HAS FOCUS, ≥50% of the letter page canvas's boundingBox is within the viewport AND the canvas renders at ≥ its normal un-zoomed scale — pin an absolute minimum canvas width (match the resume-preview scale) so shrinking the canvas to trivially fit ≥50% FAILS.\n- Paragraph edit round-trips to the rendered letter (pixel-diff + plain-text sentinel, v3 pattern); v2 contracts (undo, blank-letter, part-edit) green in the new home — the MIGRATED contract files are diffed for `expect()` count AND content vs their pre-migration versions (a looser rewrite that keeps pass/fail FAILS).\n- Baseline gate green; ratchet satisfied (assertions re-homed not deleted).",
@@ -349,8 +505,18 @@
       "title": "P4: Library per-row Edit + identity line + toolbar (OQ4) (F502/F509)",
       "status": "todo",
       "phase": "P4",
-      "depends_on": ["T040", "T042", "T043", "T044", "T045"],
-      "files": ["src/client/components/LibraryView.tsx", "src/client/components/EntryCard.tsx", "src/client/components/LibraryToolbar.tsx"],
+      "depends_on": [
+        "T040",
+        "T042",
+        "T043",
+        "T044",
+        "T045"
+      ],
+      "files": [
+        "src/client/components/LibraryView.tsx",
+        "src/client/components/EntryCard.tsx",
+        "src/client/components/LibraryToolbar.tsx"
+      ],
       "origin": "spec Phase 4 / F502/F509 / OQ4",
       "context": "See /workspace/SPEC.md F502/F509 + Locked (library). Today editing takes select-in-dropdown → 'Edit selected' (3 clicks) while destructive Delete is inline — affordance inversion. FIX: per-row Edit button BESIDE Delete (OQ4); DELETE the dropdown + 'Edit selected' pair entirely. Entry rows get an identity line ('Role · Company · Period' — company/role/period never shown today). Import/Export become outline buttons or an overflow menu; the count anchors to the filter control. Delete stays the two-step from T016. Verify LibraryToolbar's real filename. Shares LibraryView/EntryCard with T016/T040 (serialize). Depends on P3. Coarse seed.",
       "acceptance": "- e2e: per-row Edit opens that entry's editor in ONE activation with that entry's data loaded (contrast: two different rows load different data); the dropdown + 'Edit selected' pair is gone from the DOM; each row renders an identity line with company/role/period; delete stays two-step.\n- Baseline gate green; ratchet satisfied.",
@@ -362,8 +528,16 @@
       "title": "P4: Kicker dedup (F503) + action-strip regroup (F504) + metadata typography (F509)",
       "status": "todo",
       "phase": "P4",
-      "depends_on": ["T040", "T042", "T043", "T044", "T045"],
-      "files": ["src/client/components/ApplicationDetail.tsx"],
+      "depends_on": [
+        "T040",
+        "T042",
+        "T043",
+        "T044",
+        "T045"
+      ],
+      "files": [
+        "src/client/components/ApplicationDetail.tsx"
+      ],
       "origin": "spec Phase 4 / F503/F504/F509 (red-team #19)",
       "context": "See /workspace/SPEC.md F503/F504/F509 + Locked (kicker dedup, action strip). F503: mono kickers STAY (they're the scroll-spy landmarks); the duplicate in-card headings GO (no detail card heading duplicates its kicker text). F504: action strip — primary (Re-tailor) FIRST; exports grouped right (Download PDF + Plain text as a split/grouped control); 'Use as a voice source' labels disambiguated ('Use resume as a voice source' / 'Use letter as a voice source' — both present, distinct); 'Lock final' visually distinguished as consequential (vs harmless 'Plain text'). F509: unify metadata typography where it splits (mono kickers vs sans 'Updated…'/'3 of 3'). Shares ApplicationDetail with many tickets (serialize). Depends on P3.",
       "acceptance": "- e2e (red-team #19): the duplicate in-card heading is REMOVED (assert the element is gone, not merely reworded to a non-matching string); no detail card heading duplicates its kicker text (case-insensitive).\n- 'Use resume as a voice source' and 'Use letter as a voice source' both present and distinct.\n- The action strip's primary (Re-tailor) is first in BOTH visual position AND DOM/tab order (rules out a CSS `order`/`row-reverse` cheat).\n- F509 typography: assert metadata labels that should share a family DO (e.g. the 'Updated…'/'N of N' metadata no longer splits Mono vs Sans arbitrarily) — a computed font-family consistency check on the named metadata set.\n- Baseline gate green.",
@@ -375,8 +549,16 @@
       "title": "P4: Settings — split format monolith into sub-cards, center the column, ≤1200px cards (F506)",
       "status": "todo",
       "phase": "P4",
-      "depends_on": ["T040", "T042", "T043", "T044", "T045"],
-      "files": ["src/client/components/SettingsView.tsx"],
+      "depends_on": [
+        "T040",
+        "T042",
+        "T043",
+        "T044",
+        "T045"
+      ],
+      "files": [
+        "src/client/components/SettingsView.tsx"
+      ],
       "origin": "spec Phase 4 / F506 (red-team #22)",
       "context": "See /workspace/SPEC.md F506 + Locked (settings). 'Default document format' is one 3,153px monolith card beside two ~200px peers; cards are left-anchored with ~640px dead space at 1512. FIX: split the format monolith into grouped sub-cards sharing the ONE rail entry; center the column. Hard bound (red-team #22): no card exceeds 1,200px rendered height. Every section must still round-trip (re-run the v3 settings enumeration). Depends on P3.",
       "acceptance": "- e2e: no Settings card exceeds 1,200px rendered height; the column is centered (not left-anchored with large dead space); every settings section still round-trips (save + reload reflects).\n- Baseline gate green.",
@@ -388,8 +570,17 @@
       "title": "P4: Preview zoom expand-in-place (≥xl only, ephemeral) + frame on re-render (OQ6) (F507)",
       "status": "todo",
       "phase": "P4",
-      "depends_on": ["T040", "T042", "T043", "T044", "T045"],
-      "files": ["src/client/components/WorkspaceShell.tsx", "src/client/components/DocumentPreview.tsx"],
+      "depends_on": [
+        "T040",
+        "T042",
+        "T043",
+        "T044",
+        "T045"
+      ],
+      "files": [
+        "src/client/components/WorkspaceShell.tsx",
+        "src/client/components/DocumentPreview.tsx"
+      ],
       "origin": "spec Phase 4 / F507 / OQ6 (red-team #18)",
       "context": "See /workspace/SPEC.md F507 + OQ6 + Locked (preview zoom). Add a zoom control that EXPANDS the preview pane in place (editor shrinks but keeps ≥240px width) so the page renders ≥1.5× its normal in-pane width, still SIDE-BY-SIDE — NO overlay, zero modality. Toggling restores prior widths. State is EPHEMERAL — never persisted (not even localStorage); a fresh load is always un-zoomed. Below `xl` the control does NOT render (pane-swap already gives preview full width). Also: re-render must keep the page FRAME (today it drops to bare 'Rendering preview…' text with a layout jump). The rendered DOCUMENT is out of scope — this is preview CHROME only. Shares WorkspaceShell (serialize). Depends on P3.",
       "acceptance": "- e2e at 1280: activating zoom changes the editor pane's REAL layout width (shrinks, staying ≥240px) and the page canvas renders ≥1.5× its prior width via reflow — a `transform:scale` that leaves the editor's layout width unchanged FAILS (verify via `elementFromPoint` over the editor region); ZERO modality appears; toggling restores prior widths.\n- EPHEMERAL: state resets on SPA navigate-away-and-back (not just a hard reload) AND the toggle writes to NO storage key (localStorage/sessionStorage inspected).\n- Below `xl` the control is absent via `querySelector(...) === null` (not `display:none`); assert at the 1279 vs 1280 edge.\n- Re-render keeps the page frame (no bare-text layout jump).\n- Baseline gate green.",
@@ -401,22 +592,42 @@
       "title": "P4: Panel craft — sticky header/pinned footer, X close, auto-grow facts, reworded label (F508)",
       "status": "todo",
       "phase": "P4",
-      "depends_on": ["T040", "T042", "T043", "T044", "T045"],
-      "files": ["src/client/components/EntryEditor.tsx", "src/client/components/ProfileEditor.tsx", "src/client/components/LayoutEditor.tsx"],
+      "depends_on": [
+        "T040",
+        "T042",
+        "T043",
+        "T044",
+        "T045"
+      ],
+      "files": [
+        "src/client/components/EntryEditor.tsx",
+        "src/client/components/ProfileEditor.tsx",
+        "src/client/components/LayoutEditor.tsx"
+      ],
       "origin": "spec Phase 4 / F508 (red-team #19)",
       "context": "See /workspace/SPEC.md F508 + Locked (panel craft). The docked panels: whole-panel scroll clips the title on autofocus/submit at max-height → needs a STICKY header + PINNED footer with a scrolling body; the close affordance is a chevron (reads 'collapse') → make it an X with accessible name 'Close'; long facts clip in single-line inputs → facts become auto-grow textareas; 'Sort key (YYYYMM or YYYYMMDD)' raw-format label → reword to 'Sort date — newest first'. Shares the three panels with T043/T014 (serialize). Depends on P3.",
       "acceptance": "- e2e (red-team #19): every docked panel's close control is visually an X (assert the icon component/class identity, not just accessible name — an `aria-label=\"Close\"` on a still-chevron glyph FAILS) with accessible name 'Close'; the panel header boundingBox is stable while the panel body scrolls (sticky header).\n- The label text positively EQUALS the humanized copy ('Sort date — newest first') — asserting mere absence of 'Sort key (YYYYMM' lets a different raw-format string through.\n- Facts auto-grow: type multi-line content into a fact field and assert the field's rendered height INCREASES (a fixed-rows textarea FAILS).\n- Baseline gate green.",
       "attempts": [],
       "evidence": null
     },
-
     {
       "id": "T060",
       "title": "P5: Cohesion suite extended with v4 invariants (collapse, scroll-spy, restoration, sheet modality, bottom-bar/toast non-modality)",
       "status": "todo",
       "phase": "P5",
-      "depends_on": ["T041", "T050", "T051", "T052", "T053", "T054", "T055"],
-      "files": ["test/e2e/cohesion.spec.ts", "test/e2e/helpers/workspace.ts"],
+      "depends_on": [
+        "T041",
+        "T050",
+        "T051",
+        "T052",
+        "T053",
+        "T054",
+        "T055"
+      ],
+      "files": [
+        "test/e2e/cohesion.spec.ts",
+        "test/e2e/helpers/workspace.ts"
+      ],
       "origin": "spec Phase 5",
       "context": "See /workspace/SPEC.md Phase 5 + oracle.md Phase 5 oracle. Extend the v3 cohesion suite (`cohesion.spec.ts`, applications project) with v4's new invariants, run app-wide on the final tree: rail collapse (view-state, network-zero), scroll-spy active-section rule, scroll restoration on POP, sheet modality below `lg` (sanctioned) vs zero modality at ≥lg, bottom-bar + toasts classified as NON-modal chrome per the pinned taxonomy (red-team #14/#23). App-wide MODALITY SWEEP at 375, 768, 1024, AND 1280. No horizontal overflow on any surface at 375/768/1023/1024/1280/1512. This ticket adds TESTS only (test/**), asserting behavior built in P0–P4 — a src/ diff here fails the scope check. Depends on all P4 tickets. Coarse seed.",
       "acceptance": "- New/extended cohesion tests: app-wide modality sweep green under the pinned taxonomy at 375/768/1024/1280 (sheets below lg only; zero modality ≥1024; bottom bar + toasts non-modal); no horizontal overflow at 375/768/1023/1024/1280/1512; scroll restoration re-verified; rail collapse + scroll-spy invariants asserted.\n- `git diff --name-only <baseSha>..HEAD` ⊆ {test/**}.\n- Baseline gate green; test-count ratchet satisfied (counts strictly ≥ intake floor).",
@@ -428,8 +639,12 @@
       "title": "P5: Final gate — full playwright (3 projects) + docker e2e green on the final tree",
       "status": "todo",
       "phase": "P5",
-      "depends_on": ["T060"],
-      "files": ["test/e2e/cohesion.spec.ts"],
+      "depends_on": [
+        "T060"
+      ],
+      "files": [
+        "test/e2e/cohesion.spec.ts"
+      ],
       "origin": "spec Phase 5 final gate",
       "context": "See /workspace/SPEC.md Phase 5 'Done means' + oracle.md Phase 5 oracle. This is the FINAL gate ticket: verify the whole campaign holds on the final tree — full playwright (chromium, auth, applications, non-concurrent; `bun run build` before applications) + `bun run test:docker` green; app-wide modality sweep green; no horizontal overflow at all named widths; scroll restoration re-verified; test-count ratchet satisfied campaign-wide (every project ≥ intake floor). If any check is red, this ticket's failure feeds a repair ticket rather than being force-passed. Mostly a verification ticket — it may add only a final assertion if a gap is found (test/** only; src/ diff fails scope). Depends on T060.",
       "acceptance": "- Full playwright (chromium + auth + applications, non-concurrent) green; `bun run test:docker` green.\n- App-wide modality sweep green at 375/768/1024/1280; no horizontal overflow at 375/768/1023/1024/1280/1512.\n- Test-count ratchet: vitest ≥1056, chromium ≥20, auth ≥1, applications ≥32, docker ≥1 (per intake floor).\n- `git diff --name-only <baseSha>..HEAD` ⊆ {test/**}.",
