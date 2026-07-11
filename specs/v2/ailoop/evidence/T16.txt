@@ -1,0 +1,30 @@
+T16 — Letter grounding/fabrication pipeline tests + fixture acceptance
+Independent re-verify on branch ailoop/T16 (commit 9fe12cc), baseSha 76cc7cc.
+
+=== SCOPE (git diff --name-only 76cc7cc..HEAD) — CLEAN, 1 declared file (test-only) ===
+test/letter-pipeline.test.ts
+
+=== BASELINE ===
+bun run check    -> exit 0
+bun run build    -> exit 0 (✓ built in 13.38s)
+bun run lint     -> exit 0 (biome: Checked 218 files, No fixes applied)
+bunx vitest run  -> 953 passed, 1 failed = test/fit-ui.test.tsx > OVERFLOW (waitForWrapper timeout — the
+                    DOCUMENTED @fontsource flake per CLAUDE.md, NOT letter-pipeline). Isolated re-run
+                    `bunx vitest run test/fit-ui.test.tsx` -> 4/4 PASS. letter-pipeline.test.ts -> 14/14 PASS.
+
+=== ACCEPTANCE / GAMING READ (test/letter-pipeline.test.ts) ===
+1. HARD PRECONDITION: readdirSync(test/fixtures/letters) explicitly toContain the 3 fixtures + manifest.json.
+2. PROVENANCE AUTHENTICITY: manifest.model==='gemini-2.5-flash'; usage.total.{total,input,output}Tokens all >0
+   (un-fakeable — 9344 total); recordedAt parseable Date, getTime()>0.
+3. SCHEMA: LetterDecisionZ accepts all 3 recorded decisions; a groundedOn-key-deleted copy safeParse fails.
+4. FABRICATION THREE CASES (per-citation, over real SEED_ENTRIES):
+   X=cloudcase-rules-engine (facts have '~30k lines'), Y=cloudcase-frontend-rewrite (facts have NO numbers).
+   (a) '77%' cited against X, in no facts -> throws FabricationError.
+   (b) '~30k' cited against X (facts contain it) -> passes.
+   (c) '~30k' (in X's facts) cited against Y only, X uncited -> THROWS. This is the laundering-hole closer:
+       under a library-wide-pool bug case (c) would PASS; it correctly throws -> per-citation scoping proven.
+5. END-TO-END: tailorLetter(new FixtureEngine(), jd, SEED_ENTRIES) for each CONTRAST_JDS name replays and
+   validates; greeting/body/closing deep-equal the recorded fixture's decision.
+No production code touched; no bug found.
+
+VERDICT: accept. Merged --ff-only into main. (P1 now drained — phase oracle next.)

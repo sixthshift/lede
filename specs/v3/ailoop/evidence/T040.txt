@@ -1,0 +1,8 @@
+T040 — INDEPENDENT RE-VERIFY (attempt 2; branch v3-t040 @ b07e474, baseSha bc0888f)
+SCOPE: App.tsx (isWorkspaceRoute + /library, fullBleed — NOT a global hoist) + LibraryView.tsx + library-crud.spec.ts + test/library.test.tsx (vitest getByRole disambiguation for rail-nav labels). No server/shared.
+FIX (root cause of attempt-1 regression): de-modal editor panels dock `fixed right-6 top-6` (~30rem); LibraryView's right-aligned toolbar put Import under the dock zone (worse in the narrower shell editor pane) → un-forced Import click blocked → T021/22/23 timeouts. Fix = restructure the toolbar (left-aligned) so Import/Export/Edit clear the dock zone; editor pane scrolls (overflow-y-auto); NOT a test weakening (Import/filechooser proofs intact, 9 refs).
+DEGRADE LOCK (e2e, now present): library-crud.spec.ts asserts [data-testid=workspace-shell] visible on /library AND [data-testid=preview-pane] toHaveCount(0).
+PROTOCOL A: library-crud +1 test (workspace shell /library); 0 skip/only; de-modal editor tests preserved (no regression).
+BASELINE (authoritative, exit codes): check 0 · lint 0 · build 0 · vitest 1056 (no flake this run) · chromium --retries=0 EXIT 0 (15) · auth EXIT 0 (1) · applications EXIT 0 (21).
+ATTEMPT 1 (failed): protocol violation (main, no branch/commit, stalled) + regressed T022/T023 e2e + missing degrade assertion; see T040-a1.txt.
+VERDICT: DONE (attempt 2).

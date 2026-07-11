@@ -1,0 +1,28 @@
+T22 — Letter download + filename + PDF title/author
+Independent re-verify on branch ailoop/T22 (commit 63c169a), baseSha 22e1bfd.
+
+=== SCOPE (git diff --name-only 22e1bfd..HEAD) — CLEAN, 2 declared files ===
+src/client/document/download.ts
+test/letter-download.test.ts
+
+=== BASELINE ===
+bun run build    -> exit 0
+bun run check    -> exit 0
+bun run lint     -> exit 0 (biome: Checked 223 files, No fixes applied)
+bunx vitest run  -> 963 passed, 1 failed = test/fit-ui.test.tsx (documented @fontsource flake; isolated 4/4 PASS).
+                    test/letter-download.test.ts 6/6 PASS.
+
+=== ACCEPTANCE / GAMING READ (test/letter-download.test.ts) ===
+✓ letterPdfFilename('Ada Lovelace','Acme','Staff Engineer') === 'Ada Lovelace — Acme — Staff Engineer — Cover Letter.pdf'
+✓ second distinct input -> different filename
+✓ illegal chars + diacritics sanitize to a SPECIFIC expected string ('A/B\C','D:E*F?"G<H>I|J','Ké' ->
+  'ABC — DEFGHIJ — Ke — Cover Letter.pdf')
+✓ missing company/role omitted
+✓ PROPERTY: stripping ' — Cover Letter' reproduces pdfFilename output — holds BY CONSTRUCTION:
+  letterPdfFilename = pdfFilename({name,company,role}).replace(/\.pdf$/, ' — Cover Letter.pdf') (derives from
+  the shared sanitizer, not a parallel one).
+✓ downloadLetterPdf: vi.mock asserts renderLetterToBlob called with {letter,profile,paper}; vi.spyOn asserts
+  renderResumeToBlob NOT called; anchor .download === letterPdfFilename(profile.name, company, role); click() once.
+Resume filename / downloadResumePdf untouched.
+
+VERDICT: accept. Merged --ff-only into main.

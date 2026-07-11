@@ -12,14 +12,14 @@ const TABS = [
 
 export function NavTabs() {
   return (
-    <nav className="flex items-center gap-1" aria-label="Primary">
+    <nav className="flex flex-col gap-1" aria-label="Primary">
       {TABS.map((tab) => (
         <NavLink
           key={tab.to}
           to={tab.to}
           className={({ isActive }) =>
             cn(
-              "inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "flex w-full items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               isActive
                 ? "bg-accent font-medium text-primary"
                 : "font-normal text-muted-foreground hover:bg-muted hover:text-foreground",

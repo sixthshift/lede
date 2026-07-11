@@ -1,0 +1,13 @@
+T02R — Repair: focus the letter prompt (no ground-on-everything) — INDEPENDENT RE-VERIFY, branch ailoop/T02R, baseSha 7614022
+ACCEPTED. Merged --ff-only into main.
+
+SCOPE (diff --name-only): CLEAN — src/server/tailor/letter-prompt.ts, test/letter-engine.test.ts.
+BASELINE (full, coordinator-run): check 0 / lint 0 / build 0 / vitest 67 files 915 passed (912 + 3 focus tests).
+GAMING READ: clean.
+  - buildLetterUserPrompt UNTOUCHED (no diff) — fixture byte-identity contract preserved.
+  - LETTER_SYSTEM_PROMPT gained a '## 3. Focus' section: argue from ONE lead experience, don't inventory the
+    library; a second entry only if directly relevant; groundedOn should look visibly different per JD. Firm wording.
+  - fact-lock (§1 never-invent / groundedOn traceability) intact, output section renumbered but unchanged.
+  - test: 3 new assertions (focus language present, per-JD-differ language present, fact-lock language still present);
+    the 7 buildLetterUserPrompt byte-identity tests pass unmodified.
+NOTE: keyless-necessary only; the SUFFICIENT gate is T05's live re-record contrast (next).

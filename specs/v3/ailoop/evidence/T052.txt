@@ -1,0 +1,8 @@
+T052 — P5 FINAL-GATE oracle (coordinator-run on merged tree d210bd3). No code change needed (docker-spa.spec.ts shell-agnostic, passed as-is) -> empty diff, acceptance "diff⊆declared" trivially met; pure-gate ticket, new-tests rule exempt.
+FULL PLAYWRIGHT (final tree d210bd3, non-concurrent):
+  chromium      20 passed  EXIT 0
+  auth           1 passed  EXIT 0
+  applications  32 passed  EXIT 0   (✘=0)
+DOCKER E2E (bun run test:docker — real `docker compose up --build` of the shipped image, docker v29.4.0):
+  docker  1 passed (38.5s)  EXIT 0  — dockerized SPA mounts (prod bundle #root + hashed asset), first-run gate, GET /api/settings 200 through the authed session in-container.
+BASELINE: check exit 0 · build exit 0 · lint clean · vitest 1056/1056.

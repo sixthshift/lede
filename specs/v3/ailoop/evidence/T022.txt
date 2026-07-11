@@ -1,0 +1,7 @@
+T022 — INDEPENDENT RE-VERIFY (attempt 2; branch v3-t022 @ 5b27768, baseSha 919ee54)
+SCOPE: LayoutEditor.tsx + LibraryView.tsx + library-crud.spec.ts (declared; no server/shared).
+ROOT CAUSE of attempt-1 fail (fixed): (1) non-modal Radix dismisses on outside pointerdown — attempt-1's Select-click proof raced focus back; replaced with the filechooser/Import proof (like T021). (2) rows load async via useSettings() — focus now keyed on effect `open && layout.length>0`, not onOpenAutoFocus alone.
+PROTOCOL A: library-crud 10 preserved + 2 added; 0 skip/only.
+NEW layout tests: assert panel OPENED (data-layout-row first row toBeVisible) BEFORE modality; assertNoModalOverlay; firstCheckbox toBeFocused; Import filechooser proof of underlying interactivity; Escape returns focus to trigger. Round-trip: toggle 'interest' Enable + Save (PUT /api/settings 200) -> reload -> GET /api/settings reflects -> reopen verify.
+BASELINE (authoritative, exit codes captured): check 0 · lint 0 · build 0 · vitest 1053 · chromium EXIT 0 (12 passed) · auth EXIT 0 (1) · applications EXIT 0 (18).
+VERDICT: DONE (attempt 2).

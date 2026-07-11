@@ -1,0 +1,24 @@
+T15 — Motivation isolation guard (resume message byte-identical)
+Independent re-verify on branch ailoop/T15 (commit 76cc7cc), baseSha a0c7fce.
+
+=== SCOPE (git diff --name-only a0c7fce..HEAD) — CLEAN, 1 declared file (test-only) ===
+test/motivation-isolation.test.ts
+
+=== BASELINE ===
+bun run check    -> exit 0
+bun run build    -> exit 0 (✓ built in 13.49s)
+bun run lint     -> exit 0 (biome: Checked 217 files, No fixes applied)
+bunx vitest run  -> 70 files, 940 tests PASS (exit 0)  [+1 vs T14; no fit-ui flake this run]
+
+=== ACCEPTANCE / GAMING READ (test/motivation-isolation.test.ts) ===
+SpyEngine implements TailorEngine: captures decide()/decideLetter() args then DELEGATES to a real FixtureEngine
+(so both /tailor and /generate-letter genuinely succeed — not a signature-only stub). Two apps created identical
+(same recorded JD, same context, targetPages:1) except a PUT sets motivation on one.
+- REAL routes driven: POST /:id/tailor for both -> spy.decideCalls length 2; JSON.stringify(decideWith) === (decideWithout)
+  AND not.toContain(motivation) on BOTH blobs -> motivation never reaches the resume decide() input.
+- CONTRAST: POST /:id/generate-letter for both -> decideLetter motivation === motivation (with) / null (without);
+  {...with, motivation:null} deep-equals {...without, motivation:null} -> the ONLY difference is motivation.
+Anti-cheat holds: a bug folding motivation into resume context/jd would fail the byte-identical assertion; a
+motivation-is-dead-everywhere bug would fail the decideLetter contrast. No production change; no bug found.
+
+VERDICT: accept. Merged --ff-only into main.

@@ -1,0 +1,166 @@
+diff --git a/test/e2e/cohesion.spec.ts b/test/e2e/cohesion.spec.ts
+index 4adb1c5..47def17 100644
+--- a/test/e2e/cohesion.spec.ts
++++ b/test/e2e/cohesion.spec.ts
+@@ -27,7 +27,13 @@
+ // but createApplication's JD is still CONTRAST_JDS[0].jd for consistency.
+ import { test, expect, type Page } from "@playwright/test";
+ import { CONTRAST_JDS } from "../../src/server/tailor/evalcore";
+-import { login, createApplication } from "./helpers/workspace";
++import {
++  login,
++  createApplication,
++  assertNoModalOverlay,
++  openAddEntry,
++  openEditFor,
++} from "./helpers/workspace";
+ 
+ const PASSWORD = "correct horse battery staple e2e applications";
+ const JD = CONTRAST_JDS[0]!.jd; // "platform-sdk" scenario — same recorded fixture as applications.spec.ts
+@@ -206,3 +212,146 @@ test.describe("Cohesion sweep: the shell is genuinely persistent, and its rail i
+     expect(previewBox!.x).toBeGreaterThanOrEqual(editorBox!.x + editorBox!.width - 1);
+   });
+ });
++
++// ── v3-T051: app-wide modality sweep ── the cross-cutting proof that the
++// T050 hoist (single persistent WorkspaceShell above <Outlet/>) regressed
++// modality nowhere. Each de-modal flow already has its OWN phase-scoped
++// non-modal test (T020/T021/T022/T023/T024, in applications/library-crud/
++// design.spec.ts) — this sweep is not a duplicate of those; it's the
++// same bar (assertNoModalOverlay: 0 aria-modal + no >50%-viewport
++// fixed/absolute overlay) applied ONCE MORE, on the FINAL hoisted-shell
++// tree, across every surface in the same run. A closed-state 0-count would
++// be a cheat (an unopened dialog trivially has 0 aria-modal too) — every
++// case below asserts the panel is actually OPEN and VISIBLE first.
++test.describe("SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051)", () => {
++  test("NewApplication panel is non-modal (dashboard, /applications)", async ({ page }) => {
++    await page.goto("/");
++    await login(page, PASSWORD);
++    await expect(page).toHaveURL(/\/applications$/);
++
++    const trigger = page.getByRole("button", { name: "New application" });
++    await trigger.click();
++    const dialog = page.getByRole("dialog");
++    await expect(dialog).toBeVisible();
++    await expect(dialog.getByLabel(/^Company/)).toBeVisible();
++
++    await assertNoModalOverlay(page);
++  });
++
++  test("EntryEditor via Add entry is non-modal (library, /library)", async ({ page }) => {
++    await page.goto("/");
++    await login(page, PASSWORD);
++    await page.goto("/library");
++    await expect(page.getByRole("button", { name: "Add entry" })).toBeVisible();
++
++    const dialog = await openAddEntry(page);
++    await expect(dialog.getByLabel(/^Company/)).toBeVisible();
++
++    await assertNoModalOverlay(page);
++  });
++
++  test("EntryEditor via editing an existing entry is non-modal (library, /library)", async ({
++    page,
++  }) => {
++    await page.goto("/");
++    await login(page, PASSWORD);
++    await page.goto("/library");
++    await expect(page.getByRole("button", { name: "Add entry" })).toBeVisible();
++
++    // SEED_ENTRIES (src/server/seed.ts) always ships this experience entry —
++    // no need to create one first just to have something to edit.
++    const dialog = await openEditFor(
++      page,
++      "Experience: rules engine ~30k lines of unstructured rules",
++    );
++    await expect(dialog.getByLabel(/^Company/)).toBeVisible();
++
++    await assertNoModalOverlay(page);
++  });
++
++  test("LayoutEditor is non-modal (library, /library)", async ({ page }) => {
++    await page.goto("/");
++    await login(page, PASSWORD);
++    await page.goto("/library");
++    await expect(page.getByRole("button", { name: "Add entry" })).toBeVisible();
++
++    const trigger = page.getByRole("button", { name: "Edit layout" });
++    await trigger.click();
++    const dialog = page.getByRole("dialog");
++    await expect(dialog).toBeVisible();
++    await expect(dialog.locator("[data-layout-row]").first()).toBeVisible();
++
++    await assertNoModalOverlay(page);
++  });
++
++  test("ProfileEditor is non-modal (library, /library)", async ({ page }) => {
++    await page.goto("/");
++    await login(page, PASSWORD);
++    await page.goto("/library");
++    await expect(page.getByRole("button", { name: "Add entry" })).toBeVisible();
++
++    const trigger = page.getByRole("button", { name: "Edit profile" });
++    await trigger.click();
++    const dialog = page.getByRole("dialog");
++    await expect(dialog).toBeVisible();
++    await expect(dialog.getByLabel("Name", { exact: true })).toBeVisible();
++
++    await assertNoModalOverlay(page);
++  });
++
++  test("TemplateGallery via Browse templates is non-modal (application detail, /applications/:id)", async ({
++    page,
++  }, testInfo) => {
++    await page.goto("/");
++    await login(page, PASSWORD);
++    await expect(page).toHaveURL(/\/applications$/);
++
++    const company = `E2E Sweep Gallery Co ${runId}-${testInfo.retry}`;
++    const applicationId = await createApplication(page, { company, jd: JD });
++    await page.goto(`/applications/${applicationId}`);
++
++    const trigger = page.getByRole("button", { name: "Browse templates" });
++    await trigger.click();
++    const dialog = page.getByRole("dialog");
++    await expect(dialog).toBeVisible();
++    await expect(page.locator("[data-template-id]").first()).toBeVisible();
++
++    await assertNoModalOverlay(page);
++  });
++});
++
++// ── v3-T051: co-visibility re-run ── the DEGRADE test above already proves
++// side-by-side co-visibility as PART of a broader test; this re-runs the
++// same "genuinely side-by-side, not occluding" box assertion as its own,
++// explicitly-named check on the final tree — the sweep spec.md Phase 5 calls
++// for, independent of whatever else DEGRADE happens to cover. Only
++// /applications/:id is a document surface (dashboard/library/settings
++// degrade to no preview pane by design — not asserted here).
++test.describe("SWEEP 2 — co-visibility re-run: editor and preview panes are genuinely side-by-side on the final tree (v3-T051)", () => {
++  test("editor-pane and preview-pane are both visible and side-by-side at 1280x720", async ({
++    page,
++  }, testInfo) => {
++    await page.setViewportSize({ width: 1280, height: 720 });
++    await page.goto("/");
++    await login(page, PASSWORD);
++    await expect(page).toHaveURL(/\/applications$/);
++
++    const company = `E2E Sweep CoVisibility Co ${runId}-${testInfo.retry}`;
++    const applicationId = await createApplication(page, { company, jd: JD });
++    await page.goto(`/applications/${applicationId}`);
++
++    const editorPane = page.getByTestId("editor-pane");
++    const previewPane = page.getByTestId("preview-pane");
++    await expect(editorPane).toBeVisible();
++    await expect(previewPane).toBeVisible();
++
++    const [editorBox, previewBox] = await Promise.all([
++      editorPane.boundingBox(),
++      previewPane.boundingBox(),
++    ]);
++    expect(editorBox, "editor-pane must have a real box").toBeTruthy();
++    expect(previewBox, "preview-pane must have a real box").toBeTruthy();
++    expect(previewBox!.width).toBeGreaterThanOrEqual(320);
++    expect(previewBox!.x).toBeGreaterThanOrEqual(editorBox!.x + editorBox!.width - 1);
++  });
++});

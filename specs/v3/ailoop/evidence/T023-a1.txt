@@ -1,0 +1,7 @@
+T023 attempt 1 — FAILED (coordinator re-verify; builder stalled on background playwright, never confirmed green).
+chromium: 2 failed / 12 passed (exit 1):
+  - library-crud.spec.ts:256 expect(nameField).toBeFocused() -> focus doesn't land on Name field on open.
+  - library-crud.spec.ts:280 round-trip: page.waitForResponse (Save PUT /api/profile) 60s timeout + :294 headlineField.toBeVisible() -> Save never fires / field not visible.
+vitest: 1 failed — test/fit-ui.test.tsx 'ApplicationDetail fit wiring' — SUSPECTED FLAKE (T023 never touched ApplicationDetail.tsx nor any module it imports; fit-ui is react-pdf-timing-sensitive and the box was heavily loaded). To confirm on attempt-2 re-verify.
+applications: 18 passed (voice tests intact — testids preserved).
+HYPOTHESIS: same de-modal focus bug as T022 attempt 1 — focus-on-open + panel/field readiness under modal={false}. The now-MERGED LayoutEditor (T022) de-modal + its library-crud tests (~lines 139-215) are the WORKING reference; attempt 1 deviated from it.

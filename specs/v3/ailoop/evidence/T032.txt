@@ -1,0 +1,6 @@
+T032 — INDEPENDENT RE-VERIFY (branch v3-t032, baseSha 7bc09d2)
+SCOPE: test-only (applications.spec.ts + helpers/workspace.ts; 0 src — no DOM tightening needed, Badge already renders plain non-interactive div).
+NOT-A-TRACKER ALLOWLIST (red-team H8): interactiveDescendants(card) helper scopes 'button,a,input,select,[role=button],[tabindex]:not([tabindex=-1])' to a card; assertion count===4 on BOTH untailored (1 pill) AND ready (resume+letter pill+Locked badge) cards — proving pills/badges never count as interactive; the only 4 = Open anchor + Duplicate/Delete/Download buttons. Contrast check (nothing beyond allowlist is interactive).
+PROTOCOL A: titles identical (assertion inserted into the existing T031 test, no new title); 0 skip/only; 409 x15, flag-voice x9 intact.
+BASELINE (authoritative, exit codes): check 0 · lint 0 · build 0 · vitest 1056 · chromium EXIT 0 (14) · auth EXIT 0 (1) · applications EXIT 0 (21).
+VERDICT: DONE.

@@ -1,0 +1,12 @@
+T051 — independent re-verify ACCEPTED (merged main @ d210bd3, ff from 3b93e39)
+Salvaged the killed builder's test-only sweep onto CLEAN ref-based main (concurrency incident recovery, ledger [0069]); this is its first authoritative verification.
+SCOPE: git diff --name-only 3b93e39..v3-t051 = test/e2e/cohesion.spec.ts ONLY (test-only; no src touched -> no modality violation surfaced on the final tree). Clean.
+BASELINE: check exit 0 · build exit 0 · lint clean · vitest carries over 1056/1056 (src byte-identical to 3b93e39; only a playwright spec added).
+PLAYWRIGHT (fresh build, non-concurrent, no other agents):
+  chromium  20 passed  EXIT 0
+  auth       1 passed  EXIT 0
+  applications 32 passed  EXIT 0  (25 prior + 7 new; 0 real failures ✘=0)
+NEW SWEEP (all green):
+  SWEEP1 modality (open-then-assertNoModalOverlay): NewApplication(dashboard) #23, EntryEditor-add(library) #24, EntryEditor-edit-seed(library) #25, LayoutEditor #26, ProfileEditor #27, TemplateGallery(detail) #28
+  SWEEP2 co-visibility side-by-side @1280 #29 (preview.x >= editor right edge, width>=320)
+GAMING READ: genuine — each panel opened + asserted VISIBLE before the non-modal check (no closed-state 0-count cheat); reuses shared assertNoModalOverlay oracle (aria-modal 0 + no >50% overlay); edit case uses a real SEED entry; no prior assertion weakened. Asserts modality/overlay, not "no role=dialog" (per locked: ban is on modality not the ARIA role).

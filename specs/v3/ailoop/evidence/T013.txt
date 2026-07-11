@@ -1,0 +1,12 @@
+T013 — INDEPENDENT RE-VERIFY (branch v3-t013 @ 1b61413, baseSha 9d8e208)
+
+SCOPE: src/client/components/ApplicationDetail.tsx + test/e2e/applications.spec.ts (both declared; subset — WorkspaceShell/workspace.ts not needed). No server/shared/data-model.
+
+PROTOCOL A (applications.spec): titles preserved + exactly 2 ADDED (rail nav, rail collapse); no skip/fixme/only; 409 x10, flag-voice x6 intact.
+
+GAMING READ:
+  - NAV test: scroll section out of view -> click rail-nav-design -> landmark toBeInViewport()+toBeVisible(), activeElement is landmark, page.url() unchanged, expando marker on resume canvas survives (same node, no remount), canvas.toDataURL() byte-identical before/after. (Landmark = focusable div not ARIA heading, deliberately — a heading collided with design.spec getByRole heading 'Design'; valid nav target, not a weakening.)
+  - COLLAPSE test (protocol E, verbatim rigorous): real page.on('request') interceptor for PUT/PATCH/POST to /api/applications/ or /api/settings installed BEFORE collapse; after clicking rail-collapse-letter + 300ms settle, expect(writes).toEqual([]) (ZERO server writes); letterBody toBeHidden + aria-expanded false; localStorage 'lede.workspace.sectionCollapse.<id>' == {letter:true}; canvas pixel-identical; application.format & settings.layout deep-equal before/after. Interceptor is real (not a no-op).
+
+BASELINE (authoritative, ports clear): check 0 · lint 0 · build 0 · vitest 1053 · chromium 8 · auth 1 · applications 15 (applications.spec 13 [11+2] + design 1 + probe 1).
+VERDICT: DONE.

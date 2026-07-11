@@ -34,7 +34,7 @@ export function App() {
 
   const rail = (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 overflow-x-auto border-b border-border p-2">
+      <div className="shrink-0 border-b border-border p-2">
         <NavTabs />
       </div>
       <div ref={setRailTarget} className="min-h-0 flex-1" />

@@ -1,0 +1,19 @@
+T010 — INDEPENDENT RE-VERIFY (coordinator-run on branch v3-t010 @ 56487fa, baseSha aadbcb8)
+
+SCOPE (git diff --name-only aadbcb8..56487fa): only
+  src/client/components/WorkspaceShell.tsx  (new component)
+  test/workspace-shell.test.tsx             (new vitest test)
+No other src, no route/spec touched (component not imported anywhere yet — inert to e2e).
+NOTE: test placed at test/*.test.tsx (repo's real flat convention; no test/unit/ dir exists) — declared files corrected to match. Justified, not gaming.
+
+GAMING READ:
+  - grep '#hex|rgb(|hsl(|-[' in WorkspaceShell.tsx -> NONE (no raw color/arbitrary-value literal; tokens/utilities only).
+  - toggle test asserts a REAL DOM-level effect: preview-pane toHaveClass('hidden')/not('block') when closed, flips to 'block'/not('hidden') on click, back on re-click — plus aria-expanded mirrors. Not aria-only. (Tailwind 'hidden' CLASS chosen over native [hidden] attr, correctly, because UA !important on [hidden] would defeat the xl:block co-visibility override; toHaveClass checks className directly in jsdom = reliable.)
+  - degrade: no preview slot -> preview-pane not in document AND no toggle button.
+  - xl:block co-visibility class present (breakpoint itself validated later by T011 real-viewport e2e — not jsdom-checkable, flagged at intake).
+
+BASELINE GATE (authoritative, ports clear):
+  check 0 · lint 0 (237 files) · build 0 · vitest 82 files / 1053 tests passed (+4 new, count INCREASED)
+  chromium 8 · auth 1 · applications 10 (unchanged — component not wired in)
+
+VERDICT: DONE. Layout primitive delivered; suite green; not yet route-wired (per ticket).

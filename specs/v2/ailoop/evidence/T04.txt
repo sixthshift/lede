@@ -1,0 +1,26 @@
+T04 — Letter eval + record scripts + flip predicate — INDEPENDENT RE-VERIFY, branch ailoop/T04, baseSha 0928a74
+ACCEPTED. Merged --ff-only into main.
+
+SCOPE (diff --name-only 0928a74..ailoop/T04): CLEAN — scripts/eval-letter.ts (new),
+  scripts/record-letter-fixtures.ts (new), src/server/tailor/evalcore.ts (modified), test/evalcore-letter.test.ts (new).
+  engine.ts/letter.ts/prompt.ts untouched. No fixtures written.
+
+BASELINE (full, coordinator-run): check 0 / lint 0 / build 0 / vitest 912 (900 + 12 new evalcore-letter).
+  One run showed a single fit-ui failure; it did NOT reproduce on immediate re-run and fit-ui isolated is 4/4 —
+  the documented @fontsource full-suite flake, not a regression.
+SCRIPTS TYPECHECK (baseline does NOT cover scripts/ — see oracle amendment ledger 0015): the two new scripts +
+  their import graph typecheck clean via an isolated temp tsconfig (files:[eval-letter, record-letter-fixtures]) → exit 0.
+
+GAMING READ: clean.
+  - letterFlipPredicate: strict on body[0] (lead paragraph must include target; a later-paragraph mention ⇒ false).
+  - letterFlipContrast: per-letter groundedOn UNIONS, pairwise requires BOTH aMinusB AND bMinusA non-empty ⇒ the
+    superset case (strict superset ⇒ empty diff one direction) correctly returns false. Real superset trap.
+  - recordOneLetter: pure, decide→assemble→validate→flip; returns {ok:false,reason} on failure, never writes.
+  - record-letter-fixtures.ts: captures REAL per-call usage (inputTokens/outputTokens/totalTokens from generateObject,
+    summed) into manifest with recordedAt; key-gates on GOOGLE_GENERATIVE_AI_API_KEY (exit 1, no fixture-fallback).
+    Usage captured via a LetterRecordEngine seam replicating attemptLetter's generateObject call — no engine.ts edit,
+    not fabricated/aggregate-guessed.
+  - test: predicate lead/non-lead/absent, contrast identical/differ/SUPERSET-false, recordOneLetter with a failing
+    mock engine writes NO fixture (temp dir stays empty).
+
+ACCEPTANCE: all met.

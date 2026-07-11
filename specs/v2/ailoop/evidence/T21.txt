@@ -1,0 +1,33 @@
+T21 — Letter layout in the react-pdf engine + extraction-order invariant
+Independent re-verify on branch ailoop/T21 (commit 22e1bfd), baseSha 9fe12cc.
+
+=== SCOPE (git diff --name-only 9fe12cc..HEAD) — CLEAN, 5 declared files ===
+src/client/document/engine/letter.tsx (new)
+src/client/document/renderLetter.ts (new)
+src/client/document/index.ts (barrel export)
+test/letter-extraction-invariant.test.ts (new)
+test/letter-render.test.ts (new)
+
+=== BASELINE ===
+bun run build    -> exit 0 (✓ built in 13.82s; dist refreshed)
+bun run check    -> exit 0
+bun run lint     -> exit 0 (biome: Checked 222 files, No fixes applied)
+bunx vitest run  -> 73 files, 958 tests PASS (exit 0; fit-ui passed this run)
+
+=== ACCEPTANCE (letter tests, verbose) ===
+✓ extraction-order: greeting < BODY_PARA_ONE < TWO < THREE < closing via strictly-increasing lastIndex loop
+✓ never renders groundedOn: a paragraph's citation id ('cloudcase-platform-sdk', absent from its own text) is
+  ABSENT from extracted text
+✓ renderLetterToBuffer over a recorded fixture -> non-empty real PDF (%PDF)
+✓ title/author === profile.name for TWO distinct profiles (verified via pdfjs getMetadata, since react-pdf's Info
+  dict is FlateDecode-compressed — a hardcoded literal cannot pass both)
+
+=== GAMING READ (src/client/document/engine/letter.tsx) ===
+EngineLetter renders ONLY paragraph.text (line 57) — groundedOn NEVER rendered. Reuses toLegacyFormat(format) +
+resolveNameFont(format) for typography/colors/name-font — NO new design axes (tripwire respected). No column/band/
+density machinery. title/author = profile.name. Body mapped in order. ProfileHeader reused. renderLetter.ts mirrors
+renderResume.ts (registerDocumentFonts; renderToBuffer Node / pdf().toBlob() browser). Barrel exports mirror resume.
+Minor observation (not a defect): the date line uses new Date() at render time — a cover letter dated when rendered;
+acceptance does not pin the date. document.tsx (resume) untouched.
+
+VERDICT: accept. Merged --ff-only into main.

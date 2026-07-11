@@ -1,0 +1,21 @@
+T31 — independent re-verify (coordinator) — ACCEPT
+baseSha 5dd3204 == main HEAD; branch worktree-agent-ab39c18d75cbfdbb9 = base + 1 commit 9b75724 (clean ff-merge to main).
+
+SCOPE (git diff --name-only 5dd3204..branch): exactly 3 declared files —
+  src/server/routes/applications.ts, src/shared/schema.ts, test/api.applications-edit.test.ts. No overflow.
+
+BASELINE (re-run on merged tree main 9b75724, verifier full-suite un-scoped):
+  bun run check            -> exit 0 (tsc client + server)
+  bun run build            -> exit 0 (built 12.70s)
+  bun run lint             -> exit 0 (biome, 226 files, no fixes)
+  bunx vitest run          -> 76 files / 987 tests PASS, 0 fail, ~51s (+18 new vs T24's 969)
+
+GAMING READ (diff): resumePartPatchZ .strict() on outer body AND both path variants (summary | item) — a
+  structural field (entryId/rank/groundedOn/level/structure) can't ride along; strict REJECTS (400), never
+  silently strips to 200. applyResumePartPatch builds fresh objects (immutable spread/map), never mutates
+  the input snapshot; returns null on unknown section / missing group / index-past-end -> route 400 (no
+  silent append/no-op-200). Route: 404 missing, 409 locked (before any mutation), 400 null current, writes
+  only current+updatedAt back in place; previous/locked/genState/currentMeta/letter* untouched. Tests use
+  real POST create/tailor (FixtureEngine) + real POST /lock; 18 tests incl. it.each stray-key rejection,
+  full-row diff (only item text changes), well-formed structural attempt->400, index==len->400 count-unchanged,
+  locked->409 with byte-identical GET before/after. No hardcoding, no weakened/deleted tests. CLEAN.

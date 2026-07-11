@@ -1,0 +1,10 @@
+T050 attempt 1 — independent re-verify (branch v3-t050 @ 65e8c87, base 40d1b34)
+BASELINE: bun run check exit 0 · bun run build exit 0 · bunx vitest run 1056/1056 exit 0 · lint clean (pre-commit hook)
+SCOPE: git diff --name-only 40d1b34..v3-t050 = 11 files, all declared ∪ {test/settings-auth.test.tsx (accepted legit cascade: App.tsx /settings hack + main.tsx stub removed per ticket DO-list, test re-homed, assertions preserved/stronger)}
+PLAYWRIGHT (fresh build, non-concurrent, ports free):
+  chromium   20 passed  EXIT 0
+  auth        1 passed  EXIT 0
+  applications 24 passed / 1 FAILED  EXIT 1
+FAILURE (the ONLY one): test/e2e/cohesion.spec.ts:171 DEGRADE (3x retried, all 60s timeout) at helper workspace.ts:40 expect(dialog).toBeVisible().
+ROOT CAUSE = test bug, NOT product regression: DEGRADE navigates to /settings (preview-pane absence checks) then calls createApplication() WITHOUT returning to the dashboard; "New application" button exists only on /applications, so the click hangs.
+NO REGRESSION: all prior contracts green — protocol C co-visibility #9, protocol B modality #10, drawer #11, rail nav #12, rail collapse #13, inline-edit #14, locked sweep #15, NewApplication #16, dashboard content/actions #17-18, design #25, de-modal TemplateGallery #26. Cohesion PRESENCE/PERSISTENCE/FUNCTIONAL-RAIL (#19-21) green. Only DEGRADE (builder's own new test) red.

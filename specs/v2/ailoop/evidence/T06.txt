@@ -1,0 +1,19 @@
+T06 — independent re-verify (coordinator) — ACCEPT (P0 coverage-audit repair)
+baseSha cc27a74 == main HEAD; commit 14dfaec (clean ff-merge to main 14dfaec). Scope CLEAN: exactly
+test/letter-flip-keyless.test.ts; committed fixtures test/fixtures/letters/* UNTOUCHED on disk (verified via
+git diff --name-only — no fixture in the diff).
+
+GAMING READ CLEAN + NON-VACUOUS:
+  - Reads the COMMITTED files (readFileSync of the 3 .json + manifest.json), not inline data; assembles via
+    assembleLetter (groundedOn preserved).
+  - Per-fixture lead: asserts manifest.leadingEntryId === expected AND letterFlipPredicate(letter, leadingEntryId)
+    true for all 3 (platform-sdk/rules-engine/frontend-rewrite -> cloudcase-*).
+  - Contrast: letterFlipContrast over the 3 real letters === true.
+  - NEGATIVE CONTROLS (the anti-vacuity guard, on in-memory structuredClone copies — files never rewritten):
+    (a) wrong-lead mutant (lead groundedOn swapped to cloudcase-rules-engine) -> letterFlipPredicate FALSE;
+    (b) ground-on-everything superset mutant (every paragraph grounds on all entryIds) -> letterFlipContrast FALSE.
+    Positive(true) + negative(false) on the SAME predicates prove discrimination — a broken/laundered committed
+    fixture would now fail the KEYLESS suite. Gap closed.
+
+INTEGRATION BASELINE on merged main 14dfaec: check 0 / build 0 (10.77s) / lint 0 (233 files) / vitest 81 files
+  1049 pass (+6). No playwright needed (vitest-only keyless test).

@@ -1,0 +1,23 @@
+T44 — independent re-verify (coordinator) — ACCEPT (final ticket; with mechanical path-typo amendment)
+baseSha 5a03f1b IS ancestor; commit 250679f; merged into main (cc27a74, real merge — disjoint from T45's 5180ba4).
+
+SCOPE: 6 files. Declared src/client/queries/queries.ts was an INTAKE TYPO — that path doesn't exist; useProfile/
+useUpdateProfile live in src/client/hooks/queries.ts, which the builder correctly touched. Amended (ledger 0076).
+Other 5 files exactly as declared. No overflow.
+
+GAMING READ CLEAN:
+  - ProfileEditor: voiceSources list + per-item delete only; NO paste-in/add affordance (tripwire respected — grep
+    confirms no voice add/input/textarea).
+  - ApplicationDetail flag buttons: disabled only on missing content / in-flight, NOT on locked -> flagging stays
+    enabled on a locked app; create-blank-letter correctly disabled on lock; voice_cap error surfaced.
+  - e2e (3 new, rigorous + non-vacuous): (1) retroactive-import clicks the REAL create-blank-letter affordance,
+    hand-authors greeting+2 inserted paragraphs+closing with distinctive whitespace/punct via REAL in-place editing
+    (each PATCH awaited), clicks REAL flag-voice-letter, then FRESH /api/profile fetch exact-equals the test's own
+    literal joined with the server's \n\n (letterProse); (2) locked-flag CLICKS an enabled button -> asserts 200 +
+    kind resume + server-side voiceSources count +1 (not merely 'enabled'); (3) delete via Profile UI -> reload +
+    fresh fetch proves server-side removal (not optimistic DOM). All three: 0 page/console errors. Cleanup deletes
+    seeded sources (net-neutral vs the cap).
+
+INTEGRATION BASELINE on merged main cc27a74: check 0 / build 0 / lint 0 (232 files) / vitest 80 files 1043 pass.
+P4 PHASE ORACLE: bunx playwright test --project=applications -> 8/8 PASS incl. the 3 new T44 titles
+  (applications.spec.ts:928/1048/1102) + T34 editing + lifecycle/letter/design. standardFontDataUrl warnings non-fatal.

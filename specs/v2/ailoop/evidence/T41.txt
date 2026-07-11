@@ -1,0 +1,10 @@
+T41 — independent re-verify (coordinator) — ACCEPT (with mechanical declared-files amendment, ledger 0064)
+baseSha 7a82be4 ancestor; commit 5bbce5c. Scope: 7 declared + 2 legitimate required-field cascade files
+(src/client/document/sampleResume.ts, test/api.profile-settings.test.ts) — one-line, assertions STRENGTHENED not
+weakened; files amended into ticket. Gaming read CLEAN: voice_sources json notNull default [] (links idiom);
+voiceSourceZ rejects cut 'other' kind, accepts cover-letter/resume; VOICE_SOURCES_CAP=5; profileInput .max(CAP)
+.optional() secondary guard; Profile.voiceSources required (matches NOT NULL); migration ALTER ... DEFAULT '[]'
+NOT NULL + journal 0007 + snapshot; drizzle-kit generate NO-OP (builder-confirmed).
+Verified at INTEGRATION on merged tree e0270cd: check 0 / build 0 / lint 0 / vitest 78 files 1021 pass
+(+12 boot.smoke/unit for 0007 default-resolves-on-read, kind rejection, max(5), CAP===5). NOTE: this green is
+NOT "cap enforced" — enforcement is T42.

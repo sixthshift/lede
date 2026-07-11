@@ -1,0 +1,10 @@
+T050 attempt 2 — independent re-verify ACCEPTED (merged main @ 3b93e39, ff from 40d1b34)
+Committed state verified on a CLEAN tree (attempt-2 builder's unauthorized eager-host src rewrite stashed out first; not merged).
+BASELINE (unchanged src vs attempt-1's 65e8c87 — 3b93e39 adds only cohesion.spec.ts, a playwright test): check exit 0 · build exit 0 · vitest 1056/1056 exit 0 · lint clean.
+SCOPE: 11 files ⊆ declared ∪ {test/settings-auth.test.tsx (accepted cascade)}. No undeclared touch.
+PLAYWRIGHT on clean 3b93e39:
+  applications  25 passed  EXIT 0  (incl. cohesion PRESENCE/PERSISTENCE/FUNCTIONAL-RAIL/DEGRADE #19-22, co-visibility protocol C #9, modality protocol B #10, drawer #11, rail nav #12, rail collapse #13, inline-edit #14, locked sweep #15, NewApplication #16, dashboard #17-18, design #25, de-modal TemplateGallery #26)
+  chromium  20 passed  EXIT 0  (attempt-1, unaffected — cohesion.spec not in this project, src identical)
+  auth  1 passed  EXIT 0  (attempt-1, unaffected)
+GAMING READ: cohesion.spec un-gamed — persistence = expando SAME-NODE across CLIENT-SIDE nav (goto/reload forbidden), rail = observable OUTCOME, degrade = ABSENCE of preview-pane element. No prior spec weakened/deleted.
+NOTE: co-visibility protocol C passed on ref-based portal targets in BOTH attempt-1 and attempt-2 runs (2/2) — the attempt-2 builder's claimed canvas race did NOT manifest. Its eager-host remedy saved as .ailoop/evidence/T050-eager-host-standby.patch (standby if T051's co-visibility re-run ever flakes).

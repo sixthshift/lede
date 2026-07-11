@@ -1,0 +1,6 @@
+T022 attempt 1 — FAILED (coordinator re-verify; builder stalled on a background playwright job and never confirmed green).
+chromium: 2 failed / 10 passed (exit 1).
+  - library-crud.spec.ts:151 expect(dialog.locator('input[type="checkbox"]').first()).toBeFocused() -> element(s) not found.
+  - library-crud.spec.ts:168 round-trip: locator.isChecked() -> Test timeout 60000ms (checkbox never appears).
+Component LayoutEditor.tsx uses modal={false} + onOpenAutoFocus manual focus of first checkbox + data-layout-row rows (looks structurally plausible).
+HYPOTHESIS: the "Edit layout" panel likely does not OPEN (LibraryView open-state/triggerRef wiring for the layout editor not correctly extended from T021's EntryEditor pattern), OR onOpenAutoFocus does not fire under modal={false} so focus never lands + rows never mount. The 60s isChecked timeout = checkbox element absent = panel not open/rendered.

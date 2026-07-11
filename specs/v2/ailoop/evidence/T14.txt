@@ -1,0 +1,30 @@
+T14 — Cross-document 409 in-flight guard (blocking generation)
+Independent re-verify on branch ailoop/T14 (commit a0c7fce), baseSha 0255d2b.
+
+=== SCOPE (git diff --name-only 0255d2b..HEAD) — CLEAN, 2 declared files ===
+src/server/routes/applications.ts
+test/api.applications-inflight.test.ts
+
+=== BASELINE ===
+bun run check    -> exit 0
+bun run build    -> exit 0 (✓ built in 14.95s)
+bun run lint     -> exit 0 (biome: Checked 216 files, No fixes applied)
+bunx vitest run  -> 69 files, 939 tests PASS (exit 0)  [+3 vs T13]
+
+=== ACCEPTANCE (test/api.applications-inflight.test.ts — REAL held-open generation) ===
+✓ resume (A) in flight blocks letter (B) with 409 {generation_in_flight}; release A -> 200 'tailored';
+  following /generate-letter -> 200. Mid-flight 'tailoring' asserted via a SEPARATE GET (persisted state,
+  not A's own read).
+✓ SYMMETRIC: letter (A) in flight blocks concurrent resume (B) -> 409.
+✓ CROSS-DOCUMENT FAILURE RELEASE: forced /tailor failure settles genState 'failed' (not stuck 'tailoring');
+  concurrent letter 409s while in flight; immediately-following letter generation -> 200.
+
+=== GAMING READ ===
+Route guard: on entry (after row load) 409 if genState==='tailoring' OR letterGenState==='tailoring'. Flag set
+AFTER resolveEngine succeeds (a no-key 400 never marks it) and BEFORE the engine await (better-sqlite3 synchronous
+-> committed + visible to the concurrent request). Success path overrides *_genState to 'tailored'; catch path to
+'failed' — both RELEASE. Test uses a BlockingEngine implementing decide+decideLetter that signals `entered`
+synchronously before awaiting a manually-resolved deferred; A fired un-awaited, entered$ awaited (no TOCTOU),
+409 driven by the real persisted flag, NEVER a pre-written 'tailoring'. failNext() drives the real rejection path.
+
+VERDICT: accept. Merged --ff-only into main.

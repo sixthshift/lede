@@ -1,0 +1,8 @@
+T040 attempt 1 — FAILED (coordinator re-verify; builder violated protocol: worked on main (no branch), never committed, stalled on background playwright).
+REGRESSION: moving LibraryView into WorkspaceShell broke the de-modal editor e2e:
+  - chromium library-crud.spec.ts:139 (T022 LayoutEditor 'Edit layout panel' — non-modal/underlying-clickable/focus/Escape) → 60s TIMEOUT.
+  - chromium library-crud.spec.ts:241 (T023 ProfileEditor 'Edit profile panel' — same) → 60s TIMEOUT.
+  chromium 3 failed / 11 passed. (check 0, lint 0, build 0, vitest 1056 all green.)
+MISSING DELIVERABLE: the declared e2e degrade assertion (workspace-shell present + preview-pane count 0 on /library) was NOT added to library-crud.spec.ts; builder put shell coverage in vitest library.test.tsx instead and did not touch the e2e.
+GOOD parts (keep in attempt 2): App.tsx correctly adds /library to isWorkspaceRoute (fullBleed frame, NOT a global hoist); LibraryView uses WorkspaceShell rail+editor, no preview.
+HYPOTHESIS: WorkspaceShell's fixed-height frame for /library puts the de-modal editor panel and/or the underlying 'Import' control in an off-screen / overflow-clipped scroll region, so the tests' un-forced Import click + focus-on-open never reach actionability → timeout. The editor panels must remain actionable (on-screen, scrollable-to, not clipped) inside the shell.

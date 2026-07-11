@@ -1,0 +1,25 @@
+T002 — INDEPENDENT RE-VERIFY (coordinator-run on branch v3-t002 @ 5c37a2c, baseSha ce44f3e)
+
+SCOPE (git diff --name-only ce44f3e..5c37a2c): test-only, ZERO src/
+  test/e2e/auth.spec.ts
+  test/e2e/library-crud.spec.ts
+  test/e2e/helpers/workspace.ts
+
+PROTOCOL A (test-migration gaming read):
+  - test TITLES library-crud.spec + auth.spec: IDENTICAL to baseSha (diff empty, both)
+  - new skip/fixme/only: 0 in both
+  - local helpers openAddEntry/selectSection/openEditFor/cardFor: 0 remaining in library-crud.spec
+    (moved into workspace.ts 'Library CRUD' section and imported); auth.spec now imports
+    firstRunLogin+login from workspace.ts (not session.ts directly).
+  - total non-comment expect( across test/**: 2270 (post-T001) -> 2270 (non-decreasing).
+
+BASELINE GATE (authoritative, coordinator-run on branch tree, ports 8787-8789 confirmed clear):
+  bun run check ................. exit 0
+  bun run lint (biome, 234 files) exit 0
+  NODE_OPTIONS=1024 bun run build exit 0 (~11s)
+  bunx vitest run ............... 1049 passed (81 files)
+  playwright chromium (library-crud) . 8 passed
+  playwright auth .............. 1 passed
+  playwright applications ...... 9 passed (applications.spec 8 + design.spec 1)
+
+VERDICT: DONE. Baseline + acceptance green, scope clean, no gaming.

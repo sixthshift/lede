@@ -1,0 +1,25 @@
+T45 — KEY-GATED voice-on/off eval — COORDINATOR-RUN (worktrees lack .env; T05 precedent), ACCEPT
+Committed to main 5180ba4 (scripts/eval-voice.ts + test/fixtures/voice/manifest.json + transcript.md).
+
+SCOPE CLEAN: exactly the 3 declared files. (Temp out-of-band tsconfig for script typecheck created + removed.)
+
+SCRIPT (scripts/eval-voice.ts): key-gates GOOGLE_GENERATIVE_AI_API_KEY (hard exit 1, never FixtureEngine fallback);
+pins temperature 0 for BOTH runs (recorded in manifest) so any phrasing delta is INPUT-attributable not sampling
+noise; calls generateObject directly (captures real SDK usage; ProviderEngine plumbs neither temp nor usage, engine.ts
+out of scope) while reusing the REAL prompt builders buildUserPrompt/buildLetterUserPrompt + SYSTEM_PROMPT/
+LETTER_SYSTEM_PROMPT + assemble/assembleLetter. Typecheck exit 0 (out-of-band tsconfig extending server); biome clean.
+
+LIVE RUN (gemini-2.5-flash, temp 0), MECHANICAL result (script-asserted, exits nonzero on failure):
+  - resume selection+order IDENTICAL position-for-position: rules-engine#1 | platform-sdk#2 | frontend-rewrite#3
+    (both off & on); cut set identical (both []).
+  - resume phrasing DIFFERS: summary changed + 3/3 items reworded.
+  - letter grounding set IDENTICAL; letter phrasing DIFFERS.
+PROVENANCE (manifest.json, script-written, un-fakeable): model gemini-2.5-flash, provider google, temperature 0,
+  recordedAt 2026-07-10T12:24:06Z, usage total 13872 tok (in 6790 / out 7082). result.pass true.
+REGISTER VERDICT (coordinator-judged, transcript.md): AFFIRMED voice-ON adopts the exemplar's terse/blunt register
+  (greeting "Hello,"/closing "Thank you," vs OFF's "I am writing to express..."; short declaratives vs long
+  multi-clause sentences; clipped active summary) — NOT merely "text differs". Fact-lock INTACT: ~30k/~50% verbatim
+  both runs; selection+order + grounding byte-identical -> voice moved phrasing ONLY, never facts or selection.
+
+BASELINE on committed tree 5180ba4: check 0 / lint 0 (232 files incl. new script) / vitest 80 files 1043 pass
+  (unaffected — script not in tsconfig include, fixtures are data no test consumes yet).

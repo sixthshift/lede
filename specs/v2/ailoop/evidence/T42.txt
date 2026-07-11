@@ -1,0 +1,24 @@
+T42 — independent re-verify (coordinator) — ACCEPT (with move + 1 mechanical test-cascade amendment)
+baseSha e0270cd == main HEAD; commit ad39d47 (clean ff-merge to main ad39d47).
+
+SCOPE: declared (post-amend) touched — applications.ts, profile.ts, shared/plainText.ts (rename from
+client/document/plainText.ts, 79% similarity = verbatim + comment), client/document/download.ts (import ->
+@shared/plainText), test/api.voice-flag.test.ts. schema.ts declared but UNTOUCHED (flag zod inline — fine).
+OVERFLOW: test/ats-view.test.tsx — JUDGED legitimate move-cascade: a 2nd plainText importer in test/ (pre-amend
+grep scoped to src/ missed it); diff is import-path-only (`../src/client/document/plainText` -> `@shared/plainText`),
+no assertion touched. Files amended (ledger 0071). No gaming.
+
+GAMING READ CLEAN:
+  - plainText moved to shared VERBATIM (logic byte-identical) -> resume-freeze exact-equality holds.
+  - flag-voice: flagVoiceBodyZ .strict() (unknown/cut 'other' kind -> 400); 404 missing app; resume ->
+    plainText(current, rowToProfile(row)) (null current -> 400 no_source); letter -> deterministic letterProse
+    join greeting+body texts+closing (null -> 400). CAP checked BEFORE append -> 409 {error:'voice_cap'}, computed
+    text discarded, NO eviction. NO locked gate -> flagging permitted on locked. Frozen plain-string snapshot
+    (never references mutable current). rowToProfile bridges nullable columns (mirrors rowToEntry).
+  - DELETE /api/profile/voice-sources/:vid: 404 missing id, else filter + persist + return profile.
+
+INTEGRATION BASELINE on healthy main ad39d47 (verifier full-suite, un-scoped):
+  bun run check -> 0; bun run build -> 0 (14.27s); bun run lint -> 0 (biome 229 files);
+  bunx vitest run -> 79 files / 1031 tests PASS, 0 fail (+10 voice-flag). ats-view/boot.smoke/fit-ui ALL GREEN
+  on main -> builder's 7 worktree failures CONFIRMED environmental (unhealthy worktree node_modules: missing
+  .bin/tsx + @fontsource ENOENT), NOT regressions.

@@ -1,0 +1,17 @@
+T07 — independent re-verify (coordinator) — ACCEPT (P2 coverage-audit repair)
+baseSha 14dfaec == main HEAD; commit 41e5fe9 (clean ff-merge to main 41e5fe9). Scope CLEAN: exactly
+test/e2e/applications.spec.ts (1 declared file, +103 lines, one new test).
+
+GAMING READ CLEAN — all anti-cheat clauses hold:
+  - Pixel-diff asserted on the LETTER canvas ([data-testid="letter-preview"] canvas), NOT the resume
+    .document-preview (which design.spec already covers).
+  - Trigger is a TYPOGRAPHY change (Body font combobox -> "Arimo (Arial)"), awaiting the application format PUT 200
+    + asserting format.fonts.body === "arimo" — NOT a text edit, NOT a letter regenerate.
+  - before-capture guarded by expectLocatorCanvasPainted (non-blank) so the diff is real content changing.
+  - Poll letterPreviewCanvas.toDataURL() until .not.toBe(letterBefore), 15s timeout. pageErrors/consoleErrors === 0.
+
+INTEGRATION BASELINE on merged main 41e5fe9: build 0 (11.68s) / check 0 / lint 0 (233 files) / vitest 81 files
+  1049 pass. P2 PHASE ORACLE: bunx playwright test --project=applications -> 9/9 PASS incl. the new title
+  "cover letter: a typography format change re-renders the letter preview (pixel-diff)" (applications.spec.ts:705).
+Closes the P2 WEAK finding from the coverage audit — the spec's "typography visibly re-renders the letter preview
+(pixel-diff)" is now a direct, non-vacuous assertion on the letter canvas.
