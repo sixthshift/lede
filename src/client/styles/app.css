@@ -113,7 +113,8 @@ body {
   font-size: 0.6875rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--ink-faint, #a1a1aa);
+  /* F109: was --ink-faint (2.56:1 light / 4.23:1 dark on --surface). */
+  color: var(--ink-soft, #52525b);
   margin-bottom: 4px;
 }
 
@@ -143,7 +144,8 @@ body {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--ink-faint, #a1a1aa);
+  /* F109: was --ink-faint (2.56:1 light / 4.23:1 dark on --surface). */
+  color: var(--ink-soft, #52525b);
 }
 
 .weight-bar__chips {
