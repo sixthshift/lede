@@ -31,7 +31,7 @@ import {
   filterEntries,
   type LibraryFilterState,
 } from "./LibraryFilter";
-import { WorkspaceShell } from "./WorkspaceShell";
+import { WorkspaceShellSurface } from "./WorkspaceShellSlots";
 
 function groupBySection(entries: Entry[]): Map<Section, Entry[]> {
   const groups = new Map<Section, Entry[]>();
@@ -223,5 +223,9 @@ export function LibraryView() {
     </div>
   );
 
-  return <WorkspaceShell rail={rail} editor={editor} />;
+  // v3-T050: see ApplicationDetail.tsx's identical comment — this either
+  // portals `rail` into the hoisted App.tsx shell or falls back to an
+  // embedded WorkspaceShell standalone. No preview (a non-doc surface
+  // degrades).
+  return <WorkspaceShellSurface rail={rail} editor={editor} />;
 }

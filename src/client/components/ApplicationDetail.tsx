@@ -46,7 +46,7 @@ import { TemplatePicker } from "./TemplatePicker";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
 import { Skeleton } from "./ui/skeleton";
-import { WorkspaceShell } from "./WorkspaceShell";
+import { WorkspaceShellSurface } from "./WorkspaceShellSlots";
 
 // Same 300ms coalescing window the former dedicated design view used for its
 // format PUTs (v3-T012 carries that behavior into this card).
@@ -792,5 +792,10 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
     </div>
   );
 
-  return <WorkspaceShell rail={rail} editor={editor} preview={preview} />;
+  // v3-T050: WorkspaceShell is hoisted above the router's Outlet (App.tsx) in
+  // the real app — WorkspaceShellSurface portals rail/preview into it there,
+  // or (rendered standalone, e.g. under test) falls back to an embedded
+  // WorkspaceShell of its own. Either way `editor` is this route's actual
+  // Outlet content.
+  return <WorkspaceShellSurface rail={rail} editor={editor} preview={preview} />;
 }

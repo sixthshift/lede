@@ -1,5 +1,13 @@
 // Applications list page body — spec.md §27. Routing/nav is a separate
 // ticket (E6-B2); this only renders the list + create control.
+//
+// v3-T050: this dashboard joins the other three routes as a WorkspaceShell
+// surface — rendered as this route's Outlet content inside the persistent
+// shell (App.tsx). It contributes no rail content of its own (the shell's
+// global nav is its one functional rail item, spec.md Phase 5/M2) and no
+// preview (a non-doc surface degrades) — so unlike ApplicationDetail/
+// LibraryView/SettingsView, it needs neither RailSlot nor PreviewSlot, just
+// the same p-6 editor-pane padding convention those views use.
 
 import { FileText } from "lucide-react";
 
@@ -28,7 +36,7 @@ export function ApplicationsView() {
   const empty = applications && applications.length === 0;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 p-6">
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Applications</h1>

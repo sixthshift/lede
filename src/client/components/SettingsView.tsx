@@ -20,7 +20,7 @@ import { ModelPicker } from "./ModelPicker";
 import { ProviderPicker } from "./ProviderPicker";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Skeleton } from "./ui/skeleton";
-import { WorkspaceShell } from "./WorkspaceShell";
+import { WorkspaceShellSurface } from "./WorkspaceShellSlots";
 
 const SETTINGS_SECTIONS = [
   { key: "provider", label: "Provider & model" },
@@ -146,5 +146,9 @@ export function SettingsView() {
 
   const editor = <div className="max-w-2xl p-6">{editorContent}</div>;
 
-  return <WorkspaceShell rail={rail} editor={editor} />;
+  // v3-T050: see ApplicationDetail.tsx's identical comment — this either
+  // portals `rail` into the hoisted App.tsx shell or falls back to an
+  // embedded WorkspaceShell standalone. No preview (a non-doc surface
+  // degrades).
+  return <WorkspaceShellSurface rail={rail} editor={editor} />;
 }

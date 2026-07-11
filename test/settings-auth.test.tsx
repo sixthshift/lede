@@ -250,7 +250,13 @@ describe("ProviderPicker / ModelPicker — persisted via PUT /api/settings", () 
   });
 });
 
-describe("App — LoginGate wraps the app; /settings uses the real SettingsView (not the E1-F1 stub)", () => {
+describe("App — LoginGate wraps the app; /settings renders the real SettingsView through Outlet", () => {
+  // v3-T050: App.tsx's old "/settings renders SettingsView directly instead
+  // of Outlet" hack (and main.tsx's dead stub it worked around) are gone —
+  // the router's own "settings" route element IS the real SettingsView now,
+  // reached through the (hoisted, persistent) WorkspaceShell's Outlet like
+  // every other route, so this mirrors main.tsx's real route table rather
+  // than a stub App.tsx used to override.
   function renderApp(initialPath: string) {
     return render(
       withClient(
@@ -258,7 +264,7 @@ describe("App — LoginGate wraps the app; /settings uses the real SettingsView 
           <Routes>
             <Route path="/" element={<App />}>
               <Route path="tailor" element={<div>TAILOR STUB</div>} />
-              <Route path="settings" element={<div>OLD SETTINGS STUB</div>} />
+              <Route path="settings" element={<SettingsView />} />
             </Route>
           </Routes>
         </MemoryRouter>,
@@ -274,7 +280,7 @@ describe("App — LoginGate wraps the app; /settings uses the real SettingsView 
     expect(screen.queryByText("TAILOR STUB")).not.toBeInTheDocument();
   });
 
-  it("authenticated at /settings: renders SettingsView inside WorkspaceShell, not the old stub", async () => {
+  it("authenticated at /settings: renders SettingsView inside the persistent WorkspaceShell", async () => {
     mockFetch({ authed: true });
     renderApp("/settings");
 
@@ -283,6 +289,5 @@ describe("App — LoginGate wraps the app; /settings uses the real SettingsView 
     expect(await screen.findByRole("heading", { name: "Provider & model" })).toBeInTheDocument();
     expect(screen.getByTestId("workspace-shell")).toBeInTheDocument();
     expect(screen.queryByTestId("preview-pane")).not.toBeInTheDocument();
-    expect(screen.queryByText("OLD SETTINGS STUB")).not.toBeInTheDocument();
   });
 });

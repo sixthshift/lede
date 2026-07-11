@@ -6,12 +6,8 @@ import { App } from "./App";
 import { ApplicationsView } from "./components/ApplicationsView";
 import { ApplicationDetail } from "./components/ApplicationDetail";
 import { LibraryView } from "./components/LibraryView";
+import { SettingsView } from "./components/SettingsView";
 import "./styles/app.css";
-
-// Settings gets its own view in E1-F3; a stub keeps the route real until then.
-function SettingsView() {
-  return <p className="text-sm text-muted-foreground">Settings coming soon.</p>;
-}
 
 // Reads :id off the route so ApplicationDetail (spec.md §27) stays a plain
 // component taking a prop rather than reaching into the router itself.

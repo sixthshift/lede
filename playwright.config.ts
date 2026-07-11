@@ -35,6 +35,11 @@
 // (single-user app, not multi-tenant), so design.spec.ts logs in with
 // the SAME password applications.spec.ts already set on this server
 // instead of running its own first-run flow.
+//
+// v3-T050 adds cohesion.spec.ts to the same "applications" project for the
+// identical reason — its cross-cutting shell-persistence/rail-functionality
+// checks span all four routes (including the tailor-fixture-gated detail
+// view), so it shares this server/password rather than costing a fourth.
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -89,7 +94,7 @@ export default defineConfig({
     },
     {
       name: "applications",
-      testMatch: /(applications|design|mutation-probe)\.spec\.ts/,
+      testMatch: /(applications|design|mutation-probe|cohesion)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject
