@@ -51,3 +51,11 @@ corrections.
   decision: continue
   why: scope clean (5 declared + test), gaming read pass (real per-theme --ring-weak), full baseline green (vitest 1060+1flake, pw 20/1/32), acceptance 5/5. Ratchet 1056->1061.
   evidence: .ailoop/evidence/T010.txt
+
+[0008] Phase 0 disjoint batch — dispatched T011,T013,T014,T015,T016,T017,T018 as CONCURRENT builders (sonnet, worktrees, baseSha 9f7db25/d3fcec5 main tip). Builders run lightweight self-check (check+lint+their test) only; coordinator runs FULL baseline+playwright serially in verify (no concurrent playwright → no port collision). Dispatches this chunk: 8/20 (T010 + these 7). T012 held (app.css overlap with T011).
+  decision: continue
+  why: file-disjoint (scheduler batch0); concurrent builds w/o playwright are collision-free; serial verify preserves the port constraint + per-ticket full-suite regression guard
+
+[0009] Phase 0 batch — ALL 7 concurrent builders died on a session usage limit (terminal API error, "resets 3:50pm UTC"). 0 durable commits on any branch. NOT ticket failures (infra, not build) → no attempts logged. Reset T011,T013,T014,T015,T016,T017,T018 → todo; removed dead worktrees. Concurrency (7 simultaneous agents) is the likely trigger.
+  decision: amend dispatch model — abandon concurrent fan-out, go STRICTLY SERIAL (one builder at a time). Serial is both the port-collision fix AND the capacity fix. Probing capacity now with a single T011 dispatch.
+  why: no durable state lost (resume-safe); serial single-agent load is far below the concurrency that tripped the limit
