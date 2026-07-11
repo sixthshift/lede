@@ -54,7 +54,7 @@
     {
       "id": "T012",
       "title": "F101 — ATS view text wraps (orphan .ats-view__text class gets a rule)",
-      "status": "in-progress",
+      "status": "done",
       "phase": "P0",
       "depends_on": [],
       "files": [
@@ -66,7 +66,7 @@
       "context": "See /workspace/SPEC.md F101. `AtsView.tsx:104` renders `<pre class=\"ats-view__text\">` but NO CSS rule for `.ats-view__text` exists anywhere (orphan class) → UA default `white-space: pre` → measured scrollWidth 8,050px in a 351px pane; content past ~40 chars is unreachable and the pane drags sideways. FIX per oracle.md Locked (ATS view): add the `.ats-view__text` rule in app.css with `white-space: pre-wrap` (+ `overflow-wrap`/`word-break` so a long unbroken token still wraps) and mono sizing consistent with the design system (IBM Plex Mono for metadata). The rendered DOCUMENT is out of scope (react-pdf engine untouched) — this is the ATS plain-text preview chrome only. Shares app.css with T011 (scheduler serializes).",
       "acceptance": "- e2e (applications project / design layer via test/e2e/helpers): with the seeded fixture, the ATS text container's `scrollWidth ≤ clientWidth`; a 500-char unbroken token still wraps (scrollWidth stays ≤ clientWidth).\n- WRAP not CLIP: the container's rendered height GROWS with content length (a clip/`overflow:hidden`/`text-overflow:ellipsis` that shrinks scrollWidth by hiding content must FAIL).\n- PRE-WRAP not PRE-LINE: a fixture string with consecutive spaces/tabs preserves them verbatim in the DOM text (ATS fidelity — `pre-line` collapses whitespace and must fail).\n- Baseline gate green.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T012.txt"
     },
     {
       "id": "T013",

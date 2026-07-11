@@ -81,3 +81,8 @@ corrections.
 [0015] T012 — verify: playwright.config.ts touched (undeclared). Judged ACCEPTABLE — the applications project uses explicit-regex testMatch; the new ats-view.spec.ts requires registration; diff is registration-only (adds `ats-view` to the alternation, nothing else). Mechanical amendment: test-registration-only config edits are in-scope (oracle.md). Added playwright.config.ts to T012.files. app.css fix genuine (pre-wrap + overflow-wrap + word-break + mono; gaming pass).
   decision: amend-oracle (mechanical) + accept scope
   why: HOW new e2e specs get discovered in this repo — not WHAT counts as done. Recurs for T013-T017.
+
+[0016] T012 — DONE (independent re-verify green). Merged eb16ea7.
+  decision: continue
+  why: scope clean (app.css + new e2e + registration-only config), gaming pass (real pre-wrap fix, e2e red-then-green), full baseline green (vitest 1071+flake, pw 20/1/33). Ratchet applications 32->33.
+  evidence: .ailoop/evidence/T012.txt
