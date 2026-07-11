@@ -40,6 +40,10 @@
 // identical reason — its cross-cutting shell-persistence/rail-functionality
 // checks span all four routes (including the tailor-fixture-gated detail
 // view), so it shares this server/password rather than costing a fourth.
+//
+// F101/T012 adds ats-view.spec.ts to the same "applications" project — it
+// needs a real tailored application (LEDE_TAILOR_ENGINE=fixture) to reach
+// AtsView's "What the ATS sees" toggle, same rationale as design.spec.ts.
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -94,7 +98,7 @@ export default defineConfig({
     },
     {
       name: "applications",
-      testMatch: /(applications|design|mutation-probe|cohesion)\.spec\.ts/,
+      testMatch: /(applications|design|mutation-probe|cohesion|ats-view)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject
