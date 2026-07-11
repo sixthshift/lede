@@ -86,3 +86,7 @@ corrections.
   decision: continue
   why: scope clean (app.css + new e2e + registration-only config), gaming pass (real pre-wrap fix, e2e red-then-green), full baseline green (vitest 1071+flake, pw 20/1/33). Ratchet applications 32->33.
   evidence: .ailoop/evidence/T012.txt
+
+[0017] T013 — dispatch (build, SERIAL) · sonnet · worktree · baseSha f85e477 · attempt 1/3 · playwright.config.ts declared (registration)
+  decision: continue
+  why: next ready P0 (F102 gallery reposition, temporary). Serial handles the shared playwright.config.ts registration without conflict.

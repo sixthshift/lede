@@ -71,11 +71,12 @@
     {
       "id": "T013",
       "title": "F102 — template gallery reposition in-bounds (TEMPORARY; Phase 4 re-targets)",
-      "status": "todo",
+      "status": "in-progress",
       "phase": "P0",
       "depends_on": [],
       "files": [
-        "src/client/components/TemplateGallery.tsx"
+        "src/client/components/TemplateGallery.tsx",
+        "playwright.config.ts"
       ],
       "origin": "spec F102 / Phase 0 (red-team #7 sequence)",
       "context": "See /workspace/SPEC.md F102 + Locked (accordion consistency, sequence pinned). `TemplateGallery.tsx:105` uses `absolute right-0 w-[42rem]` which overflows its clipping ancestor — the popover opens 49px under the left rail with its title and first tile column cut. FIX (Phase 0, TEMPORARY): reposition so the gallery's boundingBox is fully within the editor pane at 1280×720 — a bounded reposition, not a redesign. Phase 4 (T041) will DELETE this popover entirely and re-target the assertion onto the surviving inline presentation, so keep this change minimal and self-contained. De-modal ban holds at ≥lg: no scrim, no overlay >50% viewport.",
