@@ -22,7 +22,10 @@
      --accent itself carries no <alpha-value> slot for ring-ring/25 to
      compose with. Inputs' focus ring reads this instead of ring-ring/25. */
   --ring-weak: rgba(38, 67, 189, 0.25);
-  --success: #15803d;
+  /* F109: darkened from #15803d — same hue/saturation family (~142°, ~72%),
+     lightness nudged down so pill text clears 4.5:1 on --success-soft
+     (was 4.47:1). Not a re-hue: identity frozen. */
+  --success: #137337;
   --success-soft: #e8f5ed;
   --warn: #b45309;
   --warn-soft: #fdf3e4;
@@ -61,6 +64,11 @@
   --accent-foreground: var(--ink);
   --destructive: var(--danger);
   --destructive-foreground: var(--surface);
+
+  /* F109: native controls (checkboxes/radios) otherwise render UA-blue.
+     References --accent so it re-resolves under :root.dark automatically —
+     no per-theme duplicate declaration needed. */
+  accent-color: var(--accent);
 }
 
 /*
