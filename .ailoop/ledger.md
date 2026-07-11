@@ -67,3 +67,9 @@ corrections.
 [0012] T011 — dispatch (build, attempt 2/3) · sonnet · worktree · baseSha 14e2c0f · expanded scope (+test/ui-foundation.test.tsx) · fixNote applied · builder now runs FULL vitest
   decision: continue
   why: re-dispatch after understood regression; process fix — builders run full vitest so regressions surface at the builder, not only at coordinator re-verify
+
+[0013] T011 — DONE (attempt 2, independent re-verify green). Merged (no-ff, 96c87be).
+  decision: continue
+  why: scope clean (declared+expanded), gaming pass (assertion moved with authorized change, contrast suite added), full baseline green (vitest 1071/1071, pw 20/1/32 incl cohesion). Ratchet 1061->1071.
+  evidence: .ailoop/evidence/T011.txt
+  note: T011 worker mistakenly ran `git reset --hard` against shared /workspace early on — verified NO damage (uncommitted .ailoop edits intact). HAZARD: future worker prompts must forbid git ops outside the worktree.

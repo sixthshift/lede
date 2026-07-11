@@ -28,7 +28,7 @@
     {
       "id": "T011",
       "title": "F109 — contrast fixes (weight-bar/rationale labels, success pill, checkbox accent-color)",
-      "status": "in-progress",
+      "status": "done",
       "phase": "P0",
       "depends_on": [],
       "files": [
@@ -49,7 +49,7 @@
           "fixNote": "Redo the same fix AND update test/ui-foundation.test.tsx:32 expected --success value to match the new token (the §12-verbatim assertion moves with the spec-authorized contrast fix — behavioral guarantee preserved, only the one intentionally-changed value updates). ui-foundation.test.tsx is now in your declared files. Run the FULL vitest suite yourself this time to confirm no other test pins --success."
         }
       ],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T011.txt"
     },
     {
       "id": "T012",
