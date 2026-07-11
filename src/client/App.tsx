@@ -11,10 +11,15 @@ import { SettingsView } from "./components/SettingsView";
 // /design child — that route stays in AppShell's normal centered column
 // until a later ticket) renders full-bleed so its WorkspaceShell gets a real
 // fixed-height frame to fill. Every other route is unaffected.
+//
+// v3-T040: /library joins the workspace routes — it also fills WorkspaceShell
+// (rail | editor, no preview — a non-doc surface degrades), so it needs the
+// same fixed-height frame.
 export function App() {
   const location = useLocation();
   const onSettings = location.pathname.startsWith("/settings");
-  const isWorkspaceRoute = /^\/applications\/[^/]+$/.test(location.pathname);
+  const isWorkspaceRoute =
+    /^\/applications\/[^/]+$/.test(location.pathname) || location.pathname === "/library";
 
   return (
     <LoginGate>

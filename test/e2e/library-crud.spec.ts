@@ -25,6 +25,17 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole("button", { name: "Add entry" })).toBeVisible();
 });
 
+// v3-T040: /library is housed inside WorkspaceShell (rail | editor) same as
+// the application detail workspace, but as a non-doc surface it DEGRADES —
+// no preview pane (§locked constraints: non-doc surfaces get rail+content,
+// never a preview).
+test("workspace shell: /library renders inside the shell with no preview pane (degrade)", async ({
+  page,
+}) => {
+  await expect(page.getByTestId("workspace-shell")).toBeVisible();
+  await expect(page.getByTestId("preview-pane")).toHaveCount(0);
+});
+
 test.describe("experience section", () => {
   const created = `E2E experience fact ${runId}`;
   const edited = `E2E experience fact EDITED ${runId}`;

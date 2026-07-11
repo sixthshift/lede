@@ -73,8 +73,11 @@ describe("LibraryView", () => {
   it("renders entries grouped by section using registry labels; shows facts + tag chips", async () => {
     renderLibrary([entryA, entryB]);
 
-    expect(await screen.findByText("Skills")).toBeInTheDocument();
-    expect(screen.getByText("Certifications")).toBeInTheDocument();
+    // Section headings (CardTitle -> h3), not the rail's nav buttons — v3-T040
+    // gave the rail a same-labeled row per section group, so a plain
+    // getByText would match both.
+    expect(await screen.findByRole("heading", { name: "Skills" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Certifications" })).toBeInTheDocument();
 
     expect(screen.getByText("TypeScript")).toBeInTheDocument();
     expect(screen.getByText("AWS Certified Solutions Architect")).toBeInTheDocument();
