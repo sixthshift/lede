@@ -184,6 +184,7 @@ test.describe("Cohesion sweep: the shell is genuinely persistent, and its rail i
     await page.goto("/settings");
     await expect(page.getByTestId("preview-pane")).toHaveCount(0);
 
+    await page.goto("/applications");
     const company = `E2E Cohesion Degrade Co ${runId}-${testInfo.retry}`;
     const applicationId = await createApplication(page, { company, jd: JD });
     await page.goto(`/applications/${applicationId}`);
