@@ -54,12 +54,13 @@
     {
       "id": "T012",
       "title": "F101 — ATS view text wraps (orphan .ats-view__text class gets a rule)",
-      "status": "todo",
+      "status": "in-progress",
       "phase": "P0",
       "depends_on": [],
       "files": [
         "src/client/components/AtsView.tsx",
-        "src/client/styles/app.css"
+        "src/client/styles/app.css",
+        "playwright.config.ts"
       ],
       "origin": "spec F101 / Phase 0",
       "context": "See /workspace/SPEC.md F101. `AtsView.tsx:104` renders `<pre class=\"ats-view__text\">` but NO CSS rule for `.ats-view__text` exists anywhere (orphan class) → UA default `white-space: pre` → measured scrollWidth 8,050px in a 351px pane; content past ~40 chars is unreachable and the pane drags sideways. FIX per oracle.md Locked (ATS view): add the `.ats-view__text` rule in app.css with `white-space: pre-wrap` (+ `overflow-wrap`/`word-break` so a long unbroken token still wraps) and mono sizing consistent with the design system (IBM Plex Mono for metadata). The rendered DOCUMENT is out of scope (react-pdf engine untouched) — this is the ATS plain-text preview chrome only. Shares app.css with T011 (scheduler serializes).",

@@ -73,3 +73,11 @@ corrections.
   why: scope clean (declared+expanded), gaming pass (assertion moved with authorized change, contrast suite added), full baseline green (vitest 1071/1071, pw 20/1/32 incl cohesion). Ratchet 1061->1071.
   evidence: .ailoop/evidence/T011.txt
   note: T011 worker mistakenly ran `git reset --hard` against shared /workspace early on — verified NO damage (uncommitted .ailoop edits intact). HAZARD: future worker prompts must forbid git ops outside the worktree.
+
+[0014] T012 — dispatch (build, SERIAL) · sonnet · worktree · baseSha c5b7fe9 · attempt 1/3 · git-safety hardening added to prompt
+  decision: continue
+  why: next ready P0 ticket (F101 ATS wrap); app.css free after T011 merged. Builder runs full vitest.
+
+[0015] T012 — verify: playwright.config.ts touched (undeclared). Judged ACCEPTABLE — the applications project uses explicit-regex testMatch; the new ats-view.spec.ts requires registration; diff is registration-only (adds `ats-view` to the alternation, nothing else). Mechanical amendment: test-registration-only config edits are in-scope (oracle.md). Added playwright.config.ts to T012.files. app.css fix genuine (pre-wrap + overflow-wrap + word-break + mono; gaming pass).
+  decision: amend-oracle (mechanical) + accept scope
+  why: HOW new e2e specs get discovered in this repo — not WHAT counts as done. Recurs for T013-T017.

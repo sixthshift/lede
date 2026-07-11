@@ -151,6 +151,14 @@ runs — not WHAT counts as done:
   fan-out (concurrent playwright would collide). File-disjoint batching still
   informs order; it does not authorize concurrency here.
 - `bun run build` before the `applications` playwright project (stale-dist).
+- **Test-registration allowlist (mechanical, from T012).** `playwright.config.ts`
+  uses an EXPLICIT regex `testMatch` per project, so a NEW e2e spec file must be
+  registered there to run. A `playwright.config.ts` edit that ONLY adds a new
+  spec name to an existing project's `testMatch` alternation (no change to
+  projects, servers, ports, or other config) is IN SCOPE for any ticket that
+  adds that spec — treated like the manifest allowlist. The verifier confirms
+  the diff is registration-only. Every ticket adding a new e2e spec should
+  declare `playwright.config.ts` (or reuse an already-registered spec file).
 - **Font-flake tolerance (mechanical, confirmed at intake).** The full vitest
   run flakes on `@fontsource` fetch timing under concurrency — verified on the
   untouched main tree: `fit-ui.test.tsx` / `ats-view.test.tsx` (fit-ladder
