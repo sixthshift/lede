@@ -197,3 +197,23 @@ body {
   color: var(--ink-soft, #52525b);
   margin-bottom: 6px;
 }
+
+/* F101: <pre class="ats-view__text"> (AtsView.tsx) was an orphan class —
+   no rule anywhere meant the UA default `white-space: pre` held, so a real
+   extracted document ran ~8,050px wide in a ~351px pane with everything past
+   ~40 chars unreachable. `pre-wrap` keeps `<pre>`'s whitespace fidelity
+   (consecutive spaces/tabs render verbatim, unlike `pre-line`, which would
+   collapse them) while still wrapping at normal word boundaries; the wrap
+   properties below additionally force a break inside a single unbroken run
+   (a URL, an unspaced token) that has no word boundary to wrap at, so the
+   pane's width is never dictated by content, only by its own layout. */
+.ats-view__text {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
