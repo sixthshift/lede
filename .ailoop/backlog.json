@@ -28,7 +28,7 @@
     {
       "id": "T011",
       "title": "F109 — contrast fixes (weight-bar/rationale labels, success pill, checkbox accent-color)",
-      "status": "todo",
+      "status": "in-progress",
       "phase": "P0",
       "depends_on": [],
       "files": [

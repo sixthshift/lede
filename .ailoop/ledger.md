@@ -63,3 +63,7 @@ corrections.
 [0011] T011 — attempt 1 FAILED (baseline regression). Independent full-vitest verify caught ui-foundation.test.tsx:32 ("§12 palette verbatim") failing on the authorized --success change. Builder's self-check (no full vitest) missed it; premature ff-merge rolled back (main → 2f7fb4e). Root cause: intake under-declared T011's footprint (a token-value change must also update the test that pins it). Added test/ui-foundation.test.tsx to T011.files; logged attempt with fixNote. Process fix: run FULL vitest BEFORE merging, not after.
   decision: retry (attempt 2)
   why: the fix itself is correct (spec authorizes --success ≥4.5:1); the failure is an incomplete footprint, not a wrong approach — re-dispatch with expanded scope + fixNote. Not thrash (distinct, understood cause).
+
+[0012] T011 — dispatch (build, attempt 2/3) · sonnet · worktree · baseSha 14e2c0f · expanded scope (+test/ui-foundation.test.tsx) · fixNote applied · builder now runs FULL vitest
+  decision: continue
+  why: re-dispatch after understood regression; process fix — builders run full vitest so regressions surface at the builder, not only at coordinator re-verify
