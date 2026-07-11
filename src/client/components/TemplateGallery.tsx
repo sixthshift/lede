@@ -101,8 +101,18 @@ export function TemplateGallery({
           </Button>
         </DialogPrimitive.Trigger>
 
+        {/* F102 (TEMPORARY, Phase 0 — Phase 4/T041 deletes this popover
+            entirely and re-targets the assertion onto the surviving inline
+            presentation): `absolute right-0` anchored to the trigger's own
+            box, but the trigger sits wherever the right-justified button row
+            places it — not at the editor pane's edge — so a panel this wide
+            hung off the left of that anchor and slid under the rail. `fixed`
+            anchored to the SAME width tokens WorkspaceShell already defines
+            for its own rail (`w-56`) and preview pane (`w-96`) pins this to
+            the editor pane's actual boundaries regardless of where the
+            trigger renders; `top-16` clears AppShell's `h-14` header. */}
         <DialogPrimitive.Content
-          className="absolute right-0 top-full z-20 mt-2 max-h-[80vh] w-[42rem] max-w-[90vw] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg"
+          className="fixed left-56 top-16 z-20 max-h-[80vh] w-[42rem] max-w-[90vw] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg"
           onOpenAutoFocus={(e) => {
             // Land focus on the first template card rather than the panel container.
             e.preventDefault();
