@@ -159,6 +159,68 @@ runs them:
 - **DOM-measurement checks are contrast checks, not existence checks** — a
   missing ring/marker/state must FAIL, not pass by absence (red-team #20/#21).
 
+### Anti-gaming protocols (intake red-team of the seeded acceptance, 2026-07-11)
+
+Cross-cutting cheats the fan-out found. These apply to EVERY ticket whose
+acceptance touches the pattern — the independent verifier enforces them without
+each ticket restating them:
+
+- **Per-theme resolution, not a shared literal.** Any token/contrast/ring check
+  resolves the token FOR THE ACTIVE THEME and asserts in BOTH light and dark on
+  the REAL rendered instances (not one sampled node, not a test-only stand-in).
+  A light-only hardcode that breaks dark must FAIL. (T010, T011, T017-dark)
+- **Geometry/behavior, not tag-name or class-presence.** "No header" =
+  no full-width fixed bar outside the rail (measured), not "no `<header>` tag".
+  "Hover differs" / "select hover" / "highlight" = a COMPUTED-STYLE DELTA vs
+  rest-state, not the presence of a class or a 1-LSB color nudge; assert the
+  exact resolved token value where one is named. "Contains an svg" = nonzero
+  rendered bbox. (T020, T021, T043, T045)
+- **Gone = removed, not hidden.** "Popover/drawer/dropdown gone", "control
+  absent below xl", "no floating variant" = `querySelector(...) === null` over
+  the FULL DOM (and out of tab order), NOT `toBeHidden()`/`display:none`/
+  off-canvas. A hidden-but-present node FAILS. (T030, T032, T041, T051, T054)
+- **Swap/collapse = real layout change, not opacity/transform.** A pane that is
+  "hidden" must have zero layout width AND be out of tab order (not `opacity:0`/
+  `visibility:hidden` still occupying width/intercepting clicks); a "collapsed"
+  rail must shift the main content's left offset (not clip an inner div);
+  "≥1.5× zoom" must change the editor pane's real layout width (rules out
+  `transform:scale`, verified via `elementFromPoint`). (T022, T033, T054)
+- **No-clip, no-scale overflow.** "No horizontal overflow" is not satisfiable by
+  wrapping content in non-scrollable `overflow:hidden|clip` (its scrollWidth
+  equals clientWidth while it clips) nor by a root `transform:scale`/`zoom`.
+  Assert every seeded control is reachable via `elementFromPoint`/visible bbox,
+  and flag any non-whitelisted ancestor with `overflow:hidden|clip`. The
+  overflow whitelist is FROZEN — any addition is a flagged change, not silent.
+  (T031, T034, T060)
+- **Network-zero = all bodies, all time.** "Network-zero on toggle" holds the
+  interception window several seconds past the click, asserts a zero
+  request-COUNT delta, and inspects ALL request bodies for a settings-shaped
+  payload (not a URL/field-name filter a renamed field dodges). (T022, T041)
+- **44px = functional, excluded-set snapshotted.** Tap-target size is verified by
+  a functional tap at the box extremities that fires the action (not a padded
+  non-interactive wrapper's bbox); the EXCLUDED set is asserted against its
+  pre-change dimensions (a blanket `min-height:44px` that bumps excluded items
+  to 40px still regresses them). (T034)
+- **Toast/badge = counted transition, per-item.** "Exactly one toast" = the
+  toast-root child count transitions 0→1→0 matched by message, asserted for
+  EACH named mutation individually (not one shared loop that no-ops on a missing
+  one); a failure fixture keeps toast count at 0 AND a real server error
+  occurred. (T040)
+- **Ratchet = per-file expect() non-decrease, per phase gate.** The raw
+  test-count floor is necessary but not sufficient — tautology padding
+  (`expect(true)`) games it. The verifier also asserts no per-file `expect(`
+  count decreased vs the pre-change file, and records the ratchet at EACH phase
+  gate (not just the final number) so under-testing new behavior is visible.
+  Migrated contracts (v2/v3) are diffed for `expect()` count AND content, not
+  just pass/fail. (T050, T060, T061)
+- **Test-only tickets = pure assertions.** T060/T061 scope check is paths ⊆
+  test/**, AND the verifier reads the diff for runtime-behavior injection
+  (CSS overrides, pre-seeded window globals, monkeypatching) that papers over an
+  unfixed behavior — such a diff fails even though its path is compliant.
+- **Slow suites are re-run, not trusted.** The docker e2e (P1 gate, P5 gate) is
+  independently EXECUTED by the verifier with fresh logs — never accepted on the
+  builder's report.
+
 ## Per-phase oracle (executable checks on the MERGED tree)
 
 Ticket-local `acceptance` is necessary but per-phase drain runs THESE on the
