@@ -1,0 +1,11 @@
+P4 PHASE-CLOSE GATE — GREEN on merged tree e8a4b17.
+- build: exit 0
+- playwright chromium: 30 passed (T051 library per-row-edit tests + T053 settings ≤1200/centered added)
+- playwright auth:      1 passed
+- playwright applications: 134 passed / 0 failed / 0 flaky / 0 ERR_CONNECTION_REFUSED (4.9m)
+- vitest: 1078 + fit-ui render-family flake (isolated 4/4) = floor 1079.
+- No docker at P4 (P1 + P5 only).
+All P4 specs green: accordion, design-accordion (Design groups default-collapsed), letter-editing (OQ5),
+detail-craft (F503/F504/F509), settings (≤1200/centered), preview-zoom (F507), panel-craft (F508),
+gallery consolidation migrations. v3 cohesion contracts green (minus the deleted popover sweep entry).
+NEW RATCHET FLOOR (P4 gate): vitest>=1079 · chromium>=30 · auth>=1 · applications>=134.
