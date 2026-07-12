@@ -518,7 +518,7 @@
         "T040"
       ],
       "files": [
-        "src/client/components/LetterPreview.tsx",
+        "src/client/components/ApplicationDetail.tsx",
         "test/e2e/letter-empty.spec.ts",
         "playwright.config.ts"
       ],
