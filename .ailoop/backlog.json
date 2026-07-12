@@ -552,7 +552,7 @@
     {
       "id": "T041",
       "title": "P4: Accordion consistency + template gallery consolidation (delete popover, re-target F102)",
-      "status": "todo",
+      "status": "decomposed",
       "phase": "P4",
       "depends_on": [
         "T040",
@@ -715,7 +715,8 @@
       "status": "todo",
       "phase": "P5",
       "depends_on": [
-        "T041",
+        "T041a",
+        "T041b",
         "T050",
         "T051",
         "T052",
@@ -785,6 +786,57 @@
       "acceptance": "- pane-arbitration.spec.ts stays GREEN after the clamp change — esp :134 (1512 preview width >384 and <756; 1280 preview >=384). Proportional growth preserved; only the 1280 baseline pinned to 384.\n- gallery-bounds.spec.ts:69 GREEN (template gallery fully within the editor pane at 1280).\n- phone-overflow.spec.ts GREEN incl :157 (below-lg preview trigger asserted PRESENT) and :217 (no horizontal overflow at 1280).\n- applications.spec.ts protocol B GREEN and MIGRATED: below-1280 arm still asserts non-modal (no aria-modal, no >50% fixed/absolute overlay) AND proves the editor is reachable/clickable after closing the swap. Not deleted, not weakened.\n- No per-file expect() decrease in applications.spec.ts or phone-overflow.spec.ts (assertions re-homed, never deleted).\n- Baseline gate green: bun run check/build/lint exit 0, bunx vitest run 1077 pass.",
       "attempts": [],
       "evidence": ".ailoop/evidence/T035.txt"
+    },
+    {
+      "id": "T041a",
+      "title": "P4: Accordion consistency — 3 sections default-expanded + Design internal control groups default-collapsed (F505)",
+      "status": "todo",
+      "phase": "P4",
+      "depends_on": [
+        "T040",
+        "T042",
+        "T043",
+        "T044",
+        "T045"
+      ],
+      "files": [
+        "src/client/components/ApplicationDetail.tsx",
+        "src/client/components/DesignPanel.tsx",
+        "test/e2e/design-accordion.spec.ts",
+        "playwright.config.ts"
+      ],
+      "origin": "decomposed from T041 (accordion half): Design internal-group collapse needs a new collapse mechanism in DesignPanel.tsx (~15 flat always-open groups), out of T041's declared scope",
+      "context": "See SPEC.md F505. Two parts, both in DesignPanel.tsx + ApplicationDetail.tsx:\nPART 1 (verify): the three TOP-LEVEL detail sections (Job details, Cover letter, Design) already default EXPANDED (ApplicationDetail.tsx collapsedSections initializes from readCollapsedSections() → {} when localStorage empty). Just ASSERT this in the new spec; do not regress it.\nPART 2 (build): DesignPanel.tsx (~1819 lines) renders ~15 Design control groups (Header, Links, Section headings, Dates, Entries, Color, Page, Photo, Layout, Footer, Sections/skills/interests/experience/summary/education) as FLAT always-open <div>s with NO collapse mechanism. Add a collapse affordance to these INTERNAL groups so they DEFAULT COLLAPSED — this is what retires the ~5,400px Design-card scroll (red-team #8: the OUTER sections stay default-EXPANDED; only the INNER Design groups default collapsed). Give the group-collapse the SAME view-state contract the outer sections use: localStorage at most (a per-group collapse key), NETWORK-ZERO (no settings/application writes on toggle), preview PIXEL-IDENTICAL (collapsing a group must not change the rendered document — it only hides the control group, never a format value). Each group's header toggles it; collapsed hides the group's controls (grid-rows 0fr↔1fr or equivalent, motion in [100ms,300ms] + motion-reduce per T043's established pattern).\nLocked (cite): section/group collapse is VIEW-STATE ONLY (localStorage/client, never settings.layout/sectionDisplay; network-zero; preview pixel-identical — the v3 H2 pattern). The document/preview is exempt. Motion follows T043 ([100,300]ms + motion-reduce).",
+      "acceptance": "- e2e (test/e2e/design-accordion.spec.ts, registered in playwright.config applications): the 3 top-level sections (Job details/Cover letter/Design) are ALL default EXPANDED on load (each body visible; none collapsed-by-default — red-team #8).\n- Design's internal control groups DEFAULT COLLAPSED: on load, the group bodies are hidden (assert a representative set of Design groups have their controls not visible by default, and a header toggle reveals them). Expanding/collapsing a group is NETWORK-ZERO (intercept: zero settings/application writes over a multi-second window, all bodies inspected) and the preview canvas is PIXEL-IDENTICAL before/after the toggle (dataURL equal).\n- Scroll retired: the Design card's default (all-groups-collapsed) rendered height is dramatically less than fully-expanded (assert the collapsed-default Design section height is well under the old ~5,400px, e.g. < 2000px, AND expanding all groups increases it — proves real collapse, not a cosmetic clip).\n- Scroll-spy precondition still holds: on the default surface editorPane.scrollHeight > clientHeight + 500 (so scroll-spy/restoration stay exercisable). Re-run scroll-spy.spec + route-transitions.spec green.\n- Baseline gate green (check/build/lint/vitest 1077).",
+      "attempts": [],
+      "evidence": null
+    },
+    {
+      "id": "T041b",
+      "title": "P4: Gallery consolidation — delete TemplateGallery popover, re-target F102 to inline picker, migrate specs",
+      "status": "todo",
+      "phase": "P4",
+      "depends_on": [
+        "T040",
+        "T042",
+        "T043",
+        "T044",
+        "T045",
+        "T041a"
+      ],
+      "files": [
+        "src/client/components/ApplicationDetail.tsx",
+        "test/e2e/gallery-bounds.spec.ts",
+        "test/e2e/design.spec.ts",
+        "test/e2e/cohesion.spec.ts",
+        "test/e2e/accordion.spec.ts",
+        "playwright.config.ts"
+      ],
+      "origin": "decomposed from T041 (gallery half): delete popover + re-target F102 + migrate the 3 specs referencing the deleted popover",
+      "context": "See SPEC.md re-target F102 (red-team #7). The Design card shows the template gallery TWICE: inline <TemplatePicker> AND a <TemplateGallery> popover ('Browse templates' trigger) in ApplicationDetail.tsx (~line 865 gallery, ~875 picker). DELETE the <TemplateGallery> popover usage + its import from ApplicationDetail.tsx; keep the inline <TemplatePicker> as the SINGLE surviving presentation. Leave TemplateGallery.tsx FILE in place (test/template-gallery.test.tsx still imports it — verified). The inline picker must be fully within the editor pane.\nMigrate the 3 specs that opened the deleted popover (assertions RE-HOMED, not deleted):\n- gallery-bounds.spec.ts: re-target the F102 'within editor pane / full roster / non-degenerate' intent from the popover onto the inline TemplatePicker (drop the openGallery/popover-open helper).\n- design.spec.ts (~:315 'de-modal Browse templates panel'): keep the template-APPLY behavioral assertion via the inline picker; drop the popover-panel-only modality/Escape-focus assertions (there is no panel now).\n- cohesion.spec.ts (~:302 'TemplateGallery via Browse templates is non-modal'): REMOVE only this one modality-sweep entry (no popover to sweep); leave every other sweep entry (NewApplication/EntryEditor/LayoutEditor/ProfileEditor) UNTOUCHED.\n- test/e2e/accordion.spec.ts (new, register 'accordion'): assert the 'Browse templates' popover trigger is GONE from the DOM (querySelector===null) AND exactly ONE inline template-choice presentation exists (the [data-template-id] cards present once per template, not duplicated), fully within the editor pane.\nDo NOT touch applications.spec.ts — it uses the surviving inline [data-template-id] cards and must stay green.\nLocked (cite): de-modal — deleting the popover removes a panel (good); the inline picker is in-flow. Test migration discipline: re-home surviving intent, don't just delete coverage.",
+      "acceptance": "- 'Browse templates' popover trigger is GONE from the DOM on the detail surface (querySelector===null over full DOM), not merely hidden.\n- Exactly ONE template-choice presentation on the surface: the inline TemplatePicker, fully within the editor pane (boundingBox ⊆ editor-pane), non-degenerate (title + tiles at real size, full template roster present once each). F102 re-homed here.\n- gallery-bounds.spec + design.spec migrated GREEN; cohesion.spec lost ONLY the popover sweep entry (all other sweep entries still present + green); applications.spec UNTOUCHED + green.\n- No net coverage loss: the F102 within-editor intent is re-homed onto the inline picker (not dropped); new accordion.spec asserts single-presentation + popover-gone.\n- Baseline gate green (check/build/lint/vitest 1077).",
+      "attempts": [],
+      "evidence": null
     }
   ]
 }
