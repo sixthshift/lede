@@ -20,6 +20,11 @@
 // checkbox may not exist yet. Focus is instead driven by an effect keyed on
 // `open` AND the row list actually being populated, so it lands as soon as
 // the first row exists, whenever that is.
+//
+// F103 (chrome-agnostic, T014): docks bottom-right — see EntryEditor.tsx's
+// header comment for the rationale (avoids top-viewport chrome by anchoring
+// to the one edge nothing else in this app is fixed/sticky to, rather than
+// hard-coding around the current header's height/z).
 import { useEffect, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X, ArrowDown, ArrowUp } from "lucide-react";
@@ -92,7 +97,7 @@ export function LayoutEditor({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogPrimitive.Content
-        className="fixed right-6 top-6 z-20 flex max-h-[85vh] w-[26rem] max-w-[90vw] flex-col gap-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg"
+        className="fixed bottom-6 right-6 z-20 flex max-h-[85vh] w-[26rem] max-w-[90vw] flex-col gap-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg"
         onOpenAutoFocus={(e) => {
           // Focus is actually driven by the effect above (rows may not exist
           // yet at this instant) — just keep Radix from focusing the panel

@@ -20,6 +20,16 @@
 // return-focus contract NewApplication gets for free from Radix, reproduced
 // by hand for the two-trigger case. For the same reason the panel docks to a
 // fixed viewport corner rather than anchoring under one particular trigger.
+//
+// F103 (chrome-agnostic, T014): docks bottom-right (`bottom-6 right-6`)
+// rather than top-right. Top-right collided with whatever fixed/sticky
+// chrome occupies the TOP of the viewport (today's header) — fixing that by
+// hard-coding a top offset around this app's current header height/z would
+// silently re-break the moment that chrome changes shape, which Phase 1
+// does (deletes the header outright). Nothing this app renders is anchored
+// to the BOTTOM of the viewport, so docking there is clear of top chrome by
+// construction, not by measuring it — the fix survives the header's
+// deletion unchanged rather than merely outracing its z-index.
 import { useEffect, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
@@ -209,7 +219,7 @@ export function EntryEditor({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogPrimitive.Content
-        className="fixed right-6 top-6 z-20 flex max-h-[85vh] w-[30rem] max-w-[90vw] flex-col gap-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg"
+        className="fixed bottom-6 right-6 z-20 flex max-h-[85vh] w-[30rem] max-w-[90vw] flex-col gap-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg"
         onOpenAutoFocus={(e) => {
           // Land focus on the first field rather than the panel container.
           e.preventDefault();

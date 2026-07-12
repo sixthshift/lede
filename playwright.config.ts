@@ -44,6 +44,11 @@
 // F101/T012 adds ats-view.spec.ts to the same "applications" project — it
 // needs a real tailored application (LEDE_TAILOR_ENGINE=fixture) to reach
 // AtsView's "What the ATS sees" toggle, same rationale as design.spec.ts.
+//
+// F103/T014 adds docked-panel-bounds.spec.ts to the same "applications"
+// project — same rationale as gallery-bounds.spec.ts (a real first-run
+// login -> /library round-trip, no fixture/tailor-engine need of its own,
+// but still costs a whole server if it doesn't share this one).
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -98,7 +103,8 @@ export default defineConfig({
     },
     {
       name: "applications",
-      testMatch: /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds)\.spec\.ts/,
+      testMatch:
+        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject

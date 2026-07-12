@@ -19,6 +19,11 @@
 // (LibraryView never warms that query before then). Focus is driven by an
 // effect keyed on `open` AND the profile query having resolved, so it lands
 // as soon as the form is populated with real data, whenever that is.
+//
+// F103 (chrome-agnostic, T014): docks bottom-right — see EntryEditor.tsx's
+// header comment for the rationale (avoids top-viewport chrome by anchoring
+// to the one edge nothing else in this app is fixed/sticky to, rather than
+// hard-coding around the current header's height/z).
 import { useEffect, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
@@ -202,7 +207,7 @@ export function ProfileEditor({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogPrimitive.Content
-        className="fixed right-6 top-6 z-20 flex max-h-[85vh] w-[30rem] max-w-[90vw] flex-col gap-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg"
+        className="fixed bottom-6 right-6 z-20 flex max-h-[85vh] w-[30rem] max-w-[90vw] flex-col gap-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg"
         onOpenAutoFocus={(e) => {
           // Focus is actually driven by the effect above (the profile query
           // may not have resolved yet at this instant) — just keep Radix
