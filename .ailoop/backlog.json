@@ -717,6 +717,8 @@
         "src/client/components/EntryEditor.tsx",
         "src/client/components/ProfileEditor.tsx",
         "src/client/components/LayoutEditor.tsx",
+        "src/client/components/RepeatableList.tsx",
+        "test/entry-editor.test.tsx",
         "test/e2e/panel-craft.spec.ts",
         "playwright.config.ts"
       ],
