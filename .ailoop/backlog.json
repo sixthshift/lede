@@ -580,7 +580,7 @@
     {
       "id": "T050",
       "title": "P4: Letter editing re-homed into the editor pane (OQ5), preview view-only (F501)",
-      "status": "todo",
+      "status": "done",
       "phase": "P4",
       "depends_on": [
         "T040",
@@ -601,7 +601,7 @@
       "context": "See /workspace/SPEC.md F501 + OQ5 + Locked (letter editing re-homed). Today paragraph draft editing lives in the 384px preview rail below the letter page (~90px textareas clip mid-word; scrolling to Paragraph 2 scrolls the letter out of view — you edit blind). MOVE paragraph draft editing into the Cover-letter SECTION of the wide EDITOR pane (joining Regenerate/Undo); the preview pane becomes VIEW-ONLY for letters, exactly as for resumes. The v2 behavioral contracts (paragraph edit round-trip, undo, blank-letter, part-edit) MIGRATE UNCHANGED to the new home (re-home the assertions via the helper layer, never delete). Per-paragraph Remove/Insert pairs currently outweigh content — right-size them. Depends on P3. Coarse seed.",
       "acceptance": "- e2e at 1280×720 (red-team #17): while a paragraph textarea HAS FOCUS, ≥50% of the letter page canvas's boundingBox is within the viewport AND the canvas renders at ≥ its normal un-zoomed scale — pin an absolute minimum canvas width (match the resume-preview scale) so shrinking the canvas to trivially fit ≥50% FAILS.\n- Paragraph edit round-trips to the rendered letter (pixel-diff + plain-text sentinel, v3 pattern); v2 contracts (undo, blank-letter, part-edit) green in the new home — the MIGRATED contract files are diffed for `expect()` count AND content vs their pre-migration versions (a looser rewrite that keeps pass/fail FAILS).\n- Baseline gate green; ratchet satisfied (assertions re-homed not deleted).",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T050.txt"
     },
     {
       "id": "T051",
