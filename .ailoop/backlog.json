@@ -164,7 +164,9 @@
         "src/client/api.ts",
         "src/client/components/LoginGate.tsx",
         "test/api.auth.test.ts",
-        "playwright.config.ts"
+        "playwright.config.ts",
+        "test/settings-auth.test.tsx",
+        "test/e2e/auth.spec.ts"
       ],
       "origin": "spec F108 / OQ8 / Phase 0 — v4's ONE named backend exception",
       "context": "See /workspace/SPEC.md F108 + OQ8 + oracle.md Locked (login first-run). THREE parts: (1) BACKEND (the single sanctioned server change): add `GET /api/auth/state` → `{ setup: boolean }` in `src/server/routes/auth.ts` — public (the `/api/auth/` prefix is already in PUBLIC_PREFIXES per `src/server/auth.ts:7`), NO session required, returns ONLY the boolean, leaks no secrets. `setup === true` means a password IS configured (returning user); `setup === false` means first-run pending. Compute from `db.select().from(secrets).where(eq(secrets.id,1)).get()?.auth`. Existing endpoints for shape reference: setup/login/logout in the same file. (2) CLIENT: add a `getAuthState()` call in `src/client/api.ts` (mirror the existing auth helpers at lines 272-280); in `LoginGate.tsx`, render the 'First time here? This sets your password.' microcopy (currently unconditional at line 94) ONLY when `setup === false`; map raw error codes (`invalid_credentials`) to human copy (no `_`-code string on screen); add a hidden username field (`autocomplete=\"username\"`) so password managers work. (3) TESTS: extend `test/api.auth.test.ts` for the new endpoint (answers without a session; returns only `{setup}`; reflects password-set state). This is the ONLY server change v4 permits — anything more is a scope tripwire.",
