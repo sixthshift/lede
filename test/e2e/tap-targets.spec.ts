@@ -245,6 +245,13 @@ test.describe("Coarse-pointer 44px tap targets (T034/F305)", () => {
     await page.getByRole("button", { name: "Add entry" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
+    // v4-T043 gave this panel an `animate-in zoom-in-95` entry (scale .95→1);
+    // `toBeVisible()` resolves at the animation's FIRST frame (panel still
+    // scaled down), so measure the SETTLED control — the 44px target is the
+    // resting size, not a 200ms mid-animation transient.
+    await dialog.evaluate((el) =>
+      Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished.catch(() => {}))),
+    );
 
     await assertTapTarget44(closeButton(dialog), "EntryEditor panel Close");
     await assertTapTarget44(
