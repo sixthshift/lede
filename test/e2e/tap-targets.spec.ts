@@ -287,9 +287,9 @@ test.describe("Coarse-pointer 44px tap targets (T034/F305)", () => {
     await expect(dialog).toBeVisible();
 
     // Default section is "experience" (4 meta fields: Company/Role/Period/
-    // Location) — SectionMetaFields.tsx's own grid container, reached via
-    // its stable wrapper testid (EntryEditor.tsx).
-    const grid = page.getByTestId("entry-meta-fields-grid").locator("> div.grid");
+    // Location) — SectionMetaFields.tsx's own grid container carries the
+    // testid directly (grid-cols-1 sm:grid-cols-2).
+    const grid = page.getByTestId("entry-meta-fields-grid");
     await expect(grid).toBeVisible();
 
     const columnsBelowSm = await grid.evaluate(

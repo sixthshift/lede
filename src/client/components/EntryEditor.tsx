@@ -63,24 +63,6 @@ const META_MAX_LEN = 120;
 const TAP_TARGET_COARSE =
   "[@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:min-w-[44px]";
 
-// T034 (F305): SectionMetaFields (SectionMetaFields.tsx, a file this ticket
-// doesn't own) renders its per-section meta fields as an unconditional
-// `grid-cols-2` — two columns at every viewport, including phone width.
-// Rather than edit that file, this wraps its rendered output and overrides
-// the grid it emits from the outside via a scoped selector keyed off this
-// wrapper's own testid — the same "reach into portaled/child markup by a
-// stable selector rather than editing the file" approach WorkspaceShell.tsx
-// already uses for the rail's portaled section nav. Single column below
-// `sm` (640px); the `sm:` block restores the original 2-column layout at
-// and above it, so desktop is unchanged.
-const META_FIELDS_GRID_TESTID = "entry-meta-fields-grid";
-const META_FIELDS_GRID_OVERRIDE_CSS = `
-  [data-testid="${META_FIELDS_GRID_TESTID}"] > div.grid { grid-template-columns: 1fr; }
-  @media (min-width: 640px) {
-    [data-testid="${META_FIELDS_GRID_TESTID}"] > div.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
-`;
-
 type FormState = {
   section: Section;
   meta: MetaValues;
@@ -296,14 +278,11 @@ export function EntryEditor({
             </Select>
           </div>
 
-          <div data-testid={META_FIELDS_GRID_TESTID}>
-            <style>{META_FIELDS_GRID_OVERRIDE_CSS}</style>
-            <SectionMetaFields
-              section={state.section}
-              meta={state.meta}
-              onChange={(meta) => setState((prev) => ({ ...prev, meta }))}
-            />
-          </div>
+          <SectionMetaFields
+            section={state.section}
+            meta={state.meta}
+            onChange={(meta) => setState((prev) => ({ ...prev, meta }))}
+          />
 
           {isLabel ? (
             <div className="flex flex-col gap-1">

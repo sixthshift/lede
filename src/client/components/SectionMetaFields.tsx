@@ -88,7 +88,7 @@ export function SectionMetaFields({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div data-testid="entry-meta-fields-grid" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {fields.map((field) => (
         <div key={field.key} className="flex flex-col gap-1">
           <Label htmlFor={`entry-meta-${field.key}`}>
