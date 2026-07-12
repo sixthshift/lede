@@ -18,7 +18,9 @@ export function SectionAccordion({
   return (
     <Card data-section={section}>
       <CardHeader className="flex-row items-center justify-between space-y-0 pb-1">
-        <CardTitle className="text-md">{SECTIONS[section].label}</CardTitle>
+        <CardTitle as="h2" className="text-md">
+          {SECTIONS[section].label}
+        </CardTitle>
         <span className="text-sm tabular-nums text-muted-foreground">{entries.length}</span>
       </CardHeader>
       <CardContent className="divide-y divide-border/60">

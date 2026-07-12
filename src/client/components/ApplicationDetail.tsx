@@ -536,7 +536,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
             in the editor pane's h1, and ONLY here — the rail no longer
             renders it (surface-context zone above shows company/status
             instead). */}
-        <h1 className="text-lg font-semibold tracking-tight">
+        <h1 tabIndex={-1} className="text-lg font-semibold tracking-tight outline-none">
           {application.role || "Untitled application"}
         </h1>
         <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
@@ -643,7 +643,11 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
           <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <CardTitle className="text-md">Cover letter</CardTitle>
+                {/* v4-T024/F208: h2, not the default h3 — the editor's h1
+                    has no h2 between it and here, so h3 would skip a level. */}
+                <CardTitle as="h2" className="text-md">
+                  Cover letter
+                </CardTitle>
                 <CardDescription>
                   Generated independently of the resume — its own draw on your Library, this job's
                   JD, and Motivation above.
@@ -742,7 +746,11 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
         <Card>
           <CardHeader>
             <div>
-              <CardTitle className="text-md">Design</CardTitle>
+              {/* v4-T024/F208: see the Cover letter heading above — same
+                  h3-would-skip-a-level reasoning. */}
+              <CardTitle as="h2" className="text-md">
+                Design
+              </CardTitle>
               <CardDescription>
                 {isLocked
                   ? "Locked — this reflects the look frozen at lock time. Unlock to edit."

@@ -40,6 +40,11 @@ export interface WorkspaceShellProps {
   rail: ReactNode;
   editor: ReactNode;
   preview?: ReactNode;
+  // v4-T024: an escape hatch for the ONE hoisted caller (App.tsx) that needs
+  // the editor pane's actual DOM node to sync scroll position + focus with
+  // route changes (F203/F208) — still no routing awareness enters this file
+  // itself, it just hands the node out.
+  editorPaneRef?: (el: HTMLElement | null) => void;
 }
 
 const RAIL_COLLAPSE_STORAGE_KEY = "lede.workspace.railCollapsed";
@@ -59,7 +64,7 @@ export function useRailCollapsed(): boolean {
   return useContext(RailCollapseContext);
 }
 
-export function WorkspaceShell({ rail, editor, preview }: WorkspaceShellProps) {
+export function WorkspaceShell({ rail, editor, preview, editorPaneRef }: WorkspaceShellProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [railCollapsed, setRailCollapsed] = useState(readRailCollapsed);
 
@@ -120,7 +125,11 @@ export function WorkspaceShell({ rail, editor, preview }: WorkspaceShellProps) {
         </div>
       </aside>
 
-      <main data-testid="editor-pane" className="min-w-0 flex-1 overflow-y-auto">
+      <main
+        ref={editorPaneRef}
+        data-testid="editor-pane"
+        className="min-w-0 flex-1 overflow-y-auto"
+      >
         {editor}
       </main>
 

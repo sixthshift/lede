@@ -67,6 +67,11 @@
 // F202/F209/T023 adds scroll-spy.spec.ts to the same "applications"
 // project — same shared login/password/tailor-fixture rationale as
 // rail-design.spec.ts, no fourth server warranted.
+//
+// F203/F208/T024 adds route-transitions.spec.ts to the same "applications"
+// project — scroll restoration + focus management need a real tailored
+// application (a fixture large enough to overflow the editor pane), same
+// tailor-fixture/PASSWORD-sharing rationale as scroll-spy.spec.ts.
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -122,7 +127,7 @@ export default defineConfig({
     {
       name: "applications",
       testMatch:
-        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy)\.spec\.ts/,
+        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject
