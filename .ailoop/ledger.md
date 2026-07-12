@@ -364,3 +364,4 @@ corrections.
 [0086] T035 — dispatch (build, SERIAL) · sonnet · in-place branch · baseSha fadeabd · attempt 1/3 (dispatch #8 this chunk)
   decision: continue
   why: unblocks the P2 phase-close gate (4 genuine failures, all T033-rooted). Test migrations + 1-token clamp change.
+[0087] T035 — builder flagged (honest scope stop): FIX A (clamp 40vw→30vw) breaks test/workspace-shell.test.tsx:88 which asserts the exact literal "w-[clamp(384px,40vw,640px)]" (the proportional-width assertion T033 added [0075]) — undeclared file. VERIFIED it is the only other reference to that class. EXPAND T035.files += test/workspace-shell.test.tsx; RESUME same agent to update the literal to 30vw (mechanical follow-through of FIX A — the test asserts the clamp class, the class changed). No behavior/assertion-semantics change (still asserts the proportional clamp present + old w-96 absent). No attempts entry.
