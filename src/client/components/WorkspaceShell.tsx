@@ -176,24 +176,33 @@ export function WorkspaceShell({ rail, editor, preview, editorPaneRef }: Workspa
 
       {preview ? (
         <>
-          <div className="flex shrink-0 items-start border-l border-border bg-surface p-2 xl:hidden">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              aria-expanded={previewOpen}
-              onClick={() => setPreviewOpen((open) => !open)}
-            >
-              {previewOpen ? "Hide preview" : "Show preview"}
-            </Button>
-          </div>
+          {/* T031/F302: below `lg` the preview drawer's toggle is withheld
+              entirely — its full-width-sheet presentation is a LATER
+              ticket's job (T033), and a fixed w-96 aside co-existing in this
+              same row flex at phone widths is exactly what forced the
+              editor pane down to ~29px and pushed the drawer off-viewport.
+              Until the sheet mechanics land, the drawer stays reachable only
+              from `lg` up (unaffected regression range: 1024-1279 already
+              worked via this same toggle before this ticket). */}
+          {isBelowLg ? null : (
+            <div className="flex shrink-0 items-start border-l border-border bg-surface p-2 xl:hidden">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-expanded={previewOpen}
+                onClick={() => setPreviewOpen((open) => !open)}
+              >
+                {previewOpen ? "Hide preview" : "Show preview"}
+              </Button>
+            </div>
+          )}
           <aside
             data-testid="preview-pane"
             className={cn(
               "w-96 shrink-0 overflow-y-auto border-l border-border bg-surface",
               "xl:block",
-              previewOpen ? "block" : "hidden",
-              isBelowLg && CONTENT_CLEARANCE_CLASS,
+              isBelowLg ? "hidden" : previewOpen ? "block" : "hidden",
             )}
           >
             {preview}
