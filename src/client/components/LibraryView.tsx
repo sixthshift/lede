@@ -102,15 +102,14 @@ export function LibraryView() {
     sectionCardRefs.current[section]?.scrollIntoView({ block: "start" });
   }
 
+  // F205/T021 one-title convention: the surface title lives ONLY in the
+  // editor pane's h1 (below) — the rail no longer renders it. What stays in
+  // the rail is the section zone, under the same mono-caps "SECTIONS"
+  // micro-label the detail surface's rail uses (one visual language across
+  // surfaces).
   const rail = (
-    <div className="flex flex-col gap-4 p-4">
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">Library</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Every fact tailoring can draw from, grouped by section.
-        </p>
-      </div>
-
+    <div className="flex flex-col gap-2 p-4">
+      <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">SECTIONS</p>
       <nav aria-label="Sections" data-testid="rail-nav" className="flex flex-col gap-1">
         {presentSections.map((section) => (
           <button
@@ -118,7 +117,7 @@ export function LibraryView() {
             type="button"
             data-testid={`rail-nav-${section}`}
             onClick={() => navigateToSection(section)}
-            className="truncate rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="truncate rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-[var(--ring-weak)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {SECTIONS[section].label}
           </button>
@@ -129,6 +128,13 @@ export function LibraryView() {
 
   const editor = (
     <div className="flex flex-col gap-6 p-6">
+      <div>
+        <h1 className="text-lg font-semibold tracking-tight">Library</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Every fact tailoring can draw from, grouped by section.
+        </p>
+      </div>
+
       {/* Left-aligned (not justify-end): the de-modal EntryEditor/
           ProfileEditor/LayoutEditor panels dock at a fixed viewport corner
           (`fixed right-6 top-6`, up to 30rem wide — see EntryEditor.tsx),

@@ -12,7 +12,7 @@
 // card's controls (never its preview), and the design card all live in the
 // editor pane instead, since they aren't the artifact itself.
 
-import { ArrowLeft, BookOpen, ChevronDown, Clock } from "lucide-react";
+import { BookOpen, ChevronDown, Clock } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
@@ -369,73 +369,84 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
     updateSettings.mutate({ presets: [...(settings?.presets ?? []), preset] });
   };
 
+  // F204/F205/T021: the rail carries no title of its own — the active
+  // global-nav item ("Applications") already answers "where am I" (the
+  // former "← Applications" back-link duplicated that exact same
+  // destination 30px below it), and the surface title itself lives ONLY in
+  // the editor pane's h1 below (one-title convention). What the rail's
+  // surface-context zone contributes instead is standing STATUS that has no
+  // home in the global nav: which application this is (company) and its
+  // gen-state.
   const rail = (
-    <div className="flex flex-col gap-4 p-4">
-      <Link
-        to="/applications"
-        className="inline-flex items-center gap-1.5 rounded-md text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <ArrowLeft aria-hidden className="h-3.5 w-3.5" />
-        Applications
-      </Link>
-
+    <div className="flex flex-col gap-5 p-4">
       <div className="min-w-0">
         {application.company ? (
           <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
             {application.company}
           </p>
         ) : null}
-        <h1 className="mt-1 text-lg font-semibold tracking-tight">
-          {application.role || "Untitled application"}
-        </h1>
         <div className="mt-2 flex flex-col items-start gap-1.5">
           <GenStateBadge state={application.genState} />
           {isTailoring ? <span className="text-xs text-muted-foreground">Tailoring…</span> : null}
         </div>
       </div>
 
-      {/* v3-T013: one row per editor section — order follows the SAME fixed
-          JSX order the editor pane below renders in (no second ordering
-          source). Each row navigates (scrolls/focuses the section's
-          heading, never the URL) and collapses (view-state only,
-          localStorage-persisted, never a server write). */}
-      <nav aria-label="Sections" data-testid="rail-nav" className="flex flex-col gap-1">
-        {WORKSPACE_SECTIONS.map((section) => {
-          const collapsed = Boolean(collapsedSections[section.key]);
-          return (
-            <div key={section.key} className="flex items-center gap-1">
-              <button
-                type="button"
-                data-testid={`rail-nav-${section.key}`}
-                onClick={() => navigateToSection(section.key)}
-                className="flex-1 truncate rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {section.label}
-              </button>
-              <button
-                type="button"
-                aria-expanded={!collapsed}
-                aria-label={`${collapsed ? "Expand" : "Collapse"} ${section.label}`}
-                data-testid={`rail-collapse-${section.key}`}
-                onClick={() => toggleSection(section.key)}
-                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <ChevronDown
-                  aria-hidden
-                  className={cn("h-3.5 w-3.5 transition-transform", collapsed && "-rotate-90")}
-                />
-              </button>
-            </div>
-          );
-        })}
-      </nav>
+      {/* Section zone: a mono-caps micro-label — same kicker treatment as
+          the editor pane's own section headings (EditorSection below) —
+          scopes the nav that follows to "sections of THIS surface", as
+          opposed to the global-nav zone above it. v3-T013: one row per
+          editor section — order follows the SAME fixed JSX order the editor
+          pane below renders in (no second ordering source). Each row
+          navigates (scrolls/focuses the section's heading, never the URL)
+          and collapses (view-state only, localStorage-persisted, never a
+          server write). */}
+      <div className="flex flex-col gap-2 border-t border-border pt-4">
+        <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">SECTIONS</p>
+        <nav aria-label="Sections" data-testid="rail-nav" className="flex flex-col gap-1">
+          {WORKSPACE_SECTIONS.map((section) => {
+            const collapsed = Boolean(collapsedSections[section.key]);
+            return (
+              <div key={section.key} className="flex items-center gap-1">
+                <button
+                  type="button"
+                  data-testid={`rail-nav-${section.key}`}
+                  onClick={() => navigateToSection(section.key)}
+                  className="flex-1 truncate rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-[var(--ring-weak)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {section.label}
+                </button>
+                <button
+                  type="button"
+                  aria-expanded={!collapsed}
+                  aria-label={`${collapsed ? "Expand" : "Collapse"} ${section.label}`}
+                  data-testid={`rail-collapse-${section.key}`}
+                  onClick={() => toggleSection(section.key)}
+                  className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-[var(--ring-weak)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <ChevronDown
+                    aria-hidden
+                    className={cn("h-3.5 w-3.5 transition-transform", collapsed && "-rotate-90")}
+                  />
+                </button>
+              </div>
+            );
+          })}
+        </nav>
+      </div>
     </div>
   );
 
   const editor = (
     <div className="flex flex-col gap-6 p-6">
       <div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        {/* One-title convention (F205/T021): the surface title lives here,
+            in the editor pane's h1, and ONLY here — the rail no longer
+            renders it (surface-context zone above shows company/status
+            instead). */}
+        <h1 className="text-lg font-semibold tracking-tight">
+          {application.role || "Untitled application"}
+        </h1>
+        <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
           <Button
             variant="outline"
             onClick={() =>
