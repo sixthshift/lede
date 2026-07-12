@@ -37,15 +37,22 @@ export function ApplicationsView() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Applications</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            One tailored resume per job description.
-          </p>
-        </div>
-        {empty ? null : <NewApplication />}
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Applications</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          One tailored resume per job description.
+        </p>
       </div>
+
+      {/* Inline, in-flow create panel (T032/F304) — sits above the card grid
+          so opening it pushes the grid down rather than floating over it.
+          `items-end` right-aligns the closed trigger; the panel's own
+          `w-full` overrides that alignment once open. */}
+      {empty ? null : (
+        <div className="flex flex-col items-end gap-4">
+          <NewApplication />
+        </div>
+      )}
 
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
