@@ -124,6 +124,14 @@ const PREVIEW_PROPORTIONAL_WIDTH_CLASS = "w-[clamp(384px,40vw,640px)]";
 const BOTTOM_BAR_HEIGHT_CLASS = "h-14";
 const CONTENT_CLEARANCE_CLASS = "pb-14";
 
+// T034 (F305): coarse-pointer tap-target floor, gated to `pointer: coarse`
+// (Tailwind 3.4 has no built-in coarse variant; this is an arbitrary-variant
+// media query) so mouse/desktop rendering is untouched. The sheet trigger
+// and swap toggle below are already `h-11 w-11` (44px) unconditionally and
+// don't need this.
+const TAP_TARGET_COARSE =
+  "[@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:min-w-[44px]";
+
 export interface WorkspaceShellProps {
   rail: ReactNode;
   editor: ReactNode;
@@ -394,6 +402,7 @@ export function WorkspaceShell({ rail, editor, preview, editorPaneRef }: Workspa
               aria-label="Close preview"
               data-testid="preview-sheet-close"
               onClick={() => setPreviewOpen(false)}
+              className={TAP_TARGET_COARSE}
             >
               <X aria-hidden className="mr-1 h-4 w-4" />
               Close

@@ -24,6 +24,13 @@ import { GenStateBadge } from "./GenStateBadge";
 
 const JD_PREVIEW_LENGTH = 160;
 
+// T034 (F305): coarse-pointer tap-target floor for these quick-action
+// buttons — gated to `pointer: coarse` (Tailwind 3.4 has no built-in coarse
+// variant; this is an arbitrary-variant media query) so mouse/desktop
+// rendering is untouched.
+const TAP_TARGET_COARSE =
+  "[@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:min-w-[44px]";
+
 function jdPreview(jobDescription: string): string {
   const trimmed = jobDescription.trim();
   return trimmed.length > JD_PREVIEW_LENGTH ? `${trimmed.slice(0, JD_PREVIEW_LENGTH)}…` : trimmed;
@@ -159,6 +166,7 @@ export function ApplicationCard({ application }: { application: ApplicationSumma
           data-testid="application-card-duplicate"
           disabled={duplicateApplication.isPending}
           onClick={() => duplicateApplication.mutate(application.id)}
+          className={TAP_TARGET_COARSE}
         >
           Duplicate
         </Button>
@@ -169,6 +177,7 @@ export function ApplicationCard({ application }: { application: ApplicationSumma
           data-testid="application-card-download"
           disabled={!canDownload}
           onClick={handleDownload}
+          className={TAP_TARGET_COARSE}
         >
           Download PDF
         </Button>
@@ -186,6 +195,7 @@ export function ApplicationCard({ application }: { application: ApplicationSumma
               setDeleteArmed(true);
             }
           }}
+          className={TAP_TARGET_COARSE}
         >
           {deleteArmed ? "Confirm delete" : "Delete"}
         </Button>

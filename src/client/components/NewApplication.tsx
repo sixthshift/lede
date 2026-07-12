@@ -24,6 +24,7 @@
 import { useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
+import { cn } from "../lib/utils";
 import { useCreateApplication } from "../queries/useApplications";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -33,6 +34,15 @@ import { Textarea } from "./ui/textarea";
 function emptyState() {
   return { company: "", role: "", jobDescription: "", context: "" };
 }
+
+// T034 (F305): 44px is the coarse-pointer tap-target floor — gated to
+// `pointer: coarse` (no Tailwind config change; Tailwind 3.4 has no built-in
+// coarse variant, so this is an arbitrary-variant media query) rather than
+// applied unconditionally, so the mouse/desktop rendering of these SAME
+// controls is untouched. Applied to the interactive element itself (the
+// functional target a tap must actually hit), never a wrapper.
+const TAP_TARGET_COARSE =
+  "[@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:min-w-[44px]";
 
 export function NewApplication() {
   const [open, setOpen] = useState(false);
@@ -72,7 +82,9 @@ export function NewApplication() {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange} modal={false}>
       <DialogPrimitive.Trigger asChild>
-        <Button size="sm">New application</Button>
+        <Button size="sm" className={TAP_TARGET_COARSE}>
+          New application
+        </Button>
       </DialogPrimitive.Trigger>
 
       <DialogPrimitive.Content
@@ -90,7 +102,10 @@ export function NewApplication() {
           <DialogPrimitive.Close asChild>
             <button
               type="button"
-              className="rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className={cn(
+                "rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                "[@media(pointer:coarse)]:flex [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:items-center [@media(pointer:coarse)]:justify-center",
+              )}
             >
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
@@ -145,7 +160,11 @@ export function NewApplication() {
           ) : null}
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-2">
-            <Button type="submit" disabled={createApplication.isPending}>
+            <Button
+              type="submit"
+              disabled={createApplication.isPending}
+              className={TAP_TARGET_COARSE}
+            >
               Create application
             </Button>
           </div>

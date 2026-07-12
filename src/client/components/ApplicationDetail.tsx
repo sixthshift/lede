@@ -52,6 +52,13 @@ import { WorkspaceShellSurface } from "./WorkspaceShellSlots";
 // format PUTs (v3-T012 carries that behavior into this card).
 const DEBOUNCE_MS = 300;
 
+// T034 (F305): coarse-pointer tap-target floor for the editor pane's primary
+// action strip (Lock/Tailor/Download/Plain text/voice-source) — gated to
+// `pointer: coarse` (Tailwind 3.4 has no built-in coarse variant; this is an
+// arbitrary-variant media query) so mouse/desktop rendering is untouched.
+const TAP_TARGET_COARSE =
+  "[@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:min-w-[44px]";
+
 function formatStaleDate(at: number): string {
   return new Date(at).toLocaleDateString(undefined, {
     year: "numeric",
@@ -552,6 +559,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
               lockApplication.isPending ||
               unlockApplication.isPending
             }
+            className={TAP_TARGET_COARSE}
           >
             {application.locked ? "Unlock" : "Lock final"}
           </Button>
@@ -559,6 +567,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
             data-testid="tailor-button"
             onClick={() => tailorApplication.mutate(application.id)}
             disabled={isTailoring}
+            className={TAP_TARGET_COARSE}
           >
             {tailorLabel}
           </Button>
@@ -578,6 +587,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
                 density,
               })
             }
+            className={TAP_TARGET_COARSE}
           >
             Download PDF
           </Button>
@@ -594,6 +604,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
                 role: application.role,
               })
             }
+            className={TAP_TARGET_COARSE}
           >
             Plain text
           </Button>
@@ -602,6 +613,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
             disabled={!application.current || flagVoiceResume.isPending}
             data-testid="flag-voice-resume"
             onClick={() => flagVoiceResume.mutate({ id: application.id, kind: "resume" })}
+            className={TAP_TARGET_COARSE}
           >
             Use as a voice source
           </Button>

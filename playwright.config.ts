@@ -81,6 +81,11 @@
 // project — it needs the application detail route's real preview pane across
 // three viewport regimes, same shared login/PASSWORD rationale as
 // responsive-nav.spec.ts, no fourth server warranted.
+//
+// F305/T034 adds tap-targets.spec.ts to the same "applications" project — it
+// needs the create/tailor/preview-sheet/library flows across a real
+// coarse-pointer (hasTouch/isMobile) context, same shared login/PASSWORD
+// rationale as pane-arbitration.spec.ts, no fourth server warranted.
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -136,7 +141,7 @@ export default defineConfig({
     {
       name: "applications",
       testMatch:
-        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration)\.spec\.ts/,
+        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration|tap-targets)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject

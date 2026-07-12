@@ -37,6 +37,7 @@ import type { Entry, EntryMeta, Section } from "@shared/types";
 import { SECTIONS, SECTION_VALUES } from "@shared/sections";
 import type { EntryInput } from "../api";
 import { useCreateEntry, useUpdateEntry } from "../hooks/queries";
+import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -54,6 +55,31 @@ const MAX_FACTS = 12;
 const MAX_TAGS = 8;
 const MAX_FRAMINGS = 6;
 const META_MAX_LEN = 120;
+
+// T034 (F305): coarse-pointer tap-target floor for this panel's save/close
+// controls — gated to `pointer: coarse` (Tailwind 3.4 has no built-in coarse
+// variant; this is an arbitrary-variant media query) so mouse/desktop
+// rendering is untouched.
+const TAP_TARGET_COARSE =
+  "[@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:min-w-[44px]";
+
+// T034 (F305): SectionMetaFields (SectionMetaFields.tsx, a file this ticket
+// doesn't own) renders its per-section meta fields as an unconditional
+// `grid-cols-2` — two columns at every viewport, including phone width.
+// Rather than edit that file, this wraps its rendered output and overrides
+// the grid it emits from the outside via a scoped selector keyed off this
+// wrapper's own testid — the same "reach into portaled/child markup by a
+// stable selector rather than editing the file" approach WorkspaceShell.tsx
+// already uses for the rail's portaled section nav. Single column below
+// `sm` (640px); the `sm:` block restores the original 2-column layout at
+// and above it, so desktop is unchanged.
+const META_FIELDS_GRID_TESTID = "entry-meta-fields-grid";
+const META_FIELDS_GRID_OVERRIDE_CSS = `
+  [data-testid="${META_FIELDS_GRID_TESTID}"] > div.grid { grid-template-columns: 1fr; }
+  @media (min-width: 640px) {
+    [data-testid="${META_FIELDS_GRID_TESTID}"] > div.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+`;
 
 type FormState = {
   section: Section;
@@ -239,7 +265,10 @@ export function EntryEditor({
           <DialogPrimitive.Close asChild>
             <button
               type="button"
-              className="rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className={cn(
+                "rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                "[@media(pointer:coarse)]:flex [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:items-center [@media(pointer:coarse)]:justify-center",
+              )}
             >
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
@@ -267,11 +296,14 @@ export function EntryEditor({
             </Select>
           </div>
 
-          <SectionMetaFields
-            section={state.section}
-            meta={state.meta}
-            onChange={(meta) => setState((prev) => ({ ...prev, meta }))}
-          />
+          <div data-testid={META_FIELDS_GRID_TESTID}>
+            <style>{META_FIELDS_GRID_OVERRIDE_CSS}</style>
+            <SectionMetaFields
+              section={state.section}
+              meta={state.meta}
+              onChange={(meta) => setState((prev) => ({ ...prev, meta }))}
+            />
+          </div>
 
           {isLabel ? (
             <div className="flex flex-col gap-1">
@@ -326,7 +358,7 @@ export function EntryEditor({
           ) : null}
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-2">
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={isPending} className={TAP_TARGET_COARSE}>
               {entry ? "Save changes" : "Create entry"}
             </Button>
           </div>
