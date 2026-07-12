@@ -21,7 +21,7 @@
 // whatever follows it (ApplicationsView's card grid) down in normal flow;
 // nothing is ever covered.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -49,6 +49,10 @@ export function NewApplication() {
   const [state, setState] = useState(emptyState());
   const [error, setError] = useState<string | null>(null);
   const createApplication = useCreateApplication();
+  // T045 (F406): required-field (JD) failure moves focus onto the field the
+  // error is actually about, so the inline message never renders detached
+  // from what it's describing.
+  const jdRef = useRef<HTMLTextAreaElement>(null);
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -63,6 +67,7 @@ export function NewApplication() {
     const jobDescription = state.jobDescription.trim();
     if (!jobDescription) {
       setError("Job description is required.");
+      jdRef.current?.focus();
       return;
     }
 
@@ -136,10 +141,26 @@ export function NewApplication() {
             <Label htmlFor="new-application-jd">Job description</Label>
             <Textarea
               id="new-application-jd"
+              ref={jdRef}
               rows={8}
               value={state.jobDescription}
               onChange={(e) => setState((prev) => ({ ...prev, jobDescription: e.target.value }))}
+              aria-invalid={error ? true : undefined}
+              // Textarea's own focus-visible:border-primary would otherwise
+              // paint over this red border the moment focus lands here
+              // (the very thing the failed-submit branch below does), so the
+              // error state overrides that variant too, not just the rest
+              // state.
+              className={error ? "border-destructive focus-visible:border-destructive" : undefined}
             />
+            {/* T045 (F406): renders directly beside the field it's about
+                (JD), not detached below Context — mirrors the inline-error
+                pattern used elsewhere in this file/ApplicationCard. */}
+            {error ? (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-1">
@@ -152,12 +173,6 @@ export function NewApplication() {
               onChange={(e) => setState((prev) => ({ ...prev, context: e.target.value }))}
             />
           </div>
-
-          {error ? (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          ) : null}
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-2">
             <Button

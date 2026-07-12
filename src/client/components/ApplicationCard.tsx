@@ -17,6 +17,7 @@ import { getApplication } from "../api";
 import { downloadLetterPdf, downloadResumePdf } from "../document/download";
 import { useProfile, useSettings } from "../hooks/queries";
 import { useDeleteApplication, useDuplicateApplication } from "../queries/useApplications";
+import { cn } from "../lib/utils";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -55,7 +56,22 @@ function hasDownloadableDocument(application: ApplicationSummary): boolean {
   return Boolean(application.currentMeta) || application.letterGenState !== "untailored";
 }
 
-export function ApplicationCard({ application }: { application: ApplicationSummary }) {
+export function ApplicationCard({
+  application,
+  highlighted = false,
+  onDuplicated,
+}: {
+  application: ApplicationSummary;
+  // T045 (F406): true for a brief window right after THIS card was produced
+  // by a duplicate — a transient locating affordance, not persisted state.
+  highlighted?: boolean;
+  // T045 (F406): fires with the new application's id once a duplicate of
+  // THIS card succeeds, so ApplicationsView (which owns the full list, and
+  // therefore can find the new card once it renders) can scroll it into
+  // view and light the highlight — without this card reaching into a
+  // sibling's DOM node itself.
+  onDuplicated?: (id: string) => void;
+}) {
   const { data: profile } = useProfile();
   const { data: settings } = useSettings();
   const deleteApplication = useDeleteApplication();
@@ -113,12 +129,22 @@ export function ApplicationCard({ application }: { application: ApplicationSumma
   return (
     <Card
       data-application-id={application.id}
-      className="flex h-full flex-col transition-shadow hover:border-border-strong hover:shadow-md"
+      data-highlight={highlighted ? "true" : undefined}
+      className={cn(
+        "flex h-full flex-col transition-shadow hover:border-border-strong hover:shadow-md",
+        // T045 (F406): brief locating pulse after a duplicate lands this
+        // card at the end of the list — removed by ApplicationsView once
+        // the transient window elapses, never persisted.
+        highlighted && "ring-2 ring-ring ring-offset-2",
+      )}
     >
       <Link
         to={`/applications/${application.id}`}
         data-testid="application-card-open"
-        className="flex flex-1 flex-col rounded-t-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        // T045 (F406): full card radius (rounded-xl), not rounded-t-xl — the
+        // focus ring must round all four corners like the card itself, not
+        // square off at the header/footer seam.
+        className="flex flex-1 flex-col rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         <CardHeader className="gap-1 space-y-0 pb-3">
           {application.company ? (
@@ -165,7 +191,11 @@ export function ApplicationCard({ application }: { application: ApplicationSumma
           variant="outline"
           data-testid="application-card-duplicate"
           disabled={duplicateApplication.isPending}
-          onClick={() => duplicateApplication.mutate(application.id)}
+          onClick={() =>
+            duplicateApplication.mutate(application.id, {
+              onSuccess: (created) => onDuplicated?.(created.id),
+            })
+          }
           className={TAP_TARGET_COARSE}
         >
           Duplicate
@@ -188,6 +218,11 @@ export function ApplicationCard({ application }: { application: ApplicationSumma
           data-testid="application-card-delete"
           disabled={deleteApplication.isPending}
           onBlur={() => setDeleteArmed(false)}
+          onKeyDown={(event) => {
+            // T045 (F406): mirrors EntryCard's F106 armed-delete Escape
+            // handler verbatim — Escape disarms without deleting.
+            if (event.key === "Escape") setDeleteArmed(false);
+          }}
           onClick={() => {
             if (deleteArmed) {
               deleteApplication.mutate(application.id);
