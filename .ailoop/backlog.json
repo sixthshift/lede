@@ -716,7 +716,9 @@
       "files": [
         "src/client/components/EntryEditor.tsx",
         "src/client/components/ProfileEditor.tsx",
-        "src/client/components/LayoutEditor.tsx"
+        "src/client/components/LayoutEditor.tsx",
+        "test/e2e/panel-craft.spec.ts",
+        "playwright.config.ts"
       ],
       "origin": "spec Phase 4 / F508 (red-team #19)",
       "context": "See /workspace/SPEC.md F508 + Locked (panel craft). The docked panels: whole-panel scroll clips the title on autofocus/submit at max-height → needs a STICKY header + PINNED footer with a scrolling body; the close affordance is a chevron (reads 'collapse') → make it an X with accessible name 'Close'; long facts clip in single-line inputs → facts become auto-grow textareas; 'Sort key (YYYYMM or YYYYMMDD)' raw-format label → reword to 'Sort date — newest first'. Shares the three panels with T043/T014 (serialize). Depends on P3.",
