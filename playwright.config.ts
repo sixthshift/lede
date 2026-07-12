@@ -114,6 +114,12 @@
 // project — it needs a real tailored application AND a generated letter
 // (LEDE_TAILOR_ENGINE=fixture), same PASSWORD/tailor-fixture rationale as
 // applications.spec.ts itself, no fourth server warranted.
+//
+// F503/F504/F509/T052 adds detail-craft.spec.ts to the same "applications"
+// project — kicker dedup/action-strip regroup/metadata typography all live
+// on the tailored-application detail route, same shared
+// login/PASSWORD/tailor-fixture rationale as scroll-spy.spec.ts, no fourth
+// server warranted.
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -169,7 +175,7 @@ export default defineConfig({
     {
       name: "applications",
       testMatch:
-        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration|tap-targets|toasts|export-busy|motion|letter-empty|card-detail|design-accordion|accordion|letter-editing)\.spec\.ts/,
+        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration|tap-targets|toasts|export-busy|motion|letter-empty|card-detail|design-accordion|accordion|letter-editing|detail-craft)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject

@@ -48,7 +48,7 @@ import { LetterPreview } from "./LetterPreview";
 import { ResultView } from "./ResultView";
 import { TemplatePicker } from "./TemplatePicker";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
+import { Card, CardContent, CardHeader, CardDescription } from "./ui/card";
 import { Label } from "./ui/label";
 import { Skeleton } from "./ui/skeleton";
 import { Textarea } from "./ui/textarea";
@@ -147,7 +147,7 @@ type WorkspaceSectionKey = (typeof WORKSPACE_SECTIONS)[number]["key"];
 function computeActiveSection(
   container: HTMLElement,
   sections: readonly { key: WorkspaceSectionKey }[],
-  headingEls: Partial<Record<WorkspaceSectionKey, HTMLDivElement | null>>,
+  headingEls: Partial<Record<WorkspaceSectionKey, HTMLHeadingElement | null>>,
 ): WorkspaceSectionKey | null {
   if (sections.length < 2) return null;
 
@@ -189,13 +189,20 @@ function readCollapsedSections(
 // A collapsible editor region: the heading stays mounted and focusable
 // regardless of collapse state (it's the rail's scroll/focus target — a
 // collapsed section must still be navigable-TO, just folded once you get
-// there), and only `children` folds away. Deliberately NOT a heading role —
-// the cards it wraps (Cover letter, Design) already carry their own real
-// CardTitle heading, so a second element with an overlapping accessible
-// name would break any `getByRole("heading", { name: ... })` lookup against
-// them. This is a rail/nav landmark, not new document outline content — the
-// label reuses the rail's own company/eyebrow token treatment rather than
-// introducing a new style.
+// there), and only `children` folds away.
+//
+// F503/T052: this label IS the section's heading (an <h2>) — the cards it
+// wraps (Cover letter, Design) no longer carry a duplicate CardTitle
+// repeating this exact text a few lines below (that was the actual
+// duplication F503 removes); with the duplicate gone there's nothing left
+// for a second heading element to collide with on a `getByRole("heading",
+// { name: ... })` lookup. Folding landmark + heading into one element fixes
+// the duplication at its root instead of leaving two near-identical labels
+// per card. Job details — which never had a duplicate CardTitle — gains a
+// real heading here too (it had none before): a single shared component
+// shouldn't special-case one of its three callers. Visually unchanged (same
+// mono/eyebrow classes) since Tailwind's preflight resets heading
+// font-size/weight/margin to inherit.
 //
 // F209/T023: collapse lives HERE now, on the editor's own section header —
 // not in the rail row, which used to split "click the label to scroll" from
@@ -216,20 +223,20 @@ function EditorSection({
   label: string;
   collapsed: boolean;
   onToggleCollapse: () => void;
-  headingRef: (el: HTMLDivElement | null) => void;
+  headingRef: (el: HTMLHeadingElement | null) => void;
   children: ReactNode;
 }) {
   return (
     <section data-testid={`workspace-section-${sectionKey}`} className="flex flex-col gap-3">
       <div className="flex items-center gap-1.5">
-        <div
+        <h2
           ref={headingRef}
           tabIndex={-1}
           data-testid={`workspace-section-heading-${sectionKey}`}
           className="font-mono text-xs uppercase tracking-wider text-muted-foreground outline-none"
         >
           {label}
-        </div>
+        </h2>
         <button
           type="button"
           aria-expanded={!collapsed}
@@ -546,7 +553,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   const [collapsedSections, setCollapsedSections] = useState<
     Partial<Record<WorkspaceSectionKey, boolean>>
   >(() => readCollapsedSections(applicationId));
-  const headingRefs = useRef<Partial<Record<WorkspaceSectionKey, HTMLDivElement | null>>>({});
+  const headingRefs = useRef<Partial<Record<WorkspaceSectionKey, HTMLHeadingElement | null>>>({});
 
   // T023/F202: which section nav item is "current". Null until the scroll
   // listener below gets its first reading (nothing renders as active for
@@ -570,7 +577,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   useEffect(() => {
     if (WORKSPACE_SECTIONS.length < 2) return;
     const anyHeading = Object.values(headingRefs.current).find(
-      (el): el is HTMLDivElement => el != null,
+      (el): el is HTMLHeadingElement => el != null,
     );
     const container = anyHeading?.closest<HTMLElement>('[data-testid="editor-pane"]');
     if (!container) return;
@@ -588,7 +595,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
     };
   }, [applicationId, isLoading, collapsedSections]);
 
-  function setHeadingRef(key: WorkspaceSectionKey, el: HTMLDivElement | null) {
+  function setHeadingRef(key: WorkspaceSectionKey, el: HTMLHeadingElement | null) {
     headingRefs.current[key] = el;
   }
 
@@ -710,8 +717,17 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
           </p>
         ) : null}
         <div className="mt-2 flex flex-col items-start gap-1.5">
-          <GenStateBadge state={application.genState} />
-          {isTailoring ? <span className="text-xs text-muted-foreground">Tailoring…</span> : null}
+          {/* F509/T052: gen-state metadata — explicit `font-sans`, matching
+              the letter card's own gen-state badge below, rather than
+              inheriting body-default and leaving the two free to drift apart
+              (the mono treatment above is the KICKER's, exempt by design —
+              this is the non-kicker metadata set the two badges belong to). */}
+          <div data-testid="genstate-resume-metadata" className="font-sans">
+            <GenStateBadge state={application.genState} />
+          </div>
+          {isTailoring ? (
+            <span className="font-sans text-xs text-muted-foreground">Tailoring…</span>
+          ) : null}
         </div>
       </div>
 
@@ -772,58 +788,81 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
         <h1 tabIndex={-1} className="text-lg font-semibold tracking-tight outline-none">
           {application.role || "Untitled application"}
         </h1>
-        <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-          <Button
-            variant="outline"
-            onClick={() =>
-              application.locked
-                ? unlockApplication.mutate(application.id)
-                : lockApplication.mutate(application.id)
-            }
-            disabled={
-              (!application.locked && !application.current) ||
-              lockApplication.isPending ||
-              unlockApplication.isPending
-            }
-            className={TAP_TARGET_COARSE}
-          >
-            {application.locked ? "Unlock" : "Lock final"}
-          </Button>
-          <Button
-            data-testid="tailor-button"
-            onClick={() => tailorApplication.mutate(application.id)}
-            disabled={isTailoring}
-            className={TAP_TARGET_COARSE}
-          >
-            {tailorLabel}
-          </Button>
-          <Button
-            variant="outline"
-            data-testid="download-pdf-button"
-            disabled={!application.current || !profile || isExportingPdf}
-            onClick={handleDownloadPdf}
-            className={TAP_TARGET_COARSE}
-          >
-            {isExportingPdf ? "Preparing…" : "Download PDF"}
-          </Button>
-          <Button
-            variant="outline"
-            data-testid="download-text-button"
-            disabled={!application.current || !profile || isExportingText}
-            onClick={handleDownloadText}
-            className={TAP_TARGET_COARSE}
-          >
-            {isExportingText ? "Preparing…" : "Plain text"}
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!application.current || flagVoiceResume.isPending}
-            data-testid="flag-voice-resume"
-            onClick={() => flagVoiceResume.mutate({ id: application.id, kind: "resume" })}
-            className={TAP_TARGET_COARSE}
-          >
-            Use as a voice source
-          </Button>
+        {/* F504/T052: regrouped, not just re-styled. The PRIMARY action
+            (Tailor/Re-tailor) is first in BOTH source order and this
+            `justify-between` row's visual flow — never a CSS `order`/
+            `flex-row-reverse` trick, which would satisfy sight but not tab
+            order. Lock/Unlock — a CONSEQUENTIAL, freeze-the-record action —
+            and the resume voice-source flag sit with it on the left; the two
+            harmless exports (Download PDF, Plain text) are a single grouped/
+            split control pinned right by the row's own justify-between,
+            not a manual spacer. */}
+        <div
+          data-testid="detail-action-strip"
+          className="mt-3 flex flex-wrap items-center justify-between gap-2"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              data-testid="tailor-button"
+              onClick={() => tailorApplication.mutate(application.id)}
+              disabled={isTailoring}
+              className={TAP_TARGET_COARSE}
+            >
+              {tailorLabel}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() =>
+                application.locked
+                  ? unlockApplication.mutate(application.id)
+                  : lockApplication.mutate(application.id)
+              }
+              disabled={
+                (!application.locked && !application.current) ||
+                lockApplication.isPending ||
+                unlockApplication.isPending
+              }
+              className={cn(
+                TAP_TARGET_COARSE,
+                // Consequential (freezes the record) vs the harmless exports
+                // beside it — a warn-tinted treatment, the same token this
+                // page already uses for its other "pay attention" surfaces
+                // (the stale/exceeds-target banners), not a new color.
+                "border-warn/50 bg-warn-soft text-warn hover:bg-warn-soft/70",
+              )}
+            >
+              {application.locked ? "Unlock" : "Lock final"}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!application.current || flagVoiceResume.isPending}
+              data-testid="flag-voice-resume"
+              onClick={() => flagVoiceResume.mutate({ id: application.id, kind: "resume" })}
+              className={TAP_TARGET_COARSE}
+            >
+              Use resume as a voice source
+            </Button>
+          </div>
+          <div className="inline-flex" data-testid="export-actions">
+            <Button
+              variant="outline"
+              data-testid="download-pdf-button"
+              disabled={!application.current || !profile || isExportingPdf}
+              onClick={handleDownloadPdf}
+              className={cn(TAP_TARGET_COARSE, "rounded-r-none")}
+            >
+              {isExportingPdf ? "Preparing…" : "Download PDF"}
+            </Button>
+            <Button
+              variant="outline"
+              data-testid="download-text-button"
+              disabled={!application.current || !profile || isExportingText}
+              onClick={handleDownloadText}
+              className={cn(TAP_TARGET_COARSE, "-ml-px rounded-l-none")}
+            >
+              {isExportingText ? "Preparing…" : "Plain text"}
+            </Button>
+          </div>
         </div>
         {tailorApplication.isError ? (
           <p
@@ -901,23 +940,27 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
           <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                {/* v4-T024/F208: h2, not the default h3 — the editor's h1
-                    has no h2 between it and here, so h3 would skip a level. */}
-                <CardTitle as="h2" className="text-md">
-                  Cover letter
-                </CardTitle>
+                {/* F503/T052: the "Cover letter" CardTitle that duplicated this
+                    section's own "Cover letter" kicker heading above was
+                    removed — the kicker (EditorSection's <h2>) already carries
+                    that title. */}
                 <CardDescription>
                   Generated independently of the resume — its own draw on your Library, this job's
                   JD, and Motivation above.
                 </CardDescription>
               </div>
-              <GenStateBadge state={application.letterGenState} kind="letter" />
+              {/* F509/T052: same explicit `font-sans` as the resume gen-state
+                  badge in the rail — the two share the metadata family
+                  rather than each independently inheriting it. */}
+              <div data-testid="genstate-letter-metadata" className="font-sans">
+                <GenStateBadge state={application.letterGenState} kind="letter" />
+              </div>
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
               {isLetterGenerating ? (
-                <span className="text-sm text-muted-foreground">Generating…</span>
+                <span className="font-sans text-sm text-muted-foreground">Generating…</span>
               ) : null}
               <Button
                 onClick={() => generateLetter.mutate(application.id)}
@@ -956,7 +999,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
                 data-testid="flag-voice-letter"
                 onClick={() => flagVoiceLetter.mutate({ id: application.id, kind: "cover-letter" })}
               >
-                Use as a voice source
+                Use letter as a voice source
               </Button>
             </div>
             {flagVoiceLetter.isError ? (
@@ -1012,11 +1055,11 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
         <Card>
           <CardHeader>
             <div>
-              {/* v4-T024/F208: see the Cover letter heading above — same
-                  h3-would-skip-a-level reasoning. */}
-              <CardTitle as="h2" className="text-md">
-                Design
-              </CardTitle>
+              {/* F503/T052: the "Design" CardTitle that duplicated this
+                  section's own "Design" kicker heading above was removed —
+                  the kicker (EditorSection's <h2>) already carries that
+                  title, and (v4-T024/F208) already sits at the h2 level
+                  TemplatePicker's nested h3 template-card titles below need. */}
               <CardDescription>
                 {isLocked
                   ? "Locked — this reflects the look frozen at lock time. Unlock to edit."
@@ -1052,7 +1095,9 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
       </EditorSection>
 
       {application.currentMeta ? (
-        <p className="flex items-center gap-2 rounded-lg bg-warn-soft px-4 py-2.5 text-sm text-warn">
+        // F509/T052: explicit font-sans — same non-kicker metadata family as
+        // the gen-state badges above, not left to inherit.
+        <p className="flex items-center gap-2 rounded-lg bg-warn-soft px-4 py-2.5 font-sans text-sm text-warn">
           <Clock aria-hidden className="h-4 w-4 shrink-0" />
           Tailored from your Library as of {formatStaleDate(application.currentMeta.at)} — re-tailor
           to fold in newer entries.
