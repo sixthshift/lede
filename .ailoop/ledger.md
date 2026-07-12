@@ -300,3 +300,7 @@ corrections.
   F301 delivered. Full playwright deferred to P2 gate [0033].
   evidence: .ailoop/evidence/T030.txt.
 [0064] ENV NOTE (mechanical) — Agent isolation:'worktree' does NOT create a separate worktree here; it falls back to an IN-PLACE branch checked out in /workspace itself (CLAUDE.md "agent worktrees unreliable"). Consequences for the drive: (1) parallel builders are IMPOSSIBLE (shared working dir) → serial is mandatory anyway, matches oracle. (2) After a builder reports, /workspace is left ON the builder's branch with main stale. INTEGRATION PROCEDURE per ticket: commit coordinator bookkeeping on the branch, git branch -f main <tip>, git checkout main, git branch -d <branch>. (3) The verify runs directly on the in-place tree (no merge-then-verify needed); scope/gaming still via git diff baseSha..branch. T030 reconciled this way (main f4e8929).
+[0065] T031 — pre-dispatch scope expansion: intake files [ApplicationDetail, WorkspaceShell] omit the e2e target its acceptance (375 overflow e2e) requires. Added test/e2e/phone-overflow.spec.ts (new) + playwright.config.ts (registration-only). Definition-of-done unchanged. Same pattern as P1 [0039/0048/0053].
+[0066] T031 — dispatch (build, SERIAL) · sonnet · in-place branch · baseSha eb51899 · attempt 1/3 (dispatch #2 this chunk)
+  decision: continue
+  why: phone-stacked detail + zero horizontal overflow at 375 (F302). Preview-sheet mechanics deferred to T033 per ticket.
