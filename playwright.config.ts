@@ -126,6 +126,12 @@
 // must actually paint before zoom/frame assertions mean anything), same
 // shared login/PASSWORD/tailor-fixture rationale as scroll-spy.spec.ts, no
 // fourth server warranted.
+//
+// T062/OQ2 adds panel-sheet.spec.ts to the same "applications" project — it
+// needs the library's three docked panels (EntryEditor/LayoutEditor/
+// ProfileEditor) at multiple viewport sizes, same shared login/PASSWORD
+// rationale as docked-panel-bounds.spec.ts/panel-craft.spec.ts, no fourth
+// server warranted.
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -181,7 +187,7 @@ export default defineConfig({
     {
       name: "applications",
       testMatch:
-        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration|tap-targets|toasts|export-busy|motion|letter-empty|card-detail|design-accordion|accordion|letter-editing|detail-craft|preview-zoom|panel-craft)\.spec\.ts/,
+        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration|tap-targets|toasts|export-busy|motion|letter-empty|card-detail|design-accordion|accordion|letter-editing|detail-craft|preview-zoom|panel-craft|panel-sheet)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject
