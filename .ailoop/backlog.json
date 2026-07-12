@@ -499,7 +499,9 @@
         "src/client/components/ProfileEditor.tsx",
         "src/client/components/LayoutEditor.tsx",
         "src/client/components/ApplicationDetail.tsx",
-        "src/client/components/ui/select.tsx"
+        "src/client/components/ui/select.tsx",
+        "test/e2e/motion.spec.ts",
+        "playwright.config.ts"
       ],
       "origin": "spec Phase 3 / F403/F404 (red-team #22)",
       "context": "See /workspace/SPEC.md Phase 3 + Locked (motion language). Panels currently pop at 0ms while `ui/dialog.tsx`/selects have `animate-in`. FIX: the docked panels adopt `ui/dialog.tsx`'s existing `animate-in fade zoom`; section collapse animates via grid-rows; EVERY structural animation has a duration in the pinned band [100ms,300ms] (a 1ms token-pop must FAIL — red-team #22) and a `motion-reduce:` variant (computed animation IS none under reduced motion). Selects get `hover:bg-muted transition-colors` (F404). Do NOT edit ui/dialog.tsx's existing motion (it's the reference). Coarse seed. Depends on T040.",
