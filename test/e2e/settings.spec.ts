@@ -147,7 +147,19 @@ test("API key: setting a key round-trips server-side (keySet reflects it after r
 test("Default document format: changing an axis round-trips and survives reload", async ({
   page,
 }) => {
+  // T041a defaults every DesignPanel control group COLLAPSED, so the Heading
+  // weight control (in the Typography group) has zero rendered height until
+  // its group is expanded — expand it before interacting. This is a selector/
+  // interaction update only; the SAVE -> PUT -> RELOAD round-trip below is
+  // unchanged.
+  // Zero out the group's 200ms grid-rows expand (CollapsibleGroup honors
+  // motion-reduce) so the control snaps to full height instantly — otherwise
+  // the Radix Select can open item-aligned against a still-animating trigger.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.getByTestId("design-group-toggle-typography").click();
   const weightCombo = page.getByRole("combobox", { name: "Heading weight" });
+  await expect(weightCombo).toBeVisible();
+  await weightCombo.scrollIntoViewIfNeeded();
   const current = (await weightCombo.textContent())?.trim();
   const target = current === "Bold" ? "Normal" : "Bold";
 
@@ -164,4 +176,52 @@ test("Default document format: changing an axis round-trips and survives reload"
 
   await page.reload();
   await expect(page.getByRole("combobox", { name: "Heading weight" })).toHaveText(target);
+});
+
+// F506/T053 — the ≤1200px bound (red-team #22). At default load every
+// DesignPanel control group is collapsed (T041a), so the format card is its
+// header + collapsed group toggles, well under the bound; the assertion
+// measures REAL rendered boundingBox height (no scroller hides an oversized
+// monolith).
+test("no Settings card exceeds 1200px rendered height", async ({ page }) => {
+  await page.setViewportSize({ width: 1512, height: 900 });
+  await page.goto("/settings");
+  await expect(page.getByRole("combobox", { name: "Provider" })).toBeVisible();
+
+  const cards = page.getByTestId("settings-card");
+  const count = await cards.count();
+  expect(count).toBe(3);
+  for (let i = 0; i < count; i++) {
+    const box = await cards.nth(i).boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.height).toBeLessThanOrEqual(1200);
+  }
+});
+
+// F506/T053 — the column is CENTERED, not left-anchored with a large right
+// dead-space. The persistent rail offsets the editor pane from the viewport's
+// left edge, so "centered" is measured within the pane (the column's actual
+// scroll container): the left and right margins between the column and its
+// pane are roughly equal, and neither collapses to the near-zero left gap a
+// left-anchored column would show.
+test("the settings column is centered in the editor pane, not left-anchored", async ({ page }) => {
+  await page.setViewportSize({ width: 1512, height: 900 });
+  await page.goto("/settings");
+  await expect(page.getByRole("combobox", { name: "Provider" })).toBeVisible();
+
+  const columnBox = await page.getByTestId("settings-column").boundingBox();
+  const paneBox = await page.getByTestId("editor-pane").boundingBox();
+  expect(columnBox).not.toBeNull();
+  expect(paneBox).not.toBeNull();
+
+  const leftGap = columnBox!.x - paneBox!.x;
+  const rightGap = paneBox!.x + paneBox!.width - (columnBox!.x + columnBox!.width);
+
+  // Symmetric within a few px of subpixel rounding — real mx-auto centering,
+  // not a left-pinned column.
+  expect(Math.abs(leftGap - rightGap)).toBeLessThanOrEqual(8);
+  // And genuinely inset on BOTH sides — a left-anchored column's left gap is
+  // just the container's own padding (~24px), far below this.
+  expect(leftGap).toBeGreaterThan(100);
+  expect(rightGap).toBeGreaterThan(100);
 });

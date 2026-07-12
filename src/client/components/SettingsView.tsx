@@ -90,7 +90,7 @@ export function SettingsView() {
     editorContent = (
       <div className="flex flex-col gap-6">
         <div ref={(el) => (sectionRefs.current.provider = el)}>
-          <Card>
+          <Card data-testid="settings-card">
             <CardHeader>
               <CardTitle as="h2" className="text-md">
                 Provider &amp; model
@@ -111,7 +111,7 @@ export function SettingsView() {
         </div>
 
         <div ref={(el) => (sectionRefs.current.apiKey = el)}>
-          <Card>
+          <Card data-testid="settings-card">
             <CardHeader>
               <CardTitle as="h2" className="text-md">
                 API key
@@ -128,7 +128,7 @@ export function SettingsView() {
         </div>
 
         <div ref={(el) => (sectionRefs.current.format = el)}>
-          <Card>
+          <Card data-testid="settings-card">
             <CardHeader>
               <CardTitle as="h2" className="text-md">
                 Default document format
@@ -149,8 +149,13 @@ export function SettingsView() {
     );
   }
 
+  // v4-T053 (F506): the settings column is centered in the editor pane
+  // (`mx-auto`) rather than left-anchored — at a wide viewport a left-pinned
+  // max-w-2xl column left ~640px of dead space to its right. Centering is
+  // measured within the editor pane (the column's actual scroll container),
+  // since the persistent rail offsets the pane from the viewport's left edge.
   const editor = (
-    <div className="flex max-w-2xl flex-col gap-6 p-6">
+    <div data-testid="settings-column" className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-6">
       <div>
         <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
         <p className="mt-1 text-sm text-muted-foreground">
