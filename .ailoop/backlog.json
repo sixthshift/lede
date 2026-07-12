@@ -531,7 +531,7 @@
     {
       "id": "T045",
       "title": "P3: Card detail set — Escape disarms, dup highlight, error border/focus, focus-ring radius (F406)",
-      "status": "todo",
+      "status": "done",
       "phase": "P3",
       "depends_on": [
         "T040"
@@ -547,7 +547,7 @@
       "context": "See /workspace/SPEC.md F406 + Locked (card fixes). Four items: (1) Escape disarms the card's armed 'Confirm delete'; (2) duplicate scrolls the new card into view with a brief highlight (today it appears unhighlighted at list end with no locating feedback); (3) NewApplication required-field error renders beside the RIGHT field with a red border + focus (today detached below the wrong field); (4) card focus ring uses the FULL card radius (today follows `rounded-t-xl` → square bottom corners mid-card). Verify NewApplication's real filename (from T032). Shares ApplicationCard with T017/T042 (serialize). Depends on T040.",
       "acceptance": "- e2e: Escape disarms an armed card delete (card restored, no delete); after duplicate, the new card is scrolled into view with a transient highlight class/attr; a NewApplication required-field error renders adjacent to its field with a red border and moves focus there; the card focus ring computes to the full card radius (all four corners equal).\n- Baseline gate green.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T045.txt"
     },
     {
       "id": "T041",
