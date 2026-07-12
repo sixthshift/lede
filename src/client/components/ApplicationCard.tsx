@@ -106,7 +106,7 @@ export function ApplicationCard({ application }: { application: ApplicationSumma
   return (
     <Card
       data-application-id={application.id}
-      className="flex h-full flex-col transition-shadow hover:shadow-md"
+      className="flex h-full flex-col transition-shadow hover:border-border-strong hover:shadow-md"
     >
       <Link
         to={`/applications/${application.id}`}
@@ -138,7 +138,10 @@ export function ApplicationCard({ application }: { application: ApplicationSumma
           ) : null}
           {application.locked ? <Badge variant="secondary">Locked</Badge> : null}
         </div>
-        <span className="text-xs text-muted-foreground">
+        <span
+          data-testid="application-card-stamp"
+          className="whitespace-nowrap text-xs text-muted-foreground"
+        >
           Updated {formatUpdatedAt(application.updatedAt)}
         </span>
       </CardFooter>
@@ -148,7 +151,7 @@ export function ApplicationCard({ application }: { application: ApplicationSumma
           mounted; Delete is a single two-step button (label/variant toggle,
           never a second control) so the resting-state count never exceeds
           four (spec.md red-team H8's allowlist). */}
-      <div className="flex items-center justify-end gap-1.5 border-t border-border/60 px-6 py-3">
+      <div className="flex flex-wrap items-center justify-end gap-1.5 border-t border-border/60 px-6 py-3">
         <Button
           type="button"
           size="sm"
