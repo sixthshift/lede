@@ -140,7 +140,7 @@
     {
       "id": "T017",
       "title": "F107 + F110 — dashboard card action-row overflow, stamp wrap, dark hover",
-      "status": "in-progress",
+      "status": "done",
       "phase": "P0",
       "depends_on": [],
       "files": [
@@ -151,19 +151,20 @@
       "context": "See /workspace/SPEC.md F107, F110 + Locked (card fixes). F107: the action row (258px of buttons in a 240px card, `justify-end` spills left; `ApplicationCard.tsx:151`) overflows the card and overlaps the neighbor at 768–1024; the footer stamp breaks mid-date at 1280 (`ApplicationCard.tsx:133-142`). F110: dark-mode card hover elevation is invisible (`hover:shadow-md` alone doesn't register black-on-near-black; `ApplicationCard.tsx:109`). FIX per Locked (card fixes): action row `flex-wrap`; stamp `whitespace-nowrap`; dark card hover adds `hover:border-border-strong` alongside the shadow (border must compute to the resolved `--border-strong` and differ from rest-state — red-team #21). Note: broader card-detail fixes (Escape-disarm, dup highlight, focus-ring radius) are Phase 3 T045 — scope THIS ticket to overflow/stamp/dark-hover only.",
       "acceptance": "- e2e at 768 AND 1024: no card action element extends outside its card's boundingBox; stamp renders on one line (no wrap) AND its full expected date text is present verbatim (an ellipsis/`text-overflow` truncation that hides the date must FAIL).\n- Dark theme: on hover the card's computed border equals the resolved `--border-strong` and differs from its rest-state border.\n- Baseline gate green.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T017.txt"
     },
     {
       "id": "T018",
       "title": "F108 — login copy map, first-run microcopy via GET /api/auth/state (OQ8), hidden username",
-      "status": "todo",
+      "status": "in-progress",
       "phase": "P0",
       "depends_on": [],
       "files": [
         "src/server/routes/auth.ts",
         "src/client/api.ts",
         "src/client/components/LoginGate.tsx",
-        "test/api.auth.test.ts"
+        "test/api.auth.test.ts",
+        "playwright.config.ts"
       ],
       "origin": "spec F108 / OQ8 / Phase 0 — v4's ONE named backend exception",
       "context": "See /workspace/SPEC.md F108 + OQ8 + oracle.md Locked (login first-run). THREE parts: (1) BACKEND (the single sanctioned server change): add `GET /api/auth/state` → `{ setup: boolean }` in `src/server/routes/auth.ts` — public (the `/api/auth/` prefix is already in PUBLIC_PREFIXES per `src/server/auth.ts:7`), NO session required, returns ONLY the boolean, leaks no secrets. `setup === true` means a password IS configured (returning user); `setup === false` means first-run pending. Compute from `db.select().from(secrets).where(eq(secrets.id,1)).get()?.auth`. Existing endpoints for shape reference: setup/login/logout in the same file. (2) CLIENT: add a `getAuthState()` call in `src/client/api.ts` (mirror the existing auth helpers at lines 272-280); in `LoginGate.tsx`, render the 'First time here? This sets your password.' microcopy (currently unconditional at line 94) ONLY when `setup === false`; map raw error codes (`invalid_credentials`) to human copy (no `_`-code string on screen); add a hidden username field (`autocomplete=\"username\"`) so password managers work. (3) TESTS: extend `test/api.auth.test.ts` for the new endpoint (answers without a session; returns only `{setup}`; reflects password-set state). This is the ONLY server change v4 permits — anything more is a scope tripwire.",

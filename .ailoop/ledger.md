@@ -126,3 +126,9 @@ corrections.
 
 [0028] T017 — dispatch (build, SERIAL, fresh) · sonnet · worktree · baseSha 308a752 · prompt hardened: NO playwright/background runs (prior stall cause); implement fix in ApplicationCard.tsx
   decision: continue
+
+[0029] T017 — DONE (fresh attempt, re-verify green). Merged 8f278fe. Scope clean, gaming pass (flex-wrap/nowrap/border-strong; e2e guards ellipsis cheat + dark hover), baseline green (vitest 1071, pw chromium 24/auth 1/applications 41). Ratchet applications 38->41.
+  evidence: .ailoop/evidence/T017.txt
+[0030] T018 — dispatch (build, SERIAL) · sonnet · worktree · baseSha (post-T017 main) · attempt 1/3 · v4's ONE sanctioned backend change (GET /api/auth/state)
+  decision: continue
+  why: last P0 ticket (F108 login + OQ8 endpoint).
