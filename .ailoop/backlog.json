@@ -437,7 +437,7 @@
     {
       "id": "T040",
       "title": "P3: Mount Toaster + enumerated success toasts + inline failure surfacing (F401)",
-      "status": "todo",
+      "status": "done",
       "phase": "P3",
       "depends_on": [
         "T030",
@@ -464,7 +464,7 @@
       "context": "See /workspace/SPEC.md Phase 3 + Locked (feedback layer). Mount sonner's `<Toaster>` ONCE in `App` (the primitive `ui/sonner.tsx` exists but nothing is mounted and zero `toast()` calls exist). Fire exactly ONE auto-dismissing success toast on EACH named mutation: create, duplicate, delete, profile save, entry save, layout save, import, export. Mutation FAILURES get INLINE errors beside their trigger (the `flagVoice` pattern — tailor is already done in Phase 0 T015; extend to duplicate/delete/import), NOT toasts. Toast coverage is ENUMERATED not sampled (red-team #15). Declared files are the likely mutation homes; correct via scope check. This is a broad ticket — decompose mid-flight if it exceeds one session. Depends on P2.",
       "acceptance": "- e2e (all fixture-drivable): each named success mutation (create, duplicate, delete, profile save, entry save, layout save, import, export) fires exactly ONE toast that auto-dismisses.\n- Failure contrast on ≥2 mutations (fixture 422 / invalid import): NO success toast; an inline error renders near the trigger instead.\n- Baseline gate green; v3 cohesion green (toasts are non-modal chrome per the taxonomy).",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T040.txt"
     },
     {
       "id": "T042",
