@@ -21,14 +21,44 @@ const PROTECTED_ROUTE = "/library";
 
 test.describe("first-run set-password -> login -> protected route", () => {
   test("gates a fresh boot, then logout/login flips access", async ({ page, context }) => {
+    // T018/F108/OQ8: every /api/auth/* request this test drives, so we can
+    // assert GET /api/auth/state fires on load AND that no probing
+    // POST /api/auth/setup fires before the user actually submits the form.
+    const authRequests: Array<{ method: string; url: string }> = [];
+    page.on("request", (req) => {
+      if (req.url().includes("/api/auth/")) {
+        authRequests.push({ method: req.method(), url: req.url() });
+      }
+    });
+
     // (1) fresh boot -> the set-password screen. Nothing distinguishes this
     // visually from a later login (see helpers/session.ts) — what makes it
     // "first-run" is that this DATA_DIR has never had a password set, so the
     // one form Playwright can see IS the set-password screen.
-    await page.goto("/");
+    const [firstAuthState] = await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith("/api/auth/state") && r.status() === 200),
+      page.goto("/"),
+    ]);
+    expect((await firstAuthState.json()) as { setup: boolean }).toEqual({ setup: false });
     await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
     await expect(page.getByText("First time here? This sets your password.")).toBeVisible();
+
+    // GET /api/auth/state fired on load; nothing has probed /api/auth/setup —
+    // the form doesn't yet know whether this is first-run by trying it.
+    expect(authRequests.some((r) => r.method === "GET" && r.url.endsWith("/api/auth/state"))).toBe(
+      true,
+    );
+    expect(authRequests.some((r) => r.method === "POST" && r.url.endsWith("/api/auth/setup"))).toBe(
+      false,
+    );
+
+    // Hidden username field for password managers: present (not display:none)
+    // but out of tab order and visually clipped.
+    const hiddenUsername = page.locator('input[name="username"]');
+    await expect(hiddenUsername).toHaveAttribute("autocomplete", "username");
+    await expect(hiddenUsername).toHaveAttribute("tabindex", "-1");
+    expect(await hiddenUsername.evaluate((el) => getComputedStyle(el).display)).not.toBe("none");
 
     await firstRunLogin(page, PASSWORD);
 
@@ -61,9 +91,29 @@ test.describe("first-run set-password -> login -> protected route", () => {
     // (4) direct-navigate (full browser nav, not client-side routing) to a
     // protected route while logged out -> refused, gate shows the password
     // form instead of the route's content.
-    await page.goto(PROTECTED_ROUTE);
+    const [returningAuthState] = await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith("/api/auth/state") && r.status() === 200),
+      page.goto(PROTECTED_ROUTE),
+    ]);
+    expect((await returningAuthState.json()) as { setup: boolean }).toEqual({ setup: true });
     await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Add entry" })).toHaveCount(0);
+    // setup:true (a password already exists) — the first-run hint must not render.
+    await expect(page.getByText("First time here? This sets your password.")).toHaveCount(0);
+
+    // Wrong password -> human copy, never the raw `invalid_credentials` wire code.
+    await page.getByLabel("Password", { exact: true }).fill("definitely not the password");
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().endsWith("/api/auth/login") && r.request().method() === "POST",
+      ),
+      page.getByRole("button", { name: "Continue" }).click(),
+    ]);
+    await expect(page.getByText("That password didn't work. Try again.")).toBeVisible();
+    const bodyText = await page.locator("body").innerText();
+    for (const code of ["invalid_body", "invalid_credentials", "already_configured"]) {
+      expect(bodyText).not.toContain(code);
+    }
 
     // (5) log in with the previously-set password -> the protected route is
     // now reachable (still at PROTECTED_ROUTE; the gate just swaps content).

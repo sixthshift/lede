@@ -9,6 +9,7 @@ import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 
 import { buildApp } from "../src/server/index";
 import { initDb } from "../src/server/db";
+import { authErrorMessage } from "../src/client/api";
 
 const tmpDirs: string[] = [];
 
@@ -166,5 +167,69 @@ describe("login / logout", () => {
       cookies: { session: loggedOutSession },
     });
     expect(blocked.statusCode).toBe(401);
+  });
+});
+
+describe("GET /api/auth/state (T018/F108/OQ8)", () => {
+  it("answers 200 with ONLY {setup} and no session cookie required", async () => {
+    const app = appWithAuthEnabled();
+
+    const res = await app.inject({ method: "GET", url: "/api/auth/state" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Record<string, unknown>;
+    expect(Object.keys(body)).toEqual(["setup"]);
+  });
+
+  it("is false before a password is set, true once one is", async () => {
+    const app = appWithAuthEnabled();
+
+    const before = await app.inject({ method: "GET", url: "/api/auth/state" });
+    expect(before.json()).toEqual({ setup: false });
+
+    await app.inject({
+      method: "POST",
+      url: "/api/auth/setup",
+      payload: { password: "correct horse" },
+    });
+
+    const after = await app.inject({ method: "GET", url: "/api/auth/state" });
+    expect(after.json()).toEqual({ setup: true });
+  });
+
+  it("is RESTART-SAFE: reads the secrets table, not an in-memory flag", async () => {
+    // Same DATA_DIR across two independent buildApp/initDb calls — the
+    // second stands in for a process restart. A module-level flag would
+    // reset to false here; this must still report true.
+    const dir = freshDataDir();
+
+    const before = buildApp(initDb(dir).db, { authDisabled: false });
+    const beforeState = await before.inject({ method: "GET", url: "/api/auth/state" });
+    expect(beforeState.json()).toEqual({ setup: false });
+    await before.inject({
+      method: "POST",
+      url: "/api/auth/setup",
+      payload: { password: "correct horse" },
+    });
+
+    const restarted = buildApp(initDb(dir).db, { authDisabled: false });
+    const afterState = await restarted.inject({ method: "GET", url: "/api/auth/state" });
+    expect(afterState.json()).toEqual({ setup: true });
+  });
+});
+
+describe("authErrorMessage (T018/F108) — pure error-code -> copy mapper", () => {
+  it("maps every known server code to human copy (never the raw code)", () => {
+    const knownCodes = ["invalid_body", "invalid_credentials", "already_configured"];
+
+    for (const code of knownCodes) {
+      const message = authErrorMessage(code);
+      expect(message).not.toBe(code);
+      expect(message).not.toMatch(/_/);
+    }
+  });
+
+  it("falls back to generic human copy for unknown codes and no code", () => {
+    expect(authErrorMessage("some_unmapped_code")).not.toMatch(/_/);
+    expect(authErrorMessage(undefined)).not.toMatch(/_/);
   });
 });

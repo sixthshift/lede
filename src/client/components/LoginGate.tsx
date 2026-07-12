@@ -1,14 +1,12 @@
 // Single-user password gate — spec.md §7. Wraps the whole app: pings a
 // protected route, and any 401 (ApiError.status === 401) swaps the app out
-// for a password form instead of rendering it. There's no "am I set up yet"
-// endpoint, so the form itself discovers that: it tries /api/auth/setup
-// first (the first-run path), and only falls back to /api/auth/login when
-// setup 409s because a password already exists. Either path ends in a
-// session, at which point the ping is invalidated and the app renders.
+// for a password form instead of rendering it. First-run state comes from
+// GET /api/auth/state (F108/OQ8) — restart-safe (reads the secrets table),
+// so the form never has to probe /api/auth/setup to find out.
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { fetchSettings, ApiError } from "../api";
+import { fetchSettings, getAuthState, authErrorMessage, ApiError } from "../api";
 import { useAuthSetup, useAuthLogin } from "../hooks/queries";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -22,42 +20,36 @@ function useAuthPing() {
   });
 }
 
+function useAuthState() {
+  return useQuery({
+    queryKey: ["auth-state"] as const,
+    queryFn: getAuthState,
+    retry: false,
+  });
+}
+
 function LoginForm({ onSignedIn }: { onSignedIn: () => void }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const authState = useAuthState();
   const setup = useAuthSetup();
   const login = useAuthLogin();
-  const pending = setup.isPending || login.isPending;
+  const firstRun = authState.data?.setup === false;
+  const pending = authState.isPending || setup.isPending || login.isPending;
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
 
     try {
-      await setup.mutateAsync(password);
-    } catch (err) {
-      if (!(err instanceof ApiError) || err.status !== 409) {
-        setError(err instanceof ApiError ? err.message : "Could not sign in.");
-        return;
+      if (firstRun) {
+        // first-run: store the password, then log in to establish a session.
+        await setup.mutateAsync(password);
       }
-      // password already set — this is a returning user, not first-run.
-      try {
-        await login.mutateAsync(password);
-      } catch (loginErr) {
-        setError(loginErr instanceof ApiError ? loginErr.message : "Could not sign in.");
-        return;
-      }
-      onSignedIn();
-      return;
-    }
-
-    // setup succeeded (first-run) — it only stores the password, so log in
-    // now to establish the session.
-    try {
       await login.mutateAsync(password);
       onSignedIn();
-    } catch (loginErr) {
-      setError(loginErr instanceof ApiError ? loginErr.message : "Could not sign in.");
+    } catch (err) {
+      setError(err instanceof ApiError ? authErrorMessage(err.code) : "Could not sign in.");
     }
   }
 
@@ -81,6 +73,19 @@ function LoginForm({ onSignedIn }: { onSignedIn: () => void }) {
         onSubmit={handleSubmit}
         className="flex w-full max-w-sm flex-col gap-4 rounded-xl border border-border/70 bg-card p-6 shadow-sm"
       >
+        {/* Hidden but present (not display:none) so password managers can
+            pair this single-password form with a username, per the
+            username/password autofill contract. */}
+        <input
+          type="text"
+          name="username"
+          autoComplete="username"
+          value="lede"
+          readOnly
+          tabIndex={-1}
+          aria-hidden="true"
+          className="sr-only"
+        />
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="login-gate-password">Password</Label>
           <Input
@@ -91,7 +96,11 @@ function LoginForm({ onSignedIn }: { onSignedIn: () => void }) {
             onChange={(event) => setPassword(event.target.value)}
             disabled={pending}
           />
-          <p className="text-xs text-muted-foreground">First time here? This sets your password.</p>
+          {firstRun ? (
+            <p className="text-xs text-muted-foreground">
+              First time here? This sets your password.
+            </p>
+          ) : null}
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <Button type="submit" disabled={pending || password.length === 0}>

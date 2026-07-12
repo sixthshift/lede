@@ -85,6 +85,9 @@ function mockFetch(initial: Partial<ServerState> = {}) {
     if (method === "GET" && url === "/api/settings") {
       return state.authed ? json(settingsPayload()) : json({ error: "unauthorized" }, 401);
     }
+    if (method === "GET" && url === "/api/auth/state") {
+      return json({ setup: state.configured });
+    }
     if (method === "POST" && url === "/api/auth/setup") {
       const body = JSON.parse(String(init?.body));
       if (!body.password) return json({ error: "invalid_body" }, 400);
@@ -143,12 +146,16 @@ describe("LoginGate — 401 routes to the login/setup form", () => {
     expect(screen.queryByText("APP CONTENT")).not.toBeInTheDocument();
   });
 
-  it("first-run: submitting a password sets it up, logs in, and renders the app", async () => {
+  it("first-run: GET /api/auth/state reports setup:false, submitting sets it up, logs in, and renders the app", async () => {
     const { fetchMock } = mockFetch({ authed: false, configured: false });
     render(withClient(<LoginGate>{"APP CONTENT"}</LoginGate>));
 
+    await screen.findByText("First time here? This sets your password.");
     const input = await screen.findByLabelText("Password");
     fireEvent.change(input, { target: { value: "correct horse" } });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Continue" })).not.toBeDisabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => expect(screen.getByText("APP CONTENT")).toBeInTheDocument());
@@ -156,29 +163,51 @@ describe("LoginGate — 401 routes to the login/setup form", () => {
     expect(putCallsTo(fetchMock, "/api/auth/login", "POST")).toHaveLength(1);
   });
 
-  it("returning user: setup 409s, falls back to login, and renders the app", async () => {
+  it("returning user: GET /api/auth/state reports setup:true, logs in directly with NO probing setup call", async () => {
     const { fetchMock } = mockFetch({ authed: false, configured: true });
     render(withClient(<LoginGate>{"APP CONTENT"}</LoginGate>));
 
+    // setup already true — the first-run hint must not render.
     const input = await screen.findByLabelText("Password");
+    expect(screen.queryByText("First time here? This sets your password.")).not.toBeInTheDocument();
+
     fireEvent.change(input, { target: { value: "correct horse" } });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Continue" })).not.toBeDisabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => expect(screen.getByText("APP CONTENT")).toBeInTheDocument());
-    expect(putCallsTo(fetchMock, "/api/auth/setup", "POST")).toHaveLength(1);
+    expect(putCallsTo(fetchMock, "/api/auth/setup", "POST")).toHaveLength(0);
     expect(putCallsTo(fetchMock, "/api/auth/login", "POST")).toHaveLength(1);
   });
 
-  it("wrong password on a returning user shows an error and keeps the app hidden", async () => {
+  it("wrong password on a returning user shows human copy, never the raw error code, and keeps the app hidden", async () => {
     mockFetch({ authed: false, configured: true });
     render(withClient(<LoginGate>{"APP CONTENT"}</LoginGate>));
 
     const input = await screen.findByLabelText("Password");
     fireEvent.change(input, { target: { value: "wrong" } });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Continue" })).not.toBeDisabled(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
-    await screen.findByText("invalid_credentials");
+    await screen.findByText("That password didn't work. Try again.");
+    expect(screen.queryByText("invalid_credentials")).not.toBeInTheDocument();
     expect(screen.queryByText("APP CONTENT")).not.toBeInTheDocument();
+  });
+
+  it("a hidden username field is present (not display:none) for password managers", async () => {
+    mockFetch({ authed: false, configured: false });
+    render(withClient(<LoginGate>{"APP CONTENT"}</LoginGate>));
+
+    await screen.findByLabelText("Password");
+    const hiddenUsername = document.querySelector('input[name="username"]') as HTMLInputElement;
+    expect(hiddenUsername).toBeInTheDocument();
+    expect(hiddenUsername).toHaveAttribute("autocomplete", "username");
+    expect(hiddenUsername).toHaveAttribute("tabindex", "-1");
+    expect(getComputedStyle(hiddenUsername).display).not.toBe("none");
   });
 });
 
