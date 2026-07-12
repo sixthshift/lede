@@ -123,3 +123,6 @@ corrections.
 [0027] T017 — worker STALLED (watchdog, 600s no progress; hung waiting on a self-started background test run). 0 commits; ApplicationCard.tsx never modified (only wrote the e2e test). Incomplete infra stall, not an acceptance failure — no attempt logged. Removed worktree; re-dispatching fresh with explicit "do NOT start background/playwright runs" (the stall cause).
   decision: retry (fresh, infra) 
   why: nothing durable; the hang was self-inflicted background-polling, not a build problem.
+
+[0028] T017 — dispatch (build, SERIAL, fresh) · sonnet · worktree · baseSha 308a752 · prompt hardened: NO playwright/background runs (prior stall cause); implement fix in ApplicationCard.tsx
+  decision: continue
