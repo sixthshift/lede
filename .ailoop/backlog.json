@@ -424,6 +424,7 @@
         "src/client/components/NavTabs.tsx",
         "src/client/components/WorkspaceShell.tsx",
         "src/client/components/NewApplication.tsx",
+        "src/client/components/SectionMetaFields.tsx",
         "test/e2e/tap-targets.spec.ts",
         "playwright.config.ts"
       ],
