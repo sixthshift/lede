@@ -290,3 +290,6 @@ corrections.
 
 ## Chunk — new invocation 2026-07-12 (P2→P5 continuous drive)
 [0061] RESUME. Fresh context (compaction). Verified contract sha256 unchanged (e4254fc…). Scheduler: P0+P1 done, complete=false, no problems/cycles/stale/breaches. phasesDrained=[P0,P1] already gated+closed. Ready=[T030]. Operator directive: run all remaining phases continuously to the end, compacting between phases; chunk-cap-as-checkpoint waived by operator — all CORRECTNESS guards (independent re-verify, attempt/thrash caps, phase-close gates) stay. Dispatch is SERIAL (playwright ports 8787-89 collide) per oracle env-adaptation; coordinator self-verifies.
+[0062] T030 — dispatch (build, SERIAL) · sonnet · worktree · baseSha 90a1b80 · attempt 1/3 (dispatch #1 this chunk)
+  decision: continue
+  why: only P2 ready ticket; reshapes the P1 shell for below-lg (bottom tab bar F301). Prompt flags: gone=removed (querySelector===null for rail below-lg AND bar at ≥lg), reuse existing breakpoint hook if present, no drawer.
