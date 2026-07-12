@@ -591,7 +591,11 @@
       ],
       "files": [
         "src/client/components/ApplicationDetail.tsx",
-        "src/client/components/LetterPreview.tsx"
+        "src/client/components/LetterPreview.tsx",
+        "test/e2e/applications.spec.ts",
+        "test/e2e/helpers/workspace.ts",
+        "test/e2e/letter-editing.spec.ts",
+        "playwright.config.ts"
       ],
       "origin": "spec Phase 4 / F501 / OQ5 (red-team #17)",
       "context": "See /workspace/SPEC.md F501 + OQ5 + Locked (letter editing re-homed). Today paragraph draft editing lives in the 384px preview rail below the letter page (~90px textareas clip mid-word; scrolling to Paragraph 2 scrolls the letter out of view — you edit blind). MOVE paragraph draft editing into the Cover-letter SECTION of the wide EDITOR pane (joining Regenerate/Undo); the preview pane becomes VIEW-ONLY for letters, exactly as for resumes. The v2 behavioral contracts (paragraph edit round-trip, undo, blank-letter, part-edit) MIGRATE UNCHANGED to the new home (re-home the assertions via the helper layer, never delete). Per-paragraph Remove/Insert pairs currently outweigh content — right-size them. Depends on P3. Coarse seed.",
