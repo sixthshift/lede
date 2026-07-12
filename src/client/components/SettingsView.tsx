@@ -92,7 +92,9 @@ export function SettingsView() {
         <div ref={(el) => (sectionRefs.current.provider = el)}>
           <Card>
             <CardHeader>
-              <CardTitle className="text-md">Provider &amp; model</CardTitle>
+              <CardTitle as="h2" className="text-md">
+                Provider &amp; model
+              </CardTitle>
               <CardDescription>Every tailor call runs against this model.</CardDescription>
             </CardHeader>
             <CardContent>
@@ -111,7 +113,9 @@ export function SettingsView() {
         <div ref={(el) => (sectionRefs.current.apiKey = el)}>
           <Card>
             <CardHeader>
-              <CardTitle className="text-md">API key</CardTitle>
+              <CardTitle as="h2" className="text-md">
+                API key
+              </CardTitle>
               <CardDescription>
                 Stored encrypted on the server and never shown again — you bring your own key for
                 the provider above.
@@ -126,7 +130,9 @@ export function SettingsView() {
         <div ref={(el) => (sectionRefs.current.format = el)}>
           <Card>
             <CardHeader>
-              <CardTitle className="text-md">Default document format</CardTitle>
+              <CardTitle as="h2" className="text-md">
+                Default document format
+              </CardTitle>
               <CardDescription>
                 The starting look for a new application — any application can override it.
               </CardDescription>

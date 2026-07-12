@@ -44,7 +44,7 @@ import { ResultView } from "./ResultView";
 import { TemplateGallery } from "./TemplateGallery";
 import { TemplatePicker } from "./TemplatePicker";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader, CardDescription } from "./ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
 import { Skeleton } from "./ui/skeleton";
 import { WorkspaceShellSurface } from "./WorkspaceShellSlots";
 
@@ -643,11 +643,11 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
           <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                {/* v4-T024/F208: a plain h2, not CardTitle (which renders
-                    h3) — the editor's h1 has no h2 between it and here yet,
-                    so an h3 would skip a level. Same visual treatment,
-                    accessible name unchanged, only the level moves. */}
-                <h2 className="text-md font-semibold leading-none tracking-tight">Cover letter</h2>
+                {/* v4-T024/F208: h2, not the default h3 — the editor's h1
+                    has no h2 between it and here, so h3 would skip a level. */}
+                <CardTitle as="h2" className="text-md">
+                  Cover letter
+                </CardTitle>
                 <CardDescription>
                   Generated independently of the resume — its own draw on your Library, this job's
                   JD, and Motivation above.
@@ -748,7 +748,9 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
             <div>
               {/* v4-T024/F208: see the Cover letter heading above — same
                   h3-would-skip-a-level reasoning. */}
-              <h2 className="text-md font-semibold leading-none tracking-tight">Design</h2>
+              <CardTitle as="h2" className="text-md">
+                Design
+              </CardTitle>
               <CardDescription>
                 {isLocked
                   ? "Locked — this reflects the look frozen at lock time. Unlock to edit."

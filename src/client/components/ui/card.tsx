@@ -23,15 +23,21 @@ const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
 );
 CardHeader.displayName = "CardHeader";
 
-const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
-  ({ className, ...props }, ref) => (
-    <h3
-      ref={ref}
-      className={cn("text-lg font-semibold leading-none tracking-tight", className)}
-      {...props}
-    />
-  ),
-);
+// A card's title level is contextual — it depends on where the card sits in
+// the surface's heading outline, not on the Card itself — so `as` lets the
+// caller place it (h2 directly under a surface h1, h3 nested a level deeper).
+// Default h3 preserves every pre-existing usage; only callers that need a
+// specific level pass `as` (F208 heading-order fix, v4-T024).
+const CardTitle = React.forwardRef<
+  HTMLHeadingElement,
+  React.HTMLAttributes<HTMLHeadingElement> & { as?: "h2" | "h3" | "h4" }
+>(({ className, as: Heading = "h3", ...props }, ref) => (
+  <Heading
+    ref={ref}
+    className={cn("text-lg font-semibold leading-none tracking-tight", className)}
+    {...props}
+  />
+));
 CardTitle.displayName = "CardTitle";
 
 const CardDescription = React.forwardRef<

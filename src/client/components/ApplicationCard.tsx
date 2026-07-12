@@ -119,7 +119,7 @@ export function ApplicationCard({ application }: { application: ApplicationSumma
               {application.company}
             </p>
           ) : null}
-          <CardTitle className="text-md leading-snug">
+          <CardTitle as="h2" className="text-md leading-snug">
             {application.role || "Untitled application"}
           </CardTitle>
         </CardHeader>

@@ -19,20 +19,16 @@
 //     re-asserts WorkspaceShell's is the sole survivor), and heading levels
 //     never skip (no H1->H3) on a surface.
 //
-// Heading order is fully fixed on the ONE surface this ticket's declared
-// files (App.tsx/WorkspaceShell.tsx/ApplicationDetail.tsx) can reach —
-// Application detail's two in-card headings ("Cover letter"/"Design") moved
-// from CardTitle's h3 to a plain h2. Dashboard (ApplicationCard.tsx),
-// Library (SectionAccordion.tsx, its per-section-group heading), and
-// Settings (SettingsView.tsx) all still render a card/group title via the
-// SAME shared CardTitle (h3, ui/card.tsx) with no h2 ahead of it on their
-// surface — a real H1->H3 skip that requires editing those three files (or
-// CardTitle's own default level), none of which are in this ticket's
-// declared scope. Those three assertions are marked `test.fail()` below: an
-// executable record of the gap (this test SUITE fails if any one of them
-// silently starts passing, or starts erroring some other way instead), not
-// a silently-skipped assertion — flagged in the ticket report for a
-// follow-up.
+// Heading order is fixed on all four surfaces. The shared root cause was
+// CardTitle (ui/card.tsx) hardcoding <h3>: every card-based surface placed a
+// card/group title directly under its editor h1, skipping h2. CardTitle now
+// takes an optional `as` level (default h3 — the other card usages are
+// unchanged), and the four surfaces' top-level titles pass `as="h2"`:
+// Application detail's Cover-letter/Design cards, the dashboard's
+// application cards (ApplicationCard.tsx), the library's per-section groups
+// (SectionAccordion.tsx), and Settings' three cards (SettingsView.tsx).
+// Nested titles a level deeper (the template-picker cards under Design's h2)
+// keep the default h3, which stays sequential.
 //
 // Shares applications.spec.ts's "applications" project/server (real
 // first-run set-password -> login, gate ON; LEDE_TAILOR_ENGINE=fixture) —
@@ -256,12 +252,6 @@ test.describe("Single main landmark + sequential heading order (F208), all four 
     await login(page, PASSWORD);
     await expect(page).toHaveURL(/\/applications$/);
     await expectExactlyOneMain(page);
-
-    // Known gap (see file header): ApplicationCard.tsx's CardTitle renders
-    // h3 with no h2 ahead of it on this surface — ApplicationCard.tsx is not
-    // a declared file for v4-T024. Recorded as an expected failure, not a
-    // silent skip.
-    test.fail();
     expectNoSkippedLevel(await headingLevels(page));
   });
 
@@ -270,12 +260,6 @@ test.describe("Single main landmark + sequential heading order (F208), all four 
     await login(page, PASSWORD);
     await page.goto("/library");
     await expectExactlyOneMain(page);
-
-    // Known gap (see file header): SectionAccordion.tsx's per-group
-    // CardTitle ("Experience", etc.) renders h3 with no h2 ahead of it on
-    // this surface — SectionAccordion.tsx is not a declared file for
-    // v4-T024. Recorded as an expected failure, not a silent skip.
-    test.fail();
     expectNoSkippedLevel(await headingLevels(page));
   });
 
@@ -284,12 +268,6 @@ test.describe("Single main landmark + sequential heading order (F208), all four 
     await login(page, PASSWORD);
     await page.goto("/settings");
     await expectExactlyOneMain(page);
-
-    // Known gap (see file header): SettingsView.tsx's three CardTitle
-    // instances render h3 with no h2 ahead of them — SettingsView.tsx is
-    // not a declared file for v4-T024. Recorded as an expected failure, not
-    // a silent skip.
-    test.fail();
     expectNoSkippedLevel(await headingLevels(page));
   });
 
