@@ -318,3 +318,10 @@ corrections.
 [0071] T032 — dispatch (build, SERIAL) · sonnet · in-place branch · baseSha f3dffc3 · attempt 1/3 (dispatch #4 this chunk)
   decision: continue
   why: NewApplication inline in-flow panel (OQ7/F304), popover GONE from DOM.
+[0072] T032 — DONE (independent re-verify green). Branch tip cdcdc1e.
+  fast baseline: check 0, build 0, lint 0, vitest 1077/1077.
+  scope CLEAN: NewApplication + ApplicationsView + new-application.spec(new) + playwright.config(registration). All declared.
+  DE-MODAL VERIFIED: modal={false} (no overlay/focus-trap/pointer-lock/aria-modal), no portal, no absolute/fixed, old popover classes removed + Radix-unmounted (gone not hidden).
+  gaming CLEAN: spec is geometry-based (card y-displacement>0 red-team#11, elementFromPoint no-cover, panel+ancestor position∉{absolute,fixed}, full-width span). Empty-state create path preserved (line 29 dashed card).
+  F304/OQ7 delivered. Full playwright deferred to P2 gate.
+  evidence: .ailoop/evidence/T032.txt.

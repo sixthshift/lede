@@ -1,0 +1,28 @@
+T032 — NewApplication inline in-flow panel (OQ7/F304)
+Independent re-verify on branch t032-inline-newapp tip cdcdc1e, baseSha 706c0cc.
+
+SCOPE (git diff --name-only 706c0cc..HEAD, excl .ailoop): NewApplication.tsx, ApplicationsView.tsx,
+  new-application.spec.ts(new), playwright.config.ts(registration). All ⊆ declared. CLEAN.
+
+FAST BASELINE: check 0 · build 0 · lint 0 (252 files) · vitest 1077/1077.
+
+MODALITY / DE-MODAL CONTRACT: SATISFIED.
+  - DialogPrimitive.Root modal={false} → Radix skips overlay (DialogOverlay no-op), no focus trap,
+    no outside-pointer lock, NO aria-modal="true". role="dialog" non-modal = correct ARIA per policy.
+  - No DialogPortal → renders in-flow (not portaled to body); Content has `mt-4 w-full`, NO absolute/fixed.
+  - Old popover classes (`absolute right-0 top-full z-20 w-[28rem] max-w-[90vw]`) REMOVED; Radix unmounts
+    Content when open=false → old floating variant gone from DOM (not hidden).
+  - Was already modal={false} since v3-T020 — consistent, no new modality introduced.
+
+GAMING READ: CLEAN. Spec new-application.spec.ts is geometry-based:
+  - desktop 1280: closed panel count===0; open → first card boundingBox.y AFTER − BEFORE > 0 (pushed
+    down, red-team #11); elementFromPoint at card corners resolves to card not panel (no cover); old
+    popover `.absolute.right-0.top-full` count===0 AND panel's own computed position ∉{absolute,fixed}
+    AND no ancestor-to-body is absolute/fixed (the ungameable geometry check).
+  - 375: panel full-width (x≥0, right≤376, x≤padding, right≥343 spans width), in-viewport.
+  - create end-to-end via inline panel → app created, panel unmounts, new card visible.
+  ApplicationsView: <NewApplication/> moved from header justify-between row into own in-flow block above
+  the grid (items-end closed-trigger align; w-full panel override). Empty-state create path (dashed
+  "No applications yet" card, line 29) PRESERVED — first-run create still reachable.
+
+Builder self-ran new-application.spec (applications project) 3/3. Full playwright at P2 gate [0033].
