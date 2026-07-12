@@ -731,7 +731,7 @@
     {
       "id": "T060",
       "title": "P5: Cohesion suite extended with v4 invariants (collapse, scroll-spy, restoration, sheet modality, bottom-bar/toast non-modality)",
-      "status": "todo",
+      "status": "done",
       "phase": "P5",
       "depends_on": [
         "T041a",
@@ -752,7 +752,7 @@
       "context": "See /workspace/SPEC.md Phase 5 + oracle.md Phase 5 oracle. Extend the v3 cohesion suite (`cohesion.spec.ts`, applications project) with v4's new invariants, run app-wide on the final tree: rail collapse (view-state, network-zero), scroll-spy active-section rule, scroll restoration on POP, sheet modality below `lg` (sanctioned) vs zero modality at ≥lg, bottom-bar + toasts classified as NON-modal chrome per the pinned taxonomy (red-team #14/#23). App-wide MODALITY SWEEP at 375, 768, 1024, AND 1280. No horizontal overflow on any surface at 375/768/1023/1024/1280/1512. This ticket adds TESTS only (test/**), asserting behavior built in P0–P4 — a src/ diff here fails the scope check. Depends on all P4 tickets. Coarse seed.",
       "acceptance": "- New/extended cohesion tests: app-wide modality sweep green under the pinned taxonomy at 375/768/1024/1280 (sheets below lg only; zero modality ≥1024; bottom bar + toasts non-modal); no horizontal overflow at 375/768/1023/1024/1280/1512; scroll restoration re-verified; rail collapse + scroll-spy invariants asserted.\n- `git diff --name-only <baseSha>..HEAD` ⊆ {test/**}.\n- Baseline gate green; test-count ratchet satisfied (counts strictly ≥ intake floor).",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T060.txt"
     },
     {
       "id": "T061",
