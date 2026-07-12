@@ -141,7 +141,7 @@ export default defineConfig({
     {
       name: "applications",
       testMatch:
-        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration|tap-targets|toasts)\.spec\.ts/,
+        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration|tap-targets|toasts|export-busy)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject

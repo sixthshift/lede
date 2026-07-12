@@ -179,7 +179,7 @@ export function ApplicationCard({ application }: { application: ApplicationSumma
           onClick={handleDownload}
           className={TAP_TARGET_COARSE}
         >
-          Download PDF
+          {downloading ? "Preparing…" : "Download PDF"}
         </Button>
         <Button
           type="button"

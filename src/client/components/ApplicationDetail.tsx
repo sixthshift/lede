@@ -307,6 +307,15 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   const [draftFormat, setDraftFormat] = useState<DocumentFormatV2 | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // T042/F402: export busy state. react-pdf rendering (PDF) and the
+  // plain-text derivation both run on the client with no query/mutation of
+  // their own to source an isPending flag from, so each gets a local pending
+  // flag — disabling its control and swapping its label while in flight, and
+  // guarding a second activation mid-flight into a no-op (exactly one
+  // download per user intent).
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingText, setIsExportingText] = useState(false);
+
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -444,6 +453,42 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   const letterLabel =
     application.letterGenState === "untailored" ? "Generate letter" : "Regenerate letter";
 
+  // T042/F402: guarded on the pending flag itself, not just the button's
+  // `disabled` (belt-and-suspenders against a second activation landing
+  // before React has flushed the first click's state update).
+  const handleDownloadPdf = async () => {
+    if (isExportingPdf || !application.current || !profile) return;
+    setIsExportingPdf(true);
+    try {
+      await downloadResumePdf({
+        resume: application.current,
+        profile,
+        company: application.company,
+        role: application.role,
+        format: resolvedFormat,
+        paper,
+        density,
+      });
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleDownloadText = async () => {
+    if (isExportingText || !application.current || !profile) return;
+    setIsExportingText(true);
+    try {
+      await downloadResumeText({
+        resume: application.current,
+        profile,
+        company: application.company,
+        role: application.role,
+      });
+    } finally {
+      setIsExportingText(false);
+    }
+  };
+
   const handleFormatChange = (next: DocumentFormatV2) => {
     if (isLocked) return;
     setDraftFormat(next);
@@ -573,40 +618,21 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
           </Button>
           <Button
             variant="outline"
-            disabled={!application.current || !profile}
-            onClick={() =>
-              profile &&
-              application.current &&
-              downloadResumePdf({
-                resume: application.current,
-                profile,
-                company: application.company,
-                role: application.role,
-                format: resolvedFormat,
-                paper,
-                density,
-              })
-            }
+            data-testid="download-pdf-button"
+            disabled={!application.current || !profile || isExportingPdf}
+            onClick={handleDownloadPdf}
             className={TAP_TARGET_COARSE}
           >
-            Download PDF
+            {isExportingPdf ? "Preparing…" : "Download PDF"}
           </Button>
           <Button
             variant="outline"
-            disabled={!application.current || !profile}
-            onClick={() =>
-              profile &&
-              application.current &&
-              downloadResumeText({
-                resume: application.current,
-                profile,
-                company: application.company,
-                role: application.role,
-              })
-            }
+            data-testid="download-text-button"
+            disabled={!application.current || !profile || isExportingText}
+            onClick={handleDownloadText}
             className={TAP_TARGET_COARSE}
           >
-            Plain text
+            {isExportingText ? "Preparing…" : "Plain text"}
           </Button>
           <Button
             variant="outline"
