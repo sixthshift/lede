@@ -538,7 +538,10 @@
       ],
       "files": [
         "src/client/components/ApplicationCard.tsx",
-        "src/client/components/NewApplication.tsx"
+        "src/client/components/NewApplication.tsx",
+        "src/client/components/ApplicationsView.tsx",
+        "test/e2e/card-detail.spec.ts",
+        "playwright.config.ts"
       ],
       "origin": "spec Phase 3 / F406",
       "context": "See /workspace/SPEC.md F406 + Locked (card fixes). Four items: (1) Escape disarms the card's armed 'Confirm delete'; (2) duplicate scrolls the new card into view with a brief highlight (today it appears unhighlighted at list end with no locating feedback); (3) NewApplication required-field error renders beside the RIGHT field with a red border + focus (today detached below the wrong field); (4) card focus ring uses the FULL card radius (today follows `rounded-t-xl` → square bottom corners mid-card). Verify NewApplication's real filename (from T032). Shares ApplicationCard with T017/T042 (serialize). Depends on T040.",
