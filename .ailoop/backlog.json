@@ -757,7 +757,7 @@
     {
       "id": "T061",
       "title": "P5: Final gate — full playwright (3 projects) + docker e2e green on the final tree",
-      "status": "todo",
+      "status": "done",
       "phase": "P5",
       "depends_on": [
         "T060"
@@ -769,7 +769,7 @@
       "context": "See /workspace/SPEC.md Phase 5 'Done means' + oracle.md Phase 5 oracle. This is the FINAL gate ticket: verify the whole campaign holds on the final tree — full playwright (chromium, auth, applications, non-concurrent; `bun run build` before applications) + `bun run test:docker` green; app-wide modality sweep green; no horizontal overflow at all named widths; scroll restoration re-verified; test-count ratchet satisfied campaign-wide (every project ≥ intake floor). If any check is red, this ticket's failure feeds a repair ticket rather than being force-passed. Mostly a verification ticket — it may add only a final assertion if a gap is found (test/** only; src/ diff fails scope). Depends on T060.",
       "acceptance": "- Full playwright (chromium + auth + applications, non-concurrent) green; `bun run test:docker` green.\n- App-wide modality sweep green at 375/768/1024/1280; no horizontal overflow at 375/768/1023/1024/1280/1512.\n- Test-count ratchet: vitest ≥1056, chromium ≥20, auth ≥1, applications ≥32, docker ≥1 (per intake floor).\n- `git diff --name-only <baseSha>..HEAD` ⊆ {test/**}.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/P5-final-gate.txt"
     },
     {
       "id": "T025",
