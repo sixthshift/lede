@@ -1,0 +1,101 @@
+
+Running 19 tests using 1 worker
+
+  ✓   1 [applications] › test/e2e/cohesion.spec.ts:59:3 › Cohesion sweep: the shell is genuinely persistent, and its rail is functional everywhere › PRESENCE: workspace-shell renders on all four surfaces (1.2s)
+  ✓   2 [applications] › test/e2e/cohesion.spec.ts:79:3 › Cohesion sweep: the shell is genuinely persistent, and its rail is functional everywhere › PERSISTENCE: the workspace-shell DOM node survives client-side navigation, including a document<->non-document pair (1.6s)
+  ✓   3 [applications] › test/e2e/cohesion.spec.ts:136:3 › Cohesion sweep: the shell is genuinely persistent, and its rail is functional everywhere › FUNCTIONAL RAIL: global nav activates on the dashboard/library/settings; the section rail activates on application detail (1.4s)
+  ✓   4 [applications] › test/e2e/cohesion.spec.ts:183:3 › Cohesion sweep: the shell is genuinely persistent, and its rail is functional everywhere › DEGRADE: no preview-pane off the one document surface; present and co-visible on application detail at 1280x720 (1.3s)
+  ✓   5 [applications] › test/e2e/cohesion.spec.ts:233:3 › SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051) › NewApplication panel is non-modal (dashboard, /applications) (484ms)
+  ✓   6 [applications] › test/e2e/cohesion.spec.ts:247:3 › SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051) › EntryEditor via Add entry is non-modal (library, /library) (602ms)
+  ✓   7 [applications] › test/e2e/cohesion.spec.ts:259:3 › SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051) › EntryEditor via editing an existing entry is non-modal (library, /library) (562ms)
+  ✓   8 [applications] › test/e2e/cohesion.spec.ts:278:3 › SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051) › LayoutEditor is non-modal (library, /library) (561ms)
+  ✓   9 [applications] › test/e2e/cohesion.spec.ts:293:3 › SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051) › ProfileEditor is non-modal (library, /library) (554ms)
+  ✓  10 [applications] › test/e2e/cohesion.spec.ts:317:3 › SWEEP 2 — co-visibility re-run: editor and preview panes are genuinely side-by-side on the final tree (v3-T051) › editor-pane and preview-pane are both visible and side-by-side at 1280x720 (930ms)
+  ✓  11 [applications] › test/e2e/cohesion.spec.ts:412:5 › SWEEP 3 — app-wide modality taxonomy at 375/768/1024/1280 (v4-T060, red-team #14/#23) › >=lg @ 1024: zero modality across every de-modal panel and the preview (7.1s)
+  ✓  12 [applications] › test/e2e/cohesion.spec.ts:412:5 › SWEEP 3 — app-wide modality taxonomy at 375/768/1024/1280 (v4-T060, red-team #14/#23) › >=lg @ 1280: zero modality across every de-modal panel and the preview (7.0s)
+  ✘  13 [applications] › test/e2e/cohesion.spec.ts:464:5 › SWEEP 3 — app-wide modality taxonomy at 375/768/1024/1280 (v4-T060, red-team #14/#23) › <lg @ 375: de-modal panels stay non-modal; the preview sheet is the ONLY sanctioned exception (5.5s)
+  ✘  14 [applications] › test/e2e/cohesion.spec.ts:464:5 › SWEEP 3 — app-wide modality taxonomy at 375/768/1024/1280 (v4-T060, red-team #14/#23) › <lg @ 375: de-modal panels stay non-modal; the preview sheet is the ONLY sanctioned exception (retry #1) (5.2s)
+  ✘  15 [applications] › test/e2e/cohesion.spec.ts:464:5 › SWEEP 3 — app-wide modality taxonomy at 375/768/1024/1280 (v4-T060, red-team #14/#23) › <lg @ 375: de-modal panels stay non-modal; the preview sheet is the ONLY sanctioned exception (retry #2) (5.4s)
+  ✓  16 [applications] › test/e2e/cohesion.spec.ts:464:5 › SWEEP 3 — app-wide modality taxonomy at 375/768/1024/1280 (v4-T060, red-team #14/#23) › <lg @ 768: de-modal panels stay non-modal; the preview sheet is the ONLY sanctioned exception (7.3s)
+  ✓  17 [applications] › test/e2e/cohesion.spec.ts:538:3 › SWEEP 3 — app-wide modality taxonomy at 375/768/1024/1280 (v4-T060, red-team #14/#23) › bottom tab bar + toasts classify as NON-modal persistent chrome, not modality (9.7s)
+  ✓  18 [applications] › test/e2e/cohesion.spec.ts:603:3 › SWEEP 4 — no horizontal overflow at 375/768/1023/1024/1280/1512, all four surfaces (v4-T060, red-team #13) › document.documentElement.scrollWidth matches the viewport, and no non-whitelisted descendant overflows, at every named width on every surface (5.4s)
+  ✓  19 [applications] › test/e2e/cohesion.spec.ts:637:3 › Re-verified on the final tree (v4-T060) › scroll restoration (F203): browser-BACK restores the editor pane's scrollTop within +/-24px; a fresh forward nav starts at top (3.5s)
+  ✓  20 [applications] › test/e2e/cohesion.spec.ts:681:3 › Re-verified on the final tree (v4-T060) › rail collapse (F207): toggling transitions expanded (~224px) <-> the 40-64px collapsed band, survives reload, and is network-zero (2.2s)
+  ✓  21 [applications] › test/e2e/cohesion.spec.ts:732:3 › Re-verified on the final tree (v4-T060) › scroll-spy (F202): active section tracks scroll position across independently-computed positions, with the short-last-section escape at the bottom (2.5s)
+
+
+  1) [applications] › test/e2e/cohesion.spec.ts:464:5 › SWEEP 3 — app-wide modality taxonomy at 375/768/1024/1280 (v4-T060, red-team #14/#23) › <lg @ 375: de-modal panels stay non-modal; the preview sheet is the ONLY sanctioned exception 
+
+    Error: no fixed/absolute-positioned element may cover more than half the viewport
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 0
+    Received: 1
+
+       at helpers/workspace.ts:400
+
+      398 |     oversizedOverlayCount,
+      399 |     "no fixed/absolute-positioned element may cover more than half the viewport",
+    > 400 |   ).toBe(0);
+          |     ^
+      401 | }
+      402 |
+      403 | // ── v4-T060: app-wide modality sweep + overflow walk ── two helpers factored
+        at assertNoModalOverlay (/workspace/test/e2e/helpers/workspace.ts:400:5)
+        at assertPanelNonModalAndClose (/workspace/test/e2e/cohesion.spec.ts:401:3)
+        at /workspace/test/e2e/cohesion.spec.ts:489:7
+
+    Error Context: test-results/cohesion-SWEEP-3-—-app-wid-7ec1a-e-ONLY-sanctioned-exception-applications/error-context.md
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: no fixed/absolute-positioned element may cover more than half the viewport
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 0
+    Received: 1
+
+       at helpers/workspace.ts:400
+
+      398 |     oversizedOverlayCount,
+      399 |     "no fixed/absolute-positioned element may cover more than half the viewport",
+    > 400 |   ).toBe(0);
+          |     ^
+      401 | }
+      402 |
+      403 | // ── v4-T060: app-wide modality sweep + overflow walk ── two helpers factored
+        at assertNoModalOverlay (/workspace/test/e2e/helpers/workspace.ts:400:5)
+        at assertPanelNonModalAndClose (/workspace/test/e2e/cohesion.spec.ts:401:3)
+        at /workspace/test/e2e/cohesion.spec.ts:489:7
+
+    Error Context: test-results/cohesion-SWEEP-3-—-app-wid-7ec1a-e-ONLY-sanctioned-exception-applications-retry1/error-context.md
+
+    Retry #2 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: no fixed/absolute-positioned element may cover more than half the viewport
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 0
+    Received: 1
+
+       at helpers/workspace.ts:400
+
+      398 |     oversizedOverlayCount,
+      399 |     "no fixed/absolute-positioned element may cover more than half the viewport",
+    > 400 |   ).toBe(0);
+          |     ^
+      401 | }
+      402 |
+      403 | // ── v4-T060: app-wide modality sweep + overflow walk ── two helpers factored
+        at assertNoModalOverlay (/workspace/test/e2e/helpers/workspace.ts:400:5)
+        at assertPanelNonModalAndClose (/workspace/test/e2e/cohesion.spec.ts:401:3)
+        at /workspace/test/e2e/cohesion.spec.ts:489:7
+
+    Error Context: test-results/cohesion-SWEEP-3-—-app-wid-7ec1a-e-ONLY-sanctioned-exception-applications-retry2/error-context.md
+
+  1 failed
+    [applications] › test/e2e/cohesion.spec.ts:464:5 › SWEEP 3 — app-wide modality taxonomy at 375/768/1024/1280 (v4-T060, red-team #14/#23) › <lg @ 375: de-modal panels stay non-modal; the preview sheet is the ONLY sanctioned exception 
+  18 passed (1.2m)
