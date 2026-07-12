@@ -563,7 +563,13 @@
       ],
       "files": [
         "src/client/components/ApplicationDetail.tsx",
-        "src/client/components/TemplateGallery.tsx"
+        "src/client/components/TemplateGallery.tsx",
+        "src/client/components/SectionAccordion.tsx",
+        "test/e2e/gallery-bounds.spec.ts",
+        "test/e2e/design.spec.ts",
+        "test/e2e/cohesion.spec.ts",
+        "test/e2e/accordion.spec.ts",
+        "playwright.config.ts"
       ],
       "origin": "spec Phase 4 / F505 (red-team #7, #8)",
       "context": "See /workspace/SPEC.md F505 + Locked (accordion consistency). All three detail sections collapsible, DEFAULT EXPANDED (red-team #8 — never collapsed-by-default sections); Design's INTERNAL control groups default COLLAPSED (that is what retires the ~5,400px scroll). Per-section collapse state is view-state (localStorage at most; network-zero; preview pixel-identical — the v3 H2 pattern). Consolidate the template presentation: the Design card duplicates the template gallery (same 10 templates inline AND in the popover) — DELETE the popover (the T013 temporary reposition) and re-target the F102 assertion onto the SURVIVING inline presentation: 'exactly one template-choice presentation exists on the surface, fully within the editor pane'. Re-homed, not deleted (red-team #7). Depends on P3. Coarse seed — decompose if accordion + gallery is too big for one session.",
