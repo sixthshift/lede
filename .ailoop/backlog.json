@@ -357,7 +357,8 @@
         "src/client/components/ApplicationDetail.tsx",
         "src/client/components/WorkspaceShell.tsx",
         "test/e2e/phone-overflow.spec.ts",
-        "playwright.config.ts"
+        "playwright.config.ts",
+        "src/client/styles/app.css"
       ],
       "origin": "spec Phase 2 / F302 (red-team #13)",
       "context": "See /workspace/SPEC.md Phase 2 + Locked (phone layout). At 375 the detail editor pane is 29px wide and opening preview renders it off-viewport (x=341–725). FIX: detail stacks vertically at phone width; no descendant outside whitelisted intentional scroll containers overflows. The preview becomes a full-width SHEET layer below lg (sanctioned by OQ2's exception — dismissible via Escape + visible close, focus-managed) — but the preview sheet mechanics land in T033; THIS ticket owns the stacked detail layout + overflow elimination. Coarse seed. Depends on T030 (bottom bar / rail-hidden regime).",
