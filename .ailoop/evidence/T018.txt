@@ -1,0 +1,20 @@
+T018 — F108 login copy + GET /api/auth/state (OQ8) — INDEPENDENT RE-VERIFY
+merged 0597125 (branch worktree-agent-ab15684bef155cbde, baseSha 49c0671)
+SCOPE: server/routes/auth.ts, client/api.ts, LoginGate.tsx, test/api.auth.test.ts (declared) +
+  test/e2e/auth.spec.ts (auth project, already registered) + test/settings-auth.test.tsx (undeclared,
+  NECESSARY lockstep — asserted the OLD bug: raw invalid_credentials + the removed probe). Footprint corrected.
+SCOPE TRIPWIRE (v4's ONE sanctioned backend change): server diff is EXACTLY the one public GET
+  /api/auth/state returning {setup:Boolean(row?.auth)} only — no session, reads secrets table
+  (restart-safe), no other server file touched. TRIPWIRE CLEAR.
+GAMING: endpoint {setup} only; client getAuthState + authErrorMessage pure mapper (all codes → human
+  copy, no raw fallthrough); LoginGate fetches state on load, gates microcopy on setup===false, removes
+  the blind-POST probe; hidden username via sr-only (not display:none) + tabindex=-1. PASS.
+BASELINE (clean env — stale auth servers pkill'd first):
+  check 0; lint 0; build 0; vitest 1077/1077 (0 flakes; +6 new auth tests);
+  playwright chromium 24; auth 1 (fresh boot setup:false → passes); applications 41.
+  NOTE: initial auth run failed on a STALE reused server (DATA_DIR held a password from earlier
+  per-ticket auth runs; reuseExistingServer + retries:2). Fresh single run passes. LATENT: the new
+  e2e's setup:false boot assertion is retry-fragile (attempt-1 sets a password; a retry sees setup:true)
+  → flagged for Phase 5 hardening (DATA_DIR isolation).
+RATCHET: vitest 1071 -> 1077. auth 1, applications 41, chromium 24. Non-decreasing.
+VERDICT: DONE.

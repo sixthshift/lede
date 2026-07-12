@@ -132,3 +132,13 @@ corrections.
 [0030] T018 — dispatch (build, SERIAL) · sonnet · worktree · baseSha (post-T017 main) · attempt 1/3 · v4's ONE sanctioned backend change (GET /api/auth/state)
   decision: continue
   why: last P0 ticket (F108 login + OQ8 endpoint).
+
+[0031] T018 — DONE (re-verify green, clean env). Merged 0597125. Scope tripwire CLEAR (server diff = exactly the one GET /api/auth/state). Necessary lockstep +settings-auth.test.tsx. Baseline green (vitest 1077, pw chromium 24/auth 1/applications 41). Initial auth fail was a stale-reused-server artifact (pkill'd → fresh passes); latent retry-fragility flagged for Phase 5.
+  evidence: .ailoop/evidence/T018.txt
+
+[0032] PHASE 0 — CLOSED. All 9 tickets (T010-T018) done; scheduler phasesDrained=["P0"]. Merged-tree oracle GREEN (clean full baseline): check 0, lint 0, build 0, vitest 1077/1077, playwright chromium 24 + auth 1 + applications 41. Every F1xx finding delivered: F101(T012) F102(T013) F103(T014) F104(T010) F105(T015) F106(T016) F107(T017) F108(T018) F109(T011) F110(T017).
+  decision: close-phase
+  why: per-ticket independent re-verify green + merged-tree gate green in a CLEAN environment (stale servers cleared). Phase-0 branches already pruned per ticket (fast-forward/clean merges, no gate-red bisection needed).
+  NEW RATCHET FLOOR (Phase 0 gate): vitest >=1077 · chromium >=24 · auth >=1 · applications >=41 · docker >=1.
+  RESIDUAL for Phase 5: auth.spec.ts:23 new e2e is retry-fragile against the auth project's stateful DATA_DIR (reuseExistingServer + retries:2) — harden with per-test DATA_DIR isolation in T060/T061.
+  OPERATIONAL: pkill stale `bun run start`/tsx servers before auth verification (repeated per-ticket auth runs leave a password-dirtied DATA_DIR that poisons setup:false assertions).

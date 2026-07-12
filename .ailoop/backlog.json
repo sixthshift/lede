@@ -156,7 +156,7 @@
     {
       "id": "T018",
       "title": "F108 — login copy map, first-run microcopy via GET /api/auth/state (OQ8), hidden username",
-      "status": "in-progress",
+      "status": "done",
       "phase": "P0",
       "depends_on": [],
       "files": [
@@ -172,7 +172,7 @@
       "context": "See /workspace/SPEC.md F108 + OQ8 + oracle.md Locked (login first-run). THREE parts: (1) BACKEND (the single sanctioned server change): add `GET /api/auth/state` → `{ setup: boolean }` in `src/server/routes/auth.ts` — public (the `/api/auth/` prefix is already in PUBLIC_PREFIXES per `src/server/auth.ts:7`), NO session required, returns ONLY the boolean, leaks no secrets. `setup === true` means a password IS configured (returning user); `setup === false` means first-run pending. Compute from `db.select().from(secrets).where(eq(secrets.id,1)).get()?.auth`. Existing endpoints for shape reference: setup/login/logout in the same file. (2) CLIENT: add a `getAuthState()` call in `src/client/api.ts` (mirror the existing auth helpers at lines 272-280); in `LoginGate.tsx`, render the 'First time here? This sets your password.' microcopy (currently unconditional at line 94) ONLY when `setup === false`; map raw error codes (`invalid_credentials`) to human copy (no `_`-code string on screen); add a hidden username field (`autocomplete=\"username\"`) so password managers work. (3) TESTS: extend `test/api.auth.test.ts` for the new endpoint (answers without a session; returns only `{setup}`; reflects password-set state). This is the ONLY server change v4 permits — anything more is a scope tripwire.",
       "acceptance": "- Server test: `GET /api/auth/state` returns 200 WITHOUT a session cookie; `Object.keys(body)` deep-equals `['setup']` EXACTLY (not merely 'no key material' — no `id`/`updatedAt`/extra fields); `setup` is false pre-setup and true after a password is set. RESTART-SAFE: after setup, re-instantiate the route/DB (or restart the test server) and confirm state still reports `true` — a module-level in-memory flag that doesn't survive restart FAILS (must read the `secrets` table).\n- Unit-test the error-code→copy mapper as a PURE FUNCTION over ALL known server codes (`invalid_body`, `invalid_credentials`, `already_configured`): none returns raw/underscored text (mapping only the one live-clicked code and letting others fall through to `err.message` FAILS).\n- e2e: wrong password ⇒ human copy (no `_`-code on screen); with `setup:false` the first-run hint renders, `setup:true` it does not (auth project fresh DB → false; applications reuses one → true); the e2e intercepts network and asserts a `GET /api/auth/state` call actually fires on login-page load AND no probing `POST /api/auth/setup` fires before the user submits.\n- A hidden username input is present with computed `display !== none` (visually-hidden/clip technique, `tabindex=\"-1\"`) — a `display:none` field that autofill ignores FAILS.\n- Baseline gate green.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T018.txt"
     },
     {
       "id": "T020",
