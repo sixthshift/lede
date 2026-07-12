@@ -103,6 +103,12 @@
 // placement, and card focus-ring radius all live on the dashboard route,
 // same shared login/PASSWORD rationale as new-application.spec.ts, no
 // fourth server warranted.
+//
+// F505/T041a adds design-accordion.spec.ts to the same "applications"
+// project — it needs a real tailored-application detail route (DesignPanel's
+// internal groups only render meaningfully once the panel has a resume to
+// preview), same shared login/PASSWORD/tailor-fixture rationale as
+// scroll-spy.spec.ts, no fourth server warranted.
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -158,7 +164,7 @@ export default defineConfig({
     {
       name: "applications",
       testMatch:
-        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration|tap-targets|toasts|export-busy|motion|letter-empty|card-detail)\.spec\.ts/,
+        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration|tap-targets|toasts|export-busy|motion|letter-empty|card-detail|design-accordion)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject

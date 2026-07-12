@@ -27,7 +27,8 @@
 // observable effect would be a phantom knob. The NAME font (fonts.name) is
 // its own control below, distinct from both body and heading — it now has a
 // render seam (E9-F2a, engine/document.tsx).
-import type { ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import type {
   AccentPlacementV2,
   BodyFontId,
@@ -63,6 +64,7 @@ import { CONTACT_ICON_STYLES, DATE_FORMATS, NAME_DISPLAY_FONT_IDS } from "@share
 import { SECTIONS, SECTION_VALUES } from "@shared/sections";
 import type { DocumentFormatV2 } from "@shared/format-v2";
 import { FONT_FACES } from "../document/fonts";
+import { cn } from "../lib/utils";
 import { Alert, AlertDescription } from "./ui/alert";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -478,6 +480,92 @@ function EnumSelect<T extends string>({
   );
 }
 
+// Design's internal control groups (Typography, Header, Links, ...) are pure
+// view-state accordions — a namespaced localStorage key per group, NEVER a
+// settings/application write, matching ApplicationDetail's own
+// collapseStorageKey pattern for the outer Job details/Cover letter/Design
+// sections (F209/T023). Unlike those outer sections (default EXPANDED),
+// these inner groups default COLLAPSED: absence of a stored value folds the
+// group, since the ~15-group panel is what produced the ~5,400px scroll this
+// retires. Toggling never touches `format`/`onChange` — it can't change the
+// rendered document, only which controls are visible.
+function groupCollapseStorageKey(groupKey: string): string {
+  return `lede.designPanel.groupCollapse.${groupKey}`;
+}
+
+function readGroupCollapsed(groupKey: string): boolean {
+  try {
+    const raw = window.localStorage.getItem(groupCollapseStorageKey(groupKey));
+    return raw === null ? true : raw === "true";
+  } catch {
+    return true;
+  }
+}
+
+// Same grid-rows collapse technique as ApplicationDetail's EditorSection
+// (F403/T043): the row's fr size, not display/mount, carries open/closed
+// state so height transitions, and children stay mounted through collapse.
+// The duration (200ms) sits inside T043's [100ms,300ms] band; motion-reduce
+// zeroes it out entirely.
+function CollapsibleGroup({
+  groupKey,
+  label,
+  children,
+}: {
+  groupKey: string;
+  label: string;
+  children: ReactNode;
+}) {
+  const [collapsed, setCollapsed] = useState(() => readGroupCollapsed(groupKey));
+
+  function toggle() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(groupCollapseStorageKey(groupKey), String(next));
+      } catch {
+        // localStorage unavailable (private mode etc.) — collapse still
+        // works for this render, it just won't persist across reloads.
+      }
+      return next;
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <button
+        type="button"
+        aria-expanded={!collapsed}
+        aria-controls={`design-group-body-${groupKey}`}
+        data-testid={`design-group-toggle-${groupKey}`}
+        onClick={toggle}
+        className="flex items-center gap-1.5 text-sm font-medium text-foreground transition-colors hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <ChevronDown
+          aria-hidden
+          className={cn("h-3.5 w-3.5 shrink-0 transition-transform", collapsed && "-rotate-90")}
+        />
+        {label}
+      </button>
+      <div
+        data-testid={`design-group-track-${groupKey}`}
+        className={cn(
+          "grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:duration-0 motion-reduce:transition-none",
+          collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]",
+        )}
+      >
+        <div
+          id={`design-group-body-${groupKey}`}
+          data-testid={`design-group-body-${groupKey}`}
+          className="flex flex-col gap-4 overflow-hidden"
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DesignPanel({
   format,
   onChange,
@@ -497,159 +585,159 @@ export function DesignPanel({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* ── typography ── */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FieldRow label="Body font" htmlFor="design-body-family">
-          <FontSelect
-            id="design-body-family"
-            value={format.fonts.body}
-            disabled={readOnly}
-            onChange={(body) => set({ ...format, fonts: { ...format.fonts, body } })}
-          />
-        </FieldRow>
+      <CollapsibleGroup groupKey="typography" label="Typography">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FieldRow label="Body font" htmlFor="design-body-family">
+            <FontSelect
+              id="design-body-family"
+              value={format.fonts.body}
+              disabled={readOnly}
+              onChange={(body) => set({ ...format, fonts: { ...format.fonts, body } })}
+            />
+          </FieldRow>
 
-        <FieldRow label="Name font" htmlFor="design-name-family">
-          <NameFontSelect
-            id="design-name-family"
-            value={format.fonts.name}
-            disabled={readOnly}
-            onChange={(name) => set({ ...format, fonts: { ...format.fonts, name } })}
-          />
-        </FieldRow>
+          <FieldRow label="Name font" htmlFor="design-name-family">
+            <NameFontSelect
+              id="design-name-family"
+              value={format.fonts.name}
+              disabled={readOnly}
+              onChange={(name) => set({ ...format, fonts: { ...format.fonts, name } })}
+            />
+          </FieldRow>
 
-        <FieldRow label="Body size (pt)" htmlFor="design-body-size">
-          <NumberStepper
-            id="design-body-size"
-            value={format.typeScale.bodySize}
-            min={9}
-            max={12}
-            step={0.5}
-            disabled={readOnly}
-            onChange={(bodySize) =>
-              set({ ...format, typeScale: { ...format.typeScale, bodySize } })
-            }
-          />
-        </FieldRow>
+          <FieldRow label="Body size (pt)" htmlFor="design-body-size">
+            <NumberStepper
+              id="design-body-size"
+              value={format.typeScale.bodySize}
+              min={9}
+              max={12}
+              step={0.5}
+              disabled={readOnly}
+              onChange={(bodySize) =>
+                set({ ...format, typeScale: { ...format.typeScale, bodySize } })
+              }
+            />
+          </FieldRow>
 
-        <FieldRow label="Line height" htmlFor="design-line-height">
-          <NumberStepper
-            id="design-line-height"
-            value={format.spacing.lineHeight}
-            min={1.15}
-            max={1.5}
-            step={0.05}
-            disabled={readOnly}
-            onChange={(lineHeight) =>
-              set({ ...format, spacing: { ...format.spacing, lineHeight } })
-            }
-          />
-        </FieldRow>
+          <FieldRow label="Line height" htmlFor="design-line-height">
+            <NumberStepper
+              id="design-line-height"
+              value={format.spacing.lineHeight}
+              min={1.15}
+              max={1.5}
+              step={0.05}
+              disabled={readOnly}
+              onChange={(lineHeight) =>
+                set({ ...format, spacing: { ...format.spacing, lineHeight } })
+              }
+            />
+          </FieldRow>
 
-        <FieldRow label="Heading weight" htmlFor="design-heading-weight">
-          <Select
-            value={format.header.nameWeight}
-            disabled={readOnly}
-            onValueChange={(next) =>
-              set({
-                ...format,
-                // A bulk convenience control, pre-dating titleWeight's own
-                // independence (E9-F3c): moving this ALSO moves titleWeight
-                // in lockstep, matching this control's pre-ticket behavior
-                // (and this whole app's existing settings round-trip test) —
-                // header.titleWeight has its OWN, independent control in the
-                // Header group below for anyone who wants to set it apart
-                // from the name.
-                header: {
-                  ...format.header,
-                  nameWeight: next as "normal" | "bold",
-                  titleWeight: next as "normal" | "bold",
-                },
-              })
-            }
+          <FieldRow label="Heading weight" htmlFor="design-heading-weight">
+            <Select
+              value={format.header.nameWeight}
+              disabled={readOnly}
+              onValueChange={(next) =>
+                set({
+                  ...format,
+                  // A bulk convenience control, pre-dating titleWeight's own
+                  // independence (E9-F3c): moving this ALSO moves titleWeight
+                  // in lockstep, matching this control's pre-ticket behavior
+                  // (and this whole app's existing settings round-trip test) —
+                  // header.titleWeight has its OWN, independent control in the
+                  // Header group below for anyone who wants to set it apart
+                  // from the name.
+                  header: {
+                    ...format.header,
+                    nameWeight: next as "normal" | "bold",
+                    titleWeight: next as "normal" | "bold",
+                  },
+                })
+              }
+            >
+              <SelectTrigger id="design-heading-weight" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {NAME_WEIGHT_OPTIONS.map((weight) => (
+                  <SelectItem key={weight} value={weight}>
+                    {weight === "bold" ? "Bold" : "Normal"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FieldRow>
+
+          <FieldRow label="Name size offset (pt over body)" htmlFor="design-name-offset">
+            <NumberStepper
+              id="design-name-offset"
+              value={format.typeScale.nameOffset}
+              min={4}
+              max={12}
+              step={1}
+              disabled={readOnly}
+              onChange={(nameOffset) =>
+                set({ ...format, typeScale: { ...format.typeScale, nameOffset } })
+              }
+            />
+          </FieldRow>
+
+          <FieldRow label="Title size offset (pt over body)" htmlFor="design-title-offset">
+            <NumberStepper
+              id="design-title-offset"
+              value={format.typeScale.titleOffset}
+              min={0}
+              max={4}
+              step={1}
+              disabled={readOnly}
+              onChange={(titleOffset) =>
+                set({ ...format, typeScale: { ...format.typeScale, titleOffset } })
+              }
+            />
+          </FieldRow>
+
+          <FieldRow
+            label="Section heading size offset (pt over body)"
+            htmlFor="design-section-heading-offset"
           >
-            <SelectTrigger id="design-heading-weight" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {NAME_WEIGHT_OPTIONS.map((weight) => (
-                <SelectItem key={weight} value={weight}>
-                  {weight === "bold" ? "Bold" : "Normal"}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </FieldRow>
+            <NumberStepper
+              id="design-section-heading-offset"
+              value={format.typeScale.sectionHeadingOffset}
+              min={0}
+              max={3}
+              step={1}
+              disabled={readOnly}
+              onChange={(sectionHeadingOffset) =>
+                set({ ...format, typeScale: { ...format.typeScale, sectionHeadingOffset } })
+              }
+            />
+          </FieldRow>
 
-        <FieldRow label="Name size offset (pt over body)" htmlFor="design-name-offset">
-          <NumberStepper
-            id="design-name-offset"
-            value={format.typeScale.nameOffset}
-            min={4}
-            max={12}
-            step={1}
-            disabled={readOnly}
-            onChange={(nameOffset) =>
-              set({ ...format, typeScale: { ...format.typeScale, nameOffset } })
-            }
-          />
-        </FieldRow>
-
-        <FieldRow label="Title size offset (pt over body)" htmlFor="design-title-offset">
-          <NumberStepper
-            id="design-title-offset"
-            value={format.typeScale.titleOffset}
-            min={0}
-            max={4}
-            step={1}
-            disabled={readOnly}
-            onChange={(titleOffset) =>
-              set({ ...format, typeScale: { ...format.typeScale, titleOffset } })
-            }
-          />
-        </FieldRow>
-
-        <FieldRow
-          label="Section heading size offset (pt over body)"
-          htmlFor="design-section-heading-offset"
-        >
-          <NumberStepper
-            id="design-section-heading-offset"
-            value={format.typeScale.sectionHeadingOffset}
-            min={0}
-            max={3}
-            step={1}
-            disabled={readOnly}
-            onChange={(sectionHeadingOffset) =>
-              set({ ...format, typeScale: { ...format.typeScale, sectionHeadingOffset } })
-            }
-          />
-        </FieldRow>
-
-        <FieldRow
-          label="Entry header size offset (pt over body)"
-          htmlFor="design-entry-header-offset"
-        >
-          <NumberStepper
-            id="design-entry-header-offset"
-            value={format.typeScale.entryHeaderOffset}
-            min={0}
-            max={2}
-            step={1}
-            disabled={readOnly}
-            onChange={(entryHeaderOffset) =>
-              set({ ...format, typeScale: { ...format.typeScale, entryHeaderOffset } })
-            }
-          />
-        </FieldRow>
-      </div>
+          <FieldRow
+            label="Entry header size offset (pt over body)"
+            htmlFor="design-entry-header-offset"
+          >
+            <NumberStepper
+              id="design-entry-header-offset"
+              value={format.typeScale.entryHeaderOffset}
+              min={0}
+              max={2}
+              step={1}
+              disabled={readOnly}
+              onChange={(entryHeaderOffset) =>
+                set({ ...format, typeScale: { ...format.typeScale, entryHeaderOffset } })
+              }
+            />
+          </FieldRow>
+        </div>
+      </CollapsibleGroup>
 
       {/* ── header — header.{detailsArrangement,separator,contactIconStyle,
           titlePosition,titleWeight} (§31.2, E9-F3c, sections.tsx's
           ProfileHeader). "Title weight" here is its own control, separate
           from "Heading weight" above (which still moves nameWeight and
           titleWeight together) — see that control's own comment. ── */}
-      <div className="flex flex-col gap-3">
-        <p className="text-sm font-medium">Header</p>
+      <CollapsibleGroup groupKey="header" label="Header">
         <div className="grid gap-4 sm:grid-cols-2">
           <FieldRow label="Contact details arrangement" htmlFor="design-header-details-arrangement">
             <EnumSelect
@@ -721,13 +809,12 @@ export function DesignPanel({
             </Select>
           </FieldRow>
         </div>
-      </div>
+      </CollapsibleGroup>
 
       {/* ── links — links.{underline,accentColor,icon} (§31.2, E9-F3c,
           sections.tsx's profile-link rendering: textDecoration,
           colors.primary-vs-text, and a small glyph View per link). ── */}
-      <div className="flex flex-col gap-3">
-        <p className="text-sm font-medium">Links</p>
+      <CollapsibleGroup groupKey="links" label="Links">
         <div className="flex flex-wrap gap-4">
           <div className="flex items-center gap-2">
             <input
@@ -771,15 +858,14 @@ export function DesignPanel({
             <Label htmlFor="design-links-icon">Show a link icon</Label>
           </div>
         </div>
-      </div>
+      </CollapsibleGroup>
 
       {/* ── section headings — headings.{style,capitalization,icons} (§31.2,
           sections.tsx's renderSectionHeading). Distinct from "Heading
           weight" above, which binds header.nameWeight/titleWeight (the
           PROFILE header's name/title) — this group never touches that
           axis. ── */}
-      <div className="flex flex-col gap-3">
-        <p className="text-sm font-medium">Section headings</p>
+      <CollapsibleGroup groupKey="sectionHeadings" label="Section headings">
         <div className="grid gap-4 sm:grid-cols-2">
           <FieldRow label="Heading treatment" htmlFor="design-heading-style">
             <Select
@@ -850,14 +936,13 @@ export function DesignPanel({
             </Select>
           </FieldRow>
         </div>
-      </div>
+      </CollapsibleGroup>
 
       {/* ── dates — document.dateFormat (§31.2, E9-F2d). A group's own
           date (assemble()'s structured headingParts, sections.tsx's
           resolveGroupHeadingText) re-renders through this preset; a group
           with no structured date falls back to its raw heading string. ── */}
-      <div className="flex flex-col gap-3">
-        <p className="text-sm font-medium">Dates</p>
+      <CollapsibleGroup groupKey="dates" label="Dates">
         <FieldRow label="Date format" htmlFor="design-date-format">
           <Select
             value={format.document.dateFormat}
@@ -881,14 +966,13 @@ export function DesignPanel({
             </SelectContent>
           </Select>
         </FieldRow>
-      </div>
+      </CollapsibleGroup>
 
       {/* ── entries — entries.* (§31.2, E9-F2e). The per-ENTRY internal
           header layout (title/subtitle/date/location + item list), distinct
           from the Layout group below (page-level columns/section
           placement) — see legacyAdapt.ts's EntriesRenderConfig comment. ── */}
-      <div className="flex flex-col gap-3">
-        <p className="text-sm font-medium">Entries</p>
+      <CollapsibleGroup groupKey="entries" label="Entries">
         <div className="grid gap-4 sm:grid-cols-2">
           <FieldRow label="Entry structure" htmlFor="design-entries-structure">
             <EnumSelect
@@ -1003,184 +1087,187 @@ export function DesignPanel({
           />
           <Label htmlFor="design-entries-body-indent">Indent bullet body text</Label>
         </div>
-      </div>
+      </CollapsibleGroup>
 
-      {/* ── color ── */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FieldRow label="Color area" htmlFor="design-color-area">
-          <EnumSelect
-            id="design-color-area"
-            value={format.colors.area}
-            options={COLOR_AREA_OPTIONS}
-            disabled={readOnly}
-            onChange={(area) => set({ ...format, colors: { ...format.colors, area } })}
-          />
-        </FieldRow>
+      <CollapsibleGroup groupKey="color" label="Color">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FieldRow label="Color area" htmlFor="design-color-area">
+            <EnumSelect
+              id="design-color-area"
+              value={format.colors.area}
+              options={COLOR_AREA_OPTIONS}
+              disabled={readOnly}
+              onChange={(area) => set({ ...format, colors: { ...format.colors, area } })}
+            />
+          </FieldRow>
 
-        <FieldRow label="Color mode" htmlFor="design-color-mode">
-          <EnumSelect
-            id="design-color-mode"
-            value={format.colors.mode}
-            options={COLOR_MODE_OPTIONS}
-            disabled={readOnly}
-            onChange={(mode) => set({ ...format, colors: { ...format.colors, mode } })}
-          />
-        </FieldRow>
+          <FieldRow label="Color mode" htmlFor="design-color-mode">
+            <EnumSelect
+              id="design-color-mode"
+              value={format.colors.mode}
+              options={COLOR_MODE_OPTIONS}
+              disabled={readOnly}
+              onChange={(mode) => set({ ...format, colors: { ...format.colors, mode } })}
+            />
+          </FieldRow>
 
-        <FieldRow label="Primary color" htmlFor="design-color-primary">
-          <ColorField
-            id="design-color-primary"
-            value={format.colors.accent}
-            disabled={readOnly}
-            onChange={(accent) => set({ ...format, colors: { ...format.colors, accent } })}
-          />
-        </FieldRow>
+          <FieldRow label="Primary color" htmlFor="design-color-primary">
+            <ColorField
+              id="design-color-primary"
+              value={format.colors.accent}
+              disabled={readOnly}
+              onChange={(accent) => set({ ...format, colors: { ...format.colors, accent } })}
+            />
+          </FieldRow>
 
-        <FieldRow label="Text color" htmlFor="design-color-text">
-          <ColorField
-            id="design-color-text"
-            value={format.colors.text}
-            disabled={readOnly}
-            onChange={(text) => set({ ...format, colors: { ...format.colors, text } })}
-          />
-        </FieldRow>
+          <FieldRow label="Text color" htmlFor="design-color-text">
+            <ColorField
+              id="design-color-text"
+              value={format.colors.text}
+              disabled={readOnly}
+              onChange={(text) => set({ ...format, colors: { ...format.colors, text } })}
+            />
+          </FieldRow>
 
-        <FieldRow label="Background color" htmlFor="design-color-background">
-          <ColorField
-            id="design-color-background"
-            value={format.colors.background}
-            disabled={readOnly}
-            onChange={(background) => set({ ...format, colors: { ...format.colors, background } })}
-          />
-        </FieldRow>
+          <FieldRow label="Background color" htmlFor="design-color-background">
+            <ColorField
+              id="design-color-background"
+              value={format.colors.background}
+              disabled={readOnly}
+              onChange={(background) =>
+                set({ ...format, colors: { ...format.colors, background } })
+              }
+            />
+          </FieldRow>
 
-        <FieldRow label="Border size" htmlFor="design-border-size">
-          <EnumSelect
-            id="design-border-size"
-            value={format.colors.border.size}
-            options={BORDER_SIZE_OPTIONS}
-            disabled={readOnly}
-            onChange={(size) =>
-              set({
-                ...format,
-                colors: { ...format.colors, border: { ...format.colors.border, size } },
-              })
-            }
-          />
-        </FieldRow>
+          <FieldRow label="Border size" htmlFor="design-border-size">
+            <EnumSelect
+              id="design-border-size"
+              value={format.colors.border.size}
+              options={BORDER_SIZE_OPTIONS}
+              disabled={readOnly}
+              onChange={(size) =>
+                set({
+                  ...format,
+                  colors: { ...format.colors, border: { ...format.colors.border, size } },
+                })
+              }
+            />
+          </FieldRow>
 
-        <FieldRow label="Border sides" htmlFor="design-border-side-top">
-          <div className="flex flex-wrap gap-3">
-            {BORDER_SIDES.map(({ key, label }) => (
-              <div key={key} className="flex items-center gap-2">
-                <input
-                  id={`design-border-side-${key}`}
-                  type="checkbox"
-                  checked={format.colors.border.sides[key]}
-                  disabled={readOnly}
-                  onChange={(e) =>
-                    set({
-                      ...format,
-                      colors: {
-                        ...format.colors,
-                        border: {
-                          ...format.colors.border,
-                          sides: { ...format.colors.border.sides, [key]: e.target.checked },
+          <FieldRow label="Border sides" htmlFor="design-border-side-top">
+            <div className="flex flex-wrap gap-3">
+              {BORDER_SIDES.map(({ key, label }) => (
+                <div key={key} className="flex items-center gap-2">
+                  <input
+                    id={`design-border-side-${key}`}
+                    type="checkbox"
+                    checked={format.colors.border.sides[key]}
+                    disabled={readOnly}
+                    onChange={(e) =>
+                      set({
+                        ...format,
+                        colors: {
+                          ...format.colors,
+                          border: {
+                            ...format.colors.border,
+                            sides: { ...format.colors.border.sides, [key]: e.target.checked },
+                          },
                         },
-                      },
-                    })
-                  }
-                  className="h-4 w-4 rounded border-border"
-                />
-                <Label htmlFor={`design-border-side-${key}`}>{label}</Label>
-              </div>
-            ))}
-          </div>
-        </FieldRow>
+                      })
+                    }
+                    className="h-4 w-4 rounded border-border"
+                  />
+                  <Label htmlFor={`design-border-side-${key}`}>{label}</Label>
+                </div>
+              ))}
+            </div>
+          </FieldRow>
 
-        <FieldRow label="Accent placement" htmlFor="design-accent-placement-name">
-          <div className="flex flex-wrap gap-3">
-            {ACCENT_PLACEMENT_FIELDS.map(({ key, label }) => (
-              <div key={key} className="flex items-center gap-2">
-                <input
-                  id={`design-accent-placement-${key}`}
-                  type="checkbox"
-                  checked={format.colors.accentPlacement[key]}
-                  disabled={readOnly}
-                  onChange={(e) =>
-                    set({
-                      ...format,
-                      colors: {
-                        ...format.colors,
-                        accentPlacement: {
-                          ...format.colors.accentPlacement,
-                          [key]: e.target.checked,
+          <FieldRow label="Accent placement" htmlFor="design-accent-placement-name">
+            <div className="flex flex-wrap gap-3">
+              {ACCENT_PLACEMENT_FIELDS.map(({ key, label }) => (
+                <div key={key} className="flex items-center gap-2">
+                  <input
+                    id={`design-accent-placement-${key}`}
+                    type="checkbox"
+                    checked={format.colors.accentPlacement[key]}
+                    disabled={readOnly}
+                    onChange={(e) =>
+                      set({
+                        ...format,
+                        colors: {
+                          ...format.colors,
+                          accentPlacement: {
+                            ...format.colors.accentPlacement,
+                            [key]: e.target.checked,
+                          },
                         },
-                      },
-                    })
-                  }
-                  className="h-4 w-4 rounded border-border"
-                />
-                <Label htmlFor={`design-accent-placement-${key}`}>{label}</Label>
-              </div>
-            ))}
-          </div>
-        </FieldRow>
-      </div>
+                      })
+                    }
+                    className="h-4 w-4 rounded border-border"
+                  />
+                  <Label htmlFor={`design-accent-placement-${key}`}>{label}</Label>
+                </div>
+              ))}
+            </div>
+          </FieldRow>
+        </div>
+      </CollapsibleGroup>
 
-      {/* ── page ── */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <FieldRow label="Side margin (mm)" htmlFor="design-margin-x">
-          <NumberStepper
-            id="design-margin-x"
-            value={format.spacing.marginsMm.x}
-            min={10}
-            max={28}
-            step={1}
-            disabled={readOnly}
-            onChange={(x) =>
-              set({
-                ...format,
-                spacing: { ...format.spacing, marginsMm: { ...format.spacing.marginsMm, x } },
-              })
-            }
-          />
-        </FieldRow>
+      <CollapsibleGroup groupKey="page" label="Page">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <FieldRow label="Side margin (mm)" htmlFor="design-margin-x">
+            <NumberStepper
+              id="design-margin-x"
+              value={format.spacing.marginsMm.x}
+              min={10}
+              max={28}
+              step={1}
+              disabled={readOnly}
+              onChange={(x) =>
+                set({
+                  ...format,
+                  spacing: { ...format.spacing, marginsMm: { ...format.spacing.marginsMm, x } },
+                })
+              }
+            />
+          </FieldRow>
 
-        <FieldRow label="Top/bottom margin (mm)" htmlFor="design-margin-y">
-          <NumberStepper
-            id="design-margin-y"
-            value={format.spacing.marginsMm.y}
-            min={10}
-            max={28}
-            step={1}
-            disabled={readOnly}
-            onChange={(y) =>
-              set({
-                ...format,
-                spacing: { ...format.spacing, marginsMm: { ...format.spacing.marginsMm, y } },
-              })
-            }
-          />
-        </FieldRow>
+          <FieldRow label="Top/bottom margin (mm)" htmlFor="design-margin-y">
+            <NumberStepper
+              id="design-margin-y"
+              value={format.spacing.marginsMm.y}
+              min={10}
+              max={28}
+              step={1}
+              disabled={readOnly}
+              onChange={(y) =>
+                set({
+                  ...format,
+                  spacing: { ...format.spacing, marginsMm: { ...format.spacing.marginsMm, y } },
+                })
+              }
+            />
+          </FieldRow>
 
-        <FieldRow label="Element spacing" htmlFor="design-element-spacing">
-          <NumberStepper
-            id="design-element-spacing"
-            value={format.spacing.elementSpacing}
-            min={0}
-            max={4}
-            step={1}
-            disabled={readOnly}
-            onChange={(elementSpacing) =>
-              set({ ...format, spacing: { ...format.spacing, elementSpacing } })
-            }
-          />
-        </FieldRow>
-      </div>
+          <FieldRow label="Element spacing" htmlFor="design-element-spacing">
+            <NumberStepper
+              id="design-element-spacing"
+              value={format.spacing.elementSpacing}
+              min={0}
+              max={4}
+              step={1}
+              disabled={readOnly}
+              onChange={(elementSpacing) =>
+                set({ ...format, spacing: { ...format.spacing, elementSpacing } })
+              }
+            />
+          </FieldRow>
+        </div>
+      </CollapsibleGroup>
 
-      {/* ── photo ── */}
-      <div className="flex flex-col gap-2">
+      <CollapsibleGroup groupKey="photo" label="Photo">
         <div className="flex items-center gap-2">
           <input
             id="design-photo-shown"
@@ -1281,15 +1368,14 @@ export function DesignPanel({
             </div>
           </>
         ) : null}
-      </div>
+      </CollapsibleGroup>
 
       {/* ── layout — layout.columns/headerPosition/sidebarWidthPct/sectionPlacement
           (§31.2, engine already renders these axes per E9-F0c). sectionPlacement
           here is the per-document FORMAT axis, distinct from the global
           settings.layout section-order/visibility store edited by
           LayoutEditor.tsx — this group never touches that store. ── */}
-      <div className="flex flex-col gap-3">
-        <p className="text-sm font-medium">Layout</p>
+      <CollapsibleGroup groupKey="layout" label="Layout">
         <div className="grid gap-4 sm:grid-cols-2">
           <FieldRow label="Columns" htmlFor="design-layout-columns">
             <Select
@@ -1433,7 +1519,7 @@ export function DesignPanel({
             })}
           </div>
         </div>
-      </div>
+      </CollapsibleGroup>
 
       {/* ── footer — footer.{pageNumbers,email,name,customText} (§31.2,
           E9-F3e). Fixed chrome (engine/document.tsx's renderFooter): it never
@@ -1442,8 +1528,7 @@ export function DesignPanel({
           formatV2Schema parses (@shared/format-v2) client-side too — a
           newline is stripped rather than rejected, since a single-line text
           input can't produce one on its own except via paste. ── */}
-      <div className="flex flex-col gap-3">
-        <p className="text-sm font-medium">Footer</p>
+      <CollapsibleGroup groupKey="footer" label="Footer">
         <div className="flex flex-wrap gap-4">
           <div className="flex items-center gap-2">
             <input
@@ -1502,7 +1587,7 @@ export function DesignPanel({
             }
           />
         </FieldRow>
-      </div>
+      </CollapsibleGroup>
 
       {/* ── sections — sectionDisplay.* (§31.2's per-section display group,
           §31.4's level labels; E9-F4d). One consolidated group for every
@@ -1510,14 +1595,16 @@ export function DesignPanel({
           section groups are FlowCV-gated on content there; this panel is
           handed only `format` (no resume), and no content-aware gating
           exists elsewhere in it to extend, so every axis shows
-          unconditionally — the documented fallback (§31.2b). ── */}
+          unconditionally — the documented fallback (§31.2b). Sections
+          itself is a plain (non-collapsible) label grouping five
+          independently collapsible subgroups below, not its own toggle. ── */}
       <div className="flex flex-col gap-4">
         <p className="text-sm font-medium">Sections</p>
 
-        <div className="flex flex-col gap-3">
-          <p className="text-sm font-medium">
-            {`${SECTIONS.skill.label} & ${SECTIONS.language.label}`}
-          </p>
+        <CollapsibleGroup
+          groupKey="sectionsSkillsLanguages"
+          label={`${SECTIONS.skill.label} & ${SECTIONS.language.label}`}
+        >
           <div className="grid gap-3 sm:grid-cols-2">
             <FieldRow
               label={`${SECTIONS.skill.label} & ${SECTIONS.language.label} columns`}
@@ -1619,10 +1706,9 @@ export function DesignPanel({
               })}
             </div>
           </div>
-        </div>
+        </CollapsibleGroup>
 
-        <div className="flex flex-col gap-3">
-          <p className="text-sm font-medium">{SECTIONS.interest.label}</p>
+        <CollapsibleGroup groupKey="sectionsInterests" label={SECTIONS.interest.label}>
           <div className="grid gap-3 sm:grid-cols-2">
             <FieldRow
               label={`${SECTIONS.interest.label} columns`}
@@ -1662,10 +1748,9 @@ export function DesignPanel({
               />
             </FieldRow>
           </div>
-        </div>
+        </CollapsibleGroup>
 
-        <div className="flex flex-col gap-3">
-          <p className="text-sm font-medium">{SECTIONS.experience.label}</p>
+        <CollapsibleGroup groupKey="sectionsExperience" label={SECTIONS.experience.label}>
           <div className="grid gap-3 sm:grid-cols-2">
             <FieldRow label="Experience order" htmlFor="design-section-experience-order">
               <EnumSelect
@@ -1708,10 +1793,9 @@ export function DesignPanel({
             />
             <Label htmlFor="design-section-experience-group-promotions">Group promotions</Label>
           </div>
-        </div>
+        </CollapsibleGroup>
 
-        <div className="flex flex-col gap-3">
-          <p className="text-sm font-medium">Summary</p>
+        <CollapsibleGroup groupKey="sectionsSummary" label="Summary">
           <div className="flex flex-wrap gap-4">
             <div className="flex items-center gap-2">
               <input
@@ -1758,10 +1842,9 @@ export function DesignPanel({
               <Label htmlFor="design-section-summary-show-heading">Show summary heading</Label>
             </div>
           </div>
-        </div>
+        </CollapsibleGroup>
 
-        <div className="flex flex-col gap-3">
-          <p className="text-sm font-medium">{SECTIONS.education.label}</p>
+        <CollapsibleGroup groupKey="sectionsEducation" label={SECTIONS.education.label}>
           <div className="grid gap-3 sm:grid-cols-2">
             <FieldRow label="Education order" htmlFor="design-section-education-order">
               <EnumSelect
@@ -1781,7 +1864,7 @@ export function DesignPanel({
               />
             </FieldRow>
           </div>
-        </div>
+        </CollapsibleGroup>
       </div>
     </div>
   );
