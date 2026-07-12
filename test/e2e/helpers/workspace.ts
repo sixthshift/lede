@@ -424,10 +424,17 @@ export async function submitAndClose(dialog: Locator, buttonName: string): Promi
   await expect(dialog).toBeHidden();
 }
 
+// F502/T051: editing is a per-row EntryCard control now — no more
+// "Choose entry to edit" combobox + "Edit selected" pair. Callers still pass
+// the old `"<Section label>: <fact>"` shape (e.g. "Experience: rules engine
+// …") because that's what uniquely identified an entry before; this strips
+// the section-label prefix and uses the remaining fact text to find that
+// row's card (via `cardFor`, the same row-matching this file already uses
+// for delete), then clicks that row's own Edit button — one activation.
 export async function openEditFor(page: Page, optionLabel: string): Promise<Locator> {
-  await page.getByRole("combobox", { name: "Choose entry to edit" }).click();
-  await page.getByRole("option", { name: optionLabel, exact: true }).click();
-  await page.getByRole("button", { name: "Edit selected" }).click();
+  const sep = optionLabel.indexOf(": ");
+  const rowText = sep === -1 ? optionLabel : optionLabel.slice(sep + 2);
+  await cardFor(page, rowText).getByRole("button", { name: "Edit" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   return dialog;

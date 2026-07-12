@@ -23,7 +23,6 @@ import { EntryEditor } from "./EntryEditor";
 import { ProfileEditor } from "./ProfileEditor";
 import { LayoutEditor } from "./LayoutEditor";
 import { Button } from "./ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Skeleton } from "./ui/skeleton";
 import {
   LibraryFilter,
@@ -53,14 +52,13 @@ export function LibraryView() {
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | undefined>(undefined);
-  const [editTargetId, setEditTargetId] = useState<string>("");
   const [profileOpen, setProfileOpen] = useState(false);
   const [layoutOpen, setLayoutOpen] = useState(false);
 
-  // Whichever control (Add entry / Edit selected) most recently opened
-  // EntryEditor — a non-modal panel with no owned trigger of its own (see
-  // EntryEditor.tsx). Captured at click time so EntryEditor can focus it back
-  // on close, regardless of which of the two buttons invoked it.
+  // Whichever control (Add entry / a row's own Edit button) most recently
+  // opened EntryEditor — a non-modal panel with no owned trigger of its own
+  // (see EntryEditor.tsx). Captured at click time so EntryEditor can focus it
+  // back on close, regardless of which control invoked it.
   const editorTriggerRef = useRef<HTMLElement | null>(null);
   // Same contract for LayoutEditor's single "Edit layout" trigger (v3-T022).
   const layoutTriggerRef = useRef<HTMLElement | null>(null);
@@ -156,43 +154,15 @@ export function LibraryView() {
         </Button>
       </div>
 
-      {/* Filter on the left; picking an existing entry to edit on the right
-          (EntryCard itself only deletes) — E1-F2/E6-C1. */}
+      {/* Filter only — editing each entry happens at its row (EntryCard's
+          own Edit button) rather than through a separate picker — F502/T051. */}
       {entries && entries.length > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <LibraryFilter
-            entries={entries}
-            filter={filter}
-            onFilterChange={setFilter}
-            resultCount={filteredEntries.length}
-          />
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Select value={editTargetId} onValueChange={setEditTargetId}>
-              <SelectTrigger aria-label="Choose entry to edit" className="w-64">
-                <SelectValue placeholder="Select an entry to edit…" />
-              </SelectTrigger>
-              <SelectContent>
-                {entries.map((entry) => (
-                  <SelectItem key={entry.id} value={entry.id}>
-                    {SECTIONS[entry.section].label}: {entry.facts[0] ?? entry.id}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!editTargetId}
-              onClick={() => {
-                const target = entries.find((e) => e.id === editTargetId);
-                if (target) openEdit(target);
-              }}
-            >
-              Edit selected
-            </Button>
-          </div>
-        </div>
+        <LibraryFilter
+          entries={entries}
+          filter={filter}
+          onFilterChange={setFilter}
+          resultCount={filteredEntries.length}
+        />
       ) : null}
 
       {isLoading ? <Skeleton className="h-48 rounded-xl" /> : null}
@@ -209,6 +179,7 @@ export function LibraryView() {
               section={section}
               entries={bySection.get(section) ?? []}
               onDelete={(id) => deleteEntry.mutate(id)}
+              onEdit={openEdit}
             />
           </div>
         ))}

@@ -118,7 +118,7 @@ test.describe("de-modal EntryEditor (v3-T021)", () => {
     await expect(trigger).toBeFocused();
   });
 
-  test("Edit selected panel: non-modal, focus opens into the panel, Escape returns focus to the trigger", async ({
+  test("Edit entry panel (per-row): non-modal, focus opens into the panel, Escape returns focus to the trigger", async ({
     page,
   }) => {
     const created = `E2E modality fact ${runId}`;
@@ -130,9 +130,9 @@ test.describe("de-modal EntryEditor (v3-T021)", () => {
     await createDialog.getByLabel("Facts 1", { exact: true }).fill(created);
     await submitAndClose(createDialog, "Create entry");
 
-    await page.getByRole("combobox", { name: "Choose entry to edit" }).click();
-    await page.getByRole("option", { name: `Experience: ${created}`, exact: true }).click();
-    const trigger = page.getByRole("button", { name: "Edit selected" });
+    // F502/T051: editing is that row's own Edit button — one activation,
+    // no combobox + "Edit selected" pair.
+    const trigger = cardFor(page, created).getByRole("button", { name: "Edit" });
     await trigger.click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -541,5 +541,84 @@ test.describe("F106: two-step armed delete (T016)", () => {
     await cardB.getByRole("button", { name: "Delete" }).click();
     await cardB.getByRole("button", { name: "Confirm delete" }).click();
     await expect(page.getByText(factB, { exact: true })).toHaveCount(0);
+  });
+});
+
+// ── F502/F509 (T051): per-row Edit + identity line replace the
+// "Choose entry to edit" combobox + "Edit selected" pair — editing any row
+// is now that row's own one-click Edit button (EntryCard.tsx), fed by
+// LibraryView's openEdit exactly as the old dropdown was; each row also
+// gains a "Company · Role · Period" (or section-equivalent) identity line
+// (F509) that wasn't shown before.
+test.describe("F502/F509: per-row Edit + identity line (T051)", () => {
+  test("the 'Choose entry to edit' combobox and 'Edit selected' button are gone from the DOM", async ({
+    page,
+  }) => {
+    await expect(page.getByRole("combobox", { name: "Choose entry to edit" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Edit selected" })).toHaveCount(0);
+  });
+
+  test("per-row Edit opens THAT row's entry in one activation — contrast: two different rows load different data", async ({
+    page,
+  }) => {
+    const factA = `F502 row-a fact ${runId}`;
+    const factB = `F502 row-b fact ${runId}`;
+
+    const dialogA = await openAddEntry(page);
+    await dialogA.getByLabel(/^Company/).fill("F502 Row A Co");
+    await dialogA.getByLabel(/^Role/).fill("Row A Role");
+    await dialogA.getByLabel(/^Period/).fill("2018-2019");
+    await dialogA.getByLabel("Facts 1", { exact: true }).fill(factA);
+    await submitAndClose(dialogA, "Create entry");
+
+    const dialogB = await openAddEntry(page);
+    await dialogB.getByLabel(/^Company/).fill("F502 Row B Co");
+    await dialogB.getByLabel(/^Role/).fill("Row B Role");
+    await dialogB.getByLabel(/^Period/).fill("2020-2021");
+    await dialogB.getByLabel("Facts 1", { exact: true }).fill(factB);
+    await submitAndClose(dialogB, "Create entry");
+
+    // Row A, one click — its own data.
+    await cardFor(page, factA).getByRole("button", { name: "Edit" }).click();
+    const editA = page.getByRole("dialog");
+    await expect(editA).toBeVisible();
+    await expect(editA.getByLabel(/^Company/)).toHaveValue("F502 Row A Co");
+    await expect(editA.getByLabel(/^Role/)).toHaveValue("Row A Role");
+    await page.keyboard.press("Escape");
+    await expect(editA).toBeHidden();
+
+    // Row B, one click — a genuinely different row's data (the contrast).
+    await cardFor(page, factB).getByRole("button", { name: "Edit" }).click();
+    const editB = page.getByRole("dialog");
+    await expect(editB).toBeVisible();
+    await expect(editB.getByLabel(/^Company/)).toHaveValue("F502 Row B Co");
+    await expect(editB.getByLabel(/^Role/)).toHaveValue("Row B Role");
+    await page.keyboard.press("Escape");
+    await expect(editB).toBeHidden();
+
+    // Cleanup both scratch entries.
+    for (const fact of [factA, factB]) {
+      await cardFor(page, fact).getByRole("button", { name: "Delete" }).click();
+      await cardFor(page, fact).getByRole("button", { name: "Confirm delete" }).click();
+      await expect(page.getByText(fact, { exact: true })).toHaveCount(0);
+    }
+  });
+
+  test("each row renders an identity line built from its company/role/period", async ({ page }) => {
+    const fact = `F509 identity fact ${runId}`;
+    const dialog = await openAddEntry(page);
+    await dialog.getByLabel(/^Company/).fill("F509 Identity Co");
+    await dialog.getByLabel(/^Role/).fill("Identity Role");
+    await dialog.getByLabel(/^Period/).fill("2022-2023");
+    await dialog.getByLabel("Facts 1", { exact: true }).fill(fact);
+    await submitAndClose(dialog, "Create entry");
+
+    const identity = cardFor(page, fact).getByTestId("entry-identity");
+    await expect(identity).toHaveText("F509 Identity Co · Identity Role · 2022-2023");
+
+    // Cleanup.
+    await cardFor(page, fact).getByRole("button", { name: "Delete" }).click();
+    await cardFor(page, fact).getByRole("button", { name: "Confirm delete" }).click();
+    await expect(page.getByText(fact, { exact: true })).toHaveCount(0);
   });
 });

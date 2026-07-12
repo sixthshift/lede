@@ -1,8 +1,14 @@
 // Library actions — spec.md §13. Import and Export are wired to the
 // full-instance backup endpoints (§27); adding entries lives in LibraryView.
+//
+// F502/T051: outline buttons (matching Edit profile/Edit layout's weight in
+// LibraryView's toolbar row) rather than ghost — import/export are
+// infrequent, deliberate actions and shouldn't read as lower-weight than the
+// per-row Edit/Delete controls they sit above.
 
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { Download, Upload } from "lucide-react";
 import { exportAll, importAll } from "../api";
 import { Button } from "./ui/button";
 
@@ -54,13 +60,9 @@ export function LibraryToolbar() {
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex gap-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground"
-          onClick={() => fileInputRef.current?.click()}
-        >
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+          <Upload className="h-3.5 w-3.5" />
           Import
         </Button>
         <input
@@ -70,7 +72,8 @@ export function LibraryToolbar() {
           className="hidden"
           onChange={handleFileSelected}
         />
-        <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={handleExport}>
+        <Button variant="outline" size="sm" onClick={handleExport}>
+          <Download className="h-3.5 w-3.5" />
           Export
         </Button>
       </div>

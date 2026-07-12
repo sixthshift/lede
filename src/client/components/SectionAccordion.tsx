@@ -10,10 +10,12 @@ export function SectionAccordion({
   section,
   entries,
   onDelete,
+  onEdit,
 }: {
   section: Section;
   entries: Entry[];
   onDelete: (id: string) => void;
+  onEdit: (entry: Entry) => void;
 }) {
   return (
     <Card data-section={section}>
@@ -25,7 +27,12 @@ export function SectionAccordion({
       </CardHeader>
       <CardContent className="divide-y divide-border/60">
         {entries.map((entry) => (
-          <EntryCard key={entry.id} entry={entry} onDelete={() => onDelete(entry.id)} />
+          <EntryCard
+            key={entry.id}
+            entry={entry}
+            onDelete={() => onDelete(entry.id)}
+            onEdit={() => onEdit(entry)}
+          />
         ))}
       </CardContent>
     </Card>
