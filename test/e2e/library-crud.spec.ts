@@ -145,8 +145,10 @@ test.describe("de-modal EntryEditor (v3-T021)", () => {
     await expect(trigger).toBeFocused();
 
     // Scratch entry cleanup — keeps this test's fixture out of any other
-    // test's list assertions.
+    // test's list assertions. Delete is a two-step armed confirm (F106):
+    // first click arms, second confirms.
     await cardFor(page, created).getByRole("button", { name: "Delete" }).click();
+    await cardFor(page, created).getByRole("button", { name: "Confirm delete" }).click();
     await expect(page.getByText(created, { exact: true })).toHaveCount(0);
   });
 });
