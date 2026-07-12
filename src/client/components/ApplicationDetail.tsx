@@ -123,6 +123,37 @@ const WORKSPACE_SECTIONS = [
 ] as const;
 type WorkspaceSectionKey = (typeof WORKSPACE_SECTIONS)[number]["key"];
 
+// T023/F202 — the scroll-spy rule, pinned exactly: active = the LAST section
+// whose top edge has crossed a line 30% down from the CONTAINER's viewport
+// (the editor pane, not the window — it's its own scroll container), except
+// when scrolled to the very bottom, where the final section wins regardless
+// (the short-last-section escape — a trailing section shorter than 30% of
+// the viewport could otherwise never cross the line). A surface with <2
+// sections has nothing to spy on (no vacuous spy) — that's the caller's job
+// (don't render the zone), not this function's.
+function computeActiveSection(
+  container: HTMLElement,
+  sections: readonly { key: WorkspaceSectionKey }[],
+  headingEls: Partial<Record<WorkspaceSectionKey, HTMLDivElement | null>>,
+): WorkspaceSectionKey | null {
+  if (sections.length < 2) return null;
+
+  const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 1;
+  if (atBottom) return sections[sections.length - 1].key;
+
+  const lineY = container.getBoundingClientRect().top + container.clientHeight * 0.3;
+  let active: WorkspaceSectionKey | null = null;
+  for (const section of sections) {
+    const el = headingEls[section.key];
+    if (el && el.getBoundingClientRect().top <= lineY) {
+      active = section.key;
+    }
+  }
+  // Nothing has crossed the line yet (scrolled to the very top) — the first
+  // section is the honest answer, not "none".
+  return active ?? sections[0].key;
+}
+
 // Collapse is editor VIEW-STATE only (§ locked constraints) — persisted to
 // localStorage, scoped per application, and NEVER written to the server:
 // settings.layout/sectionDisplay/format stay untouched by anything in this
@@ -152,28 +183,53 @@ function readCollapsedSections(
 // them. This is a rail/nav landmark, not new document outline content — the
 // label reuses the rail's own company/eyebrow token treatment rather than
 // introducing a new style.
+//
+// F209/T023: collapse lives HERE now, on the editor's own section header —
+// not in the rail row, which used to split "click the label to scroll" from
+// "click the chevron to collapse" with no visual seam between the two
+// (ambiguous, chevron direction only legible after clicking). The rail row
+// is now a single whole-row navigate affordance (see `rail` below); folding
+// content is something you do once you've arrived at a section, from the
+// section itself.
 function EditorSection({
   sectionKey,
   label,
   collapsed,
+  onToggleCollapse,
   headingRef,
   children,
 }: {
   sectionKey: WorkspaceSectionKey;
   label: string;
   collapsed: boolean;
+  onToggleCollapse: () => void;
   headingRef: (el: HTMLDivElement | null) => void;
   children: ReactNode;
 }) {
   return (
     <section data-testid={`workspace-section-${sectionKey}`} className="flex flex-col gap-3">
-      <div
-        ref={headingRef}
-        tabIndex={-1}
-        data-testid={`workspace-section-heading-${sectionKey}`}
-        className="font-mono text-xs uppercase tracking-wider text-muted-foreground outline-none"
-      >
-        {label}
+      <div className="flex items-center gap-1.5">
+        <div
+          ref={headingRef}
+          tabIndex={-1}
+          data-testid={`workspace-section-heading-${sectionKey}`}
+          className="font-mono text-xs uppercase tracking-wider text-muted-foreground outline-none"
+        >
+          {label}
+        </div>
+        <button
+          type="button"
+          aria-expanded={!collapsed}
+          aria-label={`${collapsed ? "Expand" : "Collapse"} ${label}`}
+          data-testid={`section-collapse-${sectionKey}`}
+          onClick={onToggleCollapse}
+          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-[var(--ring-weak)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <ChevronDown
+            aria-hidden
+            className={cn("h-3.5 w-3.5 transition-transform", collapsed && "-rotate-90")}
+          />
+        </button>
       </div>
       {collapsed ? null : (
         <div data-testid={`workspace-section-body-${sectionKey}`} className="flex flex-col gap-6">
@@ -295,10 +351,45 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   >(() => readCollapsedSections(applicationId));
   const headingRefs = useRef<Partial<Record<WorkspaceSectionKey, HTMLDivElement | null>>>({});
 
+  // T023/F202: which section nav item is "current". Null until the scroll
+  // listener below gets its first reading (nothing renders as active for
+  // one frame on mount, rather than guessing).
+  const [activeSection, setActiveSection] = useState<WorkspaceSectionKey | null>(null);
+
   // Reseed collapse state whenever a different application is loaded.
   useEffect(() => {
     setCollapsedSections(readCollapsedSections(applicationId));
   }, [applicationId]);
+
+  // Scroll-spy: the editor pane (`data-testid="editor-pane"`, rendered by
+  // WorkspaceShell) is this route's OWN scroll container — found via the
+  // heading refs rather than threaded down as a prop, since `editor` renders
+  // as that container's direct child whether portaled (real app) or embedded
+  // (component tests) — see WorkspaceShellSlots. Re-attaches whenever the
+  // heading DOM nodes could have moved: a different application's headings
+  // mounting (isLoading flip) or a collapse toggle reflowing the sections
+  // below it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: applicationId/isLoading/collapsedSections aren't read in the body — they're re-attach TRIGGERS for when the heading DOM could have moved (a new application's headings mounting, or a collapse reflowing layout).
+  useEffect(() => {
+    if (WORKSPACE_SECTIONS.length < 2) return;
+    const anyHeading = Object.values(headingRefs.current).find(
+      (el): el is HTMLDivElement => el != null,
+    );
+    const container = anyHeading?.closest<HTMLElement>('[data-testid="editor-pane"]');
+    if (!container) return;
+
+    function update() {
+      if (!container) return;
+      setActiveSection(computeActiveSection(container, WORKSPACE_SECTIONS, headingRefs.current));
+    }
+    update();
+    container.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      container.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [applicationId, isLoading, collapsedSections]);
 
   function setHeadingRef(key: WorkspaceSectionKey, el: HTMLDivElement | null) {
     headingRefs.current[key] = el;
@@ -396,43 +487,45 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
           scopes the nav that follows to "sections of THIS surface", as
           opposed to the global-nav zone above it. v3-T013: one row per
           editor section — order follows the SAME fixed JSX order the editor
-          pane below renders in (no second ordering source). Each row
-          navigates (scrolls/focuses the section's heading, never the URL)
-          and collapses (view-state only, localStorage-persisted, never a
-          server write). */}
-      <div className="flex flex-col gap-2 border-t border-border pt-4">
-        <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">SECTIONS</p>
-        <nav aria-label="Sections" data-testid="rail-nav" className="flex flex-col gap-1">
-          {WORKSPACE_SECTIONS.map((section) => {
-            const collapsed = Boolean(collapsedSections[section.key]);
-            return (
-              <div key={section.key} className="flex items-center gap-1">
+          pane below renders in (no second ordering source). F209/T023: the
+          WHOLE row navigates (scrolls/focuses the section's heading, never
+          the URL) — collapse is no longer a second control here, it moved to
+          the editor's own section header (EditorSection above). F202/T023:
+          exactly one row is "current" — driven by the scroll-spy above, not
+          by which row was last clicked — carrying BOTH `aria-current` and
+          the accent-pill treatment on this same <button>, the same visual
+          language NavTabs uses for the active global-nav item. A surface
+          with fewer than 2 sections has no "current" to track, so the WHOLE
+          zone (kicker + nav) is absent, not merely hidden (no vacuous spy). */}
+      {WORKSPACE_SECTIONS.length >= 2 ? (
+        <div className="flex flex-col gap-2 border-t border-border pt-4">
+          <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+            SECTIONS
+          </p>
+          <nav aria-label="Sections" data-testid="rail-nav" className="flex flex-col gap-1">
+            {WORKSPACE_SECTIONS.map((section) => {
+              const isActive = activeSection === section.key;
+              return (
                 <button
+                  key={section.key}
                   type="button"
                   data-testid={`rail-nav-${section.key}`}
+                  aria-current={isActive ? "true" : undefined}
                   onClick={() => navigateToSection(section.key)}
-                  className="flex-1 truncate rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-[var(--ring-weak)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className={cn(
+                    "truncate rounded-md px-2 py-1.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    isActive
+                      ? "bg-accent font-medium text-primary"
+                      : "text-muted-foreground hover:bg-[var(--ring-weak)] hover:text-foreground",
+                  )}
                 >
                   {section.label}
                 </button>
-                <button
-                  type="button"
-                  aria-expanded={!collapsed}
-                  aria-label={`${collapsed ? "Expand" : "Collapse"} ${section.label}`}
-                  data-testid={`rail-collapse-${section.key}`}
-                  onClick={() => toggleSection(section.key)}
-                  className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-[var(--ring-weak)] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <ChevronDown
-                    aria-hidden
-                    className={cn("h-3.5 w-3.5 transition-transform", collapsed && "-rotate-90")}
-                  />
-                </button>
-              </div>
-            );
-          })}
-        </nav>
-      </div>
+              );
+            })}
+          </nav>
+        </div>
+      ) : null}
     </div>
   );
 
@@ -533,6 +626,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
         sectionKey="job"
         label="Job details"
         collapsed={Boolean(collapsedSections.job)}
+        onToggleCollapse={() => toggleSection("job")}
         headingRef={(el) => setHeadingRef("job", el)}
       >
         <JobPanel application={application} />
@@ -542,6 +636,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
         sectionKey="letter"
         label="Cover letter"
         collapsed={Boolean(collapsedSections.letter)}
+        onToggleCollapse={() => toggleSection("letter")}
         headingRef={(el) => setHeadingRef("letter", el)}
       >
         <Card>
@@ -641,6 +736,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
         sectionKey="design"
         label="Design"
         collapsed={Boolean(collapsedSections.design)}
+        onToggleCollapse={() => toggleSection("design")}
         headingRef={(el) => setHeadingRef("design", el)}
       >
         <Card>

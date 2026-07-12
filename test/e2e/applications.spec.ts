@@ -1464,10 +1464,19 @@ test("rail collapse (v3-T013, protocol E): folding a section is local view-state
   const letterBody = page.getByTestId("workspace-section-body-letter");
   await expect(letterBody).toBeVisible();
 
-  await page.getByTestId("rail-collapse-letter").click();
+  // F209/T023: collapse moved OFF the rail row (now a single whole-row
+  // navigate affordance) ONTO the editor's own section header — this is
+  // that control. The view-state contract this whole test guards is
+  // unchanged: same synchronous setState + localStorage-write handler
+  // (ApplicationDetail's toggleSection), just triggered from a different
+  // element.
+  await page.getByTestId("section-collapse-letter").click();
 
   await expect(letterBody).toBeHidden();
-  await expect(page.getByTestId("rail-collapse-letter")).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByTestId("section-collapse-letter")).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
 
   // The toggle's own handler is synchronous (setState + a localStorage
   // write) — this beat is only to let an ACCIDENTAL fire-and-forget
