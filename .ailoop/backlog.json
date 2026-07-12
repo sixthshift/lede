@@ -680,7 +680,7 @@
     {
       "id": "T054",
       "title": "P4: Preview zoom expand-in-place (≥xl only, ephemeral) + frame on re-render (OQ6) (F507)",
-      "status": "todo",
+      "status": "done",
       "phase": "P4",
       "depends_on": [
         "T040",
@@ -699,7 +699,7 @@
       "context": "See /workspace/SPEC.md F507 + OQ6 + Locked (preview zoom). Add a zoom control that EXPANDS the preview pane in place (editor shrinks but keeps ≥240px width) so the page renders ≥1.5× its normal in-pane width, still SIDE-BY-SIDE — NO overlay, zero modality. Toggling restores prior widths. State is EPHEMERAL — never persisted (not even localStorage); a fresh load is always un-zoomed. Below `xl` the control does NOT render (pane-swap already gives preview full width). Also: re-render must keep the page FRAME (today it drops to bare 'Rendering preview…' text with a layout jump). The rendered DOCUMENT is out of scope — this is preview CHROME only. Shares WorkspaceShell (serialize). Depends on P3.",
       "acceptance": "- e2e at 1280: activating zoom changes the editor pane's REAL layout width (shrinks, staying ≥240px) and the page canvas renders ≥1.5× its prior width via reflow — a `transform:scale` that leaves the editor's layout width unchanged FAILS (verify via `elementFromPoint` over the editor region); ZERO modality appears; toggling restores prior widths.\n- EPHEMERAL: state resets on SPA navigate-away-and-back (not just a hard reload) AND the toggle writes to NO storage key (localStorage/sessionStorage inspected).\n- Below `xl` the control is absent via `querySelector(...) === null` (not `display:none`); assert at the 1279 vs 1280 edge.\n- Re-render keeps the page frame (no bare-text layout jump).\n- Baseline gate green.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T054.txt"
     },
     {
       "id": "T055",
