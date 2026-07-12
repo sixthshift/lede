@@ -59,6 +59,10 @@
 // project — it needs a real tailored-application detail route (same
 // PASSWORD/tailor-engine dependency as chrome-merge.spec.ts), no fourth
 // server warranted.
+//
+// F207/T022 adds rail-collapse.spec.ts to the same "applications" project —
+// same shared login/password rationale as rail-design.spec.ts, no fourth
+// server warranted.
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -114,7 +118,7 @@ export default defineConfig({
     {
       name: "applications",
       testMatch:
-        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design)\.spec\.ts/,
+        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject
