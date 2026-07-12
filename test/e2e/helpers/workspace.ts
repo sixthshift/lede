@@ -400,6 +400,220 @@ export async function assertNoModalOverlay(page: Page): Promise<void> {
   ).toBe(0);
 }
 
+// ── v4-T060: app-wide modality sweep + overflow walk ── two helpers factored
+// out of the per-file patterns responsive-nav.spec.ts/phone-overflow.spec.ts/
+// pane-arbitration.spec.ts already established, so cohesion.spec.ts's
+// final-tree, app-wide re-sweep doesn't reinvent them.
+
+/**
+ * Counts fixed/absolute-positioned elements covering >50% of the viewport —
+ * the same oracle assertNoModalOverlay uses, but with an optional `exclude`
+ * subtree (identified by its own live DOM node, not a class of selectors, so
+ * exactly one element is exempted — never a whole `[role=dialog]` category).
+ * Needed for the below-`lg` SANCTIONED sheets (OQ2/T033 preview-sheet;
+ * T062 Library panel sheets): "no OTHER modality besides THIS sheet" has to
+ * count everything BUT the one sheet the caller already verified sanctioned.
+ */
+export async function countOversizedOverlays(page: Page, exclude?: Locator): Promise<number> {
+  const viewport = page.viewportSize();
+  expect(viewport, "viewport size must be known").toBeTruthy();
+  const excludeHandle = exclude ? await exclude.elementHandle() : null;
+  const count = await page.evaluate(
+    ({ viewportArea, excludeNode }) => {
+      const elements = Array.from(document.querySelectorAll("body *"));
+      return elements.filter((el) => {
+        if (excludeNode && (el === excludeNode || excludeNode.contains(el))) return false;
+        const style = getComputedStyle(el);
+        if (style.position !== "fixed" && style.position !== "absolute") return false;
+        const rect = el.getBoundingClientRect();
+        return (rect.width * rect.height) / viewportArea > 0.5;
+      }).length;
+    },
+    { viewportArea: viewport!.width * viewport!.height, excludeNode: excludeHandle },
+  );
+  await excludeHandle?.dispose();
+  return count;
+}
+
+/**
+ * Verifies a below-`lg` full-width panel is a SANCTIONED sheet per the pinned
+ * modality taxonomy (oracle.md / OQ2 / T062), then closes it. A sanctioned
+ * sheet may cover ~100% of the viewport WITHOUT being modality precisely
+ * because it is: role="dialog", NO `aria-modal="true"`, full-width (inset ~0,
+ * width/height ~= viewport — a merely-relabeled `w-[30rem]` floating overlay
+ * fails this geometry), focus-managed (focus lands inside), and dismissible
+ * via a visible "Close" control. It ALSO asserts the taxonomy's REJECT half:
+ * apart from this one verified sheet, NOTHING ELSE oversized (>50%) is
+ * fixed/absolute (a scrim, a partial floating overlay, a second panel) and
+ * NO `aria-modal="true"` exists anywhere. `outsideReachable` is deliberately
+ * NOT asserted here — a sanctioned sheet is allowed to fully cover the
+ * surface beneath (that's what makes it a sheet, not a docked panel); its
+ * escape valve is dismissibility + focus management, checked above.
+ */
+export async function assertSanctionedSheetAndClose(page: Page, dialog: Locator): Promise<void> {
+  const viewport = page.viewportSize();
+  expect(viewport, "viewport size must be known").toBeTruthy();
+  await expect(dialog).toBeVisible();
+  // Let the T043 entrance zoom settle before measuring — a box captured
+  // mid-animation drifts a pixel or two (panel-sheet.spec.ts's own rationale).
+  await dialog.evaluate((el) =>
+    Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)),
+  );
+
+  const box = await dialog.boundingBox();
+  expect(box, "sanctioned sheet must have a rendered bounding box").toBeTruthy();
+  expect(box!.x, "sanctioned sheet left inset must be ~0 (full-width)").toBeLessThanOrEqual(1);
+  expect(box!.y, "sanctioned sheet top inset must be ~0 (full-width)").toBeLessThanOrEqual(1);
+  expect(
+    box!.width,
+    `sanctioned sheet width must be ~= viewport width (${viewport!.width})`,
+  ).toBeGreaterThanOrEqual(viewport!.width - 2);
+  expect(
+    box!.height,
+    `sanctioned sheet height must be ~= viewport height (${viewport!.height})`,
+  ).toBeGreaterThanOrEqual(viewport!.height - 2);
+
+  const ariaModal = await dialog.getAttribute("aria-modal");
+  expect(ariaModal, "a sanctioned sheet must carry no aria-modal").not.toBe("true");
+  expect(
+    await page.locator('[aria-modal="true"]').count(),
+    "no aria-modal anywhere while a sanctioned sheet is open",
+  ).toBe(0);
+
+  const focusInside = await dialog.evaluate((el) => el.contains(document.activeElement));
+  expect(focusInside, "a sanctioned sheet must be focus-managed (focus lands inside)").toBe(true);
+
+  const closeControl = dialog.getByRole("button", { name: "Close" });
+  await expect(closeControl, "a sanctioned sheet must have a visible Close control").toBeVisible();
+
+  // REJECT half: apart from THIS verified sheet, nothing else oversized/fixed
+  // exists (no scrim, no partial floating overlay covering >50%).
+  expect(
+    await countOversizedOverlays(page, dialog),
+    "no oversized (>50%) fixed/absolute overlay OTHER than the sanctioned sheet itself",
+  ).toBe(0);
+
+  await closeControl.click();
+  await expect(dialog).toBeHidden();
+}
+
+/**
+ * Proves an element OUTSIDE an open non-modal panel stays genuinely
+ * reachable: `document.body` isn't `inert`, and the element itself resolves
+ * via `elementFromPoint` at its own center (no invisible focus-trap/backdrop
+ * intercepting the hit) — the pinned modality taxonomy's (oracle.md)
+ * "underlying surface stays in tab order" clause, applied to whichever
+ * anchor the caller considers reliably present (the rail wordmark at >=lg,
+ * a bottom-tab-bar link below it).
+ */
+export async function assertOutsideElementReachable(page: Page, outside: Locator): Promise<void> {
+  const bodyInert = await page.evaluate(
+    () => (document.body as HTMLElement & { inert?: boolean }).inert === true,
+  );
+  expect(bodyInert, "document.body must not be inert while a de-modal panel is open").toBe(false);
+  await expect(outside).toBeVisible();
+  const box = await outside.boundingBox();
+  expect(box, "outside element must have a rendered bounding box").toBeTruthy();
+  const hitTestPasses = await outside.evaluate(
+    (el, [x, y]) => {
+      const hit = document.elementFromPoint(x, y);
+      return hit != null && (el === hit || el.contains(hit) || hit.contains(el));
+    },
+    [box!.x + box!.width / 2, box!.y + box!.height / 2] as const,
+  );
+  expect(
+    hitTestPasses,
+    "an element outside the open panel must remain hit-testable — no focus-trap/backdrop covering it",
+  ).toBe(true);
+}
+
+// The deliberate horizontal-scroll allowlist — FROZEN (oracle.md Phase-5
+// oracle: "any addition is a flagged change, not silent"), lifted byte-for-
+// byte from phone-overflow.spec.ts's own DELIBERATE_SCROLL_SELECTORS /
+// assertNoHorizontalOverflow (T031/F302, red-team #13) so this app-wide
+// re-sweep holds the identical bar rather than a laxer copy.
+const DELIBERATE_SCROLL_SELECTORS = [
+  '[data-testid="editor-pane"]',
+  '[data-testid="preview-pane"]',
+  ".overflow-x-auto",
+  ".overflow-x-scroll",
+  ".ats-view__text",
+];
+
+/**
+ * The red-team #13 strict walk: `document.documentElement.scrollWidth` must
+ * exactly equal the viewport width, and no descendant may have
+ * `scrollWidth > clientWidth + 1` unless it's BOTH in the frozen whitelist
+ * above AND genuinely `overflow-x: auto|scroll` (an `overflow:hidden` clipper
+ * never qualifies — its own scrollWidth==clientWidth while it silently clips
+ * a child) — walks EVERY descendant, not just the root.
+ */
+export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
+  const documentScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  const viewport = page.viewportSize();
+  expect(viewport, "viewport size must be known").toBeTruthy();
+  expect(
+    documentScrollWidth,
+    "document.documentElement.scrollWidth must exactly equal the viewport width",
+  ).toBe(viewport!.width);
+
+  const violations = await page.evaluate((whitelistSelectors: string[]) => {
+    const whitelisted = new Set<Element>();
+    for (const selector of whitelistSelectors) {
+      for (const el of Array.from(document.querySelectorAll(selector))) whitelisted.add(el);
+    }
+
+    const EXCLUDED_TAGS = new Set(["input", "textarea", "select"]);
+    const results: {
+      tag: string;
+      testId: string | null;
+      className: string;
+      scrollWidth: number;
+      clientWidth: number;
+      overflowX: string;
+      matchesWhitelistSelector: boolean;
+    }[] = [];
+
+    for (const el of Array.from(document.querySelectorAll("body *"))) {
+      if (EXCLUDED_TAGS.has(el.tagName.toLowerCase())) continue;
+      const scrollWidth = el.scrollWidth;
+      const clientWidth = el.clientWidth;
+      // A <=1px-wide element (the standard `.sr-only` visually-hidden-but-
+      // focusable technique: 1px box + overflow:hidden + nowrap text) cannot
+      // itself be the source of a VISIBLE page overflow — its own footprint
+      // never renders wide. This app-wide sweep is the first cohesion pass to
+      // walk surfaces (Settings/Library controls) that carry sr-only labels
+      // the narrower, detail-only phone-overflow.spec.ts walk never exercised
+      // — same "not a real layout bug" category the EXCLUDED_TAGS list above
+      // already carves out for native text controls, not a loosening of the
+      // FROZEN scroll-container whitelist below.
+      if (clientWidth <= 1) continue;
+      if (scrollWidth <= clientWidth + 1) continue;
+
+      const overflowX = getComputedStyle(el).overflowX;
+      const isWhitelisted = whitelisted.has(el);
+      const isGenuinelyScrollable = overflowX === "auto" || overflowX === "scroll";
+      if (isWhitelisted && isGenuinelyScrollable) continue;
+
+      results.push({
+        tag: el.tagName.toLowerCase(),
+        testId: el.getAttribute("data-testid"),
+        className: typeof el.className === "string" ? el.className : String(el.className),
+        scrollWidth,
+        clientWidth,
+        overflowX,
+        matchesWhitelistSelector: isWhitelisted,
+      });
+    }
+    return results;
+  }, DELIBERATE_SCROLL_SELECTORS);
+
+  expect(
+    violations,
+    `found element(s) with scrollWidth > clientWidth outside the deliberate-scroll whitelist (or whitelisted but not actually overflow-x:auto|scroll — an overflow:hidden clipper never qualifies): ${JSON.stringify(violations, null, 2)}`,
+  ).toEqual([]);
+}
+
 // ── Library CRUD ── LibraryView's add/edit-entry panel flow (spec.md §13),
 // lifted verbatim from library-crud.spec.ts. Edit's entry point is a
 // `${section label}: ${entry.facts[0]}` picker option, since EntryCard's own
