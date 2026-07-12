@@ -96,3 +96,9 @@ corrections.
 [0019] T014 — dispatch (build, SERIAL) · sonnet · worktree · baseSha (post-T013 main) · attempt 1/3 · playwright.config.ts declared
   decision: continue
   why: next ready P0 (F103 docked panels chrome-agnostic).
+
+[0020] T014 — DONE (re-verify green). Merged ef9db33. Scope clean, gaming pass (real top→bottom reposition, z unchanged, chrome-agnostic; e2e 4-corner sampling red-then-green), baseline green (vitest 1071, pw 20/1/37). Ratchet applications 34->37.
+  evidence: .ailoop/evidence/T014.txt
+[0021] T015 — dispatch (build, SERIAL) · sonnet · worktree · baseSha (post-T014 main) · attempt 1/3 · playwright.config.ts declared
+  decision: continue
+  why: next ready P0 (F105 tailor failure inline).

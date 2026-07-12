@@ -87,7 +87,7 @@
     {
       "id": "T014",
       "title": "F103 — docked panels open fully within viewport (CHROME-AGNOSTIC; re-gates in Phase 1)",
-      "status": "in-progress",
+      "status": "done",
       "phase": "P0",
       "depends_on": [],
       "files": [
@@ -100,17 +100,18 @@
       "context": "See /workspace/SPEC.md F103. The three docked panels (`EntryEditor.tsx:212`, `ProfileEditor.tsx:205`, `LayoutEditor.tsx:95`) use `fixed right-6 top-6 z-20` while the header is `z-40`, so each panel opens half-buried: title + close button sliced, close hit-area partially blocked. FIX must be CHROME-AGNOSTIC (red-team #1): make the panel title AND close control fully within the viewport and hit-testable regardless of the header — do NOT hard-code around the current header's height/z, because Phase 1 (T020) DELETES the header and this exact assertion RE-RUNS unchanged as part of that gate. Solve via correct stacking + top offset that references the viewport/shell, not the soon-dead header. De-modal ban holds: these stay non-modal docked panels (no scrim, no aria-modal).",
       "acceptance": "- e2e: with each docked panel open in turn, its title AND its close control are fully within the viewport and hit-testable via `elementFromPoint` (the point resolves to the panel's own element, not something overlapping it).\n- NOT a stacking-order trick (red-team): the panel's title box must not intersect ANY other fixed/sticky chrome element in the DOM (measured generically, no header reference — pre-Phase-1 this catches overlapping the header; post-Phase-1 it's vacuously true, so the assertion survives). A diff that merely raises `z-20`→`z-50` while leaving `fixed right-6 top-6` untouched FAILS the gaming read — the fix must reposition relative to the shell, not out-race the header's z-index.\n- No reference to a header element in the assertion (must survive the Phase 1 chrome merge and RE-RUN unchanged there).\n- Baseline gate green.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T014.txt"
     },
     {
       "id": "T015",
       "title": "F105 — tailor failure surfaces inline (no silent 422)",
-      "status": "todo",
+      "status": "in-progress",
       "phase": "P0",
       "depends_on": [],
       "files": [
         "src/client/queries/useApplications.ts",
-        "src/client/components/ApplicationDetail.tsx"
+        "src/client/components/ApplicationDetail.tsx",
+        "playwright.config.ts"
       ],
       "origin": "spec F105 / Phase 0",
       "context": "See /workspace/SPEC.md F105 + Locked (feedback layer: failures get inline errors beside their trigger, the existing `flagVoice` pattern, NOT toasts). Today a tailor 422 produces a pixel-identical screen; the 'Failed' badge only appears after an unrelated refetch. Root cause: `useTailorApplication` (`queries/useApplications.ts:88`) has no `onError` and invalidates only `onSuccess`; `ApplicationDetail.tsx:442` never reads `isError`. FIX: surface the tailor error inline next to the Tailor/Re-tailor button on the SAME screen without navigation, and invalidate on SETTLED (so the failure badge reflects immediately). Use the keyless FixtureEngine 422 path (an unmatched JD) to drive this — no API key needed. Do NOT add a toast for this failure (errors are co-located inline; only successes may be transient).",
