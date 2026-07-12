@@ -337,3 +337,7 @@ corrections.
   gaming/MODALITY CLEAN: swap=real width-0+inert (not opacity); sheet sanctioned below-lg (role=dialog, NO aria-modal, Escape+Close+focus-managed, absent at >=lg); proportional clamp; regime edges 1280/1279/1024/1023 exact; no aria-modal at >=lg.
   F303/F306/F207 delivered. Editor stays mounted+inert+zero-width during swap (portal-source constraint, documented). Full playwright deferred to P2 gate.
   evidence: .ailoop/evidence/T033.txt.
+[0077] T034 — pre-dispatch scope expansion: audited tap-target set spans controls CREATED by earlier P2 tickets across more files than the intake 4. Added the high-probability homes WorkspaceShell.tsx (preview-sheet-trigger/close, swap-toggle) + NewApplication.tsx (create submit), plus test/e2e/tap-targets.spec.ts(new) + playwright.config.ts(registration). Builder instructed to FLAG (not touch) any control outside this set (e.g. LibraryView entry-edit trigger). Definition-of-done unchanged.
+[0078] T034 — dispatch (build, SERIAL) · sonnet · in-place branch · baseSha 4641d5f · attempt 1/3 (dispatch #6 this chunk)
+  decision: continue
+  why: last P2 ticket; drains the phase → P2 phase-close gate next. Coarse-pointer 44px audited set + EntryEditor single-column below sm (F305).

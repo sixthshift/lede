@@ -421,7 +421,11 @@
         "src/client/components/EntryEditor.tsx",
         "src/client/components/ApplicationDetail.tsx",
         "src/client/components/ApplicationCard.tsx",
-        "src/client/components/NavTabs.tsx"
+        "src/client/components/NavTabs.tsx",
+        "src/client/components/WorkspaceShell.tsx",
+        "src/client/components/NewApplication.tsx",
+        "test/e2e/tap-targets.spec.ts",
+        "playwright.config.ts"
       ],
       "origin": "spec Phase 2 / F305 (red-team #6)",
       "context": "See /workspace/SPEC.md Locked (touch targets — audited set enumerated). Under 375×812 + `(pointer: coarse)`: ≥44px short-axis for the ENUMERATED set — bottom-tab-bar items; every control in the four gated phone flows (create application, tailor-failure error affordance, entry edit via Library, letter view + preview sheet open/close); dashboard card actions; the detail action strip; panel submit/close controls. EXCLUDED (do NOT enlarge): inline prose links, options inside open listboxes, per-paragraph icon actions inside dense editors. EntryEditor fields single-column below `sm`. This ticket runs LAST in P2 (depends on the other P2 tickets that create the controls). Declared files are the likely homes; correct if the scope check flags. Coarse seed.",
