@@ -128,7 +128,8 @@
       "files": [
         "src/client/components/LibraryView.tsx",
         "src/client/components/EntryCard.tsx",
-        "playwright.config.ts"
+        "playwright.config.ts",
+        "test/library.test.tsx"
       ],
       "origin": "spec F106 / Phase 0",
       "context": "See /workspace/SPEC.md F106. Library entry Delete fires irreversibly on one click (`LibraryView.tsx:205`, `EntryCard.tsx:35`) with zero confirmation. FIX: reuse the armed two-step pattern the dashboard cards already implement (`ApplicationCard.tsx:172-188` — read it, mirror it): first activation arms ('Confirm delete'), second deletes; blur/Escape disarms. Destructive confirms are inline two-step per the de-modal policy — never `window.confirm`, never a modal. Do not change the delete endpoint/behavior, only gate it.",
