@@ -206,10 +206,12 @@ test.describe("Phone-width detail layout: stacked, zero horizontal overflow (F30
     }
 
     // No side-by-side preview pane competing for width — it's withheld
-    // entirely below `lg` by this ticket's fix (the sheet mechanics that
-    // reveal it at phone width are T033's job, not this one's).
+    // entirely below `lg` (T033 swaps it in as a full-width sheet instead,
+    // never row-flex alongside the editor). The sheet itself is closed by
+    // default (not rendered), but its operable trigger — a FAB, T033's job —
+    // is present and reachable at this width.
     await expect(page.getByTestId("preview-pane")).toBeHidden();
-    await expect(page.getByRole("button", { name: "Show preview" })).toHaveCount(0);
+    await expect(page.getByTestId("preview-sheet-trigger")).toBeVisible();
   });
 });
 

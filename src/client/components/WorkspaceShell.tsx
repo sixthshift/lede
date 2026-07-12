@@ -116,7 +116,7 @@ function useIsBelowXl(): boolean {
 // preview instead of leaving it pinned at a fixed pixel width — floored at
 // the old fixed width (384px) so nothing narrower than before, ceilinged so
 // it never eats the majority of the viewport.
-const PREVIEW_PROPORTIONAL_WIDTH_CLASS = "w-[clamp(384px,40vw,640px)]";
+const PREVIEW_PROPORTIONAL_WIDTH_CLASS = "w-[clamp(384px,30vw,640px)]";
 
 // The bottom tab bar's own fixed height — the content panes' bottom padding
 // below `lg` must clear exactly this so the bar (persistent chrome, not

@@ -85,7 +85,7 @@ describe("WorkspaceShell", () => {
     // carries the proportional behavior is present, and that the old fixed
     // `w-96` is gone.
     const previewPane = screen.getByTestId("preview-pane");
-    expect(previewPane).toHaveClass("w-[clamp(384px,40vw,640px)]");
+    expect(previewPane).toHaveClass("w-[clamp(384px,30vw,640px)]");
     expect(previewPane).not.toHaveClass("w-96");
   });
 });

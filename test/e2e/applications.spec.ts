@@ -1282,7 +1282,11 @@ test("WorkspaceShell (protocol B): the surface stays non-modal — no aria-modal
   await tailor(page, applicationId!);
   await expectCanvasPainted(page);
 
-  async function assertNonModal(): Promise<void> {
+  // Structural half of the non-modal contract: no aria-modal, and no
+  // fixed/absolute-positioned element covers more than half the viewport.
+  // Reused by both arms below; the 1280 arm additionally proves an
+  // underlying editor control is genuinely clickable (assertNonModal).
+  async function assertNonModalStructure(): Promise<void> {
     expect(await page.locator('[aria-modal="true"]').count()).toBe(0);
 
     // Scoped to OVERLAY-shaped elements (fixed/absolute positioned) — a
@@ -1305,6 +1309,10 @@ test("WorkspaceShell (protocol B): the surface stays non-modal — no aria-modal
       oversizedOverlayCount,
       "no fixed/absolute-positioned element may cover more than half the viewport",
     ).toBe(0);
+  }
+
+  async function assertNonModal(): Promise<void> {
+    await assertNonModalStructure();
 
     // A real, un-forced click on an underlying editor control succeeds: a
     // genuine browser download is the observable side effect, proving
@@ -1319,11 +1327,25 @@ test("WorkspaceShell (protocol B): the surface stays non-modal — no aria-modal
   // At 1280px (editor + preview co-visible, no drawer involved).
   await assertNonModal();
 
-  // In the below-1280 drawer-OPEN state.
+  // In the below-1280 SWAP-open state (v4-T033: the editor is genuinely
+  // swapped OUT here — width:0 + inert — so its "Plain text" button can't be
+  // clicked while the swap is open; that's not modality, it's the editor
+  // being absent, which the structural checks below still prove isn't a
+  // backdrop/overlay situation).
   await page.setViewportSize({ width: 1024, height: 720 });
   await page.getByRole("button", { name: "Show preview" }).click();
   await expect(page.getByTestId("preview-pane")).toBeVisible();
-  await assertNonModal();
+  await assertNonModalStructure();
+
+  // Close the swap and prove the editor comes back genuinely reachable —
+  // not modally trapped behind anything, just swapped back in.
+  await page.getByRole("button", { name: "Hide preview" }).click();
+  await expect(page.getByTestId("preview-pane")).toBeHidden();
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: "Plain text" }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBeTruthy();
 });
 
 test("WorkspaceShell drawer: below 1280px the preview pane starts non-co-visible (closed), and the toggle reveals a real painted canvas", async ({
