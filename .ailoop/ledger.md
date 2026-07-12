@@ -314,3 +314,7 @@ corrections.
   gaming CLEAN: app.css one-line sibling-mirror; WorkspaceShell withholds preview toggle+aside below lg; overflow walk red-team #13-strict (exact 375, per-element fail unless whitelisted+genuinely-scrollable, native form controls excluded); only spec change was stacking-assertion correctness fix (single scrollTop=0 getBoundingClientRect, still strict), overflow walk untouched.
   F302 delivered (phone stacked, zero horizontal overflow at 375). Also fixed a genuine PRE-EXISTING TemplatePicker canvas overflow (app.css). Full playwright deferred to P2 gate.
   evidence: .ailoop/evidence/T031.txt.
+[0070] T032 — pre-dispatch scope correction: intake declared ApplicationsDashboard.tsx (DOES NOT EXIST). Verified real parent = ApplicationsView.tsx (imports+renders <NewApplication/> lines 16/29/47, owns the card grid lines 51/66); anchored popover lives at NewApplication.tsx:73 (`absolute right-0 top-full z-20 w-[28rem]`). Corrected files = [NewApplication.tsx, ApplicationsView.tsx, new-application.spec.ts(new), playwright.config.ts(registration)].
+[0071] T032 — dispatch (build, SERIAL) · sonnet · in-place branch · baseSha f3dffc3 · attempt 1/3 (dispatch #4 this chunk)
+  decision: continue
+  why: NewApplication inline in-flow panel (OQ7/F304), popover GONE from DOM.

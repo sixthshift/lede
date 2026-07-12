@@ -376,7 +376,9 @@
       ],
       "files": [
         "src/client/components/NewApplication.tsx",
-        "src/client/components/ApplicationsDashboard.tsx"
+        "src/client/components/ApplicationsView.tsx",
+        "test/e2e/new-application.spec.ts",
+        "playwright.config.ts"
       ],
       "origin": "spec Phase 2 / F304 / OQ7 (red-team #11)",
       "context": "See /workspace/SPEC.md Locked (NewApplication inline). The anchored popover (`absolute right-0 w-[28rem]`) anchors off-screen at 375 and floats over cards at desktop. Replace with an INLINE panel inserted ABOVE the card grid, pushing cards down — nothing floats, nothing covered. Phone renders the SAME panel full-width below `sm`. The anchored popover variant must be GONE from the DOM. Verify the real component/parent filenames first (declared files are best-guess — NewApplication + its dashboard parent; correct them if the scope check would flag). Depends on T030. Frozen: de-modal (this removes a floating overlay — good).",
