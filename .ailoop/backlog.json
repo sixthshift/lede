@@ -790,7 +790,7 @@
     {
       "id": "T041a",
       "title": "P4: Accordion consistency — 3 sections default-expanded + Design internal control groups default-collapsed (F505)",
-      "status": "todo",
+      "status": "done",
       "phase": "P4",
       "depends_on": [
         "T040",
@@ -809,7 +809,7 @@
       "context": "See SPEC.md F505. Two parts, both in DesignPanel.tsx + ApplicationDetail.tsx:\nPART 1 (verify): the three TOP-LEVEL detail sections (Job details, Cover letter, Design) already default EXPANDED (ApplicationDetail.tsx collapsedSections initializes from readCollapsedSections() → {} when localStorage empty). Just ASSERT this in the new spec; do not regress it.\nPART 2 (build): DesignPanel.tsx (~1819 lines) renders ~15 Design control groups (Header, Links, Section headings, Dates, Entries, Color, Page, Photo, Layout, Footer, Sections/skills/interests/experience/summary/education) as FLAT always-open <div>s with NO collapse mechanism. Add a collapse affordance to these INTERNAL groups so they DEFAULT COLLAPSED — this is what retires the ~5,400px Design-card scroll (red-team #8: the OUTER sections stay default-EXPANDED; only the INNER Design groups default collapsed). Give the group-collapse the SAME view-state contract the outer sections use: localStorage at most (a per-group collapse key), NETWORK-ZERO (no settings/application writes on toggle), preview PIXEL-IDENTICAL (collapsing a group must not change the rendered document — it only hides the control group, never a format value). Each group's header toggles it; collapsed hides the group's controls (grid-rows 0fr↔1fr or equivalent, motion in [100ms,300ms] + motion-reduce per T043's established pattern).\nLocked (cite): section/group collapse is VIEW-STATE ONLY (localStorage/client, never settings.layout/sectionDisplay; network-zero; preview pixel-identical — the v3 H2 pattern). The document/preview is exempt. Motion follows T043 ([100,300]ms + motion-reduce).",
       "acceptance": "- e2e (test/e2e/design-accordion.spec.ts, registered in playwright.config applications): the 3 top-level sections (Job details/Cover letter/Design) are ALL default EXPANDED on load (each body visible; none collapsed-by-default — red-team #8).\n- Design's internal control groups DEFAULT COLLAPSED: on load, the group bodies are hidden (assert a representative set of Design groups have their controls not visible by default, and a header toggle reveals them). Expanding/collapsing a group is NETWORK-ZERO (intercept: zero settings/application writes over a multi-second window, all bodies inspected) and the preview canvas is PIXEL-IDENTICAL before/after the toggle (dataURL equal).\n- Scroll retired: the Design card's default (all-groups-collapsed) rendered height is dramatically less than fully-expanded (assert the collapsed-default Design section height is well under the old ~5,400px, e.g. < 2000px, AND expanding all groups increases it — proves real collapse, not a cosmetic clip).\n- Scroll-spy precondition still holds: on the default surface editorPane.scrollHeight > clientHeight + 500 (so scroll-spy/restoration stay exercisable). Re-run scroll-spy.spec + route-transitions.spec green.\n- Baseline gate green (check/build/lint/vitest 1077).",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T041a.txt"
     },
     {
       "id": "T041b",
