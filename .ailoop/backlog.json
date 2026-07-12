@@ -518,7 +518,9 @@
         "T040"
       ],
       "files": [
-        "src/client/components/LetterPreview.tsx"
+        "src/client/components/LetterPreview.tsx",
+        "test/e2e/letter-empty.spec.ts",
+        "playwright.config.ts"
       ],
       "origin": "spec Phase 3 / F405",
       "context": "See /workspace/SPEC.md F405 + Locked (empty states). The letter-tab empty preview is bare text ('Nothing to preview yet.') while the resume side gets a designed dashed card + CTA. FIX: give the letter empty state the same dashed-card + CTA treatment as the resume empty state; the CTA arrow must not wrap onto its own line. Mirror the resume empty-state structure (find it in the resume preview/DocumentPreview and reuse its shape). Depends on T040.",
