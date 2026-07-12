@@ -119,3 +119,7 @@ corrections.
 [0026] T017 — dispatch (build, SERIAL) · sonnet · worktree · baseSha (post-T016 main) · attempt 1/3 · playwright.config.ts declared
   decision: continue
   why: next ready P0 (F107 card overflow/stamp + F110 dark hover).
+
+[0027] T017 — worker STALLED (watchdog, 600s no progress; hung waiting on a self-started background test run). 0 commits; ApplicationCard.tsx never modified (only wrote the e2e test). Incomplete infra stall, not an acceptance failure — no attempt logged. Removed worktree; re-dispatching fresh with explicit "do NOT start background/playwright runs" (the stall cause).
+  decision: retry (fresh, infra) 
+  why: nothing durable; the hang was self-inflicted background-polling, not a build problem.
