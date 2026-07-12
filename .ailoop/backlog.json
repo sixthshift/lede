@@ -325,7 +325,7 @@
     {
       "id": "T030",
       "title": "P2: Bottom tab bar below lg + rail hidden + section content folds into editor (F301)",
-      "status": "todo",
+      "status": "done",
       "phase": "P2",
       "depends_on": [
         "T020",
@@ -343,7 +343,7 @@
       "context": "See /workspace/SPEC.md Phase 2 + Locked (compact nav: bottom tab bar). Below `lg` (1024): hide the 224px rail entirely; global nav becomes a FIXED BOTTOM BAR with the three destinations (icon+label, ≥44px targets). NOT a hamburger-drawer (red-team #2). The rail's per-surface section content folds into the editor surface and must stay reachable there (gated at 768 AND 375). The bottom bar is persistent chrome (NOT modality per the taxonomy) and must cover no interactive content (content area bottom-padding clears it). Coarse seed — refine mid-flight if the fold-into-editor proves bigger than one session. Depends on all of P1 (reshapes the P1 shell).",
       "acceptance": "- e2e at 375×812 AND 768×1024 on all four surfaces: global nav is the fixed bottom tab bar (three items, icon+label, each ≥44px short-axis, activation navigates); no drawer/hamburger pattern in the DOM; the bar covers no interactive content.\n- Section navigation is reachable in the editor surface at 768 and 375 (rail is gone below lg).\n- Baseline gate green; ≥1280 v3 cohesion green (regression guard).",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T030.txt"
     },
     {
       "id": "T031",

@@ -293,3 +293,9 @@ corrections.
 [0062] T030 — dispatch (build, SERIAL) · sonnet · worktree · baseSha 90a1b80 · attempt 1/3 (dispatch #1 this chunk)
   decision: continue
   why: only P2 ready ticket; reshapes the P1 shell for below-lg (bottom tab bar F301). Prompt flags: gone=removed (querySelector===null for rail below-lg AND bar at ≥lg), reuse existing breakpoint hook if present, no drawer.
+[0063] T030 — DONE (independent re-verify green). Integrated to main 84e4d42 (builder commit 60bc361 + ledger). Branch t030-responsive-nav linear-merged.
+  fast baseline (merged): check 0, build 0, lint 0, vitest 1077/1077 (no flake this run).
+  scope CLEAN: playwright.config(registration) + ApplicationDetail + NavTabs + WorkspaceShell + responsive-nav.spec(new). All declared.
+  gaming CLEAN: rail/bar absence via count===0 (gone not hidden); useIsBelowLg conditional-render XOR; 44px functional boundingBox; real nav+URL; no-drawer count===0; bar-covers-nothing padding>=barH + elementFromPoint; section-nav folded into editor (distinct testids, scroll-spy locators intact).
+  F301 delivered. Full playwright deferred to P2 gate [0033].
+  evidence: .ailoop/evidence/T030.txt.
