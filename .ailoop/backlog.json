@@ -618,7 +618,11 @@
       "files": [
         "src/client/components/LibraryView.tsx",
         "src/client/components/EntryCard.tsx",
-        "src/client/components/LibraryToolbar.tsx"
+        "src/client/components/LibraryToolbar.tsx",
+        "test/e2e/helpers/workspace.ts",
+        "test/e2e/library-crud.spec.ts",
+        "test/e2e/cohesion.spec.ts",
+        "playwright.config.ts"
       ],
       "origin": "spec Phase 4 / F502/F509 / OQ4",
       "context": "See /workspace/SPEC.md F502/F509 + Locked (library). Today editing takes select-in-dropdown → 'Edit selected' (3 clicks) while destructive Delete is inline — affordance inversion. FIX: per-row Edit button BESIDE Delete (OQ4); DELETE the dropdown + 'Edit selected' pair entirely. Entry rows get an identity line ('Role · Company · Period' — company/role/period never shown today). Import/Export become outline buttons or an overflow menu; the count anchors to the filter control. Delete stays the two-step from T016. Verify LibraryToolbar's real filename. Shares LibraryView/EntryCard with T016/T040 (serialize). Depends on P3. Coarse seed.",
