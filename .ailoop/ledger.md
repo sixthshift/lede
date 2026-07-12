@@ -382,3 +382,7 @@ corrections.
   fixNote: LibraryToolbar.tsx now declared; build the FULL T040 (all 8 toasts incl import/export at LibraryToolbar call-sites + inline import error) + toasts.spec + registration.
 [0095] T040 — DONE (independent re-verify green). Branch tip 8450320. fast baseline check/build/lint 0, vitest 1077. scope CLEAN (8 touched ⊆ 12 declared). gaming CLEAN: 8 toasts each in an individual test (0→1→0 by message, red-team #15 no-shared-loop); layout/import/export at call-sites not shared hooks (no debounce spam); 2 failure-contrasts real 404/400 → inline error + no toast. F401 delivered. Full playwright + cohesion non-modality re-run deferred to P3 gate.
   evidence: .ailoop/evidence/T040.txt.
+[0096] T042 — pre-dispatch scope +test/e2e/export-busy.spec.ts(new) +playwright.config(registration).
+[0097] T042 — dispatch (build, SERIAL) · sonnet · in-place branch · baseSha 94fa347 · attempt 1/3 (dispatch #12 this chunk)
+  decision: continue
+  why: export busy state (F402) — disabled+label-swap, double-fire→one download.

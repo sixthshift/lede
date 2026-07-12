@@ -476,7 +476,9 @@
       ],
       "files": [
         "src/client/components/ApplicationDetail.tsx",
-        "src/client/components/ApplicationCard.tsx"
+        "src/client/components/ApplicationCard.tsx",
+        "test/e2e/export-busy.spec.ts",
+        "playwright.config.ts"
       ],
       "origin": "spec Phase 3 / F402",
       "context": "See /workspace/SPEC.md Phase 3 + Locked (busy pattern). PDF/plain-text export from detail has no pending state — double-click renders twice (`ApplicationDetail.tsx:445-462`); card download disables silently with no label change. FIX: shared disabled + label-swap ('Preparing…') for exports and other non-instant mutations; double-fire guarded by the pending flag. No global spinner framework. Shares ApplicationDetail/ApplicationCard with other tickets (serialize). Depends on T040 (feedback layer conventions).",
