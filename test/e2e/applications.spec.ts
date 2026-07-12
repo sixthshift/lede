@@ -57,6 +57,11 @@ import {
   pixelDiffFraction,
   interactiveDescendants,
   expandDesignGroup,
+  letterGreetingField,
+  letterClosingField,
+  letterParagraphField,
+  letterInsertParagraphButton,
+  letterRemoveParagraphButton,
 } from "./helpers/workspace";
 
 const PASSWORD = "correct horse battery staple e2e applications";
@@ -780,19 +785,22 @@ test("in-place text editing: resume + letter edits persist and reach the artifac
   await expectCanvasPainted(page);
 
   await generateLetter(page, applicationId!, { status: 200 });
-  // The letter side lives behind the preview pane's in-pane switch
-  // (v3-T011) — never mounted alongside the resume side.
+  // The letter CANVAS lives behind the preview pane's in-pane switch
+  // (v3-T011) — the paragraph field itself (T50/OQ5/F501) lives in the
+  // editor pane's Cover-letter section instead, and is reachable regardless
+  // of which preview tab is active.
   await switchPreviewDoc(page, "letter");
   const letterCanvas = letterPreviewCanvas(page);
   await expectLetterCanvasPainted(page);
 
   // (2) capture the PRE-EDIT baseline for the first resume item and the
   // first letter paragraph, so the later reload assertion can prove the
-  // edit is non-vacuous (a no-op would leave these identical). Each field
-  // only mounts while its own side of the preview switch is active.
-  const letterParagraphField = page.locator('[data-testid="letter-edit-paragraph-0"]');
-  await expect(letterParagraphField).toBeVisible();
-  const letterBaseline = await letterParagraphField.inputValue();
+  // edit is non-vacuous (a no-op would leave these identical). The resume
+  // field only mounts while the resume side of the preview switch is
+  // active; the letter field is always mounted (editor-pane home).
+  const letterParagraph0 = letterParagraphField(page, 0);
+  await expect(letterParagraph0).toBeVisible();
+  const letterBaseline = await letterParagraph0.inputValue();
   const letterPixelsBefore = await letterCanvas.evaluate((el: HTMLCanvasElement) => el.toDataURL());
 
   await switchPreviewDoc(page, "resume");
@@ -820,14 +828,14 @@ test("in-place text editing: resume + letter edits persist and reach the artifac
   expect(resumePatchResponse.status()).toBe(200);
 
   await switchPreviewDoc(page, "letter");
-  await letterParagraphField.fill(letterEditedText);
+  await letterParagraph0.fill(letterEditedText);
   const [letterPatchResponse] = await Promise.all([
     page.waitForResponse(
       (r) =>
         r.url().endsWith(`/api/applications/${applicationId}/letter-part`) &&
         r.request().method() === "PATCH",
     ),
-    letterParagraphField.press("Tab"),
+    letterParagraph0.press("Tab"),
   ]);
   expect(letterPatchResponse.status()).toBe(200);
 
@@ -863,24 +871,21 @@ test("in-place text editing: resume + letter edits persist and reach the artifac
   await expect(page.locator('[data-testid="resume-edit-item-0"]')).toHaveValue(resumeEditedText);
   await expect(page.locator('[data-testid="resume-edit-item-0"]')).not.toHaveValue(resumeBaseline);
 
-  await switchPreviewDoc(page, "letter");
-  await expect(page.locator('[data-testid="letter-edit-paragraph-0"]')).toHaveValue(
-    letterEditedText,
-  );
-  await expect(page.locator('[data-testid="letter-edit-paragraph-0"]')).not.toHaveValue(
-    letterBaseline,
-  );
+  // The letter field is in the editor pane's Cover-letter section (T50) —
+  // reachable without a preview-tab switch, unlike the resume field above.
+  await expect(letterParagraphField(page, 0)).toHaveValue(letterEditedText);
+  await expect(letterParagraphField(page, 0)).not.toHaveValue(letterBaseline);
 
   // (6) lock — every edit affordance disables.
   await lockFinal(page, applicationId!);
   await expect(page.getByRole("button", { name: "Unlock", exact: true })).toBeVisible();
 
-  // (b) the letter text-edit control (still on the letter tab from above).
-  await expect(page.locator('[data-testid="letter-edit-paragraph-0"]')).toBeDisabled();
+  // (b) the letter text-edit control (editor-pane home, T50).
+  await expect(letterParagraphField(page, 0)).toBeDisabled();
   // (c) the insert button.
-  await expect(page.locator('[data-testid="letter-insert-paragraph-0"]')).toBeDisabled();
+  await expect(letterInsertParagraphButton(page, 0)).toBeDisabled();
   // (d) the remove button.
-  await expect(page.locator('[data-testid="letter-remove-paragraph-0"]')).toBeDisabled();
+  await expect(letterRemoveParagraphButton(page, 0)).toBeDisabled();
 
   // (a) the resume text-edit control.
   await switchPreviewDoc(page, "resume");
@@ -984,8 +989,9 @@ test("retroactive import: blank letter -> hand-authored via in-place editing -> 
     page.getByTestId("create-blank-letter").click(),
   ]);
 
-  // The letter's in-place editor fields live behind the preview pane's
-  // in-pane switch (v3-T011) — never mounted alongside the resume side.
+  // The letter's editor-pane fields (T50/OQ5/F501) are reachable regardless
+  // of which preview tab is active — switched to "letter" anyway so the
+  // rendered canvas is on-screen alongside the fields being driven below.
   await switchPreviewDoc(page, "letter");
 
   // (2) hand-author DISTINCTIVE whitespace/punctuation across greeting, TWO
@@ -995,14 +1001,14 @@ test("retroactive import: blank letter -> hand-authored via in-place editing -> 
   const paragraph2 = `Second — em-dash, ellipsis... and "quoted" text (${marker}).`;
   const closing = `Warmly,\n  Jason  (${marker})`;
 
-  await page.getByTestId("letter-edit-greeting").fill(greeting);
+  await letterGreetingField(page).fill(greeting);
   await Promise.all([
     page.waitForResponse(
       (r) =>
         r.url().endsWith(`/api/applications/${applicationId}/letter-part`) &&
         r.request().method() === "PATCH",
     ),
-    page.getByTestId("letter-edit-greeting").press("Tab"),
+    letterGreetingField(page).press("Tab"),
   ]);
 
   await Promise.all([
@@ -1011,16 +1017,16 @@ test("retroactive import: blank letter -> hand-authored via in-place editing -> 
         r.url().endsWith(`/api/applications/${applicationId}/letter-part/paragraph`) &&
         r.request().method() === "POST",
     ),
-    page.getByTestId("letter-insert-paragraph-0").click(),
+    letterInsertParagraphButton(page, 0).click(),
   ]);
-  await page.getByTestId("letter-edit-paragraph-0").fill(paragraph1);
+  await letterParagraphField(page, 0).fill(paragraph1);
   await Promise.all([
     page.waitForResponse(
       (r) =>
         r.url().endsWith(`/api/applications/${applicationId}/letter-part`) &&
         r.request().method() === "PATCH",
     ),
-    page.getByTestId("letter-edit-paragraph-0").press("Tab"),
+    letterParagraphField(page, 0).press("Tab"),
   ]);
 
   await Promise.all([
@@ -1029,26 +1035,26 @@ test("retroactive import: blank letter -> hand-authored via in-place editing -> 
         r.url().endsWith(`/api/applications/${applicationId}/letter-part/paragraph`) &&
         r.request().method() === "POST",
     ),
-    page.getByTestId("letter-insert-paragraph-1").click(),
+    letterInsertParagraphButton(page, 1).click(),
   ]);
-  await page.getByTestId("letter-edit-paragraph-1").fill(paragraph2);
+  await letterParagraphField(page, 1).fill(paragraph2);
   await Promise.all([
     page.waitForResponse(
       (r) =>
         r.url().endsWith(`/api/applications/${applicationId}/letter-part`) &&
         r.request().method() === "PATCH",
     ),
-    page.getByTestId("letter-edit-paragraph-1").press("Tab"),
+    letterParagraphField(page, 1).press("Tab"),
   ]);
 
-  await page.getByTestId("letter-edit-closing").fill(closing);
+  await letterClosingField(page).fill(closing);
   await Promise.all([
     page.waitForResponse(
       (r) =>
         r.url().endsWith(`/api/applications/${applicationId}/letter-part`) &&
         r.request().method() === "PATCH",
     ),
-    page.getByTestId("letter-edit-closing").press("Tab"),
+    letterClosingField(page).press("Tab"),
   ]);
 
   // (3) flag as a voice source.
@@ -1653,12 +1659,16 @@ test("in-place edits reach the document: sentinel text is exportable AND the pre
   await expectLetterCanvasPainted(page);
   const letterBefore = await canvasSnapshot(letterCanvas);
 
-  const letterParagraphField = page.locator('[data-testid="letter-edit-paragraph-0"]');
-  await expect(letterParagraphField).toBeVisible();
-  const letterBaseline = await letterParagraphField.inputValue();
-  await letterParagraphField.fill(`${letterBaseline} ${letterSentinel}`);
+  // T50/OQ5/F501: this field lives in the editor pane's Cover-letter
+  // section now, not beside the canvas — modality is asserted below while
+  // it's focused/dirty, same as the resume field's check above, proving the
+  // editor pane itself never goes modal mid-edit.
+  const letterParagraph0 = letterParagraphField(page, 0);
+  await expect(letterParagraph0).toBeVisible();
+  const letterBaseline = await letterParagraph0.inputValue();
+  await letterParagraph0.fill(`${letterBaseline} ${letterSentinel}`);
 
-  await expect(letterParagraphField).toBeFocused();
+  await expect(letterParagraph0).toBeFocused();
   await assertNoModalOverlay(page);
 
   const [letterPatchResponse] = await Promise.all([
@@ -1667,7 +1677,7 @@ test("in-place edits reach the document: sentinel text is exportable AND the pre
         r.url().endsWith(`/api/applications/${applicationId}/letter-part`) &&
         r.request().method() === "PATCH",
     ),
-    letterParagraphField.press("Tab"),
+    letterParagraph0.press("Tab"),
   ]);
   expect(letterPatchResponse.status()).toBe(200);
 
@@ -1725,10 +1735,10 @@ test("locked sweep (protocol D): every edit affordance individually disabled/409
   );
   expect(resumePatchLocked.status(), "resume-part must 409 while locked").toBe(409);
 
-  // (2) letter edit — its field only mounts on the letter side of the
-  // preview switch — disabled AND its route 409s.
-  await switchPreviewDoc(page, "letter");
-  await expect(page.locator('[data-testid="letter-edit-paragraph-0"]')).toBeDisabled();
+  // (2) letter edit — its field lives in the editor pane's Cover-letter
+  // section (T50/OQ5/F501), reachable regardless of preview tab — disabled
+  // AND its route 409s.
+  await expect(letterParagraphField(page, 0)).toBeDisabled();
   const letterPatchLocked = await page.request.patch(
     `/api/applications/${applicationId}/letter-part`,
     {

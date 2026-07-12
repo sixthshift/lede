@@ -7,17 +7,19 @@
 // than a single scrolling column. The preview pane hosts EXACTLY one
 // document at a time — the resume side (FitChip/Preview-ATS toggle/
 // ResultView-or-AtsView, unchanged internally) or the letter side
-// (LetterPreview, unchanged internally, editor fields and all) — switched
-// via the docTab buttons below. Action buttons, JobPanel, the cover-letter
-// card's controls (never its preview), and the design card all live in the
-// editor pane instead, since they aren't the artifact itself.
+// (LetterPreview — view-only since T50/OQ5/F501, its former in-preview
+// paragraph editor now lives below in the Cover-letter editor section) —
+// switched via the docTab buttons below. Action buttons, JobPanel, the
+// cover-letter card's controls AND its paragraph editor (never its
+// preview), and the design card all live in the editor pane instead, since
+// they aren't the artifact itself.
 
 import { BookOpen, ChevronDown, Clock, Mail } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
 import type { UserPreset } from "@shared/schema";
-import type { Paper, Profile, TailoredResume } from "@shared/types";
+import type { CoverLetter, Paper, Profile, TailoredResume } from "@shared/types";
 import { ApiError } from "../api";
 import { downloadLetterPdf, downloadResumePdf, downloadResumeText } from "../document/download";
 import { fitToPages, type FitResult } from "../document/fit";
@@ -28,7 +30,10 @@ import {
   useCreateBlankLetter,
   useFlagVoice,
   useGenerateLetter,
+  useInsertLetterParagraph,
   useLockApplication,
+  usePatchLetterPart,
+  useRemoveLetterParagraph,
   useTailorApplication,
   useUndoLetter,
   useUnlockApplication,
@@ -44,7 +49,9 @@ import { ResultView } from "./ResultView";
 import { TemplatePicker } from "./TemplatePicker";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
+import { Label } from "./ui/label";
 import { Skeleton } from "./ui/skeleton";
+import { Textarea } from "./ui/textarea";
 import { WorkspaceShellSurface } from "./WorkspaceShellSlots";
 
 // Same 300ms coalescing window the former dedicated design view used for its
@@ -282,6 +289,165 @@ function tailorErrorMessage(error: unknown): string {
     return "No recorded fixture matches this job description — couldn't tailor.";
   }
   return "Couldn't tailor this application.";
+}
+
+// T50/OQ5/F501: paragraph-level letter editing, re-homed here from
+// LetterPreview (which is now view-only, see its own header comment). Same
+// uncontrolled-draft-committed-on-blur pattern as ResultView's own
+// EditableField — a no-op blur (draft unchanged) never round-trips — kept as
+// its own small copy rather than a shared import: the resume and letter
+// editors each own their field's shape, and the two have already drifted
+// (the letter's insert/remove affordances have no resume analog).
+function EditableField({
+  value,
+  readOnly,
+  onCommit,
+  id,
+  rows,
+  "data-testid": dataTestId,
+}: {
+  value: string;
+  readOnly: boolean;
+  onCommit: (text: string) => void;
+  id: string;
+  rows: number;
+  "data-testid": string;
+}) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+
+  return (
+    <Textarea
+      id={id}
+      data-testid={dataTestId}
+      rows={rows}
+      value={draft}
+      disabled={readOnly}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        if (draft !== value) onCommit(draft);
+      }}
+    />
+  );
+}
+
+// T50: insert/remove are secondary to the text itself — ghost/sm keeps them
+// reachable without visually outweighing the paragraph they sit under (the
+// prior outline/sm pair read as two equally-weighted primary actions).
+function LetterTextEditor({
+  applicationId,
+  letter,
+  readOnly,
+}: {
+  applicationId: string;
+  letter: CoverLetter;
+  readOnly: boolean;
+}) {
+  const patchLetterPart = usePatchLetterPart();
+  const insertParagraph = useInsertLetterParagraph();
+  const removeParagraph = useRemoveLetterParagraph();
+
+  return (
+    <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 shadow-xs">
+      <p className="text-sm font-semibold">Edit text</p>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="letter-edit-greeting">Greeting</Label>
+        <EditableField
+          id="letter-edit-greeting"
+          data-testid="letter-edit-greeting"
+          rows={1}
+          value={letter.greeting}
+          readOnly={readOnly}
+          onCommit={(text) =>
+            patchLetterPart.mutate({
+              id: applicationId,
+              input: { path: { kind: "greeting" }, text },
+            })
+          }
+        />
+      </div>
+
+      <div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={readOnly || insertParagraph.isPending}
+          onClick={() => insertParagraph.mutate({ id: applicationId, position: 0, text: "" })}
+          data-testid="letter-insert-paragraph-0"
+          className="text-muted-foreground"
+        >
+          Insert paragraph at top
+        </Button>
+      </div>
+
+      {letter.body.map((paragraph, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: index IS this domain's own identity for a paragraph — /letter-part/paragraph addresses one by index; there is no other id on a CoverLetter body entry.
+        <div key={index} className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`letter-edit-paragraph-${index}`}>Paragraph {index + 1}</Label>
+            <EditableField
+              id={`letter-edit-paragraph-${index}`}
+              data-testid={`letter-edit-paragraph-${index}`}
+              rows={3}
+              value={paragraph.text}
+              readOnly={readOnly}
+              onCommit={(text) =>
+                patchLetterPart.mutate({
+                  id: applicationId,
+                  input: { path: { kind: "body", index }, text },
+                })
+              }
+            />
+          </div>
+          <div className="flex gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={readOnly || removeParagraph.isPending}
+              onClick={() => removeParagraph.mutate({ id: applicationId, index })}
+              data-testid={`letter-remove-paragraph-${index}`}
+              className="text-muted-foreground"
+            >
+              Remove paragraph
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={readOnly || insertParagraph.isPending}
+              onClick={() =>
+                insertParagraph.mutate({ id: applicationId, position: index + 1, text: "" })
+              }
+              data-testid={`letter-insert-paragraph-${index + 1}`}
+              className="text-muted-foreground"
+            >
+              Insert paragraph after
+            </Button>
+          </div>
+        </div>
+      ))}
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="letter-edit-closing">Closing</Label>
+        <EditableField
+          id="letter-edit-closing"
+          data-testid="letter-edit-closing"
+          rows={1}
+          value={letter.closing}
+          readOnly={readOnly}
+          onCommit={(text) =>
+            patchLetterPart.mutate({
+              id: applicationId,
+              input: { path: { kind: "closing" }, text },
+            })
+          }
+        />
+      </div>
+    </div>
+  );
 }
 
 export function ApplicationDetail({ applicationId }: { applicationId: string }) {
@@ -824,6 +990,14 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
                 </Button>
               </div>
             ) : null}
+
+            {application.letterCurrent ? (
+              <LetterTextEditor
+                applicationId={applicationId}
+                letter={application.letterCurrent}
+                readOnly={isLocked}
+              />
+            ) : null}
           </CardContent>
         </Card>
       </EditorSection>
@@ -1003,12 +1177,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
         )
       ) : application.letterCurrent ? (
         <div data-testid="letter-preview">
-          <LetterPreview
-            letter={application.letterCurrent}
-            format={resolvedFormat}
-            applicationId={applicationId}
-            readOnly={isLocked}
-          />
+          <LetterPreview letter={application.letterCurrent} format={resolvedFormat} />
         </div>
       ) : (
         <div

@@ -170,6 +170,38 @@ export async function switchPreviewDoc(page: Page, doc: "resume" | "letter"): Pr
   await page.getByTestId("preview-pane").getByRole("button", { name: label, exact: true }).click();
 }
 
+// ── Cover-letter editor-pane fields (T050/OQ5/F501) ── paragraph-level
+// letter editing moved OUT of the (now view-only) preview-pane canvas and
+// INTO the editor pane's own Cover-letter section — every locator below is
+// scoped to that section's body (`workspace-section-body-letter`, the same
+// testid EditorSection already emits) so a match can never land on a stray
+// element elsewhere on the page, and so a regression that puts editing back
+// in the preview pane fails these locators outright rather than silently
+// still matching.
+export function letterEditorSection(page: Page): Locator {
+  return page.getByTestId("workspace-section-body-letter");
+}
+
+export function letterGreetingField(page: Page): Locator {
+  return letterEditorSection(page).getByTestId("letter-edit-greeting");
+}
+
+export function letterClosingField(page: Page): Locator {
+  return letterEditorSection(page).getByTestId("letter-edit-closing");
+}
+
+export function letterParagraphField(page: Page, index: number): Locator {
+  return letterEditorSection(page).getByTestId(`letter-edit-paragraph-${index}`);
+}
+
+export function letterInsertParagraphButton(page: Page, position: number): Locator {
+  return letterEditorSection(page).getByTestId(`letter-insert-paragraph-${position}`);
+}
+
+export function letterRemoveParagraphButton(page: Page, index: number): Locator {
+  return letterEditorSection(page).getByTestId(`letter-remove-paragraph-${index}`);
+}
+
 // ── Preview canvases ── `.document-preview` hosts the resume's pdf.js
 // canvas (single-page in the application detail view, N pages in the design
 // view's multi-page host — `.first()` is correct, and a harmless no-op, in
