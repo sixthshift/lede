@@ -606,7 +606,7 @@
     {
       "id": "T051",
       "title": "P4: Library per-row Edit + identity line + toolbar (OQ4) (F502/F509)",
-      "status": "todo",
+      "status": "done",
       "phase": "P4",
       "depends_on": [
         "T040",
@@ -622,13 +622,14 @@
         "test/e2e/helpers/workspace.ts",
         "test/e2e/library-crud.spec.ts",
         "test/e2e/cohesion.spec.ts",
-        "playwright.config.ts"
+        "playwright.config.ts",
+        "src/client/components/SectionAccordion.tsx"
       ],
       "origin": "spec Phase 4 / F502/F509 / OQ4",
       "context": "See /workspace/SPEC.md F502/F509 + Locked (library). Today editing takes select-in-dropdown → 'Edit selected' (3 clicks) while destructive Delete is inline — affordance inversion. FIX: per-row Edit button BESIDE Delete (OQ4); DELETE the dropdown + 'Edit selected' pair entirely. Entry rows get an identity line ('Role · Company · Period' — company/role/period never shown today). Import/Export become outline buttons or an overflow menu; the count anchors to the filter control. Delete stays the two-step from T016. Verify LibraryToolbar's real filename. Shares LibraryView/EntryCard with T016/T040 (serialize). Depends on P3. Coarse seed.",
       "acceptance": "- e2e: per-row Edit opens that entry's editor in ONE activation with that entry's data loaded (contrast: two different rows load different data); the dropdown + 'Edit selected' pair is gone from the DOM; each row renders an identity line with company/role/period; delete stays two-step.\n- Baseline gate green; ratchet satisfied.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T051.txt"
     },
     {
       "id": "T052",
