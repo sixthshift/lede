@@ -746,7 +746,7 @@
     {
       "id": "T035",
       "title": "P2 gate repair: proportional-preview clamp regression + migrate old-drawer/no-phone-preview tests to T033 swap/sheet",
-      "status": "todo",
+      "status": "done",
       "phase": "P2",
       "depends_on": [
         "T031",
@@ -762,7 +762,7 @@
       "context": "P2 phase-close gate red; see ledger [0084]. THREE fixes:\n(A) WorkspaceShell.tsx PREVIEW_PROPORTIONAL_WIDTH_CLASS: change w-[clamp(384px,40vw,640px)] to w-[clamp(384px,30vw,640px)]. At 1280 the clamp floor pins the preview to 384px, so the editor returns to ~672px (the P1 width where the template gallery/picker fit); above 1280 the 30vw term still grows the preview. This one change fixes gallery-bounds.spec.ts:69 AND phone-overflow.spec.ts:217 (both were the editor-too-narrow overflow at 1280).\n(B) applications.spec.ts protocol B (~line 1272): the below-1280 arm sets viewport 1024, clicks the 'Show preview' toggle, then calls assertNonModal() which clicks the editor 'Plain text' button and waits for a download. T033 SWAPS the editor OUT below 1280 (zero-width + native inert) when the preview opens, so that editor button can never be clicked -> 1min hang. Migrate the below-1280 arm to T033's swap contract: keep the 1280 co-visible arm exactly as-is; below 1280, after opening the preview assert the non-modal STRUCTURE (no aria-modal, no fixed/absolute-positioned element covering >50% of the viewport), then CLOSE the swap via its toggle (aria-label 'Hide preview' / preview-swap-toggle) and assert the editor's 'Plain text' control is clickable and downloads once the editor is restored. Do NOT delete the below-1280 arm and do NOT weaken assertNonModal.\n(C) phone-overflow.spec.ts:157 (~line 212): it asserts expect(getByRole('button',{name:'Show preview'})).toHaveCount(0) below lg — a T031 stopgap (its own comment says revealing preview at phone width is T033's job). T033 added the below-lg preview-sheet-trigger FAB (aria-label 'Show preview', data-testid 'preview-sheet-trigger'). Flip that assertion to require the trigger PRESENT below lg (getByTestId('preview-sheet-trigger') visible, or toHaveCount(1)). Keep every stacking/overflow assertion in the file unchanged.\nLocked (cite): de-modal forever — a pane SWAP is not modality (editor replaced, not covered); the below-lg preview is a SANCTIONED sheet (dismissible + focus-managed, no aria-modal). Proportional preview must still GROW on screens wider than 1280 (do not replace the clamp with a fixed 384px).",
       "acceptance": "- pane-arbitration.spec.ts stays GREEN after the clamp change — esp :134 (1512 preview width >384 and <756; 1280 preview >=384). Proportional growth preserved; only the 1280 baseline pinned to 384.\n- gallery-bounds.spec.ts:69 GREEN (template gallery fully within the editor pane at 1280).\n- phone-overflow.spec.ts GREEN incl :157 (below-lg preview trigger asserted PRESENT) and :217 (no horizontal overflow at 1280).\n- applications.spec.ts protocol B GREEN and MIGRATED: below-1280 arm still asserts non-modal (no aria-modal, no >50% fixed/absolute overlay) AND proves the editor is reachable/clickable after closing the swap. Not deleted, not weakened.\n- No per-file expect() decrease in applications.spec.ts or phone-overflow.spec.ts (assertions re-homed, never deleted).\n- Baseline gate green: bun run check/build/lint exit 0, bunx vitest run 1077 pass.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T035.txt"
     }
   ]
 }

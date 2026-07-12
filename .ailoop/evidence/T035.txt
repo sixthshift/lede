@@ -1,0 +1,8 @@
+T035 (P2 gate repair) — independent re-verify on branch t035-p2-gate-repair tip 5bd58db, baseSha 8de2e4a.
+SCOPE (excl .ailoop): WorkspaceShell.tsx, applications.spec.ts, phone-overflow.spec.ts, workspace-shell.test.tsx. All declared (last added [0087]). CLEAN.
+FAST BASELINE: check 0 · build 0 · lint 0 (254) · vitest 1077/1077.
+FIX A: clamp 40vw→30vw (one token) — at 1280 floor-pins preview to 384 (editor→672, P1 width); grows above 1280. workspace-shell.test.tsx:88 literal updated to match.
+FIX B (protocol B): factored assertNonModalStructure() (aria-modal + >50%-overlay checks); 1280 arm keeps full assertNonModal (structure + editor Plain-text click) UNCHANGED; below-1280 swap-open arm asserts structure THEN closes the swap ("Hide preview") and proves editor "Plain text" clickable+downloads once restored. STRENGTHENED not weakened (+2 expect, 230→232).
+FIX C (phone-overflow:212): flipped toHaveCount(0) for "Show preview" → getByTestId("preview-sheet-trigger").toBeVisible() (T033's below-lg FAB present); preview-pane still asserted hidden. expect() 19→19 (in-place swap, no decrease).
+RATCHET: no per-file expect() decrease. GAMING: CLEAN.
+Builder per-spec playwright (applications project): gallery-bounds:69 PASS, pane-arbitration:134 PASS (proportional green at 30vw), phone-overflow:143/157/219 PASS, applications.spec protocol B PASS (18 passed). Coordinator re-runs the FULL P2 gate on merged tree next.
