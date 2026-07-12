@@ -113,3 +113,9 @@ corrections.
 [0024] T016 — worker stopped mid-run (0 commits, uncommitted work in worktree: EntryCard.tsx, library-crud.spec.ts, library.test.tsx). Resumed via SendMessage to verify scope (library.test.tsx touch), self-check, commit, and report. Not a failure — interrupted session.
   decision: continue (resume)
   why: substantial near-complete work exists uncommitted; resume is cheaper than fresh re-dispatch and preserves it.
+
+[0025] T016 — DONE (re-verify green). Merged 417c595. Scope clean (+necessary library.test.tsx migration, expects 10→13 grew). Gaming pass (ApplicationCard pattern, per-row blur isolation). Baseline green (vitest 1071, pw chromium 24/auth 1/applications 38). Ratchet chromium 20->24.
+  evidence: .ailoop/evidence/T016.txt
+[0026] T017 — dispatch (build, SERIAL) · sonnet · worktree · baseSha (post-T016 main) · attempt 1/3 · playwright.config.ts declared
+  decision: continue
+  why: next ready P0 (F107 card overflow/stamp + F110 dark hover).

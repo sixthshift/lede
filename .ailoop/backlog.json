@@ -122,7 +122,7 @@
     {
       "id": "T016",
       "title": "F106 — Library entry Delete becomes two-step (armed confirm)",
-      "status": "in-progress",
+      "status": "done",
       "phase": "P0",
       "depends_on": [],
       "files": [
@@ -135,16 +135,17 @@
       "context": "See /workspace/SPEC.md F106. Library entry Delete fires irreversibly on one click (`LibraryView.tsx:205`, `EntryCard.tsx:35`) with zero confirmation. FIX: reuse the armed two-step pattern the dashboard cards already implement (`ApplicationCard.tsx:172-188` — read it, mirror it): first activation arms ('Confirm delete'), second deletes; blur/Escape disarms. Destructive confirms are inline two-step per the de-modal policy — never `window.confirm`, never a modal. Do not change the delete endpoint/behavior, only gate it.",
       "acceptance": "- e2e (chromium/library-crud or applications): first Delete activation arms (no deletion, entry still present, server not called); second activation deletes with a server round-trip asserted; Escape/blur after arming disarms (entry restored, no delete).\n- PER-ROW isolation (rules out one shared boolean): arm entry A, then click Delete once on a DIFFERENT entry B ⇒ B only arms (no delete) and A auto-disarms.\n- Baseline gate green.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T016.txt"
     },
     {
       "id": "T017",
       "title": "F107 + F110 — dashboard card action-row overflow, stamp wrap, dark hover",
-      "status": "todo",
+      "status": "in-progress",
       "phase": "P0",
       "depends_on": [],
       "files": [
-        "src/client/components/ApplicationCard.tsx"
+        "src/client/components/ApplicationCard.tsx",
+        "playwright.config.ts"
       ],
       "origin": "spec F107 + F110 / Phase 0",
       "context": "See /workspace/SPEC.md F107, F110 + Locked (card fixes). F107: the action row (258px of buttons in a 240px card, `justify-end` spills left; `ApplicationCard.tsx:151`) overflows the card and overlaps the neighbor at 768–1024; the footer stamp breaks mid-date at 1280 (`ApplicationCard.tsx:133-142`). F110: dark-mode card hover elevation is invisible (`hover:shadow-md` alone doesn't register black-on-near-black; `ApplicationCard.tsx:109`). FIX per Locked (card fixes): action row `flex-wrap`; stamp `whitespace-nowrap`; dark card hover adds `hover:border-border-strong` alongside the shadow (border must compute to the resolved `--border-strong` and differ from rest-state — red-team #21). Note: broader card-detail fixes (Escape-disarm, dup highlight, focus-ring radius) are Phase 3 T045 — scope THIS ticket to overflow/stamp/dark-hover only.",
