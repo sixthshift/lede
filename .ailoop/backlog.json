@@ -657,7 +657,7 @@
     {
       "id": "T053",
       "title": "P4: Settings — split format monolith into sub-cards, center the column, ≤1200px cards (F506)",
-      "status": "todo",
+      "status": "done",
       "phase": "P4",
       "depends_on": [
         "T040",
@@ -675,7 +675,7 @@
       "context": "See /workspace/SPEC.md F506 + Locked (settings). 'Default document format' is one 3,153px monolith card beside two ~200px peers; cards are left-anchored with ~640px dead space at 1512. FIX: split the format monolith into grouped sub-cards sharing the ONE rail entry; center the column. Hard bound (red-team #22): no card exceeds 1,200px rendered height. Every section must still round-trip (re-run the v3 settings enumeration). Depends on P3.",
       "acceptance": "- e2e: no Settings card exceeds 1,200px rendered height; the column is centered (not left-anchored with large dead space); every settings section still round-trips (save + reload reflects).\n- Baseline gate green.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T053.txt"
     },
     {
       "id": "T054",
