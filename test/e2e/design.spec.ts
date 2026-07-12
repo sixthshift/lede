@@ -60,6 +60,27 @@ function previewDataUrl(page: import("@playwright/test").Page): Promise<string> 
 
 const expectCanvasPainted = expectResumeCanvasPainted;
 
+// DesignPanel's internal control groups default COLLAPSED (F505/T041a —
+// design-accordion.spec.ts): a control inside a folded group is present in the
+// DOM but its region is `overflow-hidden` at 0 height, so a direct `.click()`
+// on it lands on the group wrapper instead ("intercepts pointer events").
+// Opening the owning group first is the redesigned UX's real interaction (a
+// user expands the group to reach its controls) and persists across this
+// test's reloads via the group's own localStorage key. Idempotent: a no-op
+// when the group is already expanded. (Read-only assertions like
+// toBeDisabled/toHaveText don't need this — only click targets do.)
+async function expandDesignGroup(
+  page: import("@playwright/test").Page,
+  key: string,
+): Promise<void> {
+  const toggle = page.getByTestId(`design-group-toggle-${key}`);
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute("aria-expanded")) === "false") {
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  }
+}
+
 test("design controls: reachable in-workspace, debounced persistence, preview host, locked read-only", async ({
   page,
 }) => {
@@ -117,6 +138,10 @@ test("design controls: reachable in-workspace, debounced persistence, preview ho
   // — the Design card's own heading/controls, never a separate route.
   await expect(page).toHaveURL(`/applications/${applicationId}`);
   await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
+  // Open the Typography group so its Body font control is reachable for the
+  // click below (default-collapsed since T041a; localStorage-persisted, so
+  // this one open holds through every reload in this test).
+  await expandDesignGroup(page, "typography");
   await expect(page.getByRole("combobox", { name: "Body font" })).toBeVisible();
 
   // (4) the co-visible preview host painted a real PDF.
@@ -165,6 +190,9 @@ test("design controls: reachable in-workspace, debounced persistence, preview ho
   // captures. The workspace's editor/preview panes are separate columns
   // (never overlapping, unlike the former dedicated design view's two-column
   // grid), so this is a plain click — no scroll/position workaround needed.
+  // Open the Sections › Experience group so its "Experience order" control is
+  // reachable for the click below (same default-collapse as Typography above).
+  await expandDesignGroup(page, "sectionsExperience");
   const experienceOrderCombobox = page.getByRole("combobox", { name: "Experience order" });
   await experienceOrderCombobox.scrollIntoViewIfNeeded();
   await experienceOrderCombobox.click();
@@ -235,16 +263,16 @@ test("design controls: reachable in-workspace, debounced persistence, preview ho
   expect(savedEntry, "the new preset must be in the persisted presets[]").toBeTruthy();
   expect(savedEntry?.format.fonts.body).toBe("arimo");
 
-  // The saved preset appears in the gallery immediately (same settings query
-  // cache the mutation just invalidated), with its ATS grade badge.
-  await page.getByRole("button", { name: "Browse templates" }).click();
-  await expect(page.getByRole("heading", { name: "Browse templates" })).toBeVisible();
+  // The saved preset appears in the inline template picker immediately (same
+  // settings query cache the mutation just invalidated), with its ATS grade
+  // badge. v4-T041b: the "Browse templates" popover is deleted — the inline
+  // picker (TemplatePicker's "Your saved presets" block) is now the single
+  // template-choice surface, so this reads it in-flow with no dialog to open.
   await expect(page.getByText("Your saved presets")).toBeVisible();
   const savedPresetButton = page.getByRole("button", { name: new RegExp(`^${PRESET_NAME}`) });
+  await savedPresetButton.scrollIntoViewIfNeeded();
   await expect(savedPresetButton).toBeVisible();
   await expect(savedPresetButton.getByText(/^ATS: (strict|good)$/)).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toBeHidden();
 
   // Diverge the live design AWAY from the saved snapshot — a different body
   // font — so re-applying the preset below is an observable change.
@@ -264,11 +292,11 @@ test("design controls: reachable in-workspace, debounced persistence, preview ho
   await expect(page.getByRole("combobox", { name: "Body font" })).toHaveText(/Roboto/);
   await expectCanvasPainted(page);
 
-  await page.getByRole("button", { name: "Browse templates" }).click();
   await expect(page.getByText("Your saved presets")).toBeVisible();
   const savedPresetButtonAfterReload = page.getByRole("button", {
     name: new RegExp(`^${PRESET_NAME}`),
   });
+  await savedPresetButtonAfterReload.scrollIntoViewIfNeeded();
   await expect(savedPresetButtonAfterReload).toBeVisible();
 
   // Selecting it applies its stored format DIRECTLY — the body font flips
@@ -279,7 +307,6 @@ test("design controls: reachable in-workspace, debounced persistence, preview ho
   ]);
   expect(applyPutResponse.status()).toBe(200);
   expect((await applyPutResponse.json()).format.fonts.body).toBe("arimo");
-  await expect(page.getByRole("dialog")).toBeHidden();
   await expect(page.getByRole("combobox", { name: "Body font" })).toHaveText(/Arimo/);
   await expectCanvasPainted(page);
 
@@ -304,16 +331,18 @@ test("design controls: reachable in-workspace, debounced persistence, preview ho
   expect(consoleErrors, `unexpected console errors: ${consoleErrors.join(", ")}`).toHaveLength(0);
 });
 
-// ── v3-T024: de-modal TemplateGallery ── same bar v3-T020/T021/T022/T023 set
-// for NewApplication/EntryEditor/LayoutEditor/ProfileEditor: no aria-modal, no
-// oversized overlay, the underlying workspace stays genuinely clickable,
-// focus opens into the panel, and Escape returns focus to the "Browse
-// templates" button that invoked it. Reuses this file's own PASSWORD/JD
+// ── v4-T041b: inline template-apply (re-homed from v3-T024's de-modal
+// TemplateGallery) ── the "Browse templates" popover is deleted, so the
+// popover-panel-only modality/Escape/focus-into-panel assertions are gone
+// with it (there is no panel to open). What SURVIVES is the behavioral core
+// v3-T024 also proved: selecting a BUILT-IN template from the (now inline)
+// picker applies it — observed as the real format PUT round trip, not a no-op
+// click on the already-selected card. Reuses this file's own PASSWORD/JD
 // (firstRunLogin's setup-409-then-login fallback makes a second first-run
 // call safe — see that const's comment above) so this test is fully
 // self-contained rather than depending on state left by the test above.
-test.describe("de-modal TemplateGallery (v3-T024)", () => {
-  test("Browse templates panel: non-modal, underlying workspace stays clickable, focus opens into the panel, Escape returns focus to the trigger, selecting a template applies it", async ({
+test.describe("inline template picker applies a built-in template (v4-T041b)", () => {
+  test("selecting a built-in template card applies it (format PUT round trip), no popover", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
@@ -322,34 +351,20 @@ test.describe("de-modal TemplateGallery (v3-T024)", () => {
     await firstRunLogin(page, PASSWORD);
     await expect(page).toHaveURL(/\/applications$/);
 
-    const COMPANY = `E2E Gallery Modality Co ${runId}`;
+    const COMPANY = `E2E Inline Template Co ${runId}`;
     const applicationId = await createApplication(page, { company: COMPANY, jd: JD });
     await page.goto(`/applications/${applicationId}`);
     await tailor(page, applicationId);
     await expect(page.getByRole("button", { name: "Re-tailor", exact: true })).toBeVisible();
 
-    const trigger = page.getByRole("button", { name: "Browse templates" });
-    await trigger.click();
-
-    // The gallery actually opened with real cards, not an empty shell —
-    // asserted FIRST, before any modality check.
+    // The template roster is present INLINE (no "Browse templates" trigger to
+    // open) — the picker's real cards, not an empty shell.
+    await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
     const firstCard = page.locator("[data-template-id]").first();
     await expect(firstCard).toBeVisible();
 
+    // The inline picker is in normal flow — no aria-modal, no oversized scrim.
     await assertNoModalOverlay(page);
-
-    // Focus opens INTO the panel (the first template card), not left on the trigger.
-    await expect(firstCard).toBeFocused();
-
-    // The underlying workspace stays genuinely interactive while the panel is
-    // open: a real, un-forced click on the preview pane's "Letter" tab (a
-    // control OUTSIDE the gallery) flips its own aria-pressed state — proof
-    // nothing invisible is intercepting the click, not merely that the
-    // element "exists".
-    const letterTab = page.getByRole("button", { name: "Letter", exact: true });
-    await letterTab.click();
-    await expect(letterTab).toHaveAttribute("aria-pressed", "true");
-    await page.getByRole("button", { name: "Resume", exact: true }).click();
 
     // Selecting a built-in template applies it — observed as the format PUT
     // round trip (the same oracle design.spec.ts's saved-preset case uses
@@ -357,6 +372,7 @@ test.describe("de-modal TemplateGallery (v3-T024)", () => {
     const applicationPut = (r: import("@playwright/test").Response) =>
       r.url().endsWith(`/api/applications/${applicationId}`) && r.request().method() === "PUT";
     const compactCard = page.locator('[data-template-id="compact"]');
+    await compactCard.scrollIntoViewIfNeeded();
     await expect(compactCard).toBeVisible();
     const [applyPutResponse] = await Promise.all([
       page.waitForResponse(applicationPut),
@@ -364,16 +380,7 @@ test.describe("de-modal TemplateGallery (v3-T024)", () => {
     ]);
     expect(applyPutResponse.status()).toBe(200);
     expect((await applyPutResponse.json()).format.presetId).toBe("compact");
-    await expect(page.getByRole("dialog")).toBeHidden();
+    await expect(compactCard).toHaveAttribute("aria-pressed", "true");
     await expectResumeCanvasPainted(page);
-
-    // Escape returns focus to the trigger — reopen the (now-closed) gallery
-    // to exercise Escape specifically, since selecting a card above already
-    // closed it via onChange rather than Escape.
-    await trigger.click();
-    await expect(page.locator("[data-template-id]").first()).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).toBeHidden();
-    await expect(trigger).toBeFocused();
   });
 });

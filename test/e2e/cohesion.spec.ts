@@ -298,26 +298,6 @@ test.describe("SWEEP 1 — app-wide modality: every de-modal panel stays non-mod
 
     await assertNoModalOverlay(page);
   });
-
-  test("TemplateGallery via Browse templates is non-modal (application detail, /applications/:id)", async ({
-    page,
-  }, testInfo) => {
-    await page.goto("/");
-    await login(page, PASSWORD);
-    await expect(page).toHaveURL(/\/applications$/);
-
-    const company = `E2E Sweep Gallery Co ${runId}-${testInfo.retry}`;
-    const applicationId = await createApplication(page, { company, jd: JD });
-    await page.goto(`/applications/${applicationId}`);
-
-    const trigger = page.getByRole("button", { name: "Browse templates" });
-    await trigger.click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await expect(page.locator("[data-template-id]").first()).toBeVisible();
-
-    await assertNoModalOverlay(page);
-  });
 });
 
 // ── v3-T051: co-visibility re-run ── the DEGRADE test above already proves

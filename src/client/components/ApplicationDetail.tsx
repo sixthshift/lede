@@ -41,7 +41,6 @@ import { GenStateBadge } from "./GenStateBadge";
 import { JobPanel } from "./JobPanel";
 import { LetterPreview } from "./LetterPreview";
 import { ResultView } from "./ResultView";
-import { TemplateGallery } from "./TemplateGallery";
 import { TemplatePicker } from "./TemplatePicker";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
@@ -520,7 +519,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   // Saves the FULL current in-memory format as a new named preset
   // (settings.presets, §9/E9-F5b) — a complete DocumentFormatV2 snapshot, not
   // a composition delta, so selecting it back later applies it directly
-  // (TemplateGallery's onChange(savedPreset.format), never applyPreset).
+  // (TemplatePicker's saved-preset onChange(preset.format), never applyPreset).
   const handleSaveAsPreset = () => {
     const name = window.prompt("Name this preset")?.trim();
     if (!name) return;
@@ -862,15 +861,6 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
                 >
                   Save current design as preset
                 </Button>
-                <TemplateGallery
-                  format={displayFormat}
-                  onChange={handleFormatChange}
-                  readOnly={isLocked}
-                  resume={application.current}
-                  profile={profile}
-                  paper={paper}
-                  savedPresets={settings?.presets ?? []}
-                />
               </div>
               <TemplatePicker
                 format={displayFormat}
@@ -879,6 +869,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
                 resume={application.current}
                 profile={profile}
                 paper={paper}
+                savedPresets={settings?.presets ?? []}
               />
             </div>
             <DesignPanel format={displayFormat} onChange={handleFormatChange} readOnly={isLocked} />

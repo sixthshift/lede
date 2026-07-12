@@ -1,24 +1,18 @@
-// F102/T013 (spec.md, .ailoop/oracle.md Phase 0 gate) — TEMPORARY: Phase 4/
-// T041 deletes the whole `TemplateGallery` popover and re-targets this
-// containment assertion onto whatever inline presentation survives, so this
-// file's only job is proving the Phase-0 reposition and staying out of the
-// way once that happens.
-//
-// TemplateGallery.tsx:105 used `absolute right-0`, anchored to the "Browse
-// templates" trigger's own box — but that trigger sits wherever the
-// right-justified Design-card button row places it, not at the editor
-// pane's edge, so a 42rem-wide panel hung 49px off the LEFT of that anchor
-// and opened under the rail with its title and first tile column cut. The
-// fix repositions it (`fixed left-56 top-16`, pinned to the SAME width
-// tokens WorkspaceShell already defines for its rail/preview panes) so its
-// box sits fully inside the editor pane at 1280x720 — this spec proves that
-// geometrically, not just "a dialog opened".
+// F102 (spec.md, .ailoop/oracle.md Phase 0 gate) — RE-HOMED (v4-T041b): the
+// original `TemplateGallery` "Browse templates" popover is deleted; its inline
+// counterpart, `TemplatePicker`, is now the single template-choice surface on
+// the detail route. This file's F102 intent survives verbatim, re-targeted
+// onto that inline picker: the template roster must sit fully WITHIN the
+// editor pane at 1280x720, at real (non-degenerate) size, with the FULL
+// roster present — never clipped, never shrunk to fit, never spilling under
+// the rail or the preview pane.
 //
 // Anti-gaming (oracle.md's protocols + this ticket's own acceptance): a
-// corner-tucked, near-zero popover would also satisfy naive containment, so
-// this asserts the title AND first tile each have nonzero rendered size and
-// individually sit inside the pane, AND that every template card (full
-// count, full name text) survives un-shrunk — not just the first one.
+// near-zero, corner-tucked set of tiles would also satisfy naive
+// containment, so this asserts each tile has nonzero rendered size AND
+// individually sits inside the pane, AND that every template card (full
+// count, full name + description text) survives un-shrunk — not just the
+// first one.
 import { test, expect, type Page } from "@playwright/test";
 import { CONTRAST_JDS } from "../../src/server/tailor/evalcore";
 import { PRESET_MANIFESTS } from "../../src/client/document/registry";
@@ -33,23 +27,24 @@ function requireBox(box: { x: number; y: number; width: number; height: number }
   return box!;
 }
 
-// boundingBox() containment: `inner` fully inside `outer`'s box, on all four
-// edges (equality allowed — sitting flush against an edge isn't clipping).
-function expectContained(
-  inner: { x: number; y: number; width: number; height: number },
-  outer: { x: number; y: number; width: number; height: number },
+// boundingBox() HORIZONTAL containment: `inner`'s left+right edges sit inside
+// `outer`'s box (equality allowed — sitting flush against an edge isn't
+// clipping). This is the F102 axis: the deleted popover's bug was hanging off
+// the LEFT of its anchor and sliding UNDER THE RAIL (horizontal clip); the
+// inline picker lives in the editor pane's own vertically-SCROLLING column,
+// so its tiles legitimately extend past the viewport's bottom edge — vertical
+// overflow is by design (that's what scrolling is for) and is NOT clipping.
+function expectHorizontallyContained(
+  inner: { x: number; width: number },
+  outer: { x: number; width: number },
 ) {
   expect(inner.x, "left edge inside the pane").toBeGreaterThanOrEqual(outer.x - 0.5);
-  expect(inner.y, "top edge inside the pane").toBeGreaterThanOrEqual(outer.y - 0.5);
   expect(inner.x + inner.width, "right edge inside the pane").toBeLessThanOrEqual(
     outer.x + outer.width + 0.5,
   );
-  expect(inner.y + inner.height, "bottom edge inside the pane").toBeLessThanOrEqual(
-    outer.y + outer.height + 0.5,
-  );
 }
 
-async function openGallery(page: Page) {
+async function openDetail(page: Page) {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto("/");
   await firstRunLogin(page, PASSWORD);
@@ -58,56 +53,40 @@ async function openGallery(page: Page) {
   const company = `E2E Gallery Bounds Co ${runId}`;
   const applicationId = await createApplication(page, { company, jd: JD });
   await page.goto(`/applications/${applicationId}`);
-
-  await page.getByRole("button", { name: "Browse templates" }).click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  return dialog;
+  await expect(page.getByRole("heading", { name: "Design" })).toBeVisible();
 }
 
-test.describe("F102 template gallery reposition (v4-T013, TEMPORARY — Phase 4/T041 re-targets)", () => {
-  test("gallery boundingBox is fully within the editor pane at 1280x720, non-degenerate", async ({
+test.describe("F102 inline template picker bounds (v4-T041b — re-homed from the deleted gallery popover)", () => {
+  test("the inline template picker is fully within the editor pane at 1280x720, non-degenerate, full roster", async ({
     page,
   }) => {
-    const dialog = await openGallery(page);
+    await openDetail(page);
 
     const editorPane = requireBox(await page.getByTestId("editor-pane").boundingBox());
-    const dialogBox = requireBox(await dialog.boundingBox());
 
-    // The whole panel is inside the editor pane — not just "some dialog
-    // opened somewhere on the page".
-    expectContained(dialogBox, editorPane);
-
-    // NOT degenerate: title and first tile each render at real size AND
-    // individually sit inside the pane (rules out a near-zero, corner-tucked
-    // popover that would also pass a naive box-containment check).
-    const title = page.getByRole("heading", { name: "Browse templates" });
-    const titleBox = requireBox(await title.boundingBox());
-    expect(titleBox.width).toBeGreaterThan(20);
-    expect(titleBox.height).toBeGreaterThan(8);
-    expectContained(titleBox, editorPane);
-
-    const firstTile = page.locator("[data-template-id]").first();
-    const firstTileBox = requireBox(await firstTile.boundingBox());
-    expect(firstTileBox.width).toBeGreaterThan(50);
-    expect(firstTileBox.height).toBeGreaterThan(50);
-    expectContained(firstTileBox, editorPane);
-
-    // Full tile roster preserved — un-shrunk, not truncated to fit. Scoped
-    // to the dialog: the inline TemplatePicker below shares the same
-    // data-template-id attributes and stays mounted underneath.
+    // Full tile roster preserved — un-shrunk, not truncated to fit.
     const expectedIds = Object.keys(PRESET_MANIFESTS);
-    const tiles = dialog.locator("[data-template-id]");
+    const tiles = page.locator("[data-template-id]");
     await expect(tiles).toHaveCount(expectedIds.length);
 
+    // Every card: NON-degenerate (real rendered size, rules out a near-zero
+    // corner-tucked tile that would pass naive containment) AND fully inside
+    // the editor pane (never clipped under the rail or preview pane).
     for (const manifest of Object.values(PRESET_MANIFESTS)) {
-      const card = dialog.locator(`[data-template-id="${manifest.id}"]`);
+      const card = page.locator(`[data-template-id="${manifest.id}"]`);
+      await card.scrollIntoViewIfNeeded();
+      const cardBox = requireBox(await card.boundingBox());
+      expect(cardBox.width, `${manifest.id} tile has real width`).toBeGreaterThan(50);
+      expect(cardBox.height, `${manifest.id} tile has real height`).toBeGreaterThan(50);
+      expectHorizontallyContained(cardBox, editorPane);
+
+      // Name + description render at full text, not truncated to fit.
       await expect(card.getByText(manifest.name, { exact: true })).toBeVisible();
       await expect(card.getByText(manifest.description)).toBeVisible();
     }
 
-    // De-modal ban (CLAUDE.md, oracle.md): no aria-modal, no scrim covering
-    // >50% of the viewport, at >=lg.
+    // De-modal ban (CLAUDE.md, oracle.md): the inline picker is in normal
+    // flow — no aria-modal, no scrim covering >50% of the viewport, at >=lg.
     await assertNoModalOverlay(page);
   });
 });
