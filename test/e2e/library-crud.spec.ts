@@ -5,7 +5,7 @@
 // complement to the keyless `entries persist across restart` API test
 // (test/api.entries.test.ts) — same DATA_DIR, but proving the UI re-reads it
 // rather than the API round-tripping it.
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import {
   openAddEntry,
   selectSection,
@@ -68,8 +68,17 @@ test.describe("experience section", () => {
     await expect(page.locator('[data-section="experience"]').getByText(edited)).toBeVisible();
   });
 
-  test("delete: removing the entry drops it from the list", async ({ page }) => {
-    await cardFor(page, edited).getByRole("button", { name: "Delete" }).click();
+  test("delete: two-step armed confirm — first click arms, second removes it from the list", async ({
+    page,
+  }) => {
+    const deleteButton = cardFor(page, edited).getByRole("button", { name: "Delete" });
+    await deleteButton.click();
+    await expect(
+      cardFor(page, edited).getByRole("button", { name: "Confirm delete" }),
+    ).toBeVisible();
+    await expect(page.getByText(edited, { exact: true })).toBeVisible();
+
+    await cardFor(page, edited).getByRole("button", { name: "Confirm delete" }).click();
     await expect(page.getByText(edited, { exact: true })).toHaveCount(0);
   });
 });
@@ -373,8 +382,162 @@ test.describe("project section", () => {
     await expect(page.locator('[data-section="project"]').getByText(edited)).toBeVisible();
   });
 
-  test("delete: removing the entry drops it from the list", async ({ page }) => {
-    await cardFor(page, edited).getByRole("button", { name: "Delete" }).click();
+  test("delete: two-step armed confirm — first click arms, second removes it from the list", async ({
+    page,
+  }) => {
+    const deleteButton = cardFor(page, edited).getByRole("button", { name: "Delete" });
+    await deleteButton.click();
+    await expect(
+      cardFor(page, edited).getByRole("button", { name: "Confirm delete" }),
+    ).toBeVisible();
+    await expect(page.getByText(edited, { exact: true })).toBeVisible();
+
+    await cardFor(page, edited).getByRole("button", { name: "Confirm delete" }).click();
     await expect(page.getByText(edited, { exact: true })).toHaveCount(0);
+  });
+});
+
+// ── F106 (T016): two-step armed delete on EntryCard ── mirrors the
+// dashboard's ApplicationCard armed-delete bar (applications.spec.ts's own
+// DELETE assertion): first activation arms without deleting (no server call,
+// no modality), second deletes with an actual server round-trip; blur/Escape
+// disarm. Arm state is local to EACH EntryCard instance rather than one
+// shared flag, so arming a row and then clicking Delete on a DIFFERENT row
+// must only arm that other row (never delete it) while auto-disarming the
+// first, via ordinary focus/blur — not a second boolean.
+test.describe("F106: two-step armed delete (T016)", () => {
+  async function createScratchEntry(page: Page, fact: string): Promise<void> {
+    const dialog = await openAddEntry(page);
+    // defaultSection is "experience" (EntryEditor.tsx) — no section change needed.
+    await dialog.getByLabel(/^Company/).fill("F106 Scratch Co");
+    await dialog.getByLabel(/^Role/).fill("Scratch Role");
+    await dialog.getByLabel(/^Period/).fill("2023-2024");
+    await dialog.getByLabel("Facts 1", { exact: true }).fill(fact);
+    await submitAndClose(dialog, "Create entry");
+    await expect(page.getByText(fact, { exact: true })).toBeVisible();
+  }
+
+  test("first activation arms without deleting: no server call, entry stays, still non-modal", async ({
+    page,
+  }) => {
+    const fact = `F106 arm-only fact ${runId}`;
+    await createScratchEntry(page, fact);
+
+    const deleteRequests: string[] = [];
+    page.on("request", (req) => {
+      if (req.method() === "DELETE" && /\/api\/entries\//.test(req.url())) {
+        deleteRequests.push(req.url());
+      }
+    });
+
+    const card = cardFor(page, fact);
+    await card.getByRole("button", { name: "Delete" }).click();
+    await expect(card.getByRole("button", { name: "Confirm delete" })).toBeVisible();
+    await assertNoModalOverlay(page);
+
+    // Give an accidental network call a moment to land before asserting zero.
+    await page.waitForTimeout(300);
+    expect(deleteRequests, "arming must not call the server").toHaveLength(0);
+    await expect(page.getByText(fact, { exact: true })).toBeVisible();
+
+    // Cleanup — second activation actually deletes it so it doesn't leak.
+    await card.getByRole("button", { name: "Confirm delete" }).click();
+    await expect(page.getByText(fact, { exact: true })).toHaveCount(0);
+  });
+
+  test("second activation deletes with an asserted server round-trip", async ({ page }) => {
+    const fact = `F106 confirm-delete fact ${runId}`;
+    await createScratchEntry(page, fact);
+
+    const card = cardFor(page, fact);
+    const entryId = await card.getAttribute("data-entry-id");
+    expect(entryId, "card must carry its data-entry-id").toBeTruthy();
+
+    await card.getByRole("button", { name: "Delete" }).click();
+    await expect(card.getByRole("button", { name: "Confirm delete" })).toBeVisible();
+
+    await Promise.all([
+      page.waitForResponse(
+        (r) =>
+          r.url().endsWith(`/api/entries/${entryId}`) &&
+          r.request().method() === "DELETE" &&
+          r.status() === 200,
+      ),
+      card.getByRole("button", { name: "Confirm delete" }).click(),
+    ]);
+    await expect(page.getByText(fact, { exact: true })).toHaveCount(0);
+  });
+
+  test("Escape after arming disarms: reverts to Delete, no deletion", async ({ page }) => {
+    const fact = `F106 escape-disarm fact ${runId}`;
+    await createScratchEntry(page, fact);
+
+    const card = cardFor(page, fact);
+    await card.getByRole("button", { name: "Delete" }).click();
+    await expect(card.getByRole("button", { name: "Confirm delete" })).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(card.getByRole("button", { name: "Delete" })).toBeVisible();
+    await expect(page.getByText(fact, { exact: true })).toBeVisible();
+
+    // Cleanup.
+    await card.getByRole("button", { name: "Delete" }).click();
+    await card.getByRole("button", { name: "Confirm delete" }).click();
+    await expect(page.getByText(fact, { exact: true })).toHaveCount(0);
+  });
+
+  test("blur after arming disarms: reverts to Delete, no deletion", async ({ page }) => {
+    const fact = `F106 blur-disarm fact ${runId}`;
+    await createScratchEntry(page, fact);
+
+    const card = cardFor(page, fact);
+    await card.getByRole("button", { name: "Delete" }).click();
+    await expect(card.getByRole("button", { name: "Confirm delete" })).toBeVisible();
+
+    // Moves focus elsewhere on the page, blurring the armed button.
+    await page.getByRole("button", { name: "Add entry" }).focus();
+    await expect(card.getByRole("button", { name: "Delete" })).toBeVisible();
+    await expect(page.getByText(fact, { exact: true })).toBeVisible();
+
+    // Cleanup.
+    await card.getByRole("button", { name: "Delete" }).click();
+    await card.getByRole("button", { name: "Confirm delete" }).click();
+    await expect(page.getByText(fact, { exact: true })).toHaveCount(0);
+  });
+
+  test("per-row isolation: arming entry A then clicking Delete once on a different entry B arms B only and auto-disarms A", async ({
+    page,
+  }) => {
+    const factA = `F106 row-a fact ${runId}`;
+    const factB = `F106 row-b fact ${runId}`;
+    await createScratchEntry(page, factA);
+    await createScratchEntry(page, factB);
+
+    const cardA = cardFor(page, factA);
+    const cardB = cardFor(page, factB);
+
+    await cardA.getByRole("button", { name: "Delete" }).click();
+    await expect(cardA.getByRole("button", { name: "Confirm delete" })).toBeVisible();
+
+    // A single click on B's Delete — this rules out a shared boolean, which
+    // would already read "armed" for every row and fire the delete right
+    // here instead of merely arming B.
+    await cardB.getByRole("button", { name: "Delete" }).click();
+    await expect(cardB.getByRole("button", { name: "Confirm delete" })).toBeVisible();
+    await expect(page.getByText(factB, { exact: true })).toBeVisible();
+
+    // A must have auto-disarmed back to "Delete", untouched.
+    await expect(cardA.getByRole("button", { name: "Delete" })).toBeVisible();
+    await expect(page.getByText(factA, { exact: true })).toBeVisible();
+
+    // Cleanup both — interacting with A's button blurs B (disarming it too),
+    // so B needs re-arming before its own delete.
+    await cardA.getByRole("button", { name: "Delete" }).click();
+    await cardA.getByRole("button", { name: "Confirm delete" }).click();
+    await expect(page.getByText(factA, { exact: true })).toHaveCount(0);
+
+    await cardB.getByRole("button", { name: "Delete" }).click();
+    await cardB.getByRole("button", { name: "Confirm delete" }).click();
+    await expect(page.getByText(factB, { exact: true })).toHaveCount(0);
   });
 });

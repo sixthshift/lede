@@ -92,7 +92,15 @@ describe("LibraryView", () => {
     await screen.findByText("TypeScript");
 
     const cardA = screen.getByText("TypeScript").closest("[data-entry-id]") as HTMLElement;
+    // F106: Delete is a two-step armed confirm — first click only arms it.
     fireEvent.click(within(cardA).getByRole("button", { name: "Delete" }));
+    expect(within(cardA).getByRole("button", { name: "Confirm delete" })).toBeInTheDocument();
+    expect(screen.getByText("TypeScript")).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(([, init]) => (init as RequestInit)?.method === "DELETE"),
+    ).toBe(false);
+
+    fireEvent.click(within(cardA).getByRole("button", { name: "Confirm delete" }));
 
     await waitFor(() => expect(screen.queryByText("TypeScript")).not.toBeInTheDocument());
     expect(screen.getByText("AWS Certified Solutions Architect")).toBeInTheDocument();
