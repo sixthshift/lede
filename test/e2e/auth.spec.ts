@@ -35,10 +35,15 @@ test.describe("first-run set-password -> login -> protected route", () => {
     // visually from a later login (see helpers/session.ts) — what makes it
     // "first-run" is that this DATA_DIR has never had a password set, so the
     // one form Playwright can see IS the set-password screen.
-    const [firstAuthState] = await Promise.all([
-      page.waitForResponse((r) => r.url().endsWith("/api/auth/state") && r.status() === 200),
-      page.goto("/"),
-    ]);
+    await page.goto("/");
+    // Read /api/auth/state via a direct APIRequestContext fetch (shares the
+    // context cookie jar) rather than scraping the response the app fires
+    // during navigation — a full-document goto can evict that response body
+    // before .json() reads it ("Network.getResponseBody: No resource")
+    // (public boolean-only endpoint; the app still fires its own GET on load,
+    // asserted via `authRequests` below).
+    const firstAuthState = await page.request.get("/api/auth/state");
+    expect(firstAuthState.status()).toBe(200);
     expect((await firstAuthState.json()) as { setup: boolean }).toEqual({ setup: false });
     await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
@@ -91,10 +96,9 @@ test.describe("first-run set-password -> login -> protected route", () => {
     // (4) direct-navigate (full browser nav, not client-side routing) to a
     // protected route while logged out -> refused, gate shows the password
     // form instead of the route's content.
-    const [returningAuthState] = await Promise.all([
-      page.waitForResponse((r) => r.url().endsWith("/api/auth/state") && r.status() === 200),
-      page.goto(PROTECTED_ROUTE),
-    ]);
+    await page.goto(PROTECTED_ROUTE);
+    const returningAuthState = await page.request.get("/api/auth/state");
+    expect(returningAuthState.status()).toBe(200);
     expect((await returningAuthState.json()) as { setup: boolean }).toEqual({ setup: true });
     await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Add entry" })).toHaveCount(0);
