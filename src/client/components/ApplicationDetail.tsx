@@ -238,11 +238,27 @@ function EditorSection({
           />
         </button>
       </div>
-      {collapsed ? null : (
-        <div data-testid={`workspace-section-body-${sectionKey}`} className="flex flex-col gap-6">
+      {/* F403/T043: grid-rows collapse — the row's fr size (not display/mount)
+          carries the open/closed state so the height change can transition.
+          Children stay mounted through collapse (unlike the old `collapsed ?
+          null : …`); the grid item's own overflow-hidden gives it an
+          automatic minimum size of 0 (CSS Grid §algo), letting the 0fr track
+          actually reach zero instead of clamping to content's min-content
+          height. */}
+      <div
+        data-testid={`section-collapse-track-${sectionKey}`}
+        className={cn(
+          "grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:duration-0 motion-reduce:transition-none",
+          collapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]",
+        )}
+      >
+        <div
+          data-testid={`workspace-section-body-${sectionKey}`}
+          className="flex flex-col gap-6 overflow-hidden"
+        >
           {children}
         </div>
-      )}
+      </div>
     </section>
   );
 }

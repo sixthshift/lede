@@ -207,7 +207,7 @@ export function ProfileEditor({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogPrimitive.Content
-        className="fixed bottom-6 right-6 z-20 flex max-h-[85vh] w-[30rem] max-w-[90vw] flex-col gap-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg"
+        className="fixed bottom-6 right-6 z-20 flex max-h-[85vh] w-[30rem] max-w-[90vw] flex-col gap-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=open]:motion-reduce:animate-none data-[state=closed]:motion-reduce:animate-none"
         onOpenAutoFocus={(e) => {
           // Focus is actually driven by the effect above (the profile query
           // may not have resolved yet at this instant) — just keep Radix
