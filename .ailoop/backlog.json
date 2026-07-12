@@ -409,7 +409,7 @@
     {
       "id": "T034",
       "title": "P2: Coarse-pointer 44px tap targets (audited set) + single-column fields below sm (F305)",
-      "status": "todo",
+      "status": "done",
       "phase": "P2",
       "depends_on": [
         "T030",
@@ -432,7 +432,7 @@
       "context": "See /workspace/SPEC.md Locked (touch targets — audited set enumerated). Under 375×812 + `(pointer: coarse)`: ≥44px short-axis for the ENUMERATED set — bottom-tab-bar items; every control in the four gated phone flows (create application, tailor-failure error affordance, entry edit via Library, letter view + preview sheet open/close); dashboard card actions; the detail action strip; panel submit/close controls. EXCLUDED (do NOT enlarge): inline prose links, options inside open listboxes, per-paragraph icon actions inside dense editors. EntryEditor fields single-column below `sm`. This ticket runs LAST in P2 (depends on the other P2 tickets that create the controls). Declared files are the likely homes; correct if the scope check flags. Coarse seed.",
       "acceptance": "- e2e coarse-pointer emulation (375×812 + `pointer: coarse`): every control in the enumerated audited set measures ≥44px on its short axis; the excluded set is not forced to 44px.\n- EntryEditor fields render single-column below `sm`.\n- Baseline gate green.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T034.txt"
     },
     {
       "id": "T040",

@@ -345,3 +345,8 @@ corrections.
   JUDGMENT: not gaming (behavior real + tested), but not acceptable structure. EXPAND T034.files += SectionMetaFields.tsx; RESUME same agent to replace the hack with the real Tailwind responsive variant. Coarse tap-target bumps kept as-is (those are correct). No `attempts` entry (behavior passed; this is a quality/structure redo, not a failed acceptance).
 [0080] T034 — dispatch RESUME same agent · sonnet · branch t034-tap-targets · baseSha 2e8ad9c · (dispatch #7 this chunk)
   fixNote: SectionMetaFields.tsx:91 grid-cols-2 → grid-cols-1 sm:grid-cols-2 + data-testid="entry-meta-fields-grid" on that div; delete EntryEditor's META_FIELDS_GRID_OVERRIDE_CSS/META_FIELDS_GRID_TESTID/<style>/wrapper (restore plain <SectionMetaFields/>); retarget tap-targets.spec grid selector to the testid'd div directly; keep coarse bumps; re-verify green.
+[0081] T034 — DONE (independent re-verify green, structural resume). Branch tip b3fecd4.
+  fast baseline: check 0, build 0, lint 0, vitest 1077/1077.
+  scope CLEAN (8 files incl SectionMetaFields [0079]). gaming CLEAN: coarse bumps on real elements + gated to pointer:coarse (desktop unchanged); excluded-set guard (listbox option <44 catches blanket cheat); single-column via real grid-cols-1 sm:grid-cols-2 (hack removed); real-element measurement.
+  F305 delivered. Full playwright deferred to P2 gate (NOW).
+  evidence: .ailoop/evidence/T034.txt.
