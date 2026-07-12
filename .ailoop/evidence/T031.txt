@@ -1,0 +1,26 @@
+T031 — Phone-stacked detail + no horizontal overflow at 375 (F302)
+Independent re-verify by coordinator on branch t031-phone-overflow tip a5d3a07, baseSha 4229b0b.
+
+SCOPE (git diff --name-only 4229b0b..HEAD, excl .ailoop): playwright.config.ts (registration),
+  WorkspaceShell.tsx, src/client/styles/app.css, test/e2e/phone-overflow.spec.ts. All ⊆ declared
+  (app.css added per [0067] scope expansion). CLEAN. ApplicationDetail declared-untouched.
+
+FAST BASELINE (branch tree): check 0 · build 0 · lint 0 (251 files) · vitest 1077/1077.
+
+GAMING READ: CLEAN.
+  - app.css: one-line addition of `.template-thumbnail__canvas` to the existing
+    `.document-preview__canvas,.letter-preview__canvas { max-width:100%;height:auto;display:block }`
+    rule — mirrors siblings exactly. Genuine fix for the ~41px TemplatePicker-canvas overflow.
+  - WorkspaceShell: below lg, preview toggle button + w-96 aside are WITHHELD (isBelowLg?null / hidden)
+    so the fixed-width aside no longer sits in the row flex forcing editor to ~29px. >=lg untouched.
+  - phone-overflow.spec: overflow walk is red-team #13-strict — documentElement.scrollWidth===375 exact;
+    every element with scrollWidth>clientWidth+1 FAILS unless whitelisted AND overflow-x∈{auto,scroll}
+    (hidden/clip never qualifies; whitelist entries independently re-checked); native input/textarea/select
+    excluded (internal caret-scroll, not a layout clip). The only spec change since first commit was the
+    STACKING assertion, corrected to measure all 3 headings at a single scrollTop=0 via
+    getBoundingClientRect (genuine document-order compare; prior per-heading scrollIntoView made it
+    vacuous) — still strict `>`; overflow walk UNCHANGED. Not a weakening.
+
+Builder self-ran phone-overflow.spec.ts (applications project): 3/3 pass, no retries (375 strict
+  no-overflow walk; 375 job/letter/design vertical-stack-in-viewport; 1280 editor+preview side-by-side
+  regression). Claim accepted; full playwright authoritatively re-runs at the P2 phase-close gate [0033].

@@ -308,3 +308,9 @@ corrections.
   JUDGMENT: not a real decomposition — one-line additive fix, build already correct. EXPAND T031.files += src/client/styles/app.css and RESUME the same agent (has branch+context). Definition-of-done unchanged (acceptance already demanded zero overflow on detail, which requires this). The pre-existing bug's strengthened check IS phone-overflow.spec itself (no separate escaped-bug ticket; bug predates v4, not a prior-ticket gaming escape). No `attempts` entry (nothing mis-built; not thrash).
 [0068] T031 — dispatch RESUME same agent · sonnet · branch t031-phone-overflow (on 2f7ac81) · baseSha 4229b0b · (dispatch #3 this chunk)
   fixNote: add `.template-thumbnail__canvas` to the app.css:90-96 responsive-canvas rule (mirror the siblings); re-run phone-overflow.spec to green; keep the strict walk + whitelist unchanged.
+[0069] T031 — DONE (independent re-verify green, resumed attempt). Branch tip a5d3a07.
+  fast baseline: check 0, build 0, lint 0, vitest 1077/1077.
+  scope CLEAN: WorkspaceShell + app.css([0067]) + phone-overflow.spec(new) + playwright.config(registration). ApplicationDetail declared-untouched.
+  gaming CLEAN: app.css one-line sibling-mirror; WorkspaceShell withholds preview toggle+aside below lg; overflow walk red-team #13-strict (exact 375, per-element fail unless whitelisted+genuinely-scrollable, native form controls excluded); only spec change was stacking-assertion correctness fix (single scrollTop=0 getBoundingClientRect, still strict), overflow walk untouched.
+  F302 delivered (phone stacked, zero horizontal overflow at 375). Also fixed a genuine PRE-EXISTING TemplatePicker canvas overflow (app.css). Full playwright deferred to P2 gate.
+  evidence: .ailoop/evidence/T031.txt.

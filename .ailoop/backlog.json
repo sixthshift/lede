@@ -348,7 +348,7 @@
     {
       "id": "T031",
       "title": "P2: Phone-stacked detail + no horizontal overflow at 375 (F302)",
-      "status": "todo",
+      "status": "done",
       "phase": "P2",
       "depends_on": [
         "T030"
@@ -364,7 +364,7 @@
       "context": "See /workspace/SPEC.md Phase 2 + Locked (phone layout). At 375 the detail editor pane is 29px wide and opening preview renders it off-viewport (x=341–725). FIX: detail stacks vertically at phone width; no descendant outside whitelisted intentional scroll containers overflows. The preview becomes a full-width SHEET layer below lg (sanctioned by OQ2's exception — dismissible via Escape + visible close, focus-managed) — but the preview sheet mechanics land in T033; THIS ticket owns the stacked detail layout + overflow elimination. Coarse seed. Depends on T030 (bottom bar / rail-hidden regime).",
       "acceptance": "- e2e at 375×812 on the detail surface: `document.documentElement.scrollWidth === 375` AND no descendant outside whitelisted scroll containers has `scrollWidth > clientWidth + 1` (red-team #13 — the inner-clip-wrapper cheat must fail); detail content is vertically stacked and reachable.\n- Baseline gate green.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T031.txt"
     },
     {
       "id": "T032",
