@@ -134,4 +134,42 @@ test.describe("rail design (v4-T021)", () => {
     await expect(rail.getByRole("heading", { level: 1 })).toHaveCount(0);
     await expect(rail.getByText(role, { exact: true })).toHaveCount(0);
   });
+
+  test("one-title convention holds on ALL FOUR shell surfaces: editor-pane h1 is the surface title, rail has no heading duplicating it", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await login(page, PASSWORD);
+    const company = `E2E Four Surfaces Co ${runId}`;
+    const role = `Principal Engineer ${runId}`;
+    const applicationId = await createApplication(page, { company, role, jd: JD });
+
+    const surfaces = [
+      { path: "/applications", title: "Applications" },
+      { path: `/applications/${applicationId}`, title: role },
+      { path: "/library", title: "Library" },
+      { path: "/settings", title: "Settings" },
+    ];
+
+    for (const { path, title } of surfaces) {
+      await page.goto(path);
+      await expect(page.getByTestId("workspace-shell")).toBeVisible();
+
+      // The surface title IS the editor pane's h1 (exactly one, equal to
+      // the title) — the one place titles live.
+      const editorH1 = page.getByTestId("editor-pane").getByRole("heading", { level: 1 });
+      await expect(editorH1, `${path}: editor-pane h1 must be the surface title`).toHaveText(title);
+
+      // The rail must not duplicate that title as a heading (the F205 defect
+      // was Library/Settings rendering their title as an <h1> in the rail).
+      // A global-nav LINK named for a destination is the up-level affordance,
+      // not a title duplicate — so this targets headings specifically, which
+      // is why /applications (whose rail carries an "Applications" nav link)
+      // still passes.
+      await expect(
+        page.getByTestId("rail-pane").getByRole("heading", { name: title }),
+        `${path}: rail must not render a heading duplicating the surface title`,
+      ).toHaveCount(0);
+    }
+  });
 });
