@@ -395,7 +395,9 @@
         "T030"
       ],
       "files": [
-        "src/client/components/WorkspaceShell.tsx"
+        "src/client/components/WorkspaceShell.tsx",
+        "test/e2e/pane-arbitration.spec.ts",
+        "playwright.config.ts"
       ],
       "origin": "spec Phase 2 / F303/F306/F207 (red-team #10)",
       "context": "See /workspace/SPEC.md Phase 2 + Locked (tablet arbitration, preview width). Below `xl`: preview open ⇒ editor HIDDEN (pane swap), never a coexisting sliver (today at 768 'Show preview' crushes the editor to a 43px sliver). Replace the dead full-height toggle-strip gutter with a slim tab affordance or an action-bar toggle. Preview width becomes PROPORTIONAL with clamps at ≥`xl` (e.g. `minmax(384px, ~40%)`) so wide screens grow the artifact. Below lg the preview is the full-width sheet (from T031's regime); this ticket owns the ≥lg swap + proportional clamp. Depends on T030. Shares WorkspaceShell.tsx with several P2 tickets (serialize).",

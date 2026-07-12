@@ -325,3 +325,7 @@ corrections.
   gaming CLEAN: spec is geometry-based (card y-displacement>0 red-team#11, elementFromPoint no-cover, panel+ancestor position∉{absolute,fixed}, full-width span). Empty-state create path preserved (line 29 dashed card).
   F304/OQ7 delivered. Full playwright deferred to P2 gate.
   evidence: .ailoop/evidence/T032.txt.
+[0073] T033 — pre-dispatch scope expansion: intake files [WorkspaceShell] omit e2e target. Added test/e2e/pane-arbitration.spec.ts(new) + playwright.config.ts(registration). Definition-of-done unchanged.
+[0074] T033 — dispatch (build, SERIAL) · sonnet · in-place branch · baseSha 773ab38 · attempt 1/3 (dispatch #5 this chunk)
+  decision: continue
+  why: last P2 build before T034 drains the phase. Owns ≥lg-<xl editor/preview SWAP (no sliver), below-lg full-width preview SHEET (OQ2 sanctioned: Escape+close+focus-managed) restoring the open path T031 withheld, ≥xl proportional preview minmax(384px,~40%). Single-file (WorkspaceShell) + new spec.
