@@ -105,7 +105,7 @@
     {
       "id": "T015",
       "title": "F105 — tailor failure surfaces inline (no silent 422)",
-      "status": "in-progress",
+      "status": "done",
       "phase": "P0",
       "depends_on": [],
       "files": [
@@ -117,17 +117,18 @@
       "context": "See /workspace/SPEC.md F105 + Locked (feedback layer: failures get inline errors beside their trigger, the existing `flagVoice` pattern, NOT toasts). Today a tailor 422 produces a pixel-identical screen; the 'Failed' badge only appears after an unrelated refetch. Root cause: `useTailorApplication` (`queries/useApplications.ts:88`) has no `onError` and invalidates only `onSuccess`; `ApplicationDetail.tsx:442` never reads `isError`. FIX: surface the tailor error inline next to the Tailor/Re-tailor button on the SAME screen without navigation, and invalidate on SETTLED (so the failure badge reflects immediately). Use the keyless FixtureEngine 422 path (an unmatched JD) to drive this — no API key needed. Do NOT add a toast for this failure (errors are co-located inline; only successes may be transient).",
       "acceptance": "- e2e (applications project): trigger a tailor that the fixture engine rejects with 422 (unmatched JD) ⇒ a visible inline error renders near the Tailor button WITHOUT navigation, and the failure badge reflects on the same screen.\n- RETRY transition (proves invalidate-on-SETTLED, not onError-only): after the inline error appears, trigger a second tailor that SUCCEEDS ⇒ the inline error CLEARS and the badge flips to success in the same DOM (asserted as a transition, not two independent snapshots).\n- Success path still invalidates and shows success (no regression).\n- Baseline gate green.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T015.txt"
     },
     {
       "id": "T016",
       "title": "F106 — Library entry Delete becomes two-step (armed confirm)",
-      "status": "todo",
+      "status": "in-progress",
       "phase": "P0",
       "depends_on": [],
       "files": [
         "src/client/components/LibraryView.tsx",
-        "src/client/components/EntryCard.tsx"
+        "src/client/components/EntryCard.tsx",
+        "playwright.config.ts"
       ],
       "origin": "spec F106 / Phase 0",
       "context": "See /workspace/SPEC.md F106. Library entry Delete fires irreversibly on one click (`LibraryView.tsx:205`, `EntryCard.tsx:35`) with zero confirmation. FIX: reuse the armed two-step pattern the dashboard cards already implement (`ApplicationCard.tsx:172-188` — read it, mirror it): first activation arms ('Confirm delete'), second deletes; blur/Escape disarms. Destructive confirms are inline two-step per the de-modal policy — never `window.confirm`, never a modal. Do not change the delete endpoint/behavior, only gate it.",

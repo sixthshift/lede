@@ -102,3 +102,10 @@ corrections.
 [0021] T015 — dispatch (build, SERIAL) · sonnet · worktree · baseSha (post-T014 main) · attempt 1/3 · playwright.config.ts declared
   decision: continue
   why: next ready P0 (F105 tailor failure inline).
+
+[0022] T015 — DONE (re-verify green). Merged ee8a449. Scope clean, gaming pass (onSettled + inline role=alert, no toast; retry red-then-green), baseline green. applications first run flaked on applications.spec.ts:1370 (rail-nav preview-repaint) → project re-run clean 38/38. Ratchet applications 37->38.
+  evidence: .ailoop/evidence/T015.txt
+  note: extend flake-tolerance — applications.spec.ts:1370 (rail-nav/preview-repaint) is also flake-prone; a playwright project re-run confirms flake-vs-regression, same as vitest isolated re-run.
+[0023] T016 — dispatch (build, SERIAL) · sonnet · worktree · baseSha (post-T015 main) · attempt 1/3 · playwright.config.ts declared
+  decision: continue
+  why: next ready P0 (F106 entry delete two-step).

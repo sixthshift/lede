@@ -1,0 +1,13 @@
+T015 — F105 tailor failure inline — INDEPENDENT RE-VERIFY
+merged ee8a449 (branch worktree-agent-a8af0b90c4e8d7ebc, baseSha ded1184)
+SCOPE: useApplications.ts, ApplicationDetail.tsx (declared) + playwright.config.ts (registration-only:
+  +tailor-failure) + new test/e2e/tailor-failure.spec.ts. CLEAN.
+GAMING: useTailorApplication onSuccess→onSettled (keyed off mutate var id); inline role="alert"
+  tailor-error near Tailor button, isError-driven; NO toast (locked feedback rule). e2e: 422 unmatched
+  JD ⇒ inline error + Failed badge, no nav; retry with valid JD clears error + flips to Tailored
+  (proves onSettled). red-then-green. PASS.
+BASELINE: check 0; lint 0; build 0; vitest 1071 (1 flake = fit-ui.test.tsx:227, passes isolated 8/8).
+  playwright chromium 20; auth 1; applications: first run 37+1fail (applications.spec.ts:1370 rail-nav
+  preview-repaint FLAKE) → re-ran project clean 38/38. Flake, not a T015 regression.
+RATCHET: applications 37 -> 38. vitest 1071 unchanged. Non-decreasing.
+VERDICT: DONE.
