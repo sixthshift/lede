@@ -389,3 +389,4 @@ corrections.
 [0098] T042 — DONE (re-verify green). tip 66ea32d. baseline check/build/lint 0, vitest 1077. scope CLEAN. gaming CLEAN (real early-return double-fire guard + label swap; spec counts download events =1; builder anti-gaming self-check). F402 delivered. evidence T042.txt.
 [0099] T043 — pre-dispatch scope +test/e2e/motion.spec.ts(new) +playwright.config(reg).
 [0100] T043 — dispatch (build, SERIAL) · sonnet · baseSha 40133a7 · attempt 1/3 (dispatch #13 this chunk). Motion language F403/F404: panels animate-in fade zoom, section collapse grid-rows, duration in [100ms,300ms] + motion-reduce, select hover.
+[0101] T043 — DONE (re-verify green). tip 7eff6d9. baseline check/build/lint 0, vitest 1077. scope CLEAN (7 declared). gaming CLEAN: numeric [100,300]ms band (1ms fails), reduced-motion=none, select hover computed color delta; collapse→grid-rows view-state preserved. F403/F404 delivered. evidence T043.txt.
