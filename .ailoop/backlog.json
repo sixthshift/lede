@@ -691,7 +691,9 @@
       ],
       "files": [
         "src/client/components/WorkspaceShell.tsx",
-        "src/client/components/DocumentPreview.tsx"
+        "src/client/components/DocumentPreview.tsx",
+        "test/e2e/preview-zoom.spec.ts",
+        "playwright.config.ts"
       ],
       "origin": "spec Phase 4 / F507 / OQ6 (red-team #18)",
       "context": "See /workspace/SPEC.md F507 + OQ6 + Locked (preview zoom). Add a zoom control that EXPANDS the preview pane in place (editor shrinks but keeps ≥240px width) so the page renders ≥1.5× its normal in-pane width, still SIDE-BY-SIDE — NO overlay, zero modality. Toggling restores prior widths. State is EPHEMERAL — never persisted (not even localStorage); a fresh load is always un-zoomed. Below `xl` the control does NOT render (pane-swap already gives preview full width). Also: re-render must keep the page FRAME (today it drops to bare 'Rendering preview…' text with a layout jump). The rendered DOCUMENT is out of scope — this is preview CHROME only. Shares WorkspaceShell (serialize). Depends on P3.",
