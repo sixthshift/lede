@@ -456,3 +456,4 @@ corrections.
    - T044/T050/T051/T053/T055: coordinator file-scope guesses corrected repeatedly (real homes: ApplicationDetail letter-ternary, LibraryToolbar, SectionAccordion, RepeatableList) — builders flagged honestly, coordinator expanded + resumed. Pattern: this codebase's feature homes are non-obvious; upfront investigation reduced but didn't eliminate the misses.
    - T053 reframe: ≤1200px bound already met by T041a's collapse (format card 991px) → SettingsView-only center+verify.
    - T052 builder stuck in report wait-loop → coordinator committed staged work + verified independently.
+[0150] T060 — dispatch (build, SERIAL) · sonnet · baseSha e8a4b17 · attempt 1/3 (dispatch #30 this chunk). P5 cohesion extension with v4 invariants (TEST-ONLY, test/** scope). Modality sweep 375/768/1024/1280 + no-overflow 6 widths + scroll restoration + rail collapse + scroll-spy.
