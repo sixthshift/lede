@@ -7,6 +7,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePDF } from "@react-pdf/renderer";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
 import type { Profile, TailoredResume } from "@shared/types";
 import type { Paper } from "../document";
@@ -72,13 +73,40 @@ export function PdfCanvas({
   return <canvas ref={canvasRef} className={className} />;
 }
 
+async function renderPageCanvas(
+  doc: PDFDocumentProxy,
+  pageNumber: number,
+): Promise<HTMLCanvasElement | null> {
+  const page = await doc.getPage(pageNumber);
+  const viewport = page.getViewport({ scale: 1.5 });
+  const canvas = document.createElement("canvas");
+  canvas.className = "document-preview__canvas";
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  await page.render({ canvas, canvasContext: context, viewport }).promise;
+  return canvas;
+}
+
 // Every page, not just page 1 (E9-F1a's design view: a resume that overflows
 // its target still needs every overflow page visible, not just a first-page
-// crop). Canvases are built and painted off-DOM, then appended to the
-// container in order — appending only once a page is fully painted means the
-// container never shows a half-drawn canvas, and sidesteps the ref-timing
-// problem of asking React to hand back N refs for a page count pdf.js hasn't
-// reported yet.
+// crop).
+//
+// v4-T054 (F507): a RE-render (the container already holds the PRIOR set of
+// pages) must never pass through an empty state — clearing the container up
+// front, then re-populating it page-by-page, is the same "collapse to
+// nothing mid-update" bug DocumentPreview's own bare-text loading state had,
+// just one level deeper, and it's what let the frame's height jump to 0
+// while pdf.js was still re-painting. So a re-render builds every new
+// canvas off-DOM first and swaps the whole set in as one atomic
+// `replaceChildren` call, once everything is ready — the OLD pages stay
+// fully visible (and, on a mid-update failure, stay the final state, never
+// a half-replaced mix) until the new set is complete. The FIRST render
+// (container starts empty) keeps the original progressive reveal — nothing
+// existed before, so there's no "drop" to guard against, and showing page 1
+// while page 2+ still paints is strictly better than waiting for all of
+// them.
 async function renderAllPagesInto(
   url: string,
   container: HTMLDivElement,
@@ -91,20 +119,26 @@ async function renderAllPagesInto(
   ).toString();
 
   const doc = await pdfjs.getDocument({ url }).promise;
+  const isRerender = container.children.length > 0;
+
+  if (!isRerender) {
+    for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber++) {
+      if (isCancelled()) return;
+      const canvas = await renderPageCanvas(doc, pageNumber);
+      if (isCancelled() || !canvas) continue;
+      container.appendChild(canvas);
+    }
+    return;
+  }
+
+  const nextPages: HTMLCanvasElement[] = [];
   for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber++) {
     if (isCancelled()) return;
-    const page = await doc.getPage(pageNumber);
-    const viewport = page.getViewport({ scale: 1.5 });
-    const canvas = document.createElement("canvas");
-    canvas.className = "document-preview__canvas";
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    const context = canvas.getContext("2d");
-    if (!context) continue;
-    await page.render({ canvas, canvasContext: context, viewport }).promise;
-    if (isCancelled()) return;
-    container.appendChild(canvas);
+    const canvas = await renderPageCanvas(doc, pageNumber);
+    if (canvas) nextPages.push(canvas);
   }
+  if (isCancelled()) return;
+  container.replaceChildren(...nextPages);
 }
 
 // Visible gap + border between stacked pages (className, not app.css: this
@@ -117,7 +151,6 @@ function PdfPages({ url }: { url: string }) {
     let cancelled = false;
     const container = containerRef.current;
     if (!container) return;
-    container.replaceChildren();
 
     renderAllPagesInto(url, container, () => cancelled).catch(() => {
       // Same browser-only caveat as PdfCanvas — a failure here leaves
@@ -177,10 +210,40 @@ function RenderedPreview({
       </p>
     );
   }
-  if (instance.loading || !instance.url) {
+
+  // v4-T054 (F507): usePDF's own state keeps the PRIOR `url` in place while
+  // `loading` flips back to true for a re-render (its `queueDocumentRender`
+  // spreads `...prev` rather than clearing `url` — see
+  // @react-pdf/renderer's usePDF) — so `!instance.url` alone (not
+  // `instance.loading`) is the only case with nothing to paint yet, i.e. the
+  // very first render before any PDF has ever come back. Every subsequent
+  // re-render has a still-valid `url` to keep showing: the canvas/pages
+  // painter below is keyed on that `url`, so it doesn't even repaint until a
+  // NEW url actually lands, and the frame around it never disappears in the
+  // meantime — only a non-blocking overlay indicates the update in flight,
+  // instead of the whole pane collapsing to bare "Rendering preview…" text
+  // (the pre-fix behavior, which dropped the canvas and jumped the layout on
+  // every format/density change).
+  if (!instance.url) {
     return <p className="document-preview__loading">Rendering preview…</p>;
   }
-  return allPages ? <PdfPages url={instance.url} /> : <PdfCanvas url={instance.url} />;
+  return (
+    <div className="document-preview__frame relative">
+      {allPages ? <PdfPages url={instance.url} /> : <PdfCanvas url={instance.url} />}
+      {instance.loading ? (
+        <div
+          className="document-preview__frame-overlay pointer-events-none absolute inset-0 flex items-center justify-center bg-surface/60"
+          role="status"
+          aria-label="Updating preview"
+        >
+          <span
+            aria-hidden="true"
+            className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-foreground"
+          />
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function DocumentPreview({

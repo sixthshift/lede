@@ -120,6 +120,12 @@
 // on the tailored-application detail route, same shared
 // login/PASSWORD/tailor-fixture rationale as scroll-spy.spec.ts, no fourth
 // server warranted.
+//
+// T054/F507 adds preview-zoom.spec.ts to the same "applications" project —
+// it needs the same tailored-application detail route (the preview canvas
+// must actually paint before zoom/frame assertions mean anything), same
+// shared login/PASSWORD/tailor-fixture rationale as scroll-spy.spec.ts, no
+// fourth server warranted.
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -175,7 +181,7 @@ export default defineConfig({
     {
       name: "applications",
       testMatch:
-        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration|tap-targets|toasts|export-busy|motion|letter-empty|card-detail|design-accordion|accordion|letter-editing|detail-craft)\.spec\.ts/,
+        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration|tap-targets|toasts|export-busy|motion|letter-empty|card-detail|design-accordion|accordion|letter-editing|detail-craft|preview-zoom)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject

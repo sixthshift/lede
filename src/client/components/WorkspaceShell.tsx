@@ -73,7 +73,15 @@ import {
   useRef,
   useState,
 } from "react";
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, X } from "lucide-react";
+import {
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  X,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
@@ -118,6 +126,14 @@ function useIsBelowXl(): boolean {
 // it never eats the majority of the viewport.
 const PREVIEW_PROPORTIONAL_WIDTH_CLASS = "w-[clamp(384px,30vw,640px)]";
 
+// v4-T054 (F507): zoom widens the pane well past the required >=1.5x floor
+// (1.6x at every width this scales through, before either side's own ceiling
+// kicks in) — a real LAYOUT width, not a `transform: scale` (which would
+// leave the editor's own flex-basis untouched and fail the "real reflow"
+// oracle). The editor is `flex-1`, so it absorbs the difference automatically
+// — no editor-side class needed here for it to shrink.
+const PREVIEW_ZOOMED_WIDTH_CLASS = "w-[clamp(608px,48vw,960px)]";
+
 // The bottom tab bar's own fixed height — the content panes' bottom padding
 // below `lg` must clear exactly this so the bar (persistent chrome, not
 // modality) never covers an interactive control.
@@ -131,6 +147,50 @@ const CONTENT_CLEARANCE_CLASS = "pb-14";
 // don't need this.
 const TAP_TARGET_COARSE =
   "[@media(pointer:coarse)]:min-h-[44px] [@media(pointer:coarse)]:min-w-[44px]";
+
+// v4-T054 (F507): the >=xl co-visible preview's own zoom toggle + chrome,
+// split into its own component purely so the zoom state is LOCAL to a
+// subtree that unmounts whenever `preview` goes away (any route without a
+// preview surface, e.g. navigating to Library) — that unmount is what makes
+// "ephemeral, resets on navigate-away-and-back" fall out for free from plain
+// `useState`, with no persistence and no routing awareness added to
+// WorkspaceShell itself (this file stays route-agnostic; App.tsx already
+// unmounts this pane on any non-document route by handing `preview` as
+// `undefined`, per WorkspaceShellProps' existing contract).
+function CoVisiblePreviewPane({ children }: { children: ReactNode }) {
+  const [zoomed, setZoomed] = useState(false);
+
+  return (
+    <aside
+      data-testid="preview-pane"
+      className={cn(
+        zoomed ? PREVIEW_ZOOMED_WIDTH_CLASS : PREVIEW_PROPORTIONAL_WIDTH_CLASS,
+        "flex shrink-0 flex-col border-l border-border bg-surface",
+      )}
+    >
+      <div className="flex shrink-0 items-center justify-end border-b border-border p-1.5">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-pressed={zoomed}
+          aria-label={zoomed ? "Zoom out" : "Zoom in"}
+          title={zoomed ? "Zoom out" : "Zoom in"}
+          data-testid="preview-zoom-toggle"
+          className="text-muted-foreground"
+          onClick={() => setZoomed((z) => !z)}
+        >
+          {zoomed ? (
+            <ZoomOut aria-hidden className="h-4 w-4" />
+          ) : (
+            <ZoomIn aria-hidden className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+    </aside>
+  );
+}
 
 export interface WorkspaceShellProps {
   rail: ReactNode;
@@ -317,18 +377,10 @@ export function WorkspaceShell({ rail, editor, preview, editorPaneRef }: Workspa
         </aside>
       ) : null}
 
-      {/* >=xl: always co-visible, proportional width — no toggle. */}
-      {coVisible ? (
-        <aside
-          data-testid="preview-pane"
-          className={cn(
-            PREVIEW_PROPORTIONAL_WIDTH_CLASS,
-            "shrink-0 overflow-y-auto border-l border-border bg-surface",
-          )}
-        >
-          {preview}
-        </aside>
-      ) : null}
+      {/* >=xl: always co-visible, proportional width, plus the zoom control
+          (v4-T054/F507) — the only viewport regime that gets one; below xl
+          the pane-swap (T033) already hands the preview the full width. */}
+      {coVisible ? <CoVisiblePreviewPane>{preview}</CoVisiblePreviewPane> : null}
 
       {/* lg..xl SWAP toggle strip: survives both directions of the swap (it
           never depends on which pane is currently showing), so it's the
