@@ -63,6 +63,10 @@
 // F207/T022 adds rail-collapse.spec.ts to the same "applications" project —
 // same shared login/password rationale as rail-design.spec.ts, no fourth
 // server warranted.
+//
+// F202/F209/T023 adds scroll-spy.spec.ts to the same "applications"
+// project — same shared login/password/tailor-fixture rationale as
+// rail-design.spec.ts, no fourth server warranted.
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -118,7 +122,7 @@ export default defineConfig({
     {
       name: "applications",
       testMatch:
-        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse)\.spec\.ts/,
+        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject
