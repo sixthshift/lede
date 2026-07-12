@@ -644,7 +644,9 @@
         "T045"
       ],
       "files": [
-        "src/client/components/ApplicationDetail.tsx"
+        "src/client/components/ApplicationDetail.tsx",
+        "test/e2e/detail-craft.spec.ts",
+        "playwright.config.ts"
       ],
       "origin": "spec Phase 4 / F503/F504/F509 (red-team #19)",
       "context": "See /workspace/SPEC.md F503/F504/F509 + Locked (kicker dedup, action strip). F503: mono kickers STAY (they're the scroll-spy landmarks); the duplicate in-card headings GO (no detail card heading duplicates its kicker text). F504: action strip — primary (Re-tailor) FIRST; exports grouped right (Download PDF + Plain text as a split/grouped control); 'Use as a voice source' labels disambiguated ('Use resume as a voice source' / 'Use letter as a voice source' — both present, distinct); 'Lock final' visually distinguished as consequential (vs harmless 'Plain text'). F509: unify metadata typography where it splits (mono kickers vs sans 'Updated…'/'3 of 3'). Shares ApplicationDetail with many tickets (serialize). Depends on P3.",
