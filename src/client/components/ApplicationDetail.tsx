@@ -622,6 +622,45 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
         ) : null}
       </div>
 
+      {/* F301/T030: below `lg` the rail (and the "SECTIONS" nav portaled
+          into it above) is gone entirely — this is the SAME nav, folded
+          into the editor pane itself so section-jumping stays reachable.
+          `lg:hidden` (not a conditional render) is fine here: unlike the
+          rail/bottom-bar pair, nothing asserts this node's ABSENCE at
+          desktop widths, only its reachability below `lg`. Distinct
+          testids from the rail's `rail-nav`/`rail-nav-<key>` — both can be
+          in the DOM at once (the rail's copy portals in from outside this
+          component), and scroll-spy.spec.ts's `getByTestId("rail-nav-*")`
+          locators must keep matching exactly one element. */}
+      {WORKSPACE_SECTIONS.length >= 2 ? (
+        <nav
+          aria-label="Sections"
+          data-testid="editor-section-nav"
+          className="flex flex-col gap-1 lg:hidden"
+        >
+          {WORKSPACE_SECTIONS.map((section) => {
+            const isActive = activeSection === section.key;
+            return (
+              <button
+                key={section.key}
+                type="button"
+                data-testid={`editor-section-nav-${section.key}`}
+                aria-current={isActive ? "true" : undefined}
+                onClick={() => navigateToSection(section.key)}
+                className={cn(
+                  "truncate rounded-md px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  isActive
+                    ? "bg-accent font-medium text-primary"
+                    : "text-muted-foreground hover:bg-[var(--ring-weak)] hover:text-foreground",
+                )}
+              >
+                {section.label}
+              </button>
+            );
+          })}
+        </nav>
+      ) : null}
+
       <EditorSection
         sectionKey="job"
         label="Job details"

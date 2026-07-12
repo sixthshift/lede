@@ -30,11 +30,49 @@
 // content lives in a file this ticket doesn't own — it's addressed via its
 // existing `aria-label="Sections"` contract rather than a second prop-
 // drilling path.
-import { type ReactNode, createContext, useContext, useState } from "react";
+//
+// v4-T030 (F301): below `lg` (1024px) the rail regime and the bottom-tab-bar
+// regime are mutually exclusive, and the acceptance oracle checks ABSENCE of
+// whichever one isn't current via `querySelector === null` — a CSS-hidden
+// node still answers a raw querySelector, so both the rail `<aside>` and the
+// bottom bar are conditionally RENDERED on `useIsBelowLg()`, never toggled
+// with a `lg:hidden`-style utility. That hook falls back to "not below lg"
+// when `matchMedia` doesn't exist (jsdom/unit tests) — the desktop-shaped
+// rail regime other tests already assert stays the default there.
+import { type ReactNode, createContext, useContext, useEffect, useState } from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
+import { BottomTabBar } from "./NavTabs";
+
+const BELOW_LG_QUERY = "(max-width: 1023px)";
+
+/** True below Tailwind's `lg` (1024px) — the compact-nav regime (F301). */
+function useIsBelowLg(): boolean {
+  const getMatch = () =>
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia(BELOW_LG_QUERY).matches
+      : false;
+  const [isBelowLg, setIsBelowLg] = useState(getMatch);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mql = window.matchMedia(BELOW_LG_QUERY);
+    const handleChange = () => setIsBelowLg(mql.matches);
+    handleChange();
+    mql.addEventListener("change", handleChange);
+    return () => mql.removeEventListener("change", handleChange);
+  }, []);
+
+  return isBelowLg;
+}
+
+// The bottom tab bar's own fixed height — the content panes' bottom padding
+// below `lg` must clear exactly this so the bar (persistent chrome, not
+// modality) never covers an interactive control.
+const BOTTOM_BAR_HEIGHT_CLASS = "h-14";
+const CONTENT_CLEARANCE_CLASS = "pb-14";
 
 export interface WorkspaceShellProps {
   rail: ReactNode;
@@ -67,6 +105,7 @@ export function useRailCollapsed(): boolean {
 export function WorkspaceShell({ rail, editor, preview, editorPaneRef }: WorkspaceShellProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [railCollapsed, setRailCollapsed] = useState(readRailCollapsed);
+  const isBelowLg = useIsBelowLg();
 
   function toggleRailCollapsed() {
     setRailCollapsed((collapsed) => {
@@ -83,52 +122,54 @@ export function WorkspaceShell({ rail, editor, preview, editorPaneRef }: Workspa
 
   return (
     <div data-testid="workspace-shell" className="flex h-full bg-background text-foreground">
-      <aside
-        data-testid="rail-pane"
-        data-collapsed={railCollapsed}
-        className={cn(
-          "flex shrink-0 flex-col border-r border-border bg-surface",
-          "transition-[width] duration-200 ease-in-out motion-reduce:transition-none",
-          railCollapsed ? "w-12" : "w-56",
-        )}
-      >
-        {/* The per-surface section zone is portaled-in content this
-            ticket's declared files don't own; it publishes a stable
-            `aria-label="Sections"` a11y contract we hide by, rather than
-            reaching into that file to add a collapse-aware prop. */}
-        <style>
-          {
-            '[data-testid="rail-pane"][data-collapsed="true"] div:has(> nav[aria-label="Sections"]) { display: none; }'
-          }
-        </style>
-        <RailCollapseContext.Provider value={railCollapsed}>
-          <div className="min-h-0 flex-1 overflow-y-auto">{rail}</div>
-        </RailCollapseContext.Provider>
-        <div className="flex shrink-0 justify-center border-t border-border p-1.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-pressed={railCollapsed}
-            aria-label={railCollapsed ? "Expand rail" : "Collapse rail"}
-            title={railCollapsed ? "Expand rail" : "Collapse rail"}
-            data-testid="rail-collapse-toggle"
-            className="w-full justify-center text-muted-foreground"
-            onClick={toggleRailCollapsed}
-          >
-            {railCollapsed ? (
-              <PanelLeftOpen aria-hidden className="h-4 w-4" />
-            ) : (
-              <PanelLeftClose aria-hidden className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-      </aside>
+      {isBelowLg ? null : (
+        <aside
+          data-testid="rail-pane"
+          data-collapsed={railCollapsed}
+          className={cn(
+            "flex shrink-0 flex-col border-r border-border bg-surface",
+            "transition-[width] duration-200 ease-in-out motion-reduce:transition-none",
+            railCollapsed ? "w-12" : "w-56",
+          )}
+        >
+          {/* The per-surface section zone is portaled-in content this
+              ticket's declared files don't own; it publishes a stable
+              `aria-label="Sections"` a11y contract we hide by, rather than
+              reaching into that file to add a collapse-aware prop. */}
+          <style>
+            {
+              '[data-testid="rail-pane"][data-collapsed="true"] div:has(> nav[aria-label="Sections"]) { display: none; }'
+            }
+          </style>
+          <RailCollapseContext.Provider value={railCollapsed}>
+            <div className="min-h-0 flex-1 overflow-y-auto">{rail}</div>
+          </RailCollapseContext.Provider>
+          <div className="flex shrink-0 justify-center border-t border-border p-1.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-pressed={railCollapsed}
+              aria-label={railCollapsed ? "Expand rail" : "Collapse rail"}
+              title={railCollapsed ? "Expand rail" : "Collapse rail"}
+              data-testid="rail-collapse-toggle"
+              className="w-full justify-center text-muted-foreground"
+              onClick={toggleRailCollapsed}
+            >
+              {railCollapsed ? (
+                <PanelLeftOpen aria-hidden className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose aria-hidden className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </aside>
+      )}
 
       <main
         ref={editorPaneRef}
         data-testid="editor-pane"
-        className="min-w-0 flex-1 overflow-y-auto"
+        className={cn("min-w-0 flex-1 overflow-y-auto", isBelowLg && CONTENT_CLEARANCE_CLASS)}
       >
         {editor}
       </main>
@@ -152,12 +193,20 @@ export function WorkspaceShell({ rail, editor, preview, editorPaneRef }: Workspa
               "w-96 shrink-0 overflow-y-auto border-l border-border bg-surface",
               "xl:block",
               previewOpen ? "block" : "hidden",
+              isBelowLg && CONTENT_CLEARANCE_CLASS,
             )}
           >
             {preview}
           </aside>
         </>
       ) : null}
+
+      {/* F301: the rail's replacement below `lg` — persistent chrome (always
+          present, blocks nothing, no scrim/aria-modal), not a drawer. Fixed
+          to the viewport so it survives the editor pane's own scrolling;
+          `BOTTOM_BAR_HEIGHT_CLASS` is the exact height the content panes'
+          `CONTENT_CLEARANCE_CLASS` padding clears above. */}
+      {isBelowLg ? <BottomTabBar heightClassName={BOTTOM_BAR_HEIGHT_CLASS} /> : null}
     </div>
   );
 }

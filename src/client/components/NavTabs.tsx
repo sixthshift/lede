@@ -73,3 +73,39 @@ export function NavTabs() {
     </TooltipProvider>
   );
 }
+
+// F301/T030: the rail's below-`lg` replacement — the SAME three destinations
+// as the rail's own global nav (reused from `TABS` above, not a second nav
+// model), laid out as a fixed bottom bar instead of a vertical list. Persistent
+// chrome, not modality: always mounted, no scrim, no `aria-modal`, blocks no
+// content. `heightClassName` is threaded from WorkspaceShell rather than
+// hardcoded here — it's also the exact value the content panes' bottom-
+// padding must match, and WorkspaceShell owns that pairing.
+export function BottomTabBar({ heightClassName }: { heightClassName: string }) {
+  return (
+    <nav
+      data-testid="bottom-tab-bar"
+      aria-label="Primary"
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-20 flex shrink-0 border-t border-border bg-surface",
+        heightClassName,
+      )}
+    >
+      {TABS.map((tab) => (
+        <NavLink
+          key={tab.to}
+          to={tab.to}
+          className={({ isActive }) =>
+            cn(
+              "flex flex-1 flex-col items-center justify-center gap-0.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+              isActive ? "font-medium text-primary" : "font-normal text-muted-foreground",
+            )
+          }
+        >
+          <tab.icon aria-hidden className="h-5 w-5" strokeWidth={2} />
+          {tab.label}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
