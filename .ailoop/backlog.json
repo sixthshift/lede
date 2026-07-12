@@ -469,7 +469,7 @@
     {
       "id": "T042",
       "title": "P3: Export busy state — disabled + label-swap, double-fire guarded (F402)",
-      "status": "todo",
+      "status": "done",
       "phase": "P3",
       "depends_on": [
         "T040"
@@ -484,7 +484,7 @@
       "context": "See /workspace/SPEC.md Phase 3 + Locked (busy pattern). PDF/plain-text export from detail has no pending state — double-click renders twice (`ApplicationDetail.tsx:445-462`); card download disables silently with no label change. FIX: shared disabled + label-swap ('Preparing…') for exports and other non-instant mutations; double-fire guarded by the pending flag. No global spinner framework. Shares ApplicationDetail/ApplicationCard with other tickets (serialize). Depends on T040 (feedback layer conventions).",
       "acceptance": "- e2e: during a slowed PDF render (CDP throttle or a test hook), the control is disabled with a swapped label; double-activation produces exactly ONE download event.\n- Baseline gate green.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T042.txt"
     },
     {
       "id": "T043",
