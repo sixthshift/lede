@@ -667,7 +667,9 @@
         "T045"
       ],
       "files": [
-        "src/client/components/SettingsView.tsx"
+        "src/client/components/SettingsView.tsx",
+        "test/e2e/settings.spec.ts",
+        "playwright.config.ts"
       ],
       "origin": "spec Phase 4 / F506 (red-team #22)",
       "context": "See /workspace/SPEC.md F506 + Locked (settings). 'Default document format' is one 3,153px monolith card beside two ~200px peers; cards are left-anchored with ~640px dead space at 1512. FIX: split the format monolith into grouped sub-cards sharing the ONE rail entry; center the column. Hard bound (red-team #22): no card exceeds 1,200px rendered height. Every section must still round-trip (re-run the v3 settings enumeration). Depends on P3.",
