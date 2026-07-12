@@ -124,16 +124,38 @@ Every ticket must pass ALL of these regardless of what it touched (regression
 guard). The independent verifier always runs the FULL set (never scoped); the
 builder may scope only the full-suite step to affected tests.
 
+**CADENCE AMENDMENT (mechanical, operator-directed 2026-07-12 — ledger [0033]).**
+The user directed "skip mid-loop testing, test at the end" to go faster; chosen
+resolution = **defer e2e to phase-close, keep fast guards per-ticket**. This
+changes WHEN the suite runs, not WHAT counts as done — the full Playwright set
+still gates every phase-oracle close (below), which is the real definition of a
+phase being done. Split:
+
+- **Per-ticket baseline (independent re-verify, fast):** type-check, build,
+  lint, full vitest, scope check, gaming read, new-tests-for-new-behavior.
+  The heavy Playwright projects are NOT run per ticket.
+- **Per-phase gate (merged tree, before a phase may close):** the FULL baseline
+  INCLUDING all Playwright projects `chromium` + `auth` + `applications` (+
+  docker where already required). This is unchanged and non-negotiable — a
+  phase does not close until it is green here.
+- **Consequence accepted:** a phase-gate red across merged tickets has no
+  per-ticket e2e signal to point the finger, so attribution is by bisection —
+  worker branches are KEPT until the phase gate is green (already the protocol).
+  Vitest per-ticket still catches unit/component regressions immediately.
+
+Per-ticket checklist (fast):
 - [ ] type-check: `bun run check` → exit 0
 - [ ] build: `bun run build` → exit 0
 - [ ] lint: `bun run lint` → exit 0
 - [ ] full vitest: `bunx vitest run` → all pass (intake floor: 1056)
+- [ ] new behavior ships with new tests, green under the above (exempt only
+      pure scaffold/config, stated in the ticket)
+
+Per-phase gate checklist (deferred e2e — run on merged tree at phase-close):
 - [ ] playwright projects **`chromium`, `auth`, `applications`** run
       **NON-CONCURRENTLY** → all pass. `bun run build` BEFORE the
       `applications` project (stale-dist failure mode). A phase naming one
       project is emphasis, never a narrowing.
-- [ ] new behavior ships with new tests, green under the above (exempt only
-      pure scaffold/config, stated in the ticket)
 
 Docker e2e (`bun run test:docker`) runs at the **Phase 1 chrome-merge gate**
 (red-team #16) and the **Phase 5 final gate**. Not per-ticket.
@@ -168,6 +190,32 @@ runs — not WHAT counts as done:
   ISOLATED re-run of that file. A failure that passes in isolation is a flake,
   not a baseline-red. The ground-truth baseline is 1055–1056 passing (the flaky
   1–4 float). New behavior must still add real passing tests on top.
+  - **The flake-prone set is a FAMILY, not two files (T022 2026-07-12).** The
+    concurrency flake hits the `@react-pdf`/`@fontsource`/fit-ladder
+    render+measurement tests as a group, and WHICH ones lose the race shifts
+    run-to-run: observed so far = `ats-view.test.tsx`, `fit-ui.test.tsx`,
+    `engine-single-column.test.ts`, `engine-two-column.test.ts`,
+    `engine-section-display.test.ts`, `letter-preview.test.tsx`. Do NOT treat a
+    fixed 2-file list as the whole flake surface. The DISCRIMINATOR is
+    unchanged and is the only thing that gates: a full-suite failure whose file
+    passes in single-file isolation is flake; a file that fails alone is a real
+    regression. Expanding the observed set does NOT widen tolerance — the
+    isolation check still catches every real regression.
+  - **Isolation = ONE file at a time (mechanical clarification, T021 2026-07-12).**
+    The deterministic green signal is each flake-prone file run BY ITSELF
+    (`bunx vitest run test/fit-ui.test.tsx`), repeated 2–3×. Running the two
+    flake-prone files *together* (`… ats-view.test.tsx fit-ui.test.tsx`) can
+    STILL flake — their combined @fontsource loading is enough concurrency to
+    trip the measurement tests. So a 2-file "isolation" failure does NOT prove
+    a regression; only a consistent single-file failure does. (T021 touched
+    ApplicationDetail.tsx, so fit-ui was a real suspect — but fit-ui was 4/4×3
+    alone and ats-view 4/4×2 alone → confirmed flake, not regression.)
+  - **Worktree ENOENT vs on-main concurrency flake are DIFFERENT modes.** In an
+    agent worktree the font assets fail to resolve (ENOENT), so ats-view/fit-ui
+    fail even in single-file isolation there — that is NOT the concurrency flake
+    and the isolation protocol above does NOT clear it. Settle a worktree
+    ats-view/fit-ui failure by running the file(s) on MAIN (real node_modules)
+    at the same base, or on the merged tree — never by worktree isolation.
 - **Worktree staleness (mechanical, confirmed).** The Agent tool's
   `isolation: 'worktree'` forks from a STALE base (observed: 234 commits behind
   on T010). The worker's first duty is to reset its branch to the given

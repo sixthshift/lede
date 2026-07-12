@@ -1,0 +1,506 @@
+=== P1 PHASE-CLOSE GATE — merged tree 8db3dbb ===
+--- build (stale-dist guard) ---
+$ vite build
+vite v5.4.21 building for production...
+transforming...
+src/client/document/fonts.ts (374:13): "createRequire" is not exported by "__vite-browser-external:node:module", imported by "src/client/document/fonts.ts".
+✓ 2052 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                                        0.95 kB │ gzip:   0.53 kB
+dist/assets/ibm-plex-mono-vietnamese-500-normal-C8zxqsMH.woff          5.62 kB
+dist/assets/ibm-plex-mono-vietnamese-400-normal-DDuiU_S-.woff          5.62 kB
+dist/assets/ibm-plex-mono-cyrillic-ext-500-normal-BIfNGwUT.woff        5.77 kB
+dist/assets/ibm-plex-mono-cyrillic-ext-400-normal-DMdlQ8Kv.woff        5.82 kB
+dist/assets/ibm-plex-mono-vietnamese-400-normal-BulugwFq.woff2         5.87 kB
+dist/assets/ibm-plex-mono-vietnamese-500-normal-DZ4AoWbu.woff2         6.04 kB
+dist/assets/ibm-plex-serif-vietnamese-400-normal-BY9Vij9A.woff         6.11 kB
+dist/assets/ibm-plex-serif-vietnamese-400-normal-DGubAMUE.woff2        6.15 kB
+dist/assets/ibm-plex-serif-vietnamese-500-normal-BXXzeVTF.woff         6.19 kB
+dist/assets/ibm-plex-serif-vietnamese-500-normal-2_PwV24p.woff2        6.24 kB
+dist/assets/ibm-plex-sans-vietnamese-400-normal-fK1oJ5dG.woff          6.39 kB
+dist/assets/ibm-plex-sans-vietnamese-600-normal-DgdngZtN.woff          6.58 kB
+dist/assets/ibm-plex-sans-vietnamese-500-normal-BEb3_waV.woff          6.59 kB
+dist/assets/ibm-plex-mono-cyrillic-ext-400-normal-xuaO2J-f.woff2       6.91 kB
+dist/assets/ibm-plex-mono-cyrillic-ext-500-normal-BqneJy0T.woff2       6.97 kB
+dist/assets/ibm-plex-mono-cyrillic-400-normal-CEL4l2ZJ.woff            7.20 kB
+dist/assets/ibm-plex-mono-cyrillic-500-normal-Ael50iVv.woff            7.21 kB
+dist/assets/ibm-plex-serif-cyrillic-ext-500-normal-BtThTb6K.woff       7.32 kB
+dist/assets/ibm-plex-serif-cyrillic-ext-400-normal-BcBv-TKp.woff       7.38 kB
+dist/assets/ibm-plex-sans-vietnamese-400-normal-DG4YqDda.woff2         8.20 kB
+dist/assets/ibm-plex-mono-cyrillic-400-normal-BSMlKf0J.woff2           8.36 kB
+dist/assets/ibm-plex-sans-vietnamese-500-normal-e4dixQRQ.woff2         8.42 kB
+dist/assets/ibm-plex-sans-vietnamese-600-normal-DpPYBSTl.woff2         8.46 kB
+dist/assets/ibm-plex-mono-cyrillic-500-normal-Bq9vWWag.woff2           8.46 kB
+dist/assets/ibm-plex-serif-cyrillic-ext-500-normal-DFQJzPS0.woff2      8.73 kB
+dist/assets/ibm-plex-sans-greek-400-normal-D9ESIMu3.woff               8.76 kB
+dist/assets/ibm-plex-serif-cyrillic-ext-400-normal-CxUI4jC_.woff2      8.92 kB
+dist/assets/ibm-plex-sans-greek-500-normal-CuWXN6rf.woff               9.15 kB
+dist/assets/ibm-plex-sans-greek-600-normal-D-CqTdkO.woff               9.22 kB
+dist/assets/ibm-plex-sans-greek-400-normal-_efipK4i.woff2              9.94 kB
+dist/assets/ibm-plex-sans-cyrillic-ext-400-normal-Dsrv2Tcn.woff       10.29 kB
+dist/assets/ibm-plex-sans-greek-600-normal-DzTrcv_p.woff2             10.37 kB
+dist/assets/ibm-plex-sans-greek-500-normal-JMMifIXV.woff2             10.38 kB
+dist/assets/ibm-plex-sans-cyrillic-ext-500-normal-DB5PtV2g.woff       10.59 kB
+dist/assets/ibm-plex-sans-cyrillic-ext-600-normal-Bz0x94Yp.woff       10.62 kB
+dist/assets/ibm-plex-serif-cyrillic-500-normal-oG0QAu2_.woff          10.87 kB
+dist/assets/ibm-plex-serif-cyrillic-400-normal-C7IY3oUc.woff          10.91 kB
+dist/assets/bebas-neue-latin-400-normal-Bi-ndsyu.woff                 11.18 kB
+dist/assets/ibm-plex-mono-latin-ext-400-normal-D3D2R8hC.woff          11.77 kB
+dist/assets/ibm-plex-mono-latin-ext-500-normal-CZ70TYgx.woff          11.77 kB
+dist/assets/ibm-plex-serif-cyrillic-500-normal-iHfdoNSD.woff2         12.11 kB
+dist/assets/ibm-plex-sans-cyrillic-ext-400-normal-g30qAdWV.woff2      12.15 kB
+dist/assets/ibm-plex-serif-cyrillic-400-normal-CPQ8oqB-.woff2         12.28 kB
+dist/assets/ibm-plex-sans-cyrillic-ext-600-normal-DUMzJB7m.woff2      12.30 kB
+dist/assets/ibm-plex-sans-cyrillic-ext-500-normal-Cs5J6C77.woff2      12.31 kB
+dist/assets/space-mono-latin-400-normal-_3DlpgIW.woff                 12.31 kB
+dist/assets/space-mono-latin-700-normal-D7A851RN.woff                 12.42 kB
+dist/assets/archivo-black-latin-400-normal-HW9MwEcM.woff              13.00 kB
+dist/assets/ibm-plex-mono-latin-400-normal-CvHOgSBP.woff              13.14 kB
+dist/assets/ibm-plex-mono-latin-500-normal-CB9ihrfo.woff              13.16 kB
+dist/assets/ibm-plex-mono-latin-ext-400-normal-BmRBH3aV.woff2         13.35 kB
+dist/assets/ibm-plex-mono-latin-ext-500-normal-CAhNIIs5.woff2         13.43 kB
+dist/assets/ibm-plex-sans-cyrillic-400-normal-BTotfTJu.woff           13.51 kB
+dist/assets/ibm-plex-serif-latin-ext-400-normal-DwktX9jl.woff         13.78 kB
+dist/assets/ibm-plex-sans-cyrillic-500-normal-ByOcLdNv.woff           13.86 kB
+dist/assets/ibm-plex-serif-latin-ext-500-normal-Czz10gBp.woff         13.88 kB
+dist/assets/ibm-plex-sans-cyrillic-600-normal-BGq0mW3O.woff           13.89 kB
+dist/assets/tinos-latin-400-normal-IVTQQdcE.woff                      14.21 kB
+dist/assets/ibm-plex-sans-latin-ext-400-normal-RBey6euL.woff          14.36 kB
+dist/assets/tinos-latin-700-normal-QDR0ijKS.woff                      14.44 kB
+dist/assets/ibm-plex-mono-latin-400-normal-DMJ8VG8y.woff2             14.71 kB
+dist/assets/ibm-plex-sans-latin-ext-500-normal-D0aIdm-b.woff          14.74 kB
+dist/assets/ibm-plex-sans-latin-ext-600-normal-DIrixKbi.woff          14.77 kB
+dist/assets/ibm-plex-sans-cyrillic-400-normal-DZqxrq2p.woff2          14.80 kB
+dist/assets/arimo-latin-400-normal-CDajTWgE.woff                      14.83 kB
+dist/assets/ibm-plex-mono-latin-500-normal-DSY6xOcd.woff2             14.89 kB
+dist/assets/arimo-latin-700-normal-OWpeoTlT.woff                      14.97 kB
+dist/assets/ibm-plex-sans-cyrillic-500-normal-CocWQlwt.woff2          15.00 kB
+dist/assets/ibm-plex-sans-cyrillic-600-normal-71GNu3SW.woff2          15.04 kB
+dist/assets/source-code-pro-latin-700-normal-hiRY8_bY.woff            15.10 kB
+dist/assets/source-code-pro-latin-400-normal-Bf_aQirX.woff            15.24 kB
+dist/assets/ibm-plex-serif-latin-ext-400-normal-CNMooFZX.woff2        15.48 kB
+dist/assets/ibm-plex-serif-latin-ext-500-normal-CmETpp4t.woff2        15.51 kB
+dist/assets/oswald-latin-400-normal-D1wpMXgf.woff                     15.69 kB
+dist/assets/ibm-plex-sans-latin-ext-400-normal-C5H60-Va.woff2         15.98 kB
+dist/assets/oswald-latin-700-normal-UmC9Ev9x.woff                     16.08 kB
+dist/assets/inconsolata-latin-400-normal-HYADljCo.woff                16.28 kB
+dist/assets/space-grotesk-latin-700-normal-CwsQ-cCU.woff              16.42 kB
+dist/assets/ibm-plex-sans-latin-ext-600-normal-DOrvGEcy.woff2         16.45 kB
+dist/assets/ibm-plex-sans-latin-ext-500-normal-DakdToA3.woff2         16.46 kB
+dist/assets/inconsolata-latin-700-normal-DzgUY3Rl.woff                16.62 kB
+dist/assets/open-sans-latin-700-normal-CZCQA30i.woff                  16.68 kB
+dist/assets/mulish-latin-700-normal-LuPokTVX.woff                     16.84 kB
+dist/assets/abril-fatface-latin-400-normal-CSRW-xuf.woff              16.88 kB
+dist/assets/mulish-latin-400-normal-BRmeVNaI.woff                     16.95 kB
+dist/assets/space-grotesk-latin-400-normal-BnQMeOim.woff              17.00 kB
+dist/assets/open-sans-latin-400-normal-DKniycaP.woff                  17.25 kB
+dist/assets/karla-latin-400-normal-iWRxgclR.woff                      17.33 kB
+dist/assets/spectral-latin-400-normal-D34IWA1h.woff                   17.34 kB
+dist/assets/karla-latin-700-normal-CospC10L.woff                      17.34 kB
+dist/assets/nunito-sans-latin-700-normal-CLVG92B9.woff                17.41 kB
+dist/assets/lato-latin-400-normal-B11PyLys.woff                       17.45 kB
+dist/assets/nunito-sans-latin-400-normal-DY9yCUyQ.woff                17.51 kB
+dist/assets/lato-latin-700-normal-DAdL7O4w.woff                       17.62 kB
+dist/assets/noto-serif-latin-400-normal-DT0cwSa_.woff                 17.81 kB
+dist/assets/manrope-latin-400-normal-8tf8FM3T.woff                    18.29 kB
+dist/assets/manrope-latin-700-normal-DGRFkw-m.woff                    18.41 kB
+dist/assets/ibm-plex-serif-latin-400-normal-BB-zNvJB.woff             18.50 kB
+dist/assets/noto-serif-latin-700-normal-mX-AlFMT.woff                 18.54 kB
+dist/assets/spectral-latin-700-normal-Cxe-XGuy.woff                   18.61 kB
+dist/assets/ibm-plex-serif-latin-700-normal-BBiG0u0D.woff             18.72 kB
+dist/assets/ibm-plex-serif-latin-500-normal-C3_OdgN3.woff             19.48 kB
+dist/assets/ibm-plex-serif-latin-400-normal-BIGslYFI.woff2            19.58 kB
+dist/assets/source-sans-3-latin-700-normal-BBbVrHF_.woff              19.82 kB
+dist/assets/source-sans-3-latin-400-normal-AFMiCETP.woff              19.90 kB
+dist/assets/ibm-plex-serif-latin-500-normal-REKAfBVG.woff2            20.31 kB
+dist/assets/zilla-slab-latin-700-normal-C8aaVMsA.woff                 21.64 kB
+dist/assets/roboto-latin-400-normal-DyYNIH4P.woff                     21.78 kB
+dist/assets/dm-serif-display-latin-400-normal-_kVFYEpx.woff           21.80 kB
+dist/assets/fira-sans-latin-400-normal-66xCkunx.woff                  21.88 kB
+dist/assets/roboto-latin-700-normal-DLgJJpmK.woff                     21.92 kB
+dist/assets/zilla-slab-latin-400-normal-Dlq-Ffxl.woff                 21.95 kB
+dist/assets/ibm-plex-sans-latin-400-normal-CYLoc0-x.woff              22.10 kB
+dist/assets/fira-sans-latin-700-normal-DgqLm3Fi.woff                  22.12 kB
+dist/assets/bitter-latin-400-normal-B_gsCfHZ.woff                     22.18 kB
+dist/assets/bitter-latin-700-normal-BHV1FLDM.woff                     22.20 kB
+dist/assets/ibm-plex-sans-latin-700-normal-Bth3BMcD.woff              22.28 kB
+dist/assets/ibm-plex-sans-latin-400-normal-CDDApCn2.woff2             22.59 kB
+dist/assets/carlito-latin-400-normal-jEGHVXAP.woff                    22.88 kB
+dist/assets/crimson-pro-latin-400-normal-BzhyrSeK.woff                22.93 kB
+dist/assets/crimson-pro-latin-700-normal-CnzwvVon.woff                23.24 kB
+dist/assets/carlito-latin-700-normal-CjG3MLqY.woff                    23.38 kB
+dist/assets/ibm-plex-sans-latin-600-normal-Cu4Hd6ag.woff              23.88 kB
+dist/assets/ibm-plex-sans-latin-500-normal-BgVn5rGT.woff              23.92 kB
+dist/assets/source-serif-4-latin-400-normal-Dn3IlU-Z.woff             24.02 kB
+dist/assets/ibm-plex-sans-latin-500-normal-6ng42L7E.woff2             24.18 kB
+dist/assets/ibm-plex-sans-latin-600-normal-CuJfVYMP.woff2             24.25 kB
+dist/assets/libre-baskerville-latin-400-normal-B6A5kCEq.woff          24.76 kB
+dist/assets/work-sans-latin-400-normal-DE1_0GuN.woff                  25.24 kB
+dist/assets/libre-baskerville-latin-700-normal-DFRs2Bxw.woff          25.41 kB
+dist/assets/source-serif-4-latin-700-normal-3V4Pv1hj.woff             25.72 kB
+dist/assets/lora-latin-700-normal-Yfa97ytg.woff                       25.94 kB
+dist/assets/lora-latin-400-normal-DBJS-Hc6.woff                       25.96 kB
+dist/assets/work-sans-latin-700-normal-mDs79oer.woff                  26.18 kB
+dist/assets/eb-garamond-latin-400-normal-zgGxM6DR.woff                26.27 kB
+dist/assets/playfair-display-latin-400-normal-DHYHbkg3.woff           26.90 kB
+dist/assets/jetbrains-mono-latin-400-normal-6-qcROiO.woff             27.50 kB
+dist/assets/eb-garamond-latin-700-normal-iZ6Ol97T.woff                27.79 kB
+dist/assets/jetbrains-mono-latin-700-normal-D3wTyLJW.woff             28.21 kB
+dist/assets/playfair-display-latin-700-normal-Bc_1Q1cG.woff           28.30 kB
+dist/assets/cormorant-garamond-latin-700-normal-O25Qpphb.woff         30.25 kB
+dist/assets/inter-latin-400-normal-CyCys3Eg.woff                      30.70 kB
+dist/assets/cormorant-garamond-latin-400-normal-B7YtguxJ.woff         30.98 kB
+dist/assets/inter-latin-700-normal-BLAVimhd.woff                      31.32 kB
+dist/assets/merriweather-latin-700-normal-D4-nzrAh.woff               66.67 kB
+dist/assets/IBMPlexMono-Regular-BT_fvlmi.woff                         66.92 kB
+dist/assets/merriweather-latin-400-normal-CvqO63Ah.woff               67.00 kB
+dist/assets/IBMPlexMono-Bold-LMUabaha.woff                            68.36 kB
+dist/assets/pdf.worker-CPbhI6B3.mjs                                2,206.30 kB
+dist/assets/index-CXR5FL6-.css                                        46.24 kB │ gzip:   8.39 kB
+dist/assets/pdf-D35c9CSk.js                                          476.82 kB │ gzip: 142.05 kB
+dist/assets/pdf-DxNzWohf.js                                          532.22 kB │ gzip: 161.49 kB
+dist/assets/pdf.worker-CjafX26q.js                                 1,272.41 kB │ gzip: 399.32 kB
+dist/assets/index-CWIFN58W.js                                      2,596.17 kB │ gzip: 797.13 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 14.80s
+build exit=0
+--- playwright: chromium project ---
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+
+Running 25 tests using 1 worker
+
+  ✓   1 [chromium] › test/e2e/library-crud.spec.ts:32:1 › workspace shell: /library renders inside the shell with no preview pane (degrade) (474ms)
+  ✓   2 [chromium] › test/e2e/library-crud.spec.ts:43:3 › experience section › create: new experience entry appears in the list (434ms)
+  ✓   3 [chromium] › test/e2e/library-crud.spec.ts:55:3 › experience section › edit: changing a fact updates the list (1.0s)
+  ✓   4 [chromium] › test/e2e/library-crud.spec.ts:64:3 › experience section › reload persistence: the entry survives a page reload (402ms)
+  ✓   5 [chromium] › test/e2e/library-crud.spec.ts:71:3 › experience section › delete: two-step armed confirm — first click arms, second removes it from the list (366ms)
+  ✓   6 [chromium] › test/e2e/library-crud.spec.ts:93:3 › de-modal EntryEditor (v3-T021) › Add entry panel: non-modal, underlying toolbar stays clickable, focus opens into the panel, Escape returns focus to the trigger (425ms)
+  ✘   7 [chromium] › test/e2e/library-crud.spec.ts:121:3 › de-modal EntryEditor (v3-T021) › Edit selected panel: non-modal, focus opens into the panel, Escape returns focus to the trigger (6.1s)
+  ✘   8 [chromium] › test/e2e/library-crud.spec.ts:121:3 › de-modal EntryEditor (v3-T021) › Edit selected panel: non-modal, focus opens into the panel, Escape returns focus to the trigger (retry #1) (6.2s)
+  ✘   9 [chromium] › test/e2e/library-crud.spec.ts:121:3 › de-modal EntryEditor (v3-T021) › Edit selected panel: non-modal, focus opens into the panel, Escape returns focus to the trigger (retry #2) (6.2s)
+  ✓  10 [chromium] › test/e2e/library-crud.spec.ts:159:3 › de-modal LayoutEditor (v3-T022) › Edit layout panel: opens with rows, non-modal, underlying library control stays clickable, focus opens into the panel, Escape returns focus to the trigger (673ms)
+  ✓  11 [chromium] › test/e2e/library-crud.spec.ts:200:3 › de-modal LayoutEditor (v3-T022) › round-trip: toggling a section's Enable checkbox and saving persists across reload (1.1s)
+  ✓  12 [chromium] › test/e2e/library-crud.spec.ts:261:3 › de-modal ProfileEditor (v3-T023) › Edit profile panel: opens with fields, non-modal, underlying library control stays clickable, focus opens into the panel, Escape returns focus to the trigger (459ms)
+  ✓  13 [chromium] › test/e2e/library-crud.spec.ts:301:3 › de-modal ProfileEditor (v3-T023) › round-trip: editing the Headline and saving persists across reload (650ms)
+  ✓  14 [chromium] › test/e2e/library-crud.spec.ts:359:3 › project section › create: new project entry appears in the list (943ms)
+  ✓  15 [chromium] › test/e2e/library-crud.spec.ts:369:3 › project section › edit: changing a fact updates the list (927ms)
+  ✓  16 [chromium] › test/e2e/library-crud.spec.ts:378:3 › project section › reload persistence: the entry survives a page reload (372ms)
+  ✓  17 [chromium] › test/e2e/library-crud.spec.ts:385:3 › project section › delete: two-step armed confirm — first click arms, second removes it from the list (398ms)
+  ✓  18 [chromium] › test/e2e/library-crud.spec.ts:420:3 › F106: two-step armed delete (T016) › first activation arms without deleting: no server call, entry stays, still non-modal (872ms)
+  ✓  19 [chromium] › test/e2e/library-crud.spec.ts:448:3 › F106: two-step armed delete (T016) › second activation deletes with an asserted server round-trip (558ms)
+  ✓  20 [chromium] › test/e2e/library-crud.spec.ts:471:3 › F106: two-step armed delete (T016) › Escape after arming disarms: reverts to Delete, no deletion (572ms)
+  ✓  21 [chromium] › test/e2e/library-crud.spec.ts:489:3 › F106: two-step armed delete (T016) › blur after arming disarms: reverts to Delete, no deletion (574ms)
+  ✓  22 [chromium] › test/e2e/library-crud.spec.ts:508:3 › F106: two-step armed delete (T016) › per-row isolation: arming entry A then clicking Delete once on a different entry B arms B only and auto-disarms A (908ms)
+  ✓  23 [chromium] › test/e2e/settings.spec.ts:57:1 › workspace shell: /settings renders inside the shell with no preview pane (degrade) (458ms)
+  ✓  24 [chromium] › test/e2e/settings.spec.ts:64:1 › rail: one nav item per settings section, in the same order as the cards below (460ms)
+  ✓  25 [chromium] › test/e2e/settings.spec.ts:79:1 › Provider & model: changing provider and model round-trips and survives reload (1.8s)
+  ✓  26 [chromium] › test/e2e/settings.spec.ts:116:1 › API key: setting a key round-trips server-side (keySet reflects it after reload) (1.1s)
+  ✓  27 [chromium] › test/e2e/settings.spec.ts:147:1 › Default document format: changing an axis round-trips and survives reload (1.2s)
+
+
+  1) [chromium] › test/e2e/library-crud.spec.ts:121:3 › de-modal EntryEditor (v3-T021) › Edit selected panel: non-modal, focus opens into the panel, Escape returns focus to the trigger 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByText('E2E modality fact 1783858848715-725352', { exact: true })
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 5000ms
+      - waiting for getByText('E2E modality fact 1783858848715-725352', { exact: true })
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      148 |     // test's list assertions.
+      149 |     await cardFor(page, created).getByRole("button", { name: "Delete" }).click();
+    > 150 |     await expect(page.getByText(created, { exact: true })).toHaveCount(0);
+          |                                                            ^
+      151 |   });
+      152 | });
+      153 |
+        at /workspace/test/e2e/library-crud.spec.ts:150:60
+
+    Error Context: test-results/library-crud-de-modal-Entr-d3ca4-eturns-focus-to-the-trigger-chromium/error-context.md
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByText('E2E modality fact 1783858858691-424514', { exact: true })
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 5000ms
+      - waiting for getByText('E2E modality fact 1783858858691-424514', { exact: true })
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      148 |     // test's list assertions.
+      149 |     await cardFor(page, created).getByRole("button", { name: "Delete" }).click();
+    > 150 |     await expect(page.getByText(created, { exact: true })).toHaveCount(0);
+          |                                                            ^
+      151 |   });
+      152 | });
+      153 |
+        at /workspace/test/e2e/library-crud.spec.ts:150:60
+
+    Error Context: test-results/library-crud-de-modal-Entr-d3ca4-eturns-focus-to-the-trigger-chromium-retry1/error-context.md
+
+    Retry #2 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByText('E2E modality fact 1783858865486-220988', { exact: true })
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 5000ms
+      - waiting for getByText('E2E modality fact 1783858865486-220988', { exact: true })
+        13 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      148 |     // test's list assertions.
+      149 |     await cardFor(page, created).getByRole("button", { name: "Delete" }).click();
+    > 150 |     await expect(page.getByText(created, { exact: true })).toHaveCount(0);
+          |                                                            ^
+      151 |   });
+      152 | });
+      153 |
+        at /workspace/test/e2e/library-crud.spec.ts:150:60
+
+    Error Context: test-results/library-crud-de-modal-Entr-d3ca4-eturns-focus-to-the-trigger-chromium-retry2/error-context.md
+
+  1 failed
+    [chromium] › test/e2e/library-crud.spec.ts:121:3 › de-modal EntryEditor (v3-T021) › Edit selected panel: non-modal, focus opens into the panel, Escape returns focus to the trigger 
+  24 passed (46.1s)
+chromium exit=1
+--- playwright: auth project ---
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+
+Running 1 test using 1 worker
+
+  ✘  1 [auth] › test/e2e/auth.spec.ts:23:3 › first-run set-password -> login -> protected route › gates a fresh boot, then logout/login flips access (3.3s)
+  ✘  2 [auth] › test/e2e/auth.spec.ts:23:3 › first-run set-password -> login -> protected route › gates a fresh boot, then logout/login flips access (retry #1) (430ms)
+  ✘  3 [auth] › test/e2e/auth.spec.ts:23:3 › first-run set-password -> login -> protected route › gates a fresh boot, then logout/login flips access (retry #2) (412ms)
+
+
+  1) [auth] › test/e2e/auth.spec.ts:23:3 › first-run set-password -> login -> protected route › gates a fresh boot, then logout/login flips access 
+
+    Error: response.json: Protocol error (Network.getResponseBody): No resource with given identifier found
+
+       96 |       page.goto(PROTECTED_ROUTE),
+       97 |     ]);
+    >  98 |     expect((await returningAuthState.json()) as { setup: boolean }).toEqual({ setup: true });
+          |                                      ^
+       99 |     await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
+      100 |     await expect(page.getByRole("button", { name: "Add entry" })).toHaveCount(0);
+      101 |     // setup:true (a password already exists) — the first-run hint must not render.
+        at /workspace/test/e2e/auth.spec.ts:98:38
+
+    Error Context: test-results/auth-first-run-set-passwor-a3161-n-logout-login-flips-access-auth/error-context.md
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+    -   "setup": false,
+    +   "setup": true,
+      }
+
+      40 |       page.goto("/"),
+      41 |     ]);
+    > 42 |     expect((await firstAuthState.json()) as { setup: boolean }).toEqual({ setup: false });
+         |                                                                 ^
+      43 |     await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
+      44 |     await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
+      45 |     await expect(page.getByText("First time here? This sets your password.")).toBeVisible();
+        at /workspace/test/e2e/auth.spec.ts:42:65
+
+    Error Context: test-results/auth-first-run-set-passwor-a3161-n-logout-login-flips-access-auth-retry1/error-context.md
+
+    Retry #2 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Object {
+    -   "setup": false,
+    +   "setup": true,
+      }
+
+      40 |       page.goto("/"),
+      41 |     ]);
+    > 42 |     expect((await firstAuthState.json()) as { setup: boolean }).toEqual({ setup: false });
+         |                                                                 ^
+      43 |     await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
+      44 |     await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
+      45 |     await expect(page.getByText("First time here? This sets your password.")).toBeVisible();
+        at /workspace/test/e2e/auth.spec.ts:42:65
+
+    Error Context: test-results/auth-first-run-set-passwor-a3161-n-logout-login-flips-access-auth-retry2/error-context.md
+
+  1 failed
+    [auth] › test/e2e/auth.spec.ts:23:3 › first-run set-password -> login -> protected route › gates a fresh boot, then logout/login flips access 
+auth exit=1
+--- auth project RE-RUN (clean ports, fresh DATA_DIR) ---
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+
+Running 1 test using 1 worker
+
+  ✓  1 [auth] › test/e2e/auth.spec.ts:23:3 › first-run set-password -> login -> protected route › gates a fresh boot, then logout/login flips access (1.6s)
+
+  1 passed (10.7s)
+auth-rerun exit=0
+--- playwright: applications project (build already fresh) ---
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+
+Running 65 tests using 1 worker
+
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+  ✓   1 [applications] › test/e2e/applications.spec.ts:132:1 › create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock (17.8s)
+  ✓   2 [applications] › test/e2e/applications.spec.ts:454:1 › cover letter: generate/paint isolation, download filename, undo, motivation persistence (4.6s)
+  ✓   3 [applications] › test/e2e/applications.spec.ts:604:1 › cover letter: a failed generation surfaces a distinct failed badge, never a stub letter (1.4s)
+  ✓   4 [applications] › test/e2e/applications.spec.ts:642:1 › cover letter: a typography format change re-renders the letter preview (pixel-diff) (3.5s)
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+  ✓   5 [applications] › test/e2e/applications.spec.ts:729:1 › in-place text editing: resume + letter edits persist and reach the artifact; locked disables every affordance and 409s (5.8s)
+  ✓   6 [applications] › test/e2e/applications.spec.ts:950:1 › retroactive import: blank letter -> hand-authored via in-place editing -> flag -> exact voice-source text (server-verified) (2.9s)
+  ✓   7 [applications] › test/e2e/applications.spec.ts:1074:1 › flagging a locked application's resume as a voice source is permitted: a real 200, not merely an enabled button (2.4s)
+  ✓   8 [applications] › test/e2e/applications.spec.ts:1118:1 › deleting a voice source in Profile removes it server-side, not just from the DOM (701ms)
+  ✓   9 [applications] › test/e2e/applications.spec.ts:1220:1 › WorkspaceShell (protocol C): editor + preview panes are co-visible and unoccluded at 1280px, and switching the preview's resume/letter tab never remounts the editor pane (2.8s)
+  ✓  10 [applications] › test/e2e/applications.spec.ts:1272:1 › WorkspaceShell (protocol B): the surface stays non-modal — no aria-modal/backdrop overlay, and an underlying editor control stays genuinely clickable — at 1280px and in the below-1280 drawer-open state (1.9s)
+  ✓  11 [applications] › test/e2e/applications.spec.ts:1329:1 › WorkspaceShell drawer: below 1280px the preview pane starts non-co-visible (closed), and the toggle reveals a real painted canvas (1.9s)
+  ✓  12 [applications] › test/e2e/applications.spec.ts:1370:1 › rail nav (v3-T013): activating an out-of-view section scrolls/focuses its heading without touching the URL, remounting the preview, or repainting it (2.1s)
+  ✓  13 [applications] › test/e2e/applications.spec.ts:1430:1 › rail collapse (v3-T013, protocol E): folding a section is local view-state only — zero application/settings network writes, a localStorage collapse key, a pixel-identical preview, and untouched settings.layout/application.format (2.8s)
+  ✓  14 [applications] › test/e2e/applications.spec.ts:1546:1 › in-place edits reach the document: sentinel text is exportable AND the preview canvas changes by more than a floor magnitude — not merely 'any diff'; modality holds mid-edit (3.9s)
+  ✓  15 [applications] › test/e2e/applications.spec.ts:1667:1 › locked sweep (protocol D): every edit affordance individually disabled/409'd by name; design read-only, motivation and voice-flag still work, motivation persists across reload (3.8s)
+  ✓  16 [applications] › test/e2e/applications.spec.ts:1777:1 › NewApplication (v3-T020): the create panel is non-modal, the underlying list stays clickable, focus opens into the panel, and Escape returns focus to the trigger (734ms)
+  ✓  17 [applications] › test/e2e/applications.spec.ts:1839:1 › dashboard card content (T030, OQ4a): resume pills differ and match server genState; the locked badge appears only on a locked app; the letter pill appears iff a letter exists (2.5s)
+  ✓  18 [applications] › test/e2e/applications.spec.ts:1921:1 › dashboard quick actions (T031, OQ4b): open routes to the workspace; duplicate/delete are server-verified; download produces a real PDF; disabled states match document existence (3.6s)
+  ✓  19 [applications] › test/e2e/ats-view.spec.ts:30:1 › ATS view: real content wraps in its pane, an unbroken 500-char token still wraps, height grows (not clips), and pre-wrap preserves consecutive whitespace (2.1s)
+  ✓  20 [applications] › test/e2e/card-bounds.spec.ts:137:5 › F107 dashboard card @ 768px › no card action spills outside its card, stamp stays one line and verbatim (624ms)
+  ✓  21 [applications] › test/e2e/card-bounds.spec.ts:137:5 › F107 dashboard card @ 1024px › no card action spills outside its card, stamp stays one line and verbatim (591ms)
+  ✓  22 [applications] › test/e2e/card-bounds.spec.ts:152:3 › F110 dark-mode card hover elevation › hover border resolves to the theme's --border-strong and differs from rest-state (700ms)
+  ✓  23 [applications] › test/e2e/chrome-merge.spec.ts:97:3 › chrome merge (v4-T020, single-chrome, OQ1) › AppShell is removed from the DOM (not CSS-hidden); no full-width fixed bar exists outside the rail on any shell surface (1.4s)
+  ✓  24 [applications] › test/e2e/chrome-merge.spec.ts:117:3 › chrome merge (v4-T020, single-chrome, OQ1) › the wordmark's boundingBox is geometrically contained within the rail's boundingBox (473ms)
+  ✓  25 [applications] › test/e2e/chrome-merge.spec.ts:141:3 › chrome merge (v4-T020, single-chrome, OQ1) › the rail's theme toggle is operable: flips the root theme class AND repaints two unrelated surfaces (canvas + a card) (726ms)
+  ✓  26 [applications] › test/e2e/chrome-merge.spec.ts:172:3 › chrome merge (v4-T020, single-chrome, OQ1) › the rail's logout is operable and INVALIDATES the session (server round-trip, not just a client-side route push) (749ms)
+  ✓  27 [applications] › test/e2e/chrome-merge.spec.ts:203:7 › chrome merge (v4-T020, single-chrome, OQ1) › login page's standalone mini-chrome (renders outside the shell, never inherits rail/header chrome) › wordmark + theme toggle render at 375px (phone) (286ms)
+  ✓  28 [applications] › test/e2e/chrome-merge.spec.ts:203:7 › chrome merge (v4-T020, single-chrome, OQ1) › login page's standalone mini-chrome (renders outside the shell, never inherits rail/header chrome) › wordmark + theme toggle render at 1280px (desktop) (278ms)
+  ✓  29 [applications] › test/e2e/cohesion.spec.ts:53:3 › Cohesion sweep: the shell is genuinely persistent, and its rail is functional everywhere › PRESENCE: workspace-shell renders on all four surfaces (1.2s)
+  ✓  30 [applications] › test/e2e/cohesion.spec.ts:73:3 › Cohesion sweep: the shell is genuinely persistent, and its rail is functional everywhere › PERSISTENCE: the workspace-shell DOM node survives client-side navigation, including a document<->non-document pair (1.6s)
+  ✓  31 [applications] › test/e2e/cohesion.spec.ts:130:3 › Cohesion sweep: the shell is genuinely persistent, and its rail is functional everywhere › FUNCTIONAL RAIL: global nav activates on the dashboard/library/settings; the section rail activates on application detail (1.5s)
+  ✓  32 [applications] › test/e2e/cohesion.spec.ts:177:3 › Cohesion sweep: the shell is genuinely persistent, and its rail is functional everywhere › DEGRADE: no preview-pane off the one document surface; present and co-visible on application detail at 1280x720 (1.4s)
+  ✓  33 [applications] › test/e2e/cohesion.spec.ts:227:3 › SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051) › NewApplication panel is non-modal (dashboard, /applications) (489ms)
+  ✓  34 [applications] › test/e2e/cohesion.spec.ts:241:3 › SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051) › EntryEditor via Add entry is non-modal (library, /library) (640ms)
+  ✓  35 [applications] › test/e2e/cohesion.spec.ts:253:3 › SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051) › EntryEditor via editing an existing entry is non-modal (library, /library) (1.1s)
+  ✓  36 [applications] › test/e2e/cohesion.spec.ts:272:3 › SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051) › LayoutEditor is non-modal (library, /library) (599ms)
+  ✓  37 [applications] › test/e2e/cohesion.spec.ts:287:3 › SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051) › ProfileEditor is non-modal (library, /library) (622ms)
+  ✓  38 [applications] › test/e2e/cohesion.spec.ts:302:3 › SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051) › TemplateGallery via Browse templates is non-modal (application detail, /applications/:id) (1.4s)
+  ✓  39 [applications] › test/e2e/cohesion.spec.ts:331:3 › SWEEP 2 — co-visibility re-run: editor and preview panes are genuinely side-by-side on the final tree (v3-T051) › editor-pane and preview-pane are both visible and side-by-side at 1280x720 (984ms)
+  ✓  40 [applications] › test/e2e/design.spec.ts:63:1 › design controls: reachable in-workspace, debounced persistence, preview host, locked read-only (13.2s)
+  ✓  41 [applications] › test/e2e/design.spec.ts:316:3 › de-modal TemplateGallery (v3-T024) › Browse templates panel: non-modal, underlying workspace stays clickable, focus opens into the panel, Escape returns focus to the trigger, selecting a template applies it (4.5s)
+  ✓  42 [applications] › test/e2e/docked-panel-bounds.spec.ts:159:3 › F103 docked panels open fully within viewport (v4-T014, chrome-agnostic) › EntryEditor ('Add entry'): title and close fully in-viewport, clear of other chrome (795ms)
+  ✓  43 [applications] › test/e2e/docked-panel-bounds.spec.ts:168:3 › F103 docked panels open fully within viewport (v4-T014, chrome-agnostic) › ProfileEditor ('Edit profile'): title and close fully in-viewport, clear of other chrome (763ms)
+  ✓  44 [applications] › test/e2e/docked-panel-bounds.spec.ts:177:3 › F103 docked panels open fully within viewport (v4-T014, chrome-agnostic) › LayoutEditor ('Edit layout'): title and close fully in-viewport, clear of other chrome (725ms)
+  ✓  45 [applications] › test/e2e/gallery-bounds.spec.ts:69:3 › F102 template gallery reposition (v4-T013, TEMPORARY — Phase 4/T041 re-targets) › gallery boundingBox is fully within the editor pane at 1280x720, non-degenerate (1.9s)
+injected: canvas hidden
+caught error: expect(locator).toBeVisible() failed
+
+Locator:  locator('.document-preview canvas').first()
+Expected: visible
+Received: hidden
+Timeout:  5000ms
+
+Call log:
+  - Expect "toBeVisible" with timeout 5000ms
+  - waiting for locator('.document-preview canvas').first()
+    13 × locator resolved to <canvas width="918" height="1188" class="document-preview__canvas"></canvas>
+       - unexpected value "hidden"
+
+restored: canvas repainted
+  ✓  46 [applications] › test/e2e/mutation-probe.spec.ts:27:1 › expectResumeCanvasPainted fails on a hidden canvas and passes once restored (11.9s)
+  ✓  47 [applications] › test/e2e/rail-collapse.spec.ts:31:3 › collapsible rail (v4-T022, F207) › toggle transitions the rail's measured width between expanded (~224px) and the 40-64px collapsed band, and back (1.3s)
+  ✓  48 [applications] › test/e2e/rail-collapse.spec.ts:53:3 › collapsible rail (v4-T022, F207) › collapsed/icon-only mode: all three global nav items stay operable — activating each navigates (1.2s)
+  ✓  49 [applications] › test/e2e/rail-collapse.spec.ts:77:3 › collapsible rail (v4-T022, F207) › collapse state survives a full reload (localStorage) (687ms)
+  ✓  50 [applications] › test/e2e/rail-collapse.spec.ts:93:3 › collapsible rail (v4-T022, F207) › the toggle is network-zero: no requests fire, and no settings/sectionDisplay write occurs (1.3s)
+  ✓  51 [applications] › test/e2e/rail-design.spec.ts:29:3 › rail design (v4-T021) › each global-nav item carries an icon (svg) alongside its label (518ms)
+  ✓  52 [applications] › test/e2e/rail-design.spec.ts:42:3 › rail design (v4-T021) › nav hover computes to the --ring-weak token AND differs from the resting background (639ms)
+  ✓  53 [applications] › test/e2e/rail-design.spec.ts:96:3 › rail design (v4-T021) › the SECTIONS mono-caps section-zone label renders on the detail surface's rail, and the back-link is gone (1.1s)
+  ✓  54 [applications] › test/e2e/rail-design.spec.ts:119:3 › rail design (v4-T021) › one-title convention: the detail surface's title lives ONLY in the editor pane's h1, never repeated in the rail (1.0s)
+  ✓  55 [applications] › test/e2e/rail-design.spec.ts:138:3 › rail design (v4-T021) › one-title convention holds on ALL FOUR shell surfaces: editor-pane h1 is the surface title, rail has no heading duplicating it (1.5s)
+  ✓  56 [applications] › test/e2e/route-transitions.spec.ts:64:3 › Scroll restoration (F203) + focus management (F208) › browser-BACK restores the editor pane's scrollTop within +/-24px; a fresh forward nav starts at top (3.1s)
+  ✓  57 [applications] › test/e2e/route-transitions.spec.ts:110:3 › Scroll restoration (F203) + focus management (F208) › keyed by location.key, not pathname: two visits to the SAME pathname with different scroll targets restore independently (5.9s)
+  ✓  58 [applications] › test/e2e/route-transitions.spec.ts:188:3 › Scroll restoration (F203) + focus management (F208) › focus: after a rail navigation, document.activeElement is the new surface's h1 (2.8s)
+  ✓  59 [applications] › test/e2e/route-transitions.spec.ts:250:3 › Single main landmark + sequential heading order (F208), all four shell surfaces › dashboard: exactly one <main>; heading order sequential (492ms)
+  ✓  60 [applications] › test/e2e/route-transitions.spec.ts:258:3 › Single main landmark + sequential heading order (F208), all four shell surfaces › library: exactly one <main>; heading order sequential (580ms)
+  ✓  61 [applications] › test/e2e/route-transitions.spec.ts:266:3 › Single main landmark + sequential heading order (F208), all four shell surfaces › settings: exactly one <main>; heading order sequential (784ms)
+  ✓  62 [applications] › test/e2e/route-transitions.spec.ts:274:3 › Single main landmark + sequential heading order (F208), all four shell surfaces › application detail: exactly one <main>; heading order sequential (1.8s)
+  ✓  63 [applications] › test/e2e/scroll-spy.spec.ts:71:1 › scroll-spy (v4-T023/F202): active section tracks the 30%-line rule across independently-computed scroll positions, the short-last-section escape at the bottom, and the marker provably moves (3.8s)
+  ✓  64 [applications] › test/e2e/scroll-spy.spec.ts:149:1 › section-row clarity (v4-T023/F209): the whole rail row navigates, with no second chevron/collapse control in the rail — collapse lives on the editor's own section headers instead (3.3s)
+  ✓  65 [applications] › test/e2e/tailor-failure.spec.ts:33:1 › tailor failure (F105): 422 renders an inline error + failure badge without navigation, and a successful retry clears both (1.6s)
+
+  65 passed (2.7m)
+applications exit=0
+--- CHROMIUM full project re-run on merged main (post-T025) ---
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+
+Running 25 tests using 1 worker
+
+  ✓   1 [chromium] › test/e2e/library-crud.spec.ts:32:1 › workspace shell: /library renders inside the shell with no preview pane (degrade) (403ms)
+  ✓   2 [chromium] › test/e2e/library-crud.spec.ts:43:3 › experience section › create: new experience entry appears in the list (652ms)
+  ✓   3 [chromium] › test/e2e/library-crud.spec.ts:55:3 › experience section › edit: changing a fact updates the list (991ms)
+  ✓   4 [chromium] › test/e2e/library-crud.spec.ts:64:3 › experience section › reload persistence: the entry survives a page reload (427ms)
+  ✓   5 [chromium] › test/e2e/library-crud.spec.ts:71:3 › experience section › delete: two-step armed confirm — first click arms, second removes it from the list (465ms)
+  ✓   6 [chromium] › test/e2e/library-crud.spec.ts:93:3 › de-modal EntryEditor (v3-T021) › Add entry panel: non-modal, underlying toolbar stays clickable, focus opens into the panel, Escape returns focus to the trigger (447ms)
+  ✓   7 [chromium] › test/e2e/library-crud.spec.ts:121:3 › de-modal EntryEditor (v3-T021) › Edit selected panel: non-modal, focus opens into the panel, Escape returns focus to the trigger (1.2s)
+  ✓   8 [chromium] › test/e2e/library-crud.spec.ts:161:3 › de-modal LayoutEditor (v3-T022) › Edit layout panel: opens with rows, non-modal, underlying library control stays clickable, focus opens into the panel, Escape returns focus to the trigger (488ms)
+  ✓   9 [chromium] › test/e2e/library-crud.spec.ts:202:3 › de-modal LayoutEditor (v3-T022) › round-trip: toggling a section's Enable checkbox and saving persists across reload (1.1s)
+  ✓  10 [chromium] › test/e2e/library-crud.spec.ts:263:3 › de-modal ProfileEditor (v3-T023) › Edit profile panel: opens with fields, non-modal, underlying library control stays clickable, focus opens into the panel, Escape returns focus to the trigger (418ms)
+  ✓  11 [chromium] › test/e2e/library-crud.spec.ts:303:3 › de-modal ProfileEditor (v3-T023) › round-trip: editing the Headline and saving persists across reload (627ms)
+  ✓  12 [chromium] › test/e2e/library-crud.spec.ts:361:3 › project section › create: new project entry appears in the list (969ms)
+  ✓  13 [chromium] › test/e2e/library-crud.spec.ts:371:3 › project section › edit: changing a fact updates the list (1.0s)
+  ✓  14 [chromium] › test/e2e/library-crud.spec.ts:380:3 › project section › reload persistence: the entry survives a page reload (367ms)
+  ✓  15 [chromium] › test/e2e/library-crud.spec.ts:387:3 › project section › delete: two-step armed confirm — first click arms, second removes it from the list (391ms)
+  ✓  16 [chromium] › test/e2e/library-crud.spec.ts:422:3 › F106: two-step armed delete (T016) › first activation arms without deleting: no server call, entry stays, still non-modal (875ms)
+  ✓  17 [chromium] › test/e2e/library-crud.spec.ts:450:3 › F106: two-step armed delete (T016) › second activation deletes with an asserted server round-trip (538ms)
+  ✓  18 [chromium] › test/e2e/library-crud.spec.ts:473:3 › F106: two-step armed delete (T016) › Escape after arming disarms: reverts to Delete, no deletion (623ms)
+  ✓  19 [chromium] › test/e2e/library-crud.spec.ts:491:3 › F106: two-step armed delete (T016) › blur after arming disarms: reverts to Delete, no deletion (608ms)
+  ✓  20 [chromium] › test/e2e/library-crud.spec.ts:510:3 › F106: two-step armed delete (T016) › per-row isolation: arming entry A then clicking Delete once on a different entry B arms B only and auto-disarms A (910ms)
+  ✓  21 [chromium] › test/e2e/settings.spec.ts:57:1 › workspace shell: /settings renders inside the shell with no preview pane (degrade) (482ms)
+  ✓  22 [chromium] › test/e2e/settings.spec.ts:64:1 › rail: one nav item per settings section, in the same order as the cards below (482ms)
+  ✓  23 [chromium] › test/e2e/settings.spec.ts:79:1 › Provider & model: changing provider and model round-trips and survives reload (1.8s)
+  ✓  24 [chromium] › test/e2e/settings.spec.ts:116:1 › API key: setting a key round-trips server-side (keySet reflects it after reload) (1.1s)
+  ✓  25 [chromium] › test/e2e/settings.spec.ts:147:1 › Default document format: changing an axis round-trips and survives reload (1.2s)
+
+  25 passed (27.2s)
+chromium-rerun exit=0

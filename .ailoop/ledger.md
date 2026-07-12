@@ -142,3 +142,151 @@ corrections.
   NEW RATCHET FLOOR (Phase 0 gate): vitest >=1077 · chromium >=24 · auth >=1 · applications >=41 · docker >=1.
   RESIDUAL for Phase 5: auth.spec.ts:23 new e2e is retry-fragile against the auth project's stateful DATA_DIR (reuseExistingServer + retries:2) — harden with per-test DATA_DIR isolation in T060/T061.
   OPERATIONAL: pkill stale `bun run start`/tsx servers before auth verification (repeated per-ticket auth runs leave a password-dirtied DATA_DIR that poisons setup:false assertions).
+
+[0033] CADENCE AMENDMENT (mechanical, operator-directed) — "skip mid-loop testing, test at the end."
+  User chose: DEFER e2e to phase-close, keep fast guards per-ticket.
+  Per-ticket independent re-verify = check + build + lint + full vitest + scope + gaming read (NO playwright).
+  Per-phase gate (merged tree, unchanged) = FULL baseline incl. playwright chromium+auth+applications (+docker where required).
+  Rationale: definition-of-done per phase is unchanged (full e2e still gates every phase close); only the WHEN moves. The loop's wall-clock cost here is playwright (flakes/stale-server/re-runs), so this is where the speedup lives. Vitest still runs per-ticket as the immediate regression net.
+  Consequence accepted: phase-gate red = bisect (no per-ticket e2e attribution); worker branches KEPT until phase gate green (already protocol).
+  Scope: applies from P1 onward. oracle.md Baseline-gate section updated.
+
+[0034] T020 — dispatch (build, SERIAL) · sonnet · worktree · baseSha 784b37b · attempt 1/3
+  decision: continue
+  why: only ready P1 ticket; foundational chrome-merge, every other P1 ticket depends on it.
+  cadence: per new amendment [0033], builder self-runs fast gate + its OWN new e2e spec only; full playwright (chromium+auth+applications) + docker DEFERRED to P1 phase-close gate. Independent re-verify per-ticket = fast guards + scope + gaming (no playwright).
+
+[0035] T020 — worker DIED on API ConnectionRefused (infra, transient) mid-implementation ("Now let's implement App.tsx"). 0 commits, no uncommitted work, HEAD still at baseSha 784b37b. NOT an acceptance failure → no attempts entry (per T017-stall precedent [0027]). Removed dead worktree + branch. Re-dispatched fresh.
+  decision: retry (fresh, infra)
+  why: nothing durable; API death, not a build problem.
+[0036] T020 — dispatch (build, SERIAL, fresh) · sonnet · worktree · baseSha 784b37b · attempt 1/3 (dispatch #2/20 this chunk)
+  decision: continue
+
+[0037] T020 — DONE (independent re-verify green, fast gate). Merged d60892b (--no-ff into main).
+  fast baseline: check 0, build 0, lint 0. vitest in worktree 1073/1077 — the 4 failures are ats-view/fit-ui and are the WORKTREE font-path ENOENT artifact (CLAUDE.md), NOT the concurrency flake: they fail in worktree-isolation too, but pass 8/8 on MAIN at the exact baseSha, and pass 1077/1077 on the merged tree (real env). T020 touches no fit/ATS logic. Post-merge full vitest on main: 1077/1077 exit 0.
+  scope: CLEAN — App.tsx, AppShell.tsx(deleted), LoginGate.tsx, workspace.ts (all declared) + playwright.config.ts (registration-only: +|chrome-merge) + NEW test/e2e/chrome-merge.spec.ts (ticket-mandated new-behavior test, same footprint treatment as T018). WorkspaceShell.tsx/NavTabs.tsx declared-but-untouched (fine).
+  gaming: CLEAN — chrome-merge.spec.ts assertions are geometric/behavioral (no-header = fixed/sticky ≥90% vw outside rail, tag-agnostic, 4 surfaces + 0 <header>; wordmark bbox ⊆ rail bbox; theme = root-class flip + real bg repaint canvas+card + reversible; logout = server invalidation via full-nav gate + direct 401). No weakened/existence-only checks.
+  cadence note: full playwright (chromium+auth+applications) + docker DEFERRED to P1 phase-close gate per [0033]. Builder self-ran chrome-merge.spec 6/6 + spot-checked F103/cohesion/auth/card-bounds green (its claim; authoritative run at gate).
+  evidence: .ailoop/evidence/T020.txt
+  Pruned worktree+branch (clean --no-ff merge; merge commit preserves per-ticket bisection for the deferred phase gate).
+
+[0038] T021 — dispatch (build, SERIAL) · sonnet · worktree · baseSha d60892b · attempt 1/3 (dispatch #3/20 this chunk)
+  decision: continue
+  why: ready P1 (rail design F201/F204/F205). Serialized ahead of T024 (both share WorkspaceShell.tsx+ApplicationDetail.tsx — scheduler batched separately).
+
+[0039] T021 — attempt 1 FAILED (independent re-verify). Built work is correct + scope-clean (NavTabs icons/--ring-weak hover; ApplicationDetail zoning/SECTIONS/back-link removed/detail title→editor h1; playwright.config registration; new rail-design.spec). BUT acceptance "on ALL FOUR surfaces the editor h1 is the surface title and the rail holds no duplicate" is NOT met: LibraryView.tsx:108 + SettingsView.tsx:44 still render <h1> title in the rail, and the new spec's title-convention test covers the DETAIL surface only (under-covers the acceptance).
+  root cause: intake under-declared T021.files. Coverage map (oracle.md:452) assigns F205 ENTIRELY to T021, but its files list omitted LibraryView/SettingsView. Builder's "T052/T053 will handle it" is wrong — T052=ApplicationDetail(F503/F504), T053=SettingsView format cards(F506), neither touches the title convention.
+  RECONCILE (mechanical scope correction, self-serve + ledger): expanded T021.files += LibraryView.tsx, SettingsView.tsx. Definition-of-done UNCHANGED (acceptance already demanded all four; coverage map unchanged) — only the files contract corrected to match. Scope tripwire NOT crossed (these files are in-scope for F205). No new batching conflict (T024 doesn't touch library/settings; already serialized on ApplicationDetail/WorkspaceShell).
+  decision: retry (attempt 2) — RESUME same agent (has context + branch b06f3f1) via SendMessage rather than fresh re-dispatch (cheaper, preserves correct work).
+
+[0040] T021 — dispatch attempt 2 (RESUME same agent via SendMessage) · sonnet · same worktree/branch (on b06f3f1) · baseSha d60892b · (dispatch #4/20 this chunk)
+  fixNote given: finish library/settings title-convention (h1 rail→editor pane) + extend rail-design.spec to assert one-title convention on ALL FOUR surfaces. Declared files expanded per [0039].
+  decision: continue
+
+[0041] T021 — DONE (attempt 2, independent re-verify green). Merged 9fc2db0 (--no-ff).
+  fast baseline: check 0, build 0, lint 0. vitest: post-merge full run on main = 2 failed (ats-view x1 + fit-ui x1) → CONFIRMED FLAKE, not regression: each file run INDIVIDUALLY is 4/4 green (fit-ui 3x, ats-view 2x). T021 does touch ApplicationDetail.tsx so fit-ui was a real suspect, but the measurement tests are deterministically green alone; the failure only appears under font-loading concurrency (even a 2-file run of the two flake-prone files together flaked once). Net baseline on main = 1075 stable + 2 flake-floats = 1077.
+  scope: CLEAN — NavTabs, ApplicationDetail, LibraryView, SettingsView (all declared, incl. the [0039] expansion) + playwright.config.ts (registration-only, prior commit) + rail-design.spec.ts (new). WorkspaceShell.tsx declared-but-untouched.
+  gaming: CLEAN — all-four one-title test iterates 4 surfaces, editor-pane h1==title + rail has no heading duplicating it (role=heading, correctly excludes the legit "Applications" nav link). Icons=svg-per-item, hover=--ring-weak differs-from-resting, SECTIONS label, back-link gone.
+  F205 now delivered across all four surfaces (the [0039] gap closed).
+  cadence: full playwright + docker deferred to P1 gate. Builder self-ran rail-design.spec 5/5 across surfaces (claim; authoritative at gate).
+  evidence: .ailoop/evidence/T021.txt. Pruned worktree+branch.
+
+[0042] ORACLE amendment (mechanical, self-serve) — font-flake protocol sharpened after T021. (a) "Isolation" for flake-confirmation = ONE file at a time, 2-3x; a 2-file run of both flake-prone files can still flake under combined font load. (b) Worktree font ENOENT is a DIFFERENT mode from the on-main concurrency flake — it fails even in single-file worktree isolation, so settle worktree ats-view/fit-ui failures by running on MAIN/merged-tree at the same base, not by worktree isolation. Letter-not-meaning; definition-of-done unchanged.
+
+[0043] T022 — dispatch (build, SERIAL) · sonnet · worktree · baseSha 9fc2db0 · attempt 1/3 (dispatch #5/20 this chunk)
+  decision: continue
+  why: ready P1 (collapsible rail F207). Serialized ahead of T023/T024 (all three share WorkspaceShell.tsx).
+
+[0044] ZOMBIE RESUME (no-op) — the original T020 worker aea6bb8d47642ad97 (died [0035] on API ConnectionRefused) revived ~2.6h later after the API recovered, found T020 already built+merged (d60892b) and did only READ-ONLY re-verification (reported done, no new branch, no build). Integrity check post-event: main HEAD 9fc2db0 intact, tree clean, no stray worktrees/branches, commit history = coordinator merges only. No durable trace, no backlog action. Likely contributed background CPU load behind T021's vitest timeout-kill (harmless, diagnosed). If it notifies again: same no-op treatment.
+
+[0045] T022 — DONE (independent re-verify green). Merged 5af3345 (--no-ff).
+  fast baseline: check 0, build 0, lint 0. vitest: worktree run 4 fail = ats-view/fit-ui font artifact. Post-merge full run on main = 4 fail but a SHIFTED set (engine-single-column NEVER-CUT, fit-ui x2, letter-preview usePDF-loading) → all confirmed FLAKE: each file alone on main = 110/110, 4/4, 5/5. T022 touches only WorkspaceShell/NavTabs (rail collapse) — none of the PDF/engine/letter logic. Net baseline 1077 (the ~4 float shifts across the render-timing family).
+  scope: CLEAN — WorkspaceShell, NavTabs (declared) + playwright.config (registration-only) + rail-collapse.spec (new).
+  gaming: CLEAN — persistence is window.localStorage only (grep: no fetch/mutation/settings/api write); network-zero assertion captures requests around toggle after networkidle; :has() cross-file section-hide keyed off ApplicationDetail's REAL aria-label="Sections" (:405, verified — not dead code); width/operable/reload/network-zero all asserted (4/4 self-run).
+  cadence: full playwright + docker deferred to P1 gate. Builder self-ran rail-collapse 4/4 + cohesion 11/11 + rail-design 5/5 + chrome-merge 6/6 (claim; authoritative at gate).
+  evidence: .ailoop/evidence/T022.txt. Pruned worktree+branch.
+[0046] ORACLE amendment (mechanical) — flake-prone set is the @react-pdf/@fontsource/fit-ladder FAMILY (ats-view, fit-ui, engine-single/two-column, engine-section-display, letter-preview), membership shifts run-to-run. Per-file isolation remains the sole discriminator; observed-set expansion does not widen tolerance. Definition-of-done unchanged.
+
+[0047] T023 — dispatch (build, SERIAL) · sonnet · worktree · baseSha 5af3345 · attempt 1/3 (dispatch #6/20 this chunk)
+  decision: continue
+  why: ready P1 (scroll-spy F202 + section-row clarity F209). Serialized ahead of T024 (share ApplicationDetail.tsx+WorkspaceShell.tsx). Prompt flags: fit-ui is "ApplicationDetail fit wiring" + this edits ApplicationDetail → fit-ui failing IN ISOLATION = real regression, not flake.
+
+[0048] T023 — attempt 1: built work CORRECT (scroll-spy F202 + section-row F209; scroll-spy.spec 2/2; scope clean: ApplicationDetail + playwright.config registration + new spec), BUT regresses an existing e2e baseline test: F209 removed rail-collapse-letter testid that applications.spec.ts:1430 (protocol E, section-collapse view-state contract) targets. Builder honestly flagged it; that spec was outside T023 scope. Baseline e2e regression = failed ticket even w/ acceptance green.
+  NOTE: the deferred-e2e cadence [0033] means my per-ticket FAST gate cannot catch this — only the P1 phase gate would. Caught here via the builder's flag + static read; fixing at point-of-knowledge rather than deferring a guaranteed-red gate.
+  RECONCILE: expanded T023.files += test/e2e/applications.spec.ts (the ticket's own F209 change owns migrating the test that asserts the removed behavior). Resume agent to re-home protocol-E onto section-collapse-<key>, preserving every view-state assertion (standing policy).
+  decision: retry (attempt 2, RESUME same agent).
+
+[0049] T023 — dispatch attempt 2 (RESUME same agent) · sonnet · same branch (on 112448f) · baseSha 5af3345 · (dispatch #7/20 this chunk)
+  fixNote: migrate applications.spec protocol-E onto section-collapse-<key>, preserve all view-state assertions; restore localStorage/view-state semantics in ApplicationDetail if the F209 move dropped them.
+  decision: continue
+
+[0050] T023 — DONE (attempt 2, independent re-verify green). Merged 9b23a71 (--no-ff).
+  fast baseline: check 0, build 0, lint 0. vitest render-family flake only. REAL-REGRESSION SUSPECT resolved: fit-ui ("ApplicationDetail fit wiring") failed 1x alone on post-merge main — but 5/5 clean on repeat → the documented low-rate single-file intermittency, NOT a T023 regression (ApplicationDetail +170 lines but fit wiring untouched functionally). ats-view passes alone.
+  scope: CLEAN — ApplicationDetail (declared) + applications.spec.ts (declared, [0048] expansion) + playwright.config (registration) + scroll-spy.spec (new). WorkspaceShell declared-untouched.
+  gaming: CLEAN — protocol-E migration is testid-swap-only (rail-collapse-letter->section-collapse-letter on trigger+aria-expanded), all view-state assertions kept (localStorage lede.workspace.sectionCollapse.<id>, zero writes, untouched settings.layout/format, pixel-identical preview); no production change (reuses toggleSection handler). scroll-spy.spec independently re-derives 30%-line from raw DOM geometry (not app state/constants), 3 computed fractions, marker-moves assertion, short-last-section escape — genuine anti-hardcode.
+  F202 + F209 delivered.
+  cadence: full playwright + docker deferred to P1 gate. Builder self-ran protocol-E (1 passed, all assertions) + scroll-spy 2/2.
+  evidence: .ailoop/evidence/T023.txt. Pruned worktree+branch.
+[0051] ORACLE note (mechanical) — render-family single-file isolation itself flakes at a LOW rate (~1/6 observed for fit-ui). A single isolated pass OR fail is not conclusive; confirm with 3-5 repeated single-file runs. Discriminator otherwise unchanged.
+
+[0052] T024 — dispatch (build, SERIAL) · sonnet · worktree · baseSha 9b23a71 · attempt 1/3 (dispatch #8/20 this chunk)
+  decision: continue
+  why: last P1 build ticket (F203 scroll restoration + F208 focus/landmarks/heading-order). Prompt asks the builder to explicitly report any testid/attribute removals that break existing specs (pre-empt the pattern from T023/protocol-E).
+  note: after T024 done, scheduler will show P1 phasesDrained → run P1 phase-close gate (full playwright chromium+auth+applications + docker) — the deferred-e2e reckoning.
+
+[0053] T024 — attempt 1: F203 core (scroll restoration keyed by location.key, POP-restore ±24px, fresh-nav-top, location.key-independence), focus (h1 focus w/ preventScroll — builder caught a real bug where focus() without preventScroll undoes the restore), single-<main> (already true, verified), and DETAIL heading-order all delivered + scope-clean (App.tsx, WorkspaceShell.tsx, ApplicationDetail.tsx + playwright.config registration + route-transitions.spec). BUT acceptance "heading levels sequential on ALL FOUR surfaces" (P1 gate oracle:370) not met: dashboard/library/settings skip H1->H3 (shared CardTitle=h3 root cause, files out of T024 scope). Builder disclosed + encoded 3 test.fail() markers (machine-checkable, honest).
+  RECONCILE: F208 is T024's per coverage map:481 and the P1 gate needs all-four heading order BEFORE it can close — so this must land inside P1, not deferred to the P3/P4 tickets that happen to touch those files (none own heading-order). Expanded T024.files += ApplicationCard, SectionAccordion, SettingsView, ui/card.tsx, route-transitions.spec.ts. Reallocation, definition-of-done unchanged (acceptance already demanded all four).
+  decision: retry (attempt 2, RESUME same agent — it already identified the exact files + root cause; cheaper + lower re-analysis risk than a fresh ticket). Mandate: surgical per-surface fix preferred; CardTitle-root allowed only with app-wide heading verification; flip the test.fail markers to real assertions.
+
+[0054] T024 — dispatch attempt 2 (RESUME same agent) · sonnet · same branch (on 44c2aab) · baseSha 9b23a71 · (dispatch #9/20 this chunk)
+  fixNote: sequential heading order on dashboard/library/settings (surgical per-surface preferred; CardTitle-root allowed w/ app-wide verify); flip route-transitions.spec test.fail markers to real all-four assertions.
+  decision: continue
+
+[0053] T024 — attempt 1: built work CORRECT + scope-clean (F203 scroll restoration, focus mgmt, single <main>, detail heading order; route-transitions.spec 7/7 with honest test.fail() for the gap; found+fixed a real preventScroll:true bug; regression sweep cohesion 11/11 + applications 24/24 green). BUT acceptance "sequential heading order on ALL FOUR surfaces" NOT met: dashboard/library/settings still skip H1->H3 via shared CardTitle (h3, no h2 ahead). F208 = T024 alone per coverage map:481; declared files omitted those 3 surface files + ui/card.tsx.
+  RECONCILE (same pattern as T021/[0039]): expanded T024.files += ApplicationCard.tsx, SectionAccordion.tsx, SettingsView.tsx, ui/card.tsx. Definition-of-done unchanged (acceptance already demanded all four). CardTitle fix must be backward-compatible (optional level prop, default h3 — 7 usages, only these 3 surfaces change). Also flip the 3 test.fail() markers to real passes.
+  decision: retry (attempt 2, RESUME same agent — has context + branch).
+
+[0054] T024 — dispatch attempt 2 (RESUME same agent) · sonnet · same branch (on 44c2aab) · baseSha 9b23a71 · (dispatch #9/20 this chunk)
+  fixNote: heading order on dashboard/library/settings via backward-compat CardTitle level prop (default h3); flip 3 test.fail() markers to real passes; re-run cohesion to confirm CardTitle change is inert elsewhere.
+  decision: continue
+
+[0055] T024 — DONE (attempt 2, independent re-verify green). Merged 8db3dbb (--no-ff).
+  fast baseline: check 0, build 0, lint 0. vitest render-family flake only; fit-ui + ats-view each 3/3 alone on main → confirmed flake, no regression (CardTitle level change + ApplicationDetail edits did not touch fit/ATS logic).
+  scope: CLEAN — App, WorkspaceShell, ApplicationDetail, ApplicationCard, SectionAccordion, SettingsView, ui/card (all declared incl. [0053] expansion) + playwright.config (registration) + route-transitions.spec (new).
+  gaming: CLEAN — CardTitle `as` prop defaults h3 (backward-compat; TemplateGallery x2 + TemplatePicker x1 byte-unchanged, verified); route-transitions.spec test.fail() markers FLIPPED to real per-surface assertions (headingLevels() collects all h1-h6 in DOM order, expectNoSkippedLevel asserts step<=1, expectExactlyOneMain, focus poll activeElement===h1 across 4 surfaces). No weakening.
+  F203 + F208 delivered across all four surfaces. Builder disclosed: only app-wide heading-role query is library.test.tsx:80 (level-agnostic, green); no testid/attr removed.
+  cadence: full playwright + docker deferred to P1 gate (NOW). Builder self-ran route-transitions 7/7 + cohesion 11/11 + dashboard-card 2/2.
+  evidence: .ailoop/evidence/T024.txt. Pruned worktree+branch.
+
+[0056] P1 PHASE-CLOSE GATE (merged tree 8db3dbb) — partial results:
+  - build: exit 0.
+  - vitest (full, on main): 1077/1077 (render-family float, per-file-isolation clean).
+  - playwright CHROMIUM: 24 passed / 1 FAILED — library-crud.spec.ts:121 "Edit selected panel ... Escape returns focus to the trigger", failing at line 150 (cleanup: single-click card Delete then expect count 0). BISECTED: fails IDENTICALLY at 784b37b (P0 close) → this is a P0-GATE ESCAPE, not a P1 regression. T016 (F106) made card Delete two-step armed-confirm but never migrated THIS test's single-click-delete cleanup; the P0 gate [0032] reported chromium green and missed it. File byte-identical since P0; no P1 commit touched it.
+  - playwright AUTH: auth.spec.ts:23 (the project's only test) failed on first run, PASSED on clean re-run → the documented DATA_DIR/stale-server flake ([0032] residual). Root: reuseExistingServer:!CI reuses a stale password-dirtied auth server; pkill-by-name missed it. OPERATIONAL FIX: free ports 8787-8789 by PORT (lsof -ti tcp:$p | kill -9) before auth, not just pkill-by-name. GREEN after that.
+  - playwright APPLICATIONS: 65 passed, exit 0 — ALL deferred P1 e2e green (cohesion, chrome-merge, rail-design, rail-collapse, scroll-spy, route-transitions, F103 docked-panel re-gate, design).
+  - docker: pending.
+  VERDICT so far: only real gate-red = chromium P0-escape → repair ticket T025. auth flake = operational (ports). Docker next.
+
+[0057] T025 (repair) — red-teamed (mid-flight ticket): a lazy builder could drop the cleanup assertion to green chromium, leaving entry pollution. Added guard: cleanup must retain a toHaveCount(0)/toBeHidden after two-step delete; fix = add the arm step, not remove the check. Escaped-bug strengthening: acceptance requires auditing+migrating ALL single-click delete cleanups in the file (T016 two-step migration was incomplete → the escape).
+[0058] T025 — dispatch (build, SERIAL) · sonnet · worktree · baseSha 8db3dbb · attempt 1/3 (dispatch #10/20 this chunk)
+  decision: continue
+  why: unblocks the P1 gate (only real chromium red). Test-only fix; no production change.
+
+[0059] T025 (repair) — DONE (independent re-verify green). Merged 1dd91e0 (--no-ff). Scope CLEAN (only test/e2e/library-crud.spec.ts). Gaming CLEAN — diff ADDS arm-click + "Confirm delete" click and KEEPS the toHaveCount(0) assertion (red-team guard satisfied); audit found+fixed exactly 1 escape. FULL chromium project re-run on merged main: 25 passed / 0 failed, exit 0 → gate chromium leg GREEN. Pruned worktree+branch.
+  P1 gate status: chromium 25 GREEN · auth GREEN (ports-clean) · applications 65 GREEN · vitest 1077 · build/check/lint 0. Only docker remains.
+
+[0060] PHASE 1 — CLOSED. All 6 tickets done (T020 chrome-merge, T021 rail-design, T022 collapse, T023 scroll-spy+section-clarity, T024 scroll-restore+a11y, T025 repair). Merged-tree P1 phase-close gate GREEN on 1dd91e0:
+  - check 0 · build 0 · lint 0 · vitest 1077/1077 (render-family float, per-file-isolation clean)
+  - playwright chromium 25 · auth 1 (ports-clean) · applications 65 · docker 1 — all exit 0.
+  Every F2xx delivered: F201/F204/F205(T021) F202/F209(T023) F203/F208(T024) F206 login-mini-chrome(T020) F207 collapse(T022). OQ1 single-chrome(T020).
+  NEW RATCHET FLOOR (P1 gate): vitest >=1077 · chromium >=25 · auth >=1 · applications >=65 · docker >=1.
+  DRIFT/notes caught this phase:
+   - 3 tickets (T021/T023/T024) had intake-under-declared files vs their all-four-surfaces / existing-behavior acceptance → expanded scope + resumed each (builders flagged honestly). Reconciliations [0039][0048][0053].
+   - T023 removed rail-collapse-letter testid (F209) → migrated protocol-E in applications.spec.ts [0048].
+   - P0-ESCAPE caught by P1 gate: library-crud.spec.ts cleanup used pre-F106 single-click delete; repair T025 [0057-0059]. The P0 gate [0032] mis-reported chromium green.
+   - auth.spec.ts:23 DATA_DIR/stale-server flake: OPERATIONAL fix = free ports 8787-8789 by lsof/kill before auth (reuseExistingServer reuses dirty server). Still recommend per-test DATA_DIR isolation in Phase 5 (T060/T061), residual carried.
+   - Oracle amendments this phase: cadence defer-e2e-to-phase-gate [0033]; render-family flake FAMILY + per-file-isolation discriminator + low-rate single-file intermittency [0046][0051]; worktree-ENOENT vs on-main-concurrency modes distinguished.
+  Phase-1 branches pruned per-ticket (clean --no-ff merges; no gate-red bisection needed — chromium red was a P0-escape test fix, not integration).
+
+## Chunk — new invocation 2026-07-12 (P2→P5 continuous drive)
+[0061] RESUME. Fresh context (compaction). Verified contract sha256 unchanged (e4254fc…). Scheduler: P0+P1 done, complete=false, no problems/cycles/stale/breaches. phasesDrained=[P0,P1] already gated+closed. Ready=[T030]. Operator directive: run all remaining phases continuously to the end, compacting between phases; chunk-cap-as-checkpoint waived by operator — all CORRECTNESS guards (independent re-verify, attempt/thrash caps, phase-close gates) stay. Dispatch is SERIAL (playwright ports 8787-89 collide) per oracle env-adaptation; coordinator self-verifies.

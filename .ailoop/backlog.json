@@ -177,7 +177,7 @@
     {
       "id": "T020",
       "title": "P1: Chrome merge (OQ1) — delete AppShell header, wordmark+utility cluster into the rail, login mini-chrome",
-      "status": "todo",
+      "status": "done",
       "phase": "P1",
       "depends_on": [
         "T010",
@@ -202,12 +202,12 @@
       "context": "See /workspace/SPEC.md Phase 1 + Locked (single-chrome merge) + oracle.md. Delete the header bar (`AppShell` — currently wordmark + theme toggle + logout in a 57px row). Move the wordmark to the RAIL TOP; move theme toggle + logout to the rail's BOTTOM cluster (the collapse toggle joins there in T022). `AppShell` dissolves into the shell (App.tsx/WorkspaceShell.tsx). The LOGIN page (LoginGate, outside the shell) gets its OWN standalone mini-chrome: wordmark + theme toggle above the card at every width — it must NOT lose these when the header dies and must NOT inherit shell chrome. Update the e2e helper layer (`test/e2e/helpers/workspace.ts`) so tests drive the theme/logout controls at their NEW rail location, not the dead header — re-home selectors here, never scatter them. Frozen: visual identity, three-pane model, de-modal ban. NOTE T014's F103 assertion (docked-panel-in-viewport) RE-RUNS after this merge — do not reintroduce a header that re-buries the panels. This is the campaign's core risk (v3 cohesion contracts must stay green through the restructure); keep the wordmark's DOM identity and the shell's persistence intact.",
       "acceptance": "- e2e: NO full-width fixed bar exists outside the rail on any shell surface (measured geometrically, not by `<header>` tag-name — a renamed same-size bar FAILS); the wordmark's boundingBox is geometrically contained within the rail's boundingBox; the rail's theme toggle is OPERABLE (activation flips the root theme class AND ≥2 unrelated surfaces' computed backgrounds — canvas + a card — both change); the rail's logout is OPERABLE and INVALIDATES the session (after landing on login, a subsequent app API call 401s / navigating back to a shell route redirects to login — not just a client route push).\n- Login page renders its standalone wordmark + theme toggle at 375 and 1280; `AppShell` is removed from the DOM (not CSS-hidden).\n- v3 cohesion contracts (`cohesion.spec.ts`) green on the new tree.\n- T014's F103 assertion RE-RUNS unchanged (the SAME assertion body, not skipped and not a loosened rename) and passes on the merged tree.\n- Baseline gate green + ONE docker e2e run (`bun run test:docker`) at this gate (red-team #16). Helpers updated, assertions re-homed not deleted.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T020.txt"
     },
     {
       "id": "T021",
       "title": "P1: Rail design — icon+label global nav, zoning, hover states, title convention, back-link removed",
-      "status": "todo",
+      "status": "done",
       "phase": "P1",
       "depends_on": [
         "T020"
@@ -215,18 +215,30 @@
       "files": [
         "src/client/components/NavTabs.tsx",
         "src/client/components/WorkspaceShell.tsx",
-        "src/client/components/ApplicationDetail.tsx"
+        "src/client/components/ApplicationDetail.tsx",
+        "src/client/components/LibraryView.tsx",
+        "src/client/components/SettingsView.tsx"
       ],
       "origin": "spec Phase 1 / F201/F204/F205 (red-team #9)",
       "context": "See /workspace/SPEC.md F201/F204/F205 + Locked (rail zoning, one title convention, icons). Make the rail DESIGNED, not just wired: (1) each global nav item (NavTabs) gets a lucide-react icon + label (suggested `Files`/`BookOpen`/`Settings2`, 16px, consistent stroke — builder's choice within lucide); (2) hover state computes to a designated token and DIFFERS from rest (the original finding was an imperceptible `#fafafa`-on-white hover); (3) rail ZONING: global-nav zone / surface-context zone / section zone under a mono-caps micro-label ('SECTIONS', same style as editor kickers); (4) the '← Applications' back-link row (ApplicationDetail) is DELETED — the active global-nav item is the up-level affordance; (5) ONE title convention: surface titles live in the EDITOR PANE header on every surface; the rail never repeats the active surface's name. Depends on T020 (rail exists). Frozen: identity, de-modal.",
       "acceptance": "- e2e: each global nav item contains an `svg`; hover computes to the designated token and differs from rest (both asserted — imperceptible hover must fail); the mono-caps section-zone label renders on surfaces that have a section group; the string '← Applications' appears NOWHERE on detail; on all four surfaces the editor pane's h1 is the surface title and the rail contains no duplicate of that title.\n- Baseline gate green; v3 cohesion green.",
-      "attempts": [],
-      "evidence": null
+      "attempts": [
+        {
+          "n": 1,
+          "failed": [
+            "acceptance:title-convention-all-four-surfaces",
+            "spec-coverage:title-convention-tests-detail-only"
+          ],
+          "hypothesis": "Ticket files were under-declared: F205 title convention spans all four surfaces (coverage map assigns F205 entirely to T021), but LibraryView.tsx/SettingsView.tsx render their title as an in-rail <h1> (LibraryView:108, SettingsView:44) and were absent from T021.files. The built work (NavTabs icons/hover, ApplicationDetail zoning+SECTIONS+back-link+detail title) is correct and scope-clean; only library/settings title convention + full-surface spec coverage are missing.",
+          "fixNote": "Scope EXPANDED to add LibraryView.tsx + SettingsView.tsx. On those two surfaces, move the surface title out of the rail into the editor pane header (h1), matching the detail surface pattern already built. Then EXTEND rail-design.spec.ts so the one-title-convention test runs on ALL FOUR surfaces (/applications, /applications/:id, /library, /settings): editor-pane h1 == surface title AND rail contains no duplicate of that title. Keep existing assertions."
+        }
+      ],
+      "evidence": ".ailoop/evidence/T021.txt"
     },
     {
       "id": "T022",
       "title": "P1: Collapsible rail (localStorage view-state, icon-only band, tooltips)",
-      "status": "todo",
+      "status": "done",
       "phase": "P1",
       "depends_on": [
         "T021"
@@ -239,30 +251,40 @@
       "context": "See /workspace/SPEC.md Locked (collapsible rail) + F207. Add a collapse toggle in the rail's BOTTOM cluster (with theme/logout from T020). Expanded 224px ↔ collapsed icon-only band 40–64px (builder picks within the band). Collapsed mode: icon-only global nav with tooltips; per-surface section nav hidden. State persists in `localStorage` ONLY — never a server write, never `settings.layout`/`sectionDisplay` (standing rail-collapse-is-view-state-only policy; network-zero on toggle, the v3 pattern). Width change animates within the pinned [100ms,300ms] motion band (see Phase 3 language; a transition here is fine now). Depends on T021 (rail zoning exists).",
       "acceptance": "- e2e: activating the collapse toggle transitions the rail width between expanded and the 40–64px band; in icon-only mode all three global items are operable (activation navigates); state survives a reload (localStorage) but the toggle triggers ZERO network requests (network-zero, v3 pattern); no `settings`/`sectionDisplay` write.\n- Baseline gate green; v3 cohesion green.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T022.txt"
     },
     {
       "id": "T023",
       "title": "P1: Scroll-spy section nav with active state (F202) + section-row clarity (F209)",
-      "status": "todo",
+      "status": "done",
       "phase": "P1",
       "depends_on": [
         "T021"
       ],
       "files": [
         "src/client/components/ApplicationDetail.tsx",
-        "src/client/components/WorkspaceShell.tsx"
+        "src/client/components/WorkspaceShell.tsx",
+        "test/e2e/applications.spec.ts"
       ],
       "origin": "spec Phase 1 / F202/F209 (red-team #5)",
       "context": "See /workspace/SPEC.md F202/F209 + Locked (scroll-spy rule pinned). Add scroll-spy to the section nav: active = the LAST section whose top edge has crossed a line 30% down from the viewport top; when the editor is scrolled to bottom, the FINAL section is active regardless (short-last-section escape). Exactly ONE section carries `aria-current=\"true\"` + the same accent-pill treatment as the global nav (one visual language for 'current'). Surfaces with <2 sections render NO section zone (no vacuous spy). F209: the whole section row navigates; collapse moves to the editor's section HEADERS only (not the rail) — remove the ambiguous split-button (label scrolls / chevron collapses) from the rail row. Depends on T021 (section zone exists). Shares ApplicationDetail.tsx with T024 (scheduler serializes if both ready).",
       "acceptance": "- e2e on detail (seeded fixture, 3 sections; precondition `scrollHeight > clientHeight + 500` asserted): sample ≥3 scroll positions computed PROGRAMMATICALLY from the 30%-line rule (not fixed magic scrollTops) and verify the active section matches an independently-computed expected — this rules out hardcoded per-fixture thresholds; scroll to bottom ⇒ the FINAL section's item is active (short-last-section arm); the marker provably moved.\n- Exactly ONE section carries `aria-current` AND the accent-pill computed style (background/border) is on the SAME element as `aria-current` (rules out the attribute moving while the visual pill sticks).\n- Surfaces with <2 sections render no section zone (assert non-existence / zero-bbox + not-tabbable, not merely invisible).\n- Baseline gate green; v3 cohesion green.",
-      "attempts": [],
-      "evidence": null
+      "attempts": [
+        {
+          "n": 1,
+          "failed": [
+            "baseline-regression:applications.spec.ts-protocolE-rail-collapse"
+          ],
+          "hypothesis": "Built work is correct (scroll-spy F202 + section-row clarity F209; new scroll-spy.spec 2/2). But F209 legitimately removed the rail-collapse-letter testid from the rail (section collapse moved to editor section headers, new testid section-collapse-<key> with aria-expanded), which BREAKS the existing e2e test applications.spec.ts:1430 (protocol E: section-collapse is local view-state — aria-expanded/localStorage/zero-network/no settings.layout|format mutation). That spec was outside T023 declared files. A regressed e2e baseline test = failed ticket even though acceptance passed.",
+          "fixNote": "Migrate applications.spec.ts protocol-E test to the NEW collapse control: replace getByTestId(\"rail-collapse-letter\") with the editor-header control getByTestId(\"section-collapse-letter\") (confirm \"letter\" is the section key; use the actual key). Keep ALL protocol-E assertions (aria-expanded flips, localStorage collapse key persists, ZERO application/settings network writes, settings.layout + application.format untouched, preview pixel-identical) — this is a STANDING view-state-only policy, re-home the assertions, do NOT delete or weaken them. If the moved control dropped the localStorage/view-state semantics, restore them in ApplicationDetail.tsx (declared)."
+        }
+      ],
+      "evidence": ".ailoop/evidence/T023.txt"
     },
     {
       "id": "T024",
       "title": "P1: Scroll restoration (F203) + route focus management + single main landmark + heading order (F208)",
-      "status": "todo",
+      "status": "done",
       "phase": "P1",
       "depends_on": [
         "T020"
@@ -270,13 +292,35 @@
       "files": [
         "src/client/App.tsx",
         "src/client/components/WorkspaceShell.tsx",
-        "src/client/components/ApplicationDetail.tsx"
+        "src/client/components/ApplicationDetail.tsx",
+        "src/client/components/ApplicationCard.tsx",
+        "src/client/components/SectionAccordion.tsx",
+        "src/client/components/ui/card.tsx",
+        "test/e2e/route-transitions.spec.ts",
+        "src/client/components/SettingsView.tsx"
       ],
       "origin": "spec Phase 1 / F203/F208",
       "context": "See /workspace/SPEC.md F203/F208 + Locked (scroll restoration, route-level focus management). (1) SCROLL RESTORATION: store `editor-pane` scrollTop per `location.key`; restore on POP (browser back). (2) FOCUS: on pathname change, focus the editor pane's h1 (`tabindex=\"-1\"`). (3) LANDMARKS: demote the inner `<main>` to a `div`/`region` so exactly ONE `<main>` landmark exists (AppShell's is gone after T020; WorkspaceShell keeps the one main). (4) HEADINGS: make heading levels sequential per surface (no H1→H3 skip). Depends on T020 (shell chrome final). Shares ApplicationDetail.tsx with T023.",
       "acceptance": "- e2e: scroll editor to Y ≥ 1000 (seeded fixture guarantees room), navigate away, browser back ⇒ scrollTop within ±24px of Y; forward-nav to a fresh route ⇒ top.\n- Keyed by `location.key` NOT pathname: two navigations to the SAME pathname with different scroll targets restore independently (no cross-contamination).\n- After rail navigation, `document.activeElement` is the new surface's h1; the single-`<main>` and sequential-heading checks run on ALL FOUR shell surfaces (not one sample).\n- Baseline gate green; v3 cohesion green.",
-      "attempts": [],
-      "evidence": null
+      "attempts": [
+        {
+          "n": 1,
+          "failed": [
+            "acceptance:heading-order-all-four-surfaces"
+          ],
+          "hypothesis": "F203 scroll-restoration + focus + single-main + DETAIL heading-order all delivered correctly and scope-clean. But acceptance requires sequential heading order on ALL FOUR surfaces (P1 gate oracle:370 asserts heading levels sequential per surface), and dashboard/library/settings still skip H1->H3 — their card/group titles route through the shared CardTitle (ui/card.tsx, fixed h3) with no h2 ahead. Those files were outside T024 declared scope. Builder disclosed it and encoded 3 test.fail() markers in route-transitions.spec (honest, machine-checkable).",
+          "fixNote": "Make heading order sequential (no skipped levels) on dashboard (ApplicationCard.tsx), library (SectionAccordion.tsx), settings (SettingsView.tsx). Prefer a SURGICAL per-surface fix (an h2 group heading ahead of the card groups, or an explicit level on those card usages). You MAY instead fix the shared root in ui/card.tsx (CardTitle default level) ONLY IF you then verify heading order stays sequential APP-WIDE — CardTitle is used everywhere; a default change must not create a new skip or regress the detail surface T024 just fixed. Flip the 3 test.fail() markers in route-transitions.spec.ts to REAL passing assertions (all four surfaces sequential). Do NOT weaken the single-main or detail assertions."
+        },
+        {
+          "n": 1,
+          "failed": [
+            "acceptance:heading-order-all-four-surfaces"
+          ],
+          "hypothesis": "Built work correct + scope-clean (scroll restoration F203, focus mgmt, single <main>, detail-surface heading order; route-transitions.spec 7/7 incl. honest test.fail() markers; regression sweep green). BUT acceptance requires sequential heading order on ALL FOUR surfaces (F208 = T024 entirely per coverage map:481). Dashboard (ApplicationCard.tsx), Library (SectionAccordion.tsx), Settings (SettingsView.tsx) still skip H1->H3 — all render titles via shared CardTitle (ui/card.tsx) which is hardcoded <h3> with no h2 ahead. Those files were outside T024 declared scope.",
+          "fixNote": "Scope EXPANDED += ApplicationCard.tsx, SectionAccordion.tsx, SettingsView.tsx, ui/card.tsx. Fix heading order on all three surfaces so no H1->H3 skip (h1 surface title -> h2 group/card titles). PREFERRED: give CardTitle an OPTIONAL heading-level prop (e.g. `as`/`level`) defaulting to h3 so the other 6 CardTitle usages are byte-unchanged (backward-compatible, zero blast radius), then pass h2 on these 3 surfaces; OR add a proper h2 group heading. If you touch ui/card.tsx it MUST NOT change existing usages default behavior. Then FLIP the 3 test.fail() markers in route-transitions.spec.ts to real passing assertions (all four surfaces now genuinely sequential). Re-run fast gate + the spec."
+        }
+      ],
+      "evidence": ".ailoop/evidence/T024.txt"
     },
     {
       "id": "T030",
@@ -670,6 +714,21 @@
       "acceptance": "- Full playwright (chromium + auth + applications, non-concurrent) green; `bun run test:docker` green.\n- App-wide modality sweep green at 375/768/1024/1280; no horizontal overflow at 375/768/1023/1024/1280/1512.\n- Test-count ratchet: vitest ≥1056, chromium ≥20, auth ≥1, applications ≥32, docker ≥1 (per intake floor).\n- `git diff --name-only <baseSha>..HEAD` ⊆ {test/**}.",
       "attempts": [],
       "evidence": null
+    },
+    {
+      "id": "T025",
+      "title": "repair: P1 gate chromium — migrate library-crud.spec.ts stale single-click delete cleanup(s) to T016 two-step armed confirm",
+      "status": "done",
+      "phase": "P1",
+      "depends_on": [],
+      "files": [
+        "test/e2e/library-crud.spec.ts"
+      ],
+      "origin": "repair: P1 gate chromium red — library-crud.spec.ts:150; P0-escape (T016 F106 two-step delete never migrated in this specs cleanup)",
+      "context": "P0/T016 made the Library entry-card Delete a TWO-STEP armed confirm (F106): the first Delete click ARMS (entry stays, server not called), a second click CONFIRMS the delete. The e2e test test/e2e/library-crud.spec.ts:121 (\"Edit selected panel ... Escape returns focus to the trigger\") ends with a CLEANUP at ~line 149-150 that clicks the card Delete ONCE and asserts the entry is gone (getByText(created,{exact:true}).toHaveCount(0)). Under two-step delete a single click only arms, so the entry persists and the assertion fails. This is a P0-gate escape (file byte-identical since P0 close 784b37b; fails identically there). The two-step tests already exist in the same file (search \"F106: two-step armed delete\", ~lines 489/508) — reuse their exact arm+confirm interaction pattern. Build ONLY the test migration; no production change (the app behavior is correct per F106).",
+      "acceptance": "- The chromium playwright project passes fully: `bunx playwright test --project=chromium library-crud.spec.ts` → 0 failures (run non-concurrently, build first).\n- The \"Edit selected panel\" test cleanup deletes via the two-step armed pattern (arm click → confirm click), matching the existing F106 two-step tests in this file.\n- ESCAPED-BUG AUDIT (required): grep the WHOLE file for every other cleanup/interaction that clicks a card Delete once and expects removal (any `getByRole(\"button\",{name:\"Delete\"}).click()` or cardFor(...).Delete followed by a toHaveCount(0)/toBeHidden without an intervening arm+confirm). Migrate ALL of them to two-step. Report how many you found+fixed.\n- No production files touched; no other test weakened or deleted.\n- RED-TEAM GUARD: the cleanup must STILL assert the entry is removed after the two-step delete (keep a toHaveCount(0)/toBeHidden on the created entry). Do NOT make chromium pass by deleting/commenting the cleanup or its assertion — the entry must genuinely be gone so it cannot pollute sibling tests. The fix is adding the missing arm step, not removing the check.",
+      "attempts": [],
+      "evidence": ".ailoop/evidence/P1-gate.txt"
     }
   ]
 }
