@@ -2,6 +2,7 @@
 // global store (Zustand) per §14. Keys: ['entries'], ['profile'], ['settings'].
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import type { Section } from "@shared/types";
 import type { UserPreset } from "@shared/schema";
 import {
@@ -53,6 +54,10 @@ export function useCreateEntry() {
     mutationFn: (input: EntryInput) => createEntry(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["entries"] });
+      // T040/F401: "entry save" is one named mutation across both doors
+      // (create + update) — same message, each fired in the hook 1:1 with a
+      // saved entry.
+      toast.success("Entry saved");
     },
   });
 }
@@ -63,6 +68,7 @@ export function useUpdateEntry() {
     mutationFn: ({ id, input }: { id: string; input: EntryInput }) => updateEntry(id, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["entries"] });
+      toast.success("Entry saved");
     },
   });
 }
@@ -77,6 +83,7 @@ export function useUpdateProfile() {
     mutationFn: (input: ProfileInput) => updateProfile(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("Profile saved");
     },
   });
 }

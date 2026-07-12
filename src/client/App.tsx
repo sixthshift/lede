@@ -7,6 +7,7 @@ import { LoginGate } from "./components/LoginGate";
 import { NavTabs } from "./components/NavTabs";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { Button } from "./components/ui/button";
+import { Toaster } from "./components/ui/sonner";
 import { WorkspaceShell } from "./components/WorkspaceShell";
 import { WorkspaceShellSlotsContext } from "./components/WorkspaceShellSlots";
 
@@ -175,6 +176,14 @@ export function App() {
             editorPaneRef={setEditorPaneRef}
           />
         </WorkspaceShellSlotsContext.Provider>
+        {/* T040/F401: the single app-wide feedback surface. Non-modal chrome
+            by sonner's own defaults (no scrim, pointer-events inert outside
+            each toast, auto-dismiss) — mounted once here so every mutation's
+            success toast shares one region, and left unconfigured for
+            blocking (no `duration: Infinity`), keeping the v3 modality sweep
+            green. FAILURES never come here — they render inline beside their
+            trigger (the flagVoice pattern). */}
+        <Toaster />
       </div>
     </LoginGate>
   );

@@ -1,6 +1,7 @@
 // TanStack Query hooks for /api/applications — spec.md §27. Keys:
 // ['applications'] for the list, ['applications', id] for a detail record.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import {
   listApplications,
@@ -46,6 +47,11 @@ export function useCreateApplication() {
     mutationFn: (input: ApplicationCreateInput) => createApplication(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["applications"] });
+      // T040/F401: one success toast per named mutation, fired in the hook
+      // whose onSuccess is 1:1 with the action (create fires exactly once per
+      // created application). A failed create surfaces at its own call-site,
+      // never here.
+      toast.success("Application created");
     },
   });
 }
@@ -68,6 +74,7 @@ export function useDeleteApplication() {
     mutationFn: (id: string) => deleteApplication(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["applications"] });
+      toast.success("Application deleted");
     },
   });
 }
@@ -81,6 +88,7 @@ export function useDuplicateApplication() {
     mutationFn: (id: string) => duplicateApplication(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["applications"] });
+      toast.success("Application duplicated");
     },
   });
 }

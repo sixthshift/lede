@@ -200,6 +200,22 @@ export function ApplicationCard({ application }: { application: ApplicationSumma
           {deleteArmed ? "Confirm delete" : "Delete"}
         </Button>
       </div>
+
+      {/* T040/F401: a failed duplicate/delete surfaces INLINE here, beside the
+          quick-action row that triggered it — never a toast (locked
+          feedback-layer rule; success is the toast, failure is inline). Mirrors
+          ApplicationDetail's flagVoice inline-error pattern. */}
+      {duplicateApplication.isError || deleteApplication.isError ? (
+        <p
+          role="alert"
+          data-testid="application-card-error"
+          className="border-t border-border/60 px-6 py-2 text-xs text-destructive"
+        >
+          {duplicateApplication.isError
+            ? "Couldn't duplicate this application."
+            : "Couldn't delete this application."}
+        </p>
+      ) : null}
     </Card>
   );
 }

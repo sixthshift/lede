@@ -30,6 +30,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X, ArrowDown, ArrowUp } from "lucide-react";
 import type { Layout } from "@shared/types";
 import { SECTIONS } from "@shared/sections";
+import { toast } from "sonner";
 import { useSettings, useUpdateSettings } from "../hooks/queries";
 import { Button } from "./ui/button";
 
@@ -88,6 +89,11 @@ export function LayoutEditor({
   async function handleSave() {
     try {
       await updateSettings.mutateAsync({ layout });
+      // T040/F401: the success toast lives HERE, at the explicit "Save layout"
+      // call-site — never in useUpdateSettings.onSuccess, which is shared with
+      // the debounced design/settings saves (firing there would toast-spam on
+      // every keystroke-coalesced PUT). This is the one deliberate layout save.
+      toast.success("Layout saved");
       onOpenChange(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed.");
