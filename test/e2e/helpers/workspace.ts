@@ -19,6 +19,39 @@ export async function firstRunLogin(page: Page, password: string): Promise<void>
   await ensureFirstRunPassword(page, password);
 }
 
+// ── Rail chrome (v4-T020, single-chrome merge) ── the header (AppShell) is
+// deleted; the wordmark now lives at the rail's top anchor and the theme
+// toggle + logout live in its bottom cluster (App.tsx). Both are hoisted,
+// persistent rail content — reachable on every shell route exactly like the
+// old header was — so these locators don't scope to any particular surface.
+// Centralized here per the ticket's mandate: re-home selectors in the helper
+// layer, never scatter a rail-relative locator across spec files.
+export function railWordmark(page: Page): Locator {
+  return page.getByRole("link", { name: "Lede", exact: true });
+}
+
+export function themeToggleButton(page: Page): Locator {
+  return page.getByRole("button", { name: /Switch to (dark|light) mode/ });
+}
+
+export async function toggleTheme(page: Page): Promise<void> {
+  await themeToggleButton(page).click();
+}
+
+export function railLogoutButton(page: Page): Locator {
+  return page.getByRole("button", { name: "Log out", exact: true });
+}
+
+/** Clicks the rail's logout control and waits for the server round-trip to settle. */
+export async function logoutViaRail(page: Page): Promise<void> {
+  await Promise.all([
+    page.waitForResponse(
+      (r) => r.url().includes("/api/auth/logout") && r.request().method() === "POST",
+    ),
+    railLogoutButton(page).click(),
+  ]);
+}
+
 // ── Create application ── the "New application" -> panel -> fill -> submit
 // flow, identical across every call site (the main lifecycle test, T24's
 // letter tests, and design.spec.ts's own setup). Since v3-T020, the panel is
