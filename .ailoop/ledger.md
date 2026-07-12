@@ -377,3 +377,6 @@ corrections.
 [0092] T040 — dispatch (build, SERIAL) · sonnet · in-place branch · baseSha (P2-close HEAD) · attempt 1/3 (dispatch #10 this chunk)
   decision: continue
   why: P3 gating ticket (Toaster + 8 enumerated success toasts + inline failure surfacing F401). Arch: hook-onSuccess toasts for 1:1 mutations; call-site toasts for shared/debounced (layout/import/export).
+[0093] T040 — builder flagged (honest scope stop, touched nothing): import/export live in LibraryToolbar.tsx (handleExport/importAll, rendered by LibraryView), NOT SettingsView.tsx as I declared. VERIFIED. Other 6 mutations fit declared files. NOT a real decomposition — expand T040.files += LibraryToolbar.tsx and RESUME same agent for the whole ticket in one session (no child-ticket rewiring needed; T042-T045 keep depending on T040). No attempts entry.
+[0094] T040 — dispatch RESUME same agent · sonnet · branch t040-toast-feedback · baseSha 7012e3b · (dispatch #11 this chunk)
+  fixNote: LibraryToolbar.tsx now declared; build the FULL T040 (all 8 toasts incl import/export at LibraryToolbar call-sites + inline import error) + toasts.spec + registration.
