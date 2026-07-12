@@ -56,6 +56,7 @@ import {
   canvasSnapshot,
   pixelDiffFraction,
   interactiveDescendants,
+  expandDesignGroup,
 } from "./helpers/workspace";
 
 const PASSWORD = "correct horse battery staple e2e applications";
@@ -310,6 +311,10 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   expect((await templatePutResponse.json()).format.presetId).toBe("sidebar-left");
   await expectCanvasPainted(page);
 
+  // Body font lives in DesignPanel's Typography group, default-collapsed since
+  // T041a — open it so the control below is reachable (localStorage-persisted,
+  // so this one open holds through this test's reloads).
+  await expandDesignGroup(page, "typography");
   await page.getByRole("combobox", { name: "Body font" }).click();
   const [fontPutResponse] = await Promise.all([
     page.waitForResponse(applicationPut),
@@ -323,6 +328,9 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   // color repaints a thumbnail's actual pixels — a static screenshot
   // couldn't react to this, only a live render can.
   const sidebarThumbnailBeforeColor = await thumbnailDataUrl(page, "sidebar-left");
+  // Primary color lives in DesignPanel's Color group (default-collapsed since
+  // T041a) — open it so the swatch below is clickable.
+  await expandDesignGroup(page, "color");
   // Scoped to the "Primary color" field specifically — the same curated hex
   // swatches also appear under "Text color", so an unscoped role query would
   // match both.
@@ -363,28 +371,28 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   );
   await expect(page.getByRole("combobox", { name: "Body font" })).toHaveText(/Arimo/);
 
-  // (4d) Dedicated template gallery (E8-C1, §28.2) — a full-screen browse
-  // dialog off the Design card, opened here (AFTER (4b)/(4c)'s sidebar-LEFT
-  // selection + reload-persistence checks, BEFORE (6)'s template-agnostic
-  // re-tailor/lock) so switching the template to sidebar-RIGHT can't disturb
-  // any earlier assertion.
-  await page.getByRole("button", { name: "Browse templates" }).click();
-  const gallery = page.getByRole("dialog");
-  await expect(gallery).toBeVisible();
-
-  // All 6 cards visible with PAINTED canvases — scoped to the gallery
-  // dialog, since the inline TemplatePicker (same data-template-id
-  // attributes) is still mounted underneath it while the dialog is open.
+  // (4d) Template browsing (E8-C1, §28.2 — v4-T041b: the dedicated "Browse
+  // templates" popover was DELETED; the inline TemplatePicker is now the
+  // single template-choice surface, so this SAME behavioral intent runs
+  // through its inline `[data-template-id]` cards). Exercised here (AFTER
+  // (4b)/(4c)'s sidebar-LEFT selection + reload-persistence checks, BEFORE
+  // (6)'s template-agnostic re-tailor/lock) so switching the template to
+  // sidebar-RIGHT can't disturb any earlier assertion.
+  //
+  // All 6 inline cards render PAINTED canvases (live mini-renders, §28.2) —
+  // page-scoped now that there's no second (popover) set to disambiguate from.
   for (const templateId of TEMPLATE_IDS) {
-    await expectThumbnailPainted(gallery, templateId);
+    await expectThumbnailPainted(page, templateId);
   }
 
   // Selecting a card applies that preset's composition (applyPreset) — the
   // (4b) color/font PUTs (stylistic axes, untouched by preset choice) must
   // survive.
+  const sidebarRightCard = page.getByRole("button", { name: /^Sidebar Right/ });
+  await sidebarRightCard.scrollIntoViewIfNeeded();
   const [galleryPutResponse] = await Promise.all([
     page.waitForResponse(applicationPut),
-    gallery.getByRole("button", { name: /^Sidebar Right/ }).click(),
+    sidebarRightCard.click(),
   ]);
   expect(galleryPutResponse.status()).toBe(200);
   const galleryPutFormat = (await galleryPutResponse.json()).format;
@@ -392,9 +400,7 @@ test("create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock",
   expect(galleryPutFormat.colors.accent).toBe("#14532d");
   expect(galleryPutFormat.fonts.body).toBe("arimo");
 
-  // Selecting closes the gallery; the inline picker + preview reflect the
-  // new choice immediately.
-  await expect(gallery).toBeHidden();
+  // The inline picker + preview reflect the new choice immediately.
   await expect(page.getByRole("button", { name: /^Sidebar Right ATS/ })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -703,6 +709,9 @@ test("cover letter: a typography format change re-renders the letter preview (pi
   const applicationPut = (r: import("@playwright/test").Response) =>
     r.url().endsWith(`/api/applications/${applicationId}`) && r.request().method() === "PUT";
 
+  // Body font lives in the default-collapsed Typography group (T041a) — open
+  // it so the control is reachable.
+  await expandDesignGroup(page, "typography");
   await page.getByRole("combobox", { name: "Body font" }).click();
   const [fontPutResponse] = await Promise.all([
     page.waitForResponse(applicationPut),

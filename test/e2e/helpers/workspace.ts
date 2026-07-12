@@ -326,6 +326,24 @@ export async function distinctColorCount(canvas: Locator): Promise<number> {
   });
 }
 
+// ── DesignPanel collapsible groups (F505/T041a) ── DesignPanel's ~16 internal
+// control groups default COLLAPSED: a control inside a folded group is present
+// in the DOM but its region is `overflow-hidden` at 0 height, so a direct
+// `.click()` on it lands on the group wrapper ("intercepts pointer events").
+// Opening the owning group first is the redesigned UX's real interaction (a
+// user expands a group to reach its controls) and persists across reloads via
+// the group's own localStorage key. Idempotent — a no-op when already
+// expanded. Read-only checks (toBeDisabled/toHaveText) don't need this; only
+// click targets do.
+export async function expandDesignGroup(page: Page, groupKey: string): Promise<void> {
+  const toggle = page.getByTestId(`design-group-toggle-${groupKey}`);
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute("aria-expanded")) === "false") {
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  }
+}
+
 // ── Modality ban ── the shared "non-modal" oracle: no aria-modal, and no
 // fixed/absolute-positioned element covers more than half the viewport.
 // Ported from applications.spec.ts's own local assertNoModalOverlay (the

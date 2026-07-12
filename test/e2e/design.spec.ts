@@ -28,6 +28,7 @@ import {
   expectResumeCanvasPainted,
   canvasSnapshot,
   assertNoModalOverlay,
+  expandDesignGroup,
 } from "./helpers/workspace";
 
 // MUST match applications.spec.ts's PASSWORD exactly (playwright.config.ts:
@@ -60,26 +61,9 @@ function previewDataUrl(page: import("@playwright/test").Page): Promise<string> 
 
 const expectCanvasPainted = expectResumeCanvasPainted;
 
-// DesignPanel's internal control groups default COLLAPSED (F505/T041a —
-// design-accordion.spec.ts): a control inside a folded group is present in the
-// DOM but its region is `overflow-hidden` at 0 height, so a direct `.click()`
-// on it lands on the group wrapper instead ("intercepts pointer events").
-// Opening the owning group first is the redesigned UX's real interaction (a
-// user expands the group to reach its controls) and persists across this
-// test's reloads via the group's own localStorage key. Idempotent: a no-op
-// when the group is already expanded. (Read-only assertions like
-// toBeDisabled/toHaveText don't need this — only click targets do.)
-async function expandDesignGroup(
-  page: import("@playwright/test").Page,
-  key: string,
-): Promise<void> {
-  const toggle = page.getByTestId(`design-group-toggle-${key}`);
-  await expect(toggle).toBeVisible();
-  if ((await toggle.getAttribute("aria-expanded")) === "false") {
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-expanded", "true");
-  }
-}
+// DesignPanel's internal control groups default COLLAPSED (F505/T041a) — the
+// shared expandDesignGroup helper (helpers/workspace.ts) opens the owning
+// group so a control inside it is clickable; see that helper's comment.
 
 test("design controls: reachable in-workspace, debounced persistence, preview host, locked read-only", async ({
   page,
