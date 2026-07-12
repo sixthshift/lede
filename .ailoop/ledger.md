@@ -350,3 +350,5 @@ corrections.
   scope CLEAN (8 files incl SectionMetaFields [0079]). gaming CLEAN: coarse bumps on real elements + gated to pointer:coarse (desktop unchanged); excluded-set guard (listbox option <44 catches blanket cheat); single-column via real grid-cols-1 sm:grid-cols-2 (hack removed); real-element measurement.
   F305 delivered. Full playwright deferred to P2 gate (NOW).
   evidence: .ailoop/evidence/T034.txt.
+
+[0082] P2 PHASE-CLOSE GATE (merged tree ed1518f) — START. Running full playwright chromium + auth + applications NON-CONCURRENTLY (build before applications; free ports 8787-89 before auth per P1 [0056] operational fix). Docker NOT run at P2 (P1/P5 only). New P2 specs live in applications project: responsive-nav, phone-overflow, new-application, pane-arbitration, tap-targets. Ratchet floor: chromium>=25, auth>=1, applications>=65.
