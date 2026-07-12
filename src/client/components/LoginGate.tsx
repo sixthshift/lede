@@ -11,6 +11,7 @@ import { useAuthSetup, useAuthLogin } from "../hooks/queries";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { ThemeToggle } from "./ThemeToggle";
 
 function useAuthPing() {
   return useQuery({
@@ -54,7 +55,14 @@ function LoginForm({ onSignedIn }: { onSignedIn: () => void }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 pb-16">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-background px-6 pb-16">
+      {/* v4-T020: LoginGate renders OUTSIDE the shell, so it never inherits
+          the rail's wordmark/theme toggle — it gets its OWN standalone
+          mini-chrome instead, present at every width (no responsive
+          variants gate it). */}
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
       <div className="mb-8 flex flex-col items-center gap-3 text-center">
         <span
           aria-hidden
