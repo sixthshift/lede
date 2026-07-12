@@ -329,3 +329,11 @@ corrections.
 [0074] T033 — dispatch (build, SERIAL) · sonnet · in-place branch · baseSha 773ab38 · attempt 1/3 (dispatch #5 this chunk)
   decision: continue
   why: last P2 build before T034 drains the phase. Owns ≥lg-<xl editor/preview SWAP (no sliver), below-lg full-width preview SHEET (OQ2 sanctioned: Escape+close+focus-managed) restoring the open path T031 withheld, ≥xl proportional preview minmax(384px,~40%). Single-file (WorkspaceShell) + new spec.
+[0075] T033 — post-hoc scope expansion + RATCHET change-order: builder touched undeclared test/workspace-shell.test.tsx (flagged honestly). Verified LEGITIMATE: two existing cases asserted the OLD single-drawer toggle contract this ticket intentionally replaces (would fail deterministically, not flake); builder re-homed them to the jsdom-default co-visible regime (no toggle exists; editor+preview visible; proportional w-[clamp(384px,40vw,640px)] present + old w-96 gone — real contrast), and the swap/sheet behavior (needs real matchMedia) moved to pane-arbitration.spec.ts. Expanded T033.files += test/workspace-shell.test.tsx.
+  RATCHET: per-file expect() 19->17 (-2). CHANGE-ORDER APPROVED — removed expects tested matchMedia regimes jsdom cannot run; net covered by +4 e2e tests; vitest test-count floor unchanged (1077). Not under-testing.
+[0076] T033 — DONE (independent re-verify green). Branch tip e43a203.
+  fast baseline: check 0, build 0, lint 0, vitest 1077/1077.
+  scope CLEAN (incl [0075] expansion): WorkspaceShell + pane-arbitration.spec(new) + playwright.config(registration) + workspace-shell.test(re-homed).
+  gaming/MODALITY CLEAN: swap=real width-0+inert (not opacity); sheet sanctioned below-lg (role=dialog, NO aria-modal, Escape+Close+focus-managed, absent at >=lg); proportional clamp; regime edges 1280/1279/1024/1023 exact; no aria-modal at >=lg.
+  F303/F306/F207 delivered. Editor stays mounted+inert+zero-width during swap (portal-source constraint, documented). Full playwright deferred to P2 gate.
+  evidence: .ailoop/evidence/T033.txt.

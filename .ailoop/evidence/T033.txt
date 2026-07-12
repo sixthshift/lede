@@ -1,0 +1,43 @@
+T033 — Pane arbitration below xl (swap, never sliver) + proportional preview (F303/F306/F207)
+Independent re-verify on branch t033-pane-arbitration tip e43a203, baseSha ebf8f19.
+
+SCOPE (git diff --name-only ebf8f19..HEAD, excl .ailoop): WorkspaceShell.tsx, pane-arbitration.spec.ts(new),
+  playwright.config.ts(registration), test/workspace-shell.test.tsx. First three declared; the fourth is a
+  post-hoc scope expansion (see ledger [0075]) — the same component's own unit suite, re-homed to the new
+  contract, NOT gaming.
+
+FAST BASELINE: check 0 · build 0 · lint 0 (253 files) · vitest 1077/1077.
+
+THREE REGIMES (WorkspaceShell):
+  - >=xl (1280+) co-visible: preview width = w-[clamp(384px,40vw,640px)] (floored at old fixed 384,
+    proportional 40vw, ceiled 640). 1512→604px>384 & <756; 1280→512px>=384. Editor keeps min-w-0 flex-1.
+  - lg..xl (1024-1279) SWAP: previewOpen → editor gets w-0/min-w-0/overflow-hidden (real zero layout width)
+    + native `inert` (imperative DOM prop; out of tab order + AT-hidden); preview-pane renders flex-1.
+    Editor STAYS MOUNTED by necessity — ApplicationDetail (the editor slot) portals the preview's own
+    content, so unmounting it kills the preview source (documented). preview-swap-toggle (h-11 w-11=44px)
+    always present in-regime.
+  - <lg SHEET: preview-sheet-trigger (fixed FAB h-11 w-11, closed-only) opens preview-sheet
+    (role="dialog", fixed inset-0, NO aria-modal, no scrim — editor swapped out beneath, not covered).
+    Dismissible: Escape handler + preview-sheet-close ("Close" + X). Focus-managed: focus→close on open,
+    focus→(freshly-mounted) trigger on close. OQ2-sanctioned below-lg exception.
+
+GAMING/MODALITY READ: CLEAN.
+  - Swap "gone" = real layout (width 0 via raw getBoundingClientRect) + inert===true — NOT opacity/visibility.
+  - Sheet is a SANCTIONED below-lg sheet: no aria-modal, dismissible+focus-managed. At >=lg it does not exist
+    (spec asserts count 0 + [aria-modal=true] count 0 at 1280/1279).
+  - pane-arbitration.spec 4 tests genuinely validate: 768 swap (editor width===0 & inert true; sheet>=60%
+    viewport; expectResumeCanvasPainted real react-pdf; close restores editor visible+inert-false+width>0);
+    Escape & Close both close + return focus to trigger + focus→close on open; proportional 1512 (>384 &
+    <0.5*1512, editor>=240) + 1280 (>=384, editor>=240); regime edges 1280/1279/1024/1023 exact.
+  - workspace-shell.test.tsx: OLD assertions tested the replaced single-drawer toggle (show-preview button,
+    hidden/block flip, xl:block override). NEW assertions test the jsdom-default co-visible regime (no toggle
+    button exists, editor+preview both visible, proportional w-[clamp(...)] present AND old w-96 gone — real
+    contrast). Swap/sheet behavior (needs real matchMedia) MOVED to the e2e. Not weakened.
+
+RATCHET CHANGE-ORDER (red-team #25): test/workspace-shell.test.tsx per-file expect() 19→17 (-2). Justified:
+  the removed ~8 toggle-flip expects tested matchMedia-driven behavior jsdom fundamentally cannot exercise;
+  that behavior is now covered by pane-arbitration.spec.ts's 4 e2e tests (net campaign test count UP, not
+  down). Vitest test COUNT floor unchanged (1077, still 4 tests in this file). Approved.
+
+Builder self-ran pane-arbitration 4/4 (twice) + cohesion/responsive-nav/route-transitions 27/27. Full
+  playwright authoritatively at the P2 phase-close gate [0033].

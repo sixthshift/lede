@@ -389,7 +389,7 @@
     {
       "id": "T033",
       "title": "P2: Pane arbitration below xl (swap, never sliver) + proportional preview width (F303/F306/F207)",
-      "status": "todo",
+      "status": "done",
       "phase": "P2",
       "depends_on": [
         "T030"
@@ -397,13 +397,14 @@
       "files": [
         "src/client/components/WorkspaceShell.tsx",
         "test/e2e/pane-arbitration.spec.ts",
-        "playwright.config.ts"
+        "playwright.config.ts",
+        "test/workspace-shell.test.tsx"
       ],
       "origin": "spec Phase 2 / F303/F306/F207 (red-team #10)",
       "context": "See /workspace/SPEC.md Phase 2 + Locked (tablet arbitration, preview width). Below `xl`: preview open ⇒ editor HIDDEN (pane swap), never a coexisting sliver (today at 768 'Show preview' crushes the editor to a 43px sliver). Replace the dead full-height toggle-strip gutter with a slim tab affordance or an action-bar toggle. Preview width becomes PROPORTIONAL with clamps at ≥`xl` (e.g. `minmax(384px, ~40%)`) so wide screens grow the artifact. Below lg the preview is the full-width sheet (from T031's regime); this ticket owns the ≥lg swap + proportional clamp. Depends on T030. Shares WorkspaceShell.tsx with several P2 tickets (serialize).",
       "acceptance": "- e2e at 768×1024 with preview open: editor pane is NOT rendered/visible (swap asserted), preview canvas ≥60% viewport width and paints non-uniform pixels; toggle returns the editor.\n- Proportional preview (red-team #10): at 1512×900 the preview pane is WIDER than 384px and within its clamp; at 1280 it is ≥384px.\n- Regime edges: 1023 vs 1024 behave as their respective regimes.\n- Baseline gate green.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T033.txt"
     },
     {
       "id": "T034",
