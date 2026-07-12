@@ -1,16 +1,21 @@
 // @vitest-environment jsdom
-// WorkspaceShell (v3 T010) — the three-pane layout primitive. RED-TEAM focus:
+// WorkspaceShell (v3 T010; regime split v4-T033) — the three-pane layout
+// primitive. jsdom has no `window.matchMedia`, so both `useIsBelowLg`/
+// `useIsBelowXl` fall back to "not below" (their documented default) — every
+// render in this file lands in the >=xl CO-VISIBLE regime, the one regime
+// with no toggle at all. The swap/sheet regimes (which DO need a real
+// `matchMedia`-driven viewport) are covered by test/e2e/pane-arbitration.spec.ts
+// instead. RED-TEAM focus here:
 //  - the two required testids show up regardless of what's plugged into the
 //    slots.
 //  - the optional preview slot truly degrades: omit it, get no preview-pane
 //    element at all (never an empty third column).
-//  - the below-1280 drawer toggle is a real button (getByRole) and toggling
-//    it is a genuine DOM-level effect (class-driven display, not merely an
-//    aria-state flip) — closed by default (Tailwind's `hidden` utility
-//    present, `block` absent), open after one click (and back on a second).
+//  - in the default (co-visible) regime, the preview pane is always
+//    present/visible with no toggle button at all — proportional width, not
+//    a fixed one.
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, cleanup } from "@testing-library/react";
 
 import { WorkspaceShell } from "../src/client/components/WorkspaceShell";
 
@@ -44,7 +49,7 @@ describe("WorkspaceShell", () => {
     expect(screen.queryByRole("button", { name: /preview/i })).not.toBeInTheDocument();
   });
 
-  it("the drawer toggle is a real button, and toggling it flips the preview's DOM state", () => {
+  it("co-visible regime (jsdom's matchMedia-less default): no toggle exists at all, and the preview pane is always visible", () => {
     render(
       <WorkspaceShell
         rail={<div>rail</div>}
@@ -53,34 +58,20 @@ describe("WorkspaceShell", () => {
       />,
     );
 
-    const toggle = screen.getByRole("button", { name: /show preview/i });
+    // No toggle in this regime — co-visible means co-visible, unconditionally.
+    expect(screen.queryByRole("button", { name: /preview/i })).not.toBeInTheDocument();
+
     const previewPane = screen.getByTestId("preview-pane");
+    expect(previewPane).toBeVisible();
+    expect(screen.getByText("preview content")).toBeInTheDocument();
 
-    // Closed by default (below-1280 drawer state): a real class-driven
-    // display:none, not just an aria attribute.
-    expect(previewPane).toHaveClass("hidden");
-    expect(previewPane).not.toHaveClass("block");
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-
-    fireEvent.click(toggle);
-
-    const reopened = screen.getByTestId("preview-pane");
-    expect(reopened).toHaveClass("block");
-    expect(reopened).not.toHaveClass("hidden");
-    expect(screen.getByRole("button", { name: /hide preview/i })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-
-    // and back closed on a second click — the effect is a real toggle, not
-    // one-directional.
-    fireEvent.click(screen.getByRole("button", { name: /hide preview/i }));
-    const reclosed = screen.getByTestId("preview-pane");
-    expect(reclosed).toHaveClass("hidden");
-    expect(reclosed).not.toHaveClass("block");
+    // The editor stays mounted and visible alongside it — this regime never
+    // swaps the two.
+    expect(screen.getByTestId("editor-pane")).toBeVisible();
+    expect(screen.getByText("editor")).toBeInTheDocument();
   });
 
-  it("preview pane always carries the xl:block override so it co-shows at >=1280 regardless of drawer state", () => {
+  it("preview pane carries the proportional (clamped) width class, not the old fixed 384px, in the co-visible regime", () => {
     render(
       <WorkspaceShell
         rail={<div>rail</div>}
@@ -89,9 +80,12 @@ describe("WorkspaceShell", () => {
       />,
     );
 
-    // jsdom can't evaluate the media query itself (validated by a real-
-    // viewport e2e instead) — this asserts the class that carries that
-    // behavior is present regardless of the toggle's current state.
-    expect(screen.getByTestId("preview-pane")).toHaveClass("xl:block");
+    // jsdom can't lay out `clamp()` itself (validated at real viewport widths
+    // by test/e2e/pane-arbitration.spec.ts) — this asserts the class that
+    // carries the proportional behavior is present, and that the old fixed
+    // `w-96` is gone.
+    const previewPane = screen.getByTestId("preview-pane");
+    expect(previewPane).toHaveClass("w-[clamp(384px,40vw,640px)]");
+    expect(previewPane).not.toHaveClass("w-96");
   });
 });

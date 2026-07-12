@@ -76,6 +76,11 @@
 // F304/T032 adds new-application.spec.ts to the same "applications" project —
 // same shared login/PASSWORD rationale as responsive-nav.spec.ts, no fourth
 // server warranted.
+//
+// F303/F306/F207/T033 adds pane-arbitration.spec.ts to the same "applications"
+// project — it needs the application detail route's real preview pane across
+// three viewport regimes, same shared login/PASSWORD rationale as
+// responsive-nav.spec.ts, no fourth server warranted.
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -131,7 +136,7 @@ export default defineConfig({
     {
       name: "applications",
       testMatch:
-        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application)\.spec\.ts/,
+        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject
