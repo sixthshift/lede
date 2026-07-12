@@ -280,6 +280,27 @@ export async function authLogout(): Promise<void> {
   await request<{ ok: true }>("/api/auth/logout", { method: "POST" });
 }
 
+// Public, unauthenticated: does a password already exist? Lets the login
+// form show first-run copy only when it's actually true, instead of
+// inferring it by probing /api/auth/setup and reading the 409.
+export async function getAuthState(): Promise<{ setup: boolean }> {
+  return request<{ setup: boolean }>("/api/auth/state");
+}
+
+// Server `error` codes are wire identifiers, not copy — map every known one
+// to a human sentence so the login form never shows raw/underscored text.
+// Unknown codes fall back to the same generic sentence (never `err.message`).
+const AUTH_ERROR_COPY: Record<string, string> = {
+  invalid_body: "Enter a password to continue.",
+  invalid_credentials: "That password didn't work. Try again.",
+  already_configured: "This instance is already set up. Try signing in instead.",
+};
+
+export function authErrorMessage(code: string | undefined): string {
+  const fallback = "Could not sign in.";
+  return code ? (AUTH_ERROR_COPY[code] ?? fallback) : fallback;
+}
+
 // ── BYOK provider key (spec.md §8) — write-only: the server never returns
 // the key value, only `keySet`. There is nothing here to fetch or display.
 export async function setApiKey(apiKey: string): Promise<{ keySet: true }> {
