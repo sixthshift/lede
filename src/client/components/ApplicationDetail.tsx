@@ -194,6 +194,18 @@ function flagVoiceErrorMessage(error: unknown): string {
   return "Couldn't flag as a voice source.";
 }
 
+// F105: a tailor failure surfaced next to the Tailor/Re-tailor button — same
+// co-located pattern as flagVoiceErrorMessage above. "no_fixture" is the one
+// keyless, deterministic failure (an unmatched JD, FixtureEngine's
+// NoFixtureError) worth naming distinctly; anything else is a generic retry
+// prompt.
+function tailorErrorMessage(error: unknown): string {
+  if (error instanceof ApiError && error.code === "no_fixture") {
+    return "No recorded fixture matches this job description — couldn't tailor.";
+  }
+  return "Couldn't tailor this application.";
+}
+
 export function ApplicationDetail({ applicationId }: { applicationId: string }) {
   const { data: application, isLoading, isError } = useApplication(applicationId);
   const { data: profile } = useProfile();
@@ -439,7 +451,11 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
           >
             {application.locked ? "Unlock" : "Lock final"}
           </Button>
-          <Button onClick={() => tailorApplication.mutate(application.id)} disabled={isTailoring}>
+          <Button
+            data-testid="tailor-button"
+            onClick={() => tailorApplication.mutate(application.id)}
+            disabled={isTailoring}
+          >
             {tailorLabel}
           </Button>
           <Button
@@ -486,6 +502,15 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
             Use as a voice source
           </Button>
         </div>
+        {tailorApplication.isError ? (
+          <p
+            role="alert"
+            data-testid="tailor-error"
+            className="mt-2 text-right text-xs text-destructive"
+          >
+            {tailorErrorMessage(tailorApplication.error)}
+          </p>
+        ) : null}
         {flagVoiceResume.isError ? (
           <p role="alert" className="mt-2 text-right text-xs text-destructive">
             {flagVoiceErrorMessage(flagVoiceResume.error)}

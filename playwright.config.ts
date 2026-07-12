@@ -49,6 +49,11 @@
 // project — same rationale as gallery-bounds.spec.ts (a real first-run
 // login -> /library round-trip, no fixture/tailor-engine need of its own,
 // but still costs a whole server if it doesn't share this one).
+//
+// F105/T015 adds tailor-failure.spec.ts to the same "applications" project —
+// it needs the keyless FixtureEngine 422 ("no_fixture") path on an unmatched
+// JD, same tailor-engine dependency as applications.spec.ts itself, so it
+// shares that server/password rather than costing a fourth.
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -104,7 +109,7 @@ export default defineConfig({
     {
       name: "applications",
       testMatch:
-        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds)\.spec\.ts/,
+        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject

@@ -85,12 +85,18 @@ export function useDuplicateApplication() {
   });
 }
 
+// F105: invalidates on SETTLED, not just onSuccess — a 422 (fixture-engine
+// rejection) still persists `genState: "failed"` server-side (see
+// routes/applications.ts's /tailor catch block), and the inline error +
+// failure badge both need that refetch on the SAME screen, not only the
+// happy path. `variables` (the id passed to `.mutate`) stands in for the
+// response body, which doesn't exist on the error branch.
 export function useTailorApplication() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => tailorApplication(id),
-    onSuccess: (updated) => {
-      queryClient.invalidateQueries({ queryKey: ["applications", updated.id] });
+    onSettled: (_updated, _error, id) => {
+      queryClient.invalidateQueries({ queryKey: ["applications", id] });
     },
   });
 }
