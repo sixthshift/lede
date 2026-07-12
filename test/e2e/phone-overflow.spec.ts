@@ -164,32 +164,45 @@ test.describe("Phone-width detail layout: stacked, zero horizontal overflow (F30
     await page.goto(`/applications/${applicationId}`);
     await expect(page.getByTestId("workspace-shell")).toBeVisible();
 
+    // Measure ALL three headings at ONE fixed scroll position (the editor
+    // pane pinned to its top) — never scrollIntoView per-heading, which
+    // would land each at roughly the same viewport y and make the stacking
+    // comparison vacuous. getBoundingClientRect returns a valid box even for
+    // a heading scrolled below the fold, so a single reading captures the
+    // real document order and the real horizontal extent at once.
+    await page.getByTestId("editor-pane").evaluate((el) => {
+      el.scrollTop = 0;
+    });
+
     const sectionKeys = ["job", "letter", "design"] as const;
-    const boxes: { key: string; x: number; width: number; y: number }[] = [];
+    const boxes: { key: string; left: number; right: number; top: number }[] = [];
     for (const key of sectionKeys) {
       const heading = page.getByTestId(`workspace-section-heading-${key}`);
       await expect(heading, `${key} section heading must be present`).toBeAttached();
-      await heading.scrollIntoViewIfNeeded();
-      const box = await heading.boundingBox();
-      expect(box, `${key} section heading must have a rendered bounding box`).not.toBeNull();
+      const rect = await heading.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top };
+      });
       expect(
-        box!.x,
+        rect.left,
         `${key} heading's left edge must be within the viewport`,
       ).toBeGreaterThanOrEqual(0);
       expect(
-        box!.x + box!.width,
+        rect.right,
         `${key} heading's right edge must be within the 375px viewport`,
       ).toBeLessThanOrEqual(375 + 1);
-      boxes.push({ key, x: box!.x, width: box!.width, y: box!.y });
+      boxes.push({ key, left: rect.left, right: rect.right, top: rect.top });
     }
 
     // Vertically stacked (single column): each later section's top edge is
-    // at or below the previous one's — never side-by-side.
+    // strictly below the previous one's — never side-by-side. Measured at a
+    // single scroll offset, so these viewport-relative tops are directly
+    // comparable as document order.
     for (let i = 1; i < boxes.length; i++) {
       expect(
-        boxes[i]!.y,
+        boxes[i]!.top,
         `${boxes[i]!.key} must be stacked below ${boxes[i - 1]!.key}, not beside it`,
-      ).toBeGreaterThan(boxes[i - 1]!.y);
+      ).toBeGreaterThan(boxes[i - 1]!.top);
     }
 
     // No side-by-side preview pane competing for width — it's withheld

@@ -89,7 +89,8 @@ body {
    overflowing it. */
 .document-preview__canvas,
 .document-preview__pages canvas,
-.letter-preview__canvas {
+.letter-preview__canvas,
+.template-thumbnail__canvas {
   display: block;
   max-width: 100%;
   height: auto;
