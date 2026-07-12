@@ -207,7 +207,7 @@ export function ProfileEditor({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogPrimitive.Content
-        className="fixed bottom-6 right-6 z-20 flex max-h-[85vh] w-[30rem] max-w-[90vw] flex-col gap-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=open]:motion-reduce:animate-none data-[state=closed]:motion-reduce:animate-none"
+        className="fixed bottom-6 right-6 z-20 flex max-h-[85vh] w-[30rem] max-w-[90vw] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=open]:motion-reduce:animate-none data-[state=closed]:motion-reduce:animate-none"
         onOpenAutoFocus={(e) => {
           // Focus is actually driven by the effect above (the profile query
           // may not have resolved yet at this instant) — just keep Radix
@@ -219,7 +219,10 @@ export function ProfileEditor({
           triggerRef?.current?.focus();
         }}
       >
-        <div className="flex items-start justify-between">
+        <div
+          data-testid="panel-header"
+          className="flex items-start justify-between border-b border-border px-6 py-4"
+        >
           <DialogPrimitive.Title className="text-lg font-semibold leading-none tracking-tight text-foreground">
             Edit profile
           </DialogPrimitive.Title>
@@ -234,129 +237,134 @@ export function ProfileEditor({
           </DialogPrimitive.Close>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="profile-name">Name</Label>
-            <Input
-              id="profile-name"
-              ref={nameFieldRef}
-              value={state.name}
-              onChange={(e) => setState((prev) => ({ ...prev, name: e.target.value }))}
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div
+            data-testid="panel-body"
+            className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4"
+          >
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="profile-name">Name</Label>
+              <Input
+                id="profile-name"
+                ref={nameFieldRef}
+                value={state.name}
+                onChange={(e) => setState((prev) => ({ ...prev, name: e.target.value }))}
+              />
+            </div>
 
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="profile-headline">Headline</Label>
-            <Input
-              id="profile-headline"
-              value={state.headline}
-              onChange={(e) => setState((prev) => ({ ...prev, headline: e.target.value }))}
-            />
-          </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="profile-headline">Headline</Label>
+              <Input
+                id="profile-headline"
+                value={state.headline}
+                onChange={(e) => setState((prev) => ({ ...prev, headline: e.target.value }))}
+              />
+            </div>
 
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="profile-email">Email</Label>
-            <Input
-              id="profile-email"
-              value={state.email}
-              onChange={(e) => setState((prev) => ({ ...prev, email: e.target.value }))}
-            />
-          </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="profile-email">Email</Label>
+              <Input
+                id="profile-email"
+                value={state.email}
+                onChange={(e) => setState((prev) => ({ ...prev, email: e.target.value }))}
+              />
+            </div>
 
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="profile-phone">Phone</Label>
-            <Input
-              id="profile-phone"
-              value={state.phone}
-              onChange={(e) => setState((prev) => ({ ...prev, phone: e.target.value }))}
-            />
-          </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="profile-phone">Phone</Label>
+              <Input
+                id="profile-phone"
+                value={state.phone}
+                onChange={(e) => setState((prev) => ({ ...prev, phone: e.target.value }))}
+              />
+            </div>
 
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="profile-location">Location</Label>
-            <Input
-              id="profile-location"
-              value={state.location}
-              onChange={(e) => setState((prev) => ({ ...prev, location: e.target.value }))}
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <Label>Links</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={state.links.length >= MAX_LINKS}
-                onClick={addLink}
-              >
-                Add link
-              </Button>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="profile-location">Location</Label>
+              <Input
+                id="profile-location"
+                value={state.location}
+                onChange={(e) => setState((prev) => ({ ...prev, location: e.target.value }))}
+              />
             </div>
 
             <div className="flex flex-col gap-2">
-              {state.links.map((link, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: link rows are controlled by index (updateLink(i, …)); no stable id in the profile data model
-                <div key={i} className="flex items-center gap-2">
-                  <Select
-                    value={link.type}
-                    onValueChange={(value) => updateLink(i, { type: value as LinkRow["type"] })}
-                  >
-                    <SelectTrigger aria-label={`Link ${i + 1} type`} className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="github">GitHub</SelectItem>
-                      <SelectItem value="linkedin">LinkedIn</SelectItem>
-                      <SelectItem value="site">Site</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    aria-label={`Link ${i + 1} label`}
-                    placeholder="Label"
-                    value={link.label}
-                    onChange={(e) => updateLink(i, { label: e.target.value })}
-                  />
-                  <Input
-                    aria-label={`Link ${i + 1} url`}
-                    placeholder="URL"
-                    value={link.url}
-                    onChange={(e) => updateLink(i, { url: e.target.value })}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Remove link ${i + 1}`}
-                    onClick={() => removeLink(i)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+              <div className="flex items-center justify-between">
+                <Label>Links</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={state.links.length >= MAX_LINKS}
+                  onClick={addLink}
+                >
+                  Add link
+                </Button>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                {state.links.map((link, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: link rows are controlled by index (updateLink(i, …)); no stable id in the profile data model
+                  <div key={i} className="flex items-center gap-2">
+                    <Select
+                      value={link.type}
+                      onValueChange={(value) => updateLink(i, { type: value as LinkRow["type"] })}
+                    >
+                      <SelectTrigger aria-label={`Link ${i + 1} type`} className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="github">GitHub</SelectItem>
+                        <SelectItem value="linkedin">LinkedIn</SelectItem>
+                        <SelectItem value="site">Site</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      aria-label={`Link ${i + 1} label`}
+                      placeholder="Label"
+                      value={link.label}
+                      onChange={(e) => updateLink(i, { label: e.target.value })}
+                    />
+                    <Input
+                      aria-label={`Link ${i + 1} url`}
+                      placeholder="URL"
+                      value={link.url}
+                      onChange={(e) => updateLink(i, { url: e.target.value })}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remove link ${i + 1}`}
+                      onClick={() => removeLink(i)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
+
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="profile-summary">Base summary</Label>
+              <Textarea
+                id="profile-summary"
+                value={state.baseSummary}
+                onChange={(e) => setState((prev) => ({ ...prev, baseSummary: e.target.value }))}
+              />
+            </div>
+
+            <VoiceSourcesSection profile={profile} />
+
+            {error ? (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
           </div>
 
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="profile-summary">Base summary</Label>
-            <Textarea
-              id="profile-summary"
-              value={state.baseSummary}
-              onChange={(e) => setState((prev) => ({ ...prev, baseSummary: e.target.value }))}
-            />
-          </div>
-
-          <VoiceSourcesSection profile={profile} />
-
-          {error ? (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          ) : null}
-
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-2">
+          <div className="flex flex-col-reverse gap-2 border-t border-border px-6 py-4 sm:flex-row sm:justify-end sm:space-x-2">
             <Button type="submit" disabled={updateProfile.isPending}>
               Save profile
             </Button>

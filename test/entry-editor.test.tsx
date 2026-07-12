@@ -272,6 +272,20 @@ describe("RepeatableList", () => {
     render(<RepeatableList label="Facts" values={["a", "b"]} onChange={() => {}} max={2} />);
     expect(screen.getByRole("button", { name: "Add" })).toBeDisabled();
   });
+
+  it("renders each row as an auto-grow textarea, not a single-line input (T055/F508)", () => {
+    render(<RepeatableList label="Facts" values={["one", "two"]} onChange={() => {}} />);
+    const first = screen.getByLabelText("Facts 1");
+    expect(first.tagName).toBe("TEXTAREA");
+    expect(first).toHaveValue("one");
+  });
+
+  it("edits a row's value through the textarea's onChange (behavior invariant)", () => {
+    const onChange = vi.fn();
+    render(<RepeatableList label="Facts" values={["one", "two"]} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText("Facts 2"), { target: { value: "second\nline" } });
+    expect(onChange).toHaveBeenCalledWith(["one", "second\nline"]);
+  });
 });
 
 describe("TagInput", () => {

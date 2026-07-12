@@ -103,7 +103,7 @@ export function LayoutEditor({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} modal={false}>
       <DialogPrimitive.Content
-        className="fixed bottom-6 right-6 z-20 flex max-h-[85vh] w-[26rem] max-w-[90vw] flex-col gap-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=open]:motion-reduce:animate-none data-[state=closed]:motion-reduce:animate-none"
+        className="fixed bottom-6 right-6 z-20 flex max-h-[85vh] w-[26rem] max-w-[90vw] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=open]:motion-reduce:animate-none data-[state=closed]:motion-reduce:animate-none"
         onOpenAutoFocus={(e) => {
           // Focus is actually driven by the effect above (rows may not exist
           // yet at this instant) — just keep Radix from focusing the panel
@@ -115,7 +115,10 @@ export function LayoutEditor({
           triggerRef?.current?.focus();
         }}
       >
-        <div className="flex items-start justify-between">
+        <div
+          data-testid="panel-header"
+          className="flex items-start justify-between border-b border-border px-6 py-4"
+        >
           <DialogPrimitive.Title className="text-lg font-semibold leading-none tracking-tight text-foreground">
             Edit layout
           </DialogPrimitive.Title>
@@ -130,54 +133,59 @@ export function LayoutEditor({
           </DialogPrimitive.Close>
         </div>
 
-        <div className="flex flex-col gap-2">
-          {layout.map((row, i) => (
-            <div
-              key={row.section}
-              data-layout-row={row.section}
-              className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
-            >
-              <label className="flex flex-1 items-center gap-2 text-sm">
-                <input
-                  ref={i === 0 ? firstCheckboxRef : undefined}
-                  type="checkbox"
-                  aria-label={`Enable ${labelFor(row.section)}`}
-                  checked={row.enabled}
-                  onChange={() => toggle(i)}
-                />
-                {labelFor(row.section)}
-              </label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                disabled={i === 0}
-                aria-label={`Move ${labelFor(row.section)} up`}
-                onClick={() => move(i, -1)}
+        <div
+          data-testid="panel-body"
+          className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4"
+        >
+          <div className="flex flex-col gap-2">
+            {layout.map((row, i) => (
+              <div
+                key={row.section}
+                data-layout-row={row.section}
+                className="flex items-center gap-2 rounded-md border border-border px-3 py-2"
               >
-                <ArrowUp className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                disabled={i === layout.length - 1}
-                aria-label={`Move ${labelFor(row.section)} down`}
-                onClick={() => move(i, 1)}
-              >
-                <ArrowDown className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+                <label className="flex flex-1 items-center gap-2 text-sm">
+                  <input
+                    ref={i === 0 ? firstCheckboxRef : undefined}
+                    type="checkbox"
+                    aria-label={`Enable ${labelFor(row.section)}`}
+                    checked={row.enabled}
+                    onChange={() => toggle(i)}
+                  />
+                  {labelFor(row.section)}
+                </label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={i === 0}
+                  aria-label={`Move ${labelFor(row.section)} up`}
+                  onClick={() => move(i, -1)}
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={i === layout.length - 1}
+                  aria-label={`Move ${labelFor(row.section)} down`}
+                  onClick={() => move(i, 1)}
+                >
+                  <ArrowDown className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
         </div>
 
-        {error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        ) : null}
-
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:space-x-2">
+        <div className="flex flex-col-reverse gap-2 border-t border-border px-6 py-4 sm:flex-row sm:justify-end sm:space-x-2">
           <Button type="button" onClick={handleSave} disabled={updateSettings.isPending}>
             Save layout
           </Button>
