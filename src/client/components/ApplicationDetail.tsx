@@ -12,7 +12,7 @@
 // card's controls (never its preview), and the design card all live in the
 // editor pane instead, since they aren't the artifact itself.
 
-import { BookOpen, ChevronDown, Clock } from "lucide-react";
+import { BookOpen, ChevronDown, Clock, Mail } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { DEFAULT_FORMAT_V2, type DocumentFormatV2 } from "@shared/format-v2";
@@ -1020,7 +1020,24 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
           />
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">Nothing to preview yet.</p>
+        <div
+          data-testid="letter-empty"
+          className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border-strong py-16 text-center"
+        >
+          <Mail aria-hidden className="h-8 w-8 text-muted-foreground/60" strokeWidth={1.5} />
+          <div>
+            <p className="text-sm font-medium">No cover letter yet</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Generated or hand-authored in the{" "}
+              <span className="whitespace-nowrap text-primary underline underline-offset-4">
+                <span data-testid="letter-cta-text">Cover letter panel</span>{" "}
+                <span data-testid="letter-cta-arrow" aria-hidden>
+                  →
+                </span>
+              </span>
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );

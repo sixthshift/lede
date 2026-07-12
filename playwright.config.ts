@@ -91,6 +91,12 @@
 // needs a real tailored-application-detail-adjacent route (the "job" section
 // collapse) plus the library's docked panels, same shared login/PASSWORD
 // rationale as tap-targets.spec.ts, no fourth server warranted.
+//
+// F405/T044 adds letter-empty.spec.ts to the same "applications" project — it
+// creates an application and switches the preview to the letter tab without
+// generating a letter, asserting the empty-state's dashed-card + CTA parity
+// with the resume empty state. Same shared login/PASSWORD + fixture-engine
+// rationale as applications.spec.ts, no fourth server warranted.
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -146,7 +152,7 @@ export default defineConfig({
     {
       name: "applications",
       testMatch:
-        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration|tap-targets|toasts|export-busy|motion)\.spec\.ts/,
+        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration|tap-targets|toasts|export-busy|motion|letter-empty)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject
