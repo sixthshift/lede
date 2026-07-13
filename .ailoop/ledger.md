@@ -150,3 +150,10 @@ Append-only journal. Newest at the bottom.
     evidence: .ailoop/evidence/T004-fast.txt + T004-e2e.txt (+ failed attempt-1 at T004-a1.txt)
   decision: ACCEPT T004, status=done. Committing (commit = merge). P2 drained (scheduler) + its phase oracle (motion.spec.ts fade/reduced-motion + T001 invariant) green within the 199-pass run on the committed tree → P2 CLOSED. Backlog now complete:true. On-main model: no worker branches to prune.
   chunk accounting: MY builder dispatches this invocation = 4 (T004 attempt-1 + attempt-2 resume). Proceeding to coverage pass + termination report.
+
+[0023] TERMINATION — backlog drained (complete:true), all phase oracles green, coverage pass PASSED
+  scheduler: 4/4 done, phasesDrained=[P0,P1,P2], ready=[], no problems/cycles/cap/thrash breaches.
+  coverage pass (re-read SPEC.md §Findings vs oracle coverage map): every finding mapped to a DONE ticket + green check — P3/P4/P9/P10→T001; P1/P5/P6-OQ5/icon-16px→T002; P2/P7/P8/P10-toggle/P11→T003; P12/OQ6→T004. OQ1–OQ6 all resolved. Out-of-scope list (header revival, BottomTabBar/below-lg, new theme options, rail→settings write, tokens.css/button.tsx identity) — none crossed (per-ticket scope checks + rail-local hover/focus fixes held the tripwire).
+  phase oracles (merged/committed tree, PORT=9200 fresh servers): P0 e2e 188 (T001a2) → P1 192 (T002) / 196 (T003) → P2 199 (T004). Each a full chromium+auth+applications pass, EXIT=0.
+  commits: T001 2e21b68 · T002 37bd718 · T003 b1ff8ea · T004 c8612f4.
+  run outcome: COMPLETE. This invocation's builder dispatches = 4 (T001a2, T002, T003, T004×2 incl. resume). No v5 worker branches (on-main model). Pre-existing legacy branches (e9-*/e2-*/worktree-* from v1–v4) left untouched — not this campaign's.
