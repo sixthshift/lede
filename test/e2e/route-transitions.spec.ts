@@ -222,6 +222,40 @@ test.describe("Scroll restoration (F203) + focus management (F208)", () => {
     await expect(page).toHaveURL(/\/applications\/[^/]+$/);
     await expectFocusOnSurfaceH1();
   });
+
+  test("focus: a cold page load does NOT move focus to the h1 — only client-side navigations do", async ({
+    page,
+  }, testInfo) => {
+    // Cold load isn't a navigation the user made, so focusing the title reads
+    // as an unmotivated highlight (App.tsx `isColdLoad`). This asserts the
+    // fix's two halves together, so it can't pass by the focus feature simply
+    // being dead: a logged-in reload of a surface that HAS an h1 leaves focus
+    // OFF the title, and the very next client-side nav still lands ON it.
+    const company = `E2E Cold Load Focus Co ${runId}-${testInfo.retry}`;
+    const applicationId = await setupTailoredApplication(page, company);
+
+    await page.goto(`/applications/${applicationId}`);
+    await expectResumeCanvasPainted(page); // surface fully settled — any async h1 has rendered
+    const h1 = page.getByTestId("editor-pane").locator("h1");
+    await expect(h1).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.activeElement === document.querySelector('[data-testid="editor-pane"] h1'),
+      ),
+      "a logged-in cold load must leave focus off the title",
+    ).toBe(false);
+
+    await globalNavLink(page, "Library").click();
+    await expect(page).toHaveURL(/\/library$/);
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const heading = document.querySelector('[data-testid="editor-pane"] h1');
+          return heading !== null && document.activeElement === heading;
+        }),
+      )
+      .toBe(true);
+  });
 });
 
 test.describe("Single main landmark + sequential heading order (F208), all four shell surfaces", () => {

@@ -234,6 +234,14 @@ function useRouteScrollAndFocus(editorPaneRef: React.RefObject<HTMLElement | nul
   const location = useLocation();
   const navigationType = useNavigationType();
   const scrollPositions = useRef(new Map<string, number>());
+  // The initial history entry, captured at mount. Cold load isn't a navigation
+  // the user made — there's no incoming surface to announce, so moving focus
+  // onto the title reads as an unmotivated highlight. Focus-on-<h1> is gated on
+  // the key having CHANGED from this one, not on a run counter: the effect can
+  // fire more than once for the initial entry (navigationType settles after
+  // mount, re-triggering it under the same key), and React Router only mints a
+  // fresh key on a real navigation — which is exactly the event to announce.
+  const initialLocationKey = useRef(location.key);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: editorPaneRef is a stable ref object (attached to the persistent editor-pane node during the same commit this effect follows) — its `.current` is already populated by the time this runs, not a reactive trigger of its own.
   useEffect(() => {
@@ -255,7 +263,7 @@ function useRouteScrollAndFocus(editorPaneRef: React.RefObject<HTMLElement | nul
     }
 
     let observer: MutationObserver | null = null;
-    if (!focusHeading(container)) {
+    if (location.key !== initialLocationKey.current && !focusHeading(container)) {
       observer = new MutationObserver(() => {
         if (focusHeading(container)) observer?.disconnect();
       });
