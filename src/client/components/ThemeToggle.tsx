@@ -6,10 +6,20 @@
 import { useState } from "react";
 import { Moon, Sun } from "lucide-react";
 
+import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { useRailCollapsed } from "./WorkspaceShell";
 
 export function ThemeToggle() {
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
+  // v5-T001: this button renders inside RailBottomCluster (App.tsx), itself
+  // inside WorkspaceShell's RailCollapseContext.Provider — so it can read
+  // collapse directly and surface its own Radix tooltip (name-on-hover, no
+  // native `title`) when the rail's collapsed band hides all visible text.
+  // RailBottomCluster supplies the ancestor TooltipProvider only in that
+  // collapsed case, matching NavTabs' established pattern.
+  const collapsed = useRailCollapsed();
 
   function toggle() {
     const next = !dark;
@@ -18,16 +28,27 @@ export function ThemeToggle() {
     setDark(next);
   }
 
-  return (
+  const label = dark ? "Switch to light mode" : "Switch to dark mode";
+
+  const button = (
     <Button
       type="button"
       variant="ghost"
       size="sm"
-      className="text-muted-foreground"
+      className={cn("text-muted-foreground", collapsed && "w-9 justify-center px-0")}
       onClick={toggle}
-      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label={label}
     >
-      {dark ? <Sun aria-hidden /> : <Moon aria-hidden />}
+      {dark ? <Sun aria-hidden className="h-4 w-4" /> : <Moon aria-hidden className="h-4 w-4" />}
     </Button>
+  );
+
+  if (!collapsed) return button;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent side="right">{label}</TooltipContent>
+    </Tooltip>
   );
 }

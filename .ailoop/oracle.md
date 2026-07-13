@@ -103,9 +103,13 @@ applications"` (must match `rail-design.spec.ts` exactly — single server secre
 
 ### Phase 0 — Collapsed-rail correctness (T001)
 At ≥1024px, collapse the rail (`[data-testid="rail-pane"][data-collapsed="true"]`):
-- [ ] `rail-pane` `clientWidth === 48`; **no descendant** has
-      `scrollWidth > clientWidth`; overflow not masked by `overflow:hidden` on an
-      inner wrapper.
+- [ ] The rail collapses to the icon band: **poll** `rail-pane` boundingBox width
+      until the 200ms width transition settles, then assert it is in `[40,64]`
+      (the established v4-T022 band; exact `clientWidth===48` was wrong in letter
+      — border-box makes clientWidth≈47, and a single post-flip read races the
+      CSS transition → **mechanical amendment 2026-07-13, ledger [0010]**). AFTER
+      the width settles: **no descendant** has `scrollWidth > clientWidth`, and no
+      descendant clips overflow (hidden/clip/scroll on either axis) to mask it.
 - [ ] Wordmark: collapsed → serif "Lede" text ABSENT **and** the "L" box present
       + visible (non-zero box); expanded → "Lede" present.
 - [ ] Theme + logout: collapsed → visible text absent, both still queryable by

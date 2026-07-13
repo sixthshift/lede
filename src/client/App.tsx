@@ -4,11 +4,13 @@ import { LogOut } from "lucide-react";
 
 import { useAuthLogout } from "./hooks/queries";
 import { LoginGate } from "./components/LoginGate";
+import { cn } from "./lib/utils";
 import { NavTabs } from "./components/NavTabs";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { Button } from "./components/ui/button";
 import { Toaster } from "./components/ui/sonner";
-import { WorkspaceShell } from "./components/WorkspaceShell";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./components/ui/tooltip";
+import { useRailCollapsed, WorkspaceShell } from "./components/WorkspaceShell";
 import { WorkspaceShellSlotsContext } from "./components/WorkspaceShellSlots";
 
 // v4-T020 (single-chrome merge, OQ1): the header bar (AppShell) is gone — the
@@ -16,39 +18,85 @@ import { WorkspaceShellSlotsContext } from "./components/WorkspaceShellSlots";
 // bottom cluster (a collapse toggle joins them in T022). AppShell used to own
 // the `h-screen` frame; that ownership moves here since it dissolved into
 // this shell.
+//
+// v5-T001: this zone owns its own outer chrome (border + padding), not
+// App()'s `rail` JSX — App() renders above WorkspaceShell's
+// RailCollapseContext.Provider, so a className computed inline there can
+// never react to collapse. As its own function component, React only calls
+// it once reached inside the provider, so `useRailCollapsed()` here resolves
+// correctly. Collapsed: the "Lede" text node is removed outright (not
+// CSS-hidden) and the link picks up `aria-label="Lede"` so its accessible
+// name survives losing that text; the "L" box stays, unconditionally, as the
+// one thing collapsed mode still shows.
 function RailWordmark() {
+  const collapsed = useRailCollapsed();
+
   return (
-    <Link
-      to="/applications"
-      className="flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <span
-        aria-hidden
-        className="flex h-6 w-6 items-center justify-center rounded-md bg-primary pb-0.5 font-serif text-md font-medium leading-none text-primary-foreground"
+    <div className={cn("shrink-0 border-b border-border", collapsed ? "p-1.5" : "p-2")}>
+      <Link
+        to="/applications"
+        aria-label={collapsed ? "Lede" : undefined}
+        className={cn(
+          "flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          collapsed && "justify-center",
+        )}
       >
-        L
-      </span>
-      <span className="font-serif text-md font-medium tracking-tight">Lede</span>
-    </Link>
+        <span
+          aria-hidden
+          className="flex h-6 w-6 items-center justify-center rounded-md bg-primary pb-0.5 font-serif text-md font-medium leading-none text-primary-foreground"
+        >
+          L
+        </span>
+        {collapsed ? null : (
+          <span className="font-serif text-md font-medium tracking-tight">Lede</span>
+        )}
+      </Link>
+    </div>
   );
 }
 
+// v5-T001: same collapse-aware chrome pattern as RailWordmark above.
+// Collapsed: theme + logout become centered, icon-only, vertically stacked
+// controls, each named via `aria-label` and surfaced via the SAME Radix
+// Tooltip primitive NavTabs' collapsed band already uses (one shared
+// TooltipProvider for the pair, side="right"). Expanded: unchanged from
+// before this ticket (a later ticket redesigns that labeled footer).
 function RailBottomCluster() {
   const logout = useAuthLogout();
+  const collapsed = useRailCollapsed();
+
+  const logoutButton = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      aria-label="Log out"
+      className={cn("text-muted-foreground", collapsed && "w-9 justify-center px-0")}
+      onClick={() => logout.mutate()}
+    >
+      <LogOut aria-hidden className="h-4 w-4" />
+      {collapsed ? null : "Log out"}
+    </Button>
+  );
 
   return (
-    <div className="flex items-center justify-between gap-1">
-      <ThemeToggle />
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="text-muted-foreground"
-        onClick={() => logout.mutate()}
-      >
-        <LogOut aria-hidden />
-        Log out
-      </Button>
+    <div className={cn("shrink-0 border-t border-border", collapsed ? "p-1.5" : "p-2")}>
+      {collapsed ? (
+        <TooltipProvider delayDuration={200}>
+          <div className="flex flex-col items-center gap-1">
+            <ThemeToggle />
+            <Tooltip>
+              <TooltipTrigger asChild>{logoutButton}</TooltipTrigger>
+              <TooltipContent side="right">Log out</TooltipContent>
+            </Tooltip>
+          </div>
+        </TooltipProvider>
+      ) : (
+        <div className="flex items-center justify-between gap-1">
+          <ThemeToggle />
+          {logoutButton}
+        </div>
+      )}
     </div>
   );
 }
@@ -150,16 +198,10 @@ export function App() {
 
   const rail = (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 border-b border-border p-2">
-        <RailWordmark />
-      </div>
-      <div className="shrink-0 border-b border-border p-2">
-        <NavTabs />
-      </div>
+      <RailWordmark />
+      <NavTabs />
       <div ref={setRailTarget} className="min-h-0 flex-1 overflow-y-auto" />
-      <div className="shrink-0 border-t border-border p-2">
-        <RailBottomCluster />
-      </div>
+      <RailBottomCluster />
     </div>
   );
 

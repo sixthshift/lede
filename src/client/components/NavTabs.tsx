@@ -54,23 +54,33 @@ export function NavTabs() {
 
   if (!collapsed) {
     return (
-      <nav className="flex flex-col gap-1" aria-label="Primary">
-        {links}
-      </nav>
+      <div className="shrink-0 border-b border-border p-2">
+        <nav className="flex flex-col gap-1" aria-label="Primary">
+          {links}
+        </nav>
+      </div>
     );
   }
 
+  // v5-T001: this zone owns its own outer chrome (border + padding), moved
+  // in from App.tsx's `rail` JSX — a p-1.5 (6px/side) band, not p-2, is what
+  // lets a collapsed w-9 (36px) link actually fit inside the rail's 48px
+  // band without overflowing it. `items-center` centers each icon-only link
+  // on the band's horizontal center, matching the collapsed footer cluster's
+  // own center (RailBottomCluster, App.tsx).
   return (
-    <TooltipProvider delayDuration={200}>
-      <nav className="flex flex-col gap-1" aria-label="Primary">
-        {TABS.map((tab, i) => (
-          <Tooltip key={tab.to}>
-            <TooltipTrigger asChild>{links[i]}</TooltipTrigger>
-            <TooltipContent side="right">{tab.label}</TooltipContent>
-          </Tooltip>
-        ))}
-      </nav>
-    </TooltipProvider>
+    <div className="shrink-0 border-b border-border p-1.5">
+      <TooltipProvider delayDuration={200}>
+        <nav className="flex flex-col items-center gap-1" aria-label="Primary">
+          {TABS.map((tab, i) => (
+            <Tooltip key={tab.to}>
+              <TooltipTrigger asChild>{links[i]}</TooltipTrigger>
+              <TooltipContent side="right">{tab.label}</TooltipContent>
+            </Tooltip>
+          ))}
+        </nav>
+      </TooltipProvider>
+    </div>
   );
 }
 

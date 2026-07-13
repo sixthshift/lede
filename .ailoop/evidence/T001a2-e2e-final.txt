@@ -1,0 +1,28 @@
+### e2e regression chromium+auth+applications, PORT=9200 CI=1 2026-07-13T02:38:10Z
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+
+Running 188 tests using 1 worker
+································Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+····Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+············································
+···························injected: canvas hidden
+caught error: expect(locator).toBeVisible() failed
+
+Locator:  locator('.document-preview canvas').first()
+Expected: visible
+Received: hidden
+Timeout:  5000ms
+
+Call log:
+  - Expect "toBeVisible" with timeout 5000ms
+  - waiting for locator('.document-preview canvas').first()
+    13 × locator resolved to <canvas width="918" height="1188" class="document-preview__canvas"></canvas>
+       - unexpected value "hidden"
+
+restored: canvas repainted
+·····················································
+····························
+  188 passed (6.8m)
+E2E_EXIT=0
