@@ -23,7 +23,7 @@ import type { CoverLetter, Paper, Profile, TailoredResume } from "@shared/types"
 import { ApiError } from "../api";
 import { downloadLetterPdf, downloadResumePdf, downloadResumeText } from "../document/download";
 import { fitToPages, type FitResult } from "../document/fit";
-import { useProfile, useSettings, useUpdateSettings } from "../hooks/queries";
+import { useEntries, useProfile, useSettings, useUpdateSettings } from "../hooks/queries";
 import { cn } from "../lib/utils";
 import {
   useApplication,
@@ -40,6 +40,7 @@ import {
   useUpdateApplication,
 } from "../queries/useApplications";
 import { AtsView } from "./AtsView";
+import { CoveragePanel } from "./CoveragePanel";
 import { DesignPanel } from "./DesignPanel";
 import { FitChip } from "./FitChip";
 import { GenStateBadge } from "./GenStateBadge";
@@ -461,6 +462,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   const { data: application, isLoading, isError } = useApplication(applicationId);
   const { data: profile } = useProfile();
   const { data: settings } = useSettings();
+  const { data: entries } = useEntries();
   const tailorApplication = useTailorApplication();
   const generateLetter = useGenerateLetter();
   const undoLetter = useUndoLetter();
@@ -477,7 +479,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   // Preview vs "what the ATS sees" (§28.6) — a view toggle, not a route:
   // both read the SAME current resume + resolvedFormat/density computed
   // below, so switching never re-tailors or re-fits.
-  const [view, setView] = useState<"preview" | "ats">("preview");
+  const [view, setView] = useState<"preview" | "ats" | "coverage">("preview");
 
   // Which document the (co-visible) preview pane currently shows — a purely
   // client-side switch, independent of `view` above (that toggle only
@@ -1154,6 +1156,14 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
                 >
                   What the ATS sees
                 </Button>
+                <Button
+                  size="sm"
+                  variant={view === "coverage" ? "default" : "outline"}
+                  aria-pressed={view === "coverage"}
+                  onClick={() => setView("coverage")}
+                >
+                  Keyword coverage
+                </Button>
               </div>
             </div>
 
@@ -1191,6 +1201,16 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
               <AtsView
                 resume={application.current}
                 profile={profile}
+                format={displayFormat}
+                paper={paper}
+                density={density}
+              />
+            ) : view === "coverage" && profile ? (
+              <CoveragePanel
+                resume={application.current}
+                profile={profile}
+                jd={application.jobDescription}
+                entries={entries ?? []}
                 format={displayFormat}
                 paper={paper}
                 density={density}
