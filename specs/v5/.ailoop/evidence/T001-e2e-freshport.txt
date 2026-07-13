@@ -1,0 +1,485 @@
+### fresh build + e2e on PORT=9200 (bypass stuck/poisoned 8787-8789) 2026-07-13T01:41:28Z
+loadavg: 5.13 8.03 17.52 13/18720 2966703
+--- build ---
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3m 20s
+BUILD_EXIT=0
+--- e2e (fresh servers, no reuse) ---
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+
+Running 188 tests using 1 worker
+
+  ✓    1 [chromium] › test/e2e/library-crud.spec.ts:32:1 › workspace shell: /library renders inside the shell with no preview pane (degrade) (507ms)
+  ✓    2 [chromium] › test/e2e/library-crud.spec.ts:43:3 › experience section › create: new experience entry appears in the list (920ms)
+  ✓    3 [chromium] › test/e2e/library-crud.spec.ts:55:3 › experience section › edit: changing a fact updates the list (12.6s)
+  ✓    4 [chromium] › test/e2e/library-crud.spec.ts:64:3 › experience section › reload persistence: the entry survives a page reload (632ms)
+  ✓    5 [chromium] › test/e2e/library-crud.spec.ts:71:3 › experience section › delete: two-step armed confirm — first click arms, second removes it from the list (603ms)
+  ✓    6 [chromium] › test/e2e/library-crud.spec.ts:93:3 › de-modal EntryEditor (v3-T021) › Add entry panel: non-modal, underlying toolbar stays clickable, focus opens into the panel, Escape returns focus to the trigger (855ms)
+  ✓    7 [chromium] › test/e2e/library-crud.spec.ts:121:3 › de-modal EntryEditor (v3-T021) › Edit entry panel (per-row): non-modal, focus opens into the panel, Escape returns focus to the trigger (1.5s)
+  ✓    8 [chromium] › test/e2e/library-crud.spec.ts:161:3 › de-modal LayoutEditor (v3-T022) › Edit layout panel: opens with rows, non-modal, underlying library control stays clickable, focus opens into the panel, Escape returns focus to the trigger (970ms)
+  ✓    9 [chromium] › test/e2e/library-crud.spec.ts:202:3 › de-modal LayoutEditor (v3-T022) › round-trip: toggling a section's Enable checkbox and saving persists across reload (2.0s)
+  ✓   10 [chromium] › test/e2e/library-crud.spec.ts:263:3 › de-modal ProfileEditor (v3-T023) › Edit profile panel: opens with fields, non-modal, underlying library control stays clickable, focus opens into the panel, Escape returns focus to the trigger (873ms)
+  ✓   11 [chromium] › test/e2e/library-crud.spec.ts:303:3 › de-modal ProfileEditor (v3-T023) › round-trip: editing the Headline and saving persists across reload (1.4s)
+  ✓   12 [chromium] › test/e2e/library-crud.spec.ts:361:3 › project section › create: new project entry appears in the list (1.3s)
+  ✓   13 [chromium] › test/e2e/library-crud.spec.ts:371:3 › project section › edit: changing a fact updates the list (799ms)
+  ✓   14 [chromium] › test/e2e/library-crud.spec.ts:380:3 › project section › reload persistence: the entry survives a page reload (373ms)
+  ✓   15 [chromium] › test/e2e/library-crud.spec.ts:387:3 › project section › delete: two-step armed confirm — first click arms, second removes it from the list (420ms)
+  ✓   16 [chromium] › test/e2e/library-crud.spec.ts:422:3 › F106: two-step armed delete (T016) › first activation arms without deleting: no server call, entry stays, still non-modal (1.2s)
+  ✓   17 [chromium] › test/e2e/library-crud.spec.ts:450:3 › F106: two-step armed delete (T016) › second activation deletes with an asserted server round-trip (910ms)
+  ✓   18 [chromium] › test/e2e/library-crud.spec.ts:473:3 › F106: two-step armed delete (T016) › Escape after arming disarms: reverts to Delete, no deletion (910ms)
+  ✓   19 [chromium] › test/e2e/library-crud.spec.ts:491:3 › F106: two-step armed delete (T016) › blur after arming disarms: reverts to Delete, no deletion (854ms)
+  ✓   20 [chromium] › test/e2e/library-crud.spec.ts:510:3 › F106: two-step armed delete (T016) › per-row isolation: arming entry A then clicking Delete once on a different entry B arms B only and auto-disarms A (5.9s)
+  ✓   21 [chromium] › test/e2e/library-crud.spec.ts:554:3 › F502/F509: per-row Edit + identity line (T051) › the 'Choose entry to edit' combobox and 'Edit selected' button are gone from the DOM (294ms)
+  ✓   22 [chromium] › test/e2e/library-crud.spec.ts:561:3 › F502/F509: per-row Edit + identity line (T051) › per-row Edit opens THAT row's entry in one activation — contrast: two different rows load different data (6.3s)
+  ✓   23 [chromium] › test/e2e/library-crud.spec.ts:607:3 › F502/F509: per-row Edit + identity line (T051) › each row renders an identity line built from its company/role/period (944ms)
+  ✓   24 [chromium] › test/e2e/settings.spec.ts:57:1 › workspace shell: /settings renders inside the shell with no preview pane (degrade) (562ms)
+  ✓   25 [chromium] › test/e2e/settings.spec.ts:64:1 › rail: one nav item per settings section, in the same order as the cards below (547ms)
+  ✓   26 [chromium] › test/e2e/settings.spec.ts:79:1 › Provider & model: changing provider and model round-trips and survives reload (1.8s)
+  ✓   27 [chromium] › test/e2e/settings.spec.ts:116:1 › API key: setting a key round-trips server-side (keySet reflects it after reload) (1.3s)
+  ✓   28 [chromium] › test/e2e/settings.spec.ts:147:1 › Default document format: changing an axis round-trips and survives reload (1.3s)
+  ✓   29 [chromium] › test/e2e/settings.spec.ts:186:1 › no Settings card exceeds 1200px rendered height (856ms)
+  ✓   30 [chromium] › test/e2e/settings.spec.ts:207:1 › the settings column is centered in the editor pane, not left-anchored (1.0s)
+  ✓   31 [auth] › test/e2e/auth.spec.ts:23:3 › first-run set-password -> login -> protected route › gates a fresh boot, then logout/login flips access (1.7s)
+  ✓   32 [applications] › test/e2e/accordion.spec.ts:22:3 › F505 single template-choice presentation (v4-T041b) › the Browse templates popover is gone; exactly one inline picker, within the editor pane (2.4s)
+  ✘   33 [applications] › test/e2e/applications.spec.ts:138:1 › create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock (21.8s)
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+  ✓   34 [applications] › test/e2e/applications.spec.ts:138:1 › create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock (retry #1) (21.2s)
+  ✓   35 [applications] › test/e2e/applications.spec.ts:465:1 › cover letter: generate/paint isolation, download filename, undo, motivation persistence (3.8s)
+  ✓   36 [applications] › test/e2e/applications.spec.ts:615:1 › cover letter: a failed generation surfaces a distinct failed badge, never a stub letter (1.5s)
+  ✓   37 [applications] › test/e2e/applications.spec.ts:653:1 › cover letter: a typography format change re-renders the letter preview (pixel-diff) (3.8s)
+Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+  ✓   38 [applications] › test/e2e/applications.spec.ts:743:1 › in-place text editing: resume + letter edits persist and reach the artifact; locked disables every affordance and 409s (4.8s)
+  ✓   39 [applications] › test/e2e/applications.spec.ts:964:1 › retroactive import: blank letter -> hand-authored via in-place editing -> flag -> exact voice-source text (server-verified) (2.7s)
+  ✓   40 [applications] › test/e2e/applications.spec.ts:1089:1 › flagging a locked application's resume as a voice source is permitted: a real 200, not merely an enabled button (2.7s)
+  ✓   41 [applications] › test/e2e/applications.spec.ts:1133:1 › deleting a voice source in Profile removes it server-side, not just from the DOM (921ms)
+  ✓   42 [applications] › test/e2e/applications.spec.ts:1235:1 › WorkspaceShell (protocol C): editor + preview panes are co-visible and unoccluded at 1280px, and switching the preview's resume/letter tab never remounts the editor pane (3.3s)
+  ✓   43 [applications] › test/e2e/applications.spec.ts:1287:1 › WorkspaceShell (protocol B): the surface stays non-modal — no aria-modal/backdrop overlay, and an underlying editor control stays genuinely clickable — at 1280px and in the below-1280 drawer-open state (2.4s)
+  ✓   44 [applications] › test/e2e/applications.spec.ts:1366:1 › WorkspaceShell drawer: below 1280px the preview pane starts non-co-visible (closed), and the toggle reveals a real painted canvas (1.7s)
+  ✓   45 [applications] › test/e2e/applications.spec.ts:1407:1 › rail nav (v3-T013): activating an out-of-view section scrolls/focuses its heading without touching the URL, remounting the preview, or repainting it (2.0s)
+  ✓   46 [applications] › test/e2e/applications.spec.ts:1467:1 › rail collapse (v3-T013, protocol E): folding a section is local view-state only — zero application/settings network writes, a localStorage collapse key, a pixel-identical preview, and untouched settings.layout/application.format (2.3s)
+  ✓   47 [applications] › test/e2e/applications.spec.ts:1583:1 › in-place edits reach the document: sentinel text is exportable AND the preview canvas changes by more than a floor magnitude — not merely 'any diff'; modality holds mid-edit (3.4s)
+  ✓   48 [applications] › test/e2e/applications.spec.ts:1708:1 › locked sweep (protocol D): every edit affordance individually disabled/409'd by name; design read-only, motivation and voice-flag still work, motivation persists across reload (4.2s)
+  ✓   49 [applications] › test/e2e/applications.spec.ts:1818:1 › NewApplication (v3-T020): the create panel is non-modal, the underlying list stays clickable, focus opens into the panel, and Escape returns focus to the trigger (1.2s)
+  ✓   50 [applications] › test/e2e/applications.spec.ts:1880:1 › dashboard card content (T030, OQ4a): resume pills differ and match server genState; the locked badge appears only on a locked app; the letter pill appears iff a letter exists (3.6s)
+  ✓   51 [applications] › test/e2e/applications.spec.ts:1962:1 › dashboard quick actions (T031, OQ4b): open routes to the workspace; duplicate/delete are server-verified; download produces a real PDF; disabled states match document existence (5.5s)
+  ✓   52 [applications] › test/e2e/ats-view.spec.ts:30:1 › ATS view: real content wraps in its pane, an unbroken 500-char token still wraps, height grows (not clips), and pre-wrap preserves consecutive whitespace (2.6s)
+  ✓   53 [applications] › test/e2e/card-bounds.spec.ts:137:5 › F107 dashboard card @ 768px › no card action spills outside its card, stamp stays one line and verbatim (1.5s)
+  ✓   54 [applications] › test/e2e/card-bounds.spec.ts:137:5 › F107 dashboard card @ 1024px › no card action spills outside its card, stamp stays one line and verbatim (695ms)
+  ✓   55 [applications] › test/e2e/card-bounds.spec.ts:152:3 › F110 dark-mode card hover elevation › hover border resolves to the theme's --border-strong and differs from rest-state (730ms)
+  ✓   56 [applications] › test/e2e/card-detail.spec.ts:40:3 › F406: Escape disarms armed delete (T045) › Escape after arming restores the resting Delete affordance and deletes nothing (683ms)
+  ✓   57 [applications] › test/e2e/card-detail.spec.ts:62:3 › F406: duplicate scroll + highlight (T045) › the new card gets a transient highlight and is scrolled into view (4.5s)
+  ✓   58 [applications] › test/e2e/card-detail.spec.ts:125:3 › F406: NewApplication required-JD error placement (T045) › submitting without a JD renders the error beside the JD field, reddens its border, and focuses it (704ms)
+  ✓   59 [applications] › test/e2e/card-detail.spec.ts:180:3 › F406: card focus ring uses the full card radius (T045) › the focus-ring element's computed border-radius is equal on all four corners and non-zero (933ms)
+  ✓   60 [applications] › test/e2e/chrome-merge.spec.ts:97:3 › chrome merge (v4-T020, single-chrome, OQ1) › AppShell is removed from the DOM (not CSS-hidden); no full-width fixed bar exists outside the rail on any shell surface (1.6s)
+  ✓   61 [applications] › test/e2e/chrome-merge.spec.ts:117:3 › chrome merge (v4-T020, single-chrome, OQ1) › the wordmark's boundingBox is geometrically contained within the rail's boundingBox (489ms)
+  ✓   62 [applications] › test/e2e/chrome-merge.spec.ts:141:3 › chrome merge (v4-T020, single-chrome, OQ1) › the rail's theme toggle is operable: flips the root theme class AND repaints two unrelated surfaces (canvas + a card) (787ms)
+  ✓   63 [applications] › test/e2e/chrome-merge.spec.ts:172:3 › chrome merge (v4-T020, single-chrome, OQ1) › the rail's logout is operable and INVALIDATES the session (server round-trip, not just a client-side route push) (765ms)
+  ✓   64 [applications] › test/e2e/chrome-merge.spec.ts:203:7 › chrome merge (v4-T020, single-chrome, OQ1) › login page's standalone mini-chrome (renders outside the shell, never inherits rail/header chrome) › wordmark + theme toggle render at 375px (phone) (307ms)
+  ✓   65 [applications] › test/e2e/chrome-merge.spec.ts:203:7 › chrome merge (v4-T020, single-chrome, OQ1) › login page's standalone mini-chrome (renders outside the shell, never inherits rail/header chrome) › wordmark + theme toggle render at 1280px (desktop) (280ms)
+  ✓   66 [applications] › test/e2e/cohesion.spec.ts:60:3 › Cohesion sweep: the shell is genuinely persistent, and its rail is functional everywhere › PRESENCE: workspace-shell renders on all four surfaces (1.2s)
+  ✓   67 [applications] › test/e2e/cohesion.spec.ts:80:3 › Cohesion sweep: the shell is genuinely persistent, and its rail is functional everywhere › PERSISTENCE: the workspace-shell DOM node survives client-side navigation, including a document<->non-document pair (1.8s)
+  ✓   68 [applications] › test/e2e/cohesion.spec.ts:137:3 › Cohesion sweep: the shell is genuinely persistent, and its rail is functional everywhere › FUNCTIONAL RAIL: global nav activates on the dashboard/library/settings; the section rail activates on application detail (1.7s)
+  ✓   69 [applications] › test/e2e/cohesion.spec.ts:184:3 › Cohesion sweep: the shell is genuinely persistent, and its rail is functional everywhere › DEGRADE: no preview-pane off the one document surface; present and co-visible on application detail at 1280x720 (1.5s)
+  ✓   70 [applications] › test/e2e/cohesion.spec.ts:234:3 › SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051) › NewApplication panel is non-modal (dashboard, /applications) (535ms)
+  ✓   71 [applications] › test/e2e/cohesion.spec.ts:248:3 › SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051) › EntryEditor via Add entry is non-modal (library, /library) (666ms)
+  ✓   72 [applications] › test/e2e/cohesion.spec.ts:260:3 › SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051) › EntryEditor via editing an existing entry is non-modal (library, /library) (656ms)
+  ✓   73 [applications] › test/e2e/cohesion.spec.ts:279:3 › SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051) › LayoutEditor is non-modal (library, /library) (636ms)
+  ✓   74 [applications] › test/e2e/cohesion.spec.ts:294:3 › SWEEP 1 — app-wide modality: every de-modal panel stays non-modal on the final hoisted-shell tree (v3-T051) › ProfileEditor is non-modal (library, /library) (649ms)
+  ✓   75 [applications] › test/e2e/cohesion.spec.ts:318:3 › SWEEP 2 — co-visibility re-run: editor and preview panes are genuinely side-by-side on the final tree (v3-T051) › editor-pane and preview-pane are both visible and side-by-side at 1280x720 (1.0s)
+  ✓   76 [applications] › test/e2e/cohesion.spec.ts:413:5 › SWEEP 3 — app-wide modality taxonomy at 375/768/1024/1280 (v4-T060, red-team #14/#23) › >=lg @ 1024: zero modality across every de-modal panel and the preview (7.2s)
+  ✓   77 [applications] › test/e2e/cohesion.spec.ts:413:5 › SWEEP 3 — app-wide modality taxonomy at 375/768/1024/1280 (v4-T060, red-team #14/#23) › >=lg @ 1280: zero modality across every de-modal panel and the preview (7.1s)
+  ✓   78 [applications] › test/e2e/cohesion.spec.ts:465:5 › SWEEP 3 — app-wide modality taxonomy at 375/768/1024/1280 (v4-T060, red-team #14/#23) › <lg @ 375: NewApplication in-flow non-modal; Library panels + preview are SANCTIONED sheets (not modality); nothing else oversized (7.6s)
+  ✓   79 [applications] › test/e2e/cohesion.spec.ts:465:5 › SWEEP 3 — app-wide modality taxonomy at 375/768/1024/1280 (v4-T060, red-team #14/#23) › <lg @ 768: NewApplication in-flow non-modal; Library panels + preview are SANCTIONED sheets (not modality); nothing else oversized (7.4s)
+  ✓   80 [applications] › test/e2e/cohesion.spec.ts:548:3 › SWEEP 3 — app-wide modality taxonomy at 375/768/1024/1280 (v4-T060, red-team #14/#23) › bottom tab bar + toasts classify as NON-modal persistent chrome, not modality (9.6s)
+  ✓   81 [applications] › test/e2e/cohesion.spec.ts:613:3 › SWEEP 4 — no horizontal overflow at 375/768/1023/1024/1280/1512, all four surfaces (v4-T060, red-team #13) › document.documentElement.scrollWidth matches the viewport, and no non-whitelisted descendant overflows, at every named width on every surface (5.8s)
+  ✓   82 [applications] › test/e2e/cohesion.spec.ts:647:3 › Re-verified on the final tree (v4-T060) › scroll restoration (F203): browser-BACK restores the editor pane's scrollTop within +/-24px; a fresh forward nav starts at top (3.5s)
+  ✓   83 [applications] › test/e2e/cohesion.spec.ts:691:3 › Re-verified on the final tree (v4-T060) › rail collapse (F207): toggling transitions expanded (~224px) <-> the 40-64px collapsed band, survives reload, and is network-zero (2.0s)
+  ✓   84 [applications] › test/e2e/cohesion.spec.ts:742:3 › Re-verified on the final tree (v4-T060) › scroll-spy (F202): active section tracks scroll position across independently-computed positions, with the short-last-section escape at the bottom (4.4s)
+  ✓   85 [applications] › test/e2e/design-accordion.spec.ts:93:3 › design accordion (v4-T041a, F505) › the 3 top-level sections (Job details/Cover letter/Design) are ALL default expanded on load (2.5s)
+  ✓   86 [applications] › test/e2e/design-accordion.spec.ts:107:3 › design accordion (v4-T041a, F505) › Design's internal groups default COLLAPSED on load; clicking a group header reveals its controls (4.4s)
+  ✓   87 [applications] › test/e2e/design-accordion.spec.ts:132:3 › design accordion (v4-T041a, F505) › toggling a Design group is network-zero over a multi-second window, and the preview canvas is pixel-identical before/after (6.3s)
+  ✓   88 [applications] › test/e2e/design-accordion.spec.ts:206:3 › design accordion (v4-T041a, F505) › scroll retired: default (groups-collapsed) Design height is far below fully-expanded, and expanding every group measurably grows it; scroll-spy precondition still holds (6.6s)
+  ✘   89 [applications] › test/e2e/design.spec.ts:68:1 › design controls: reachable in-workspace, debounced persistence, preview host, locked read-only (18.9s)
+  ✘   90 [applications] › test/e2e/design.spec.ts:68:1 › design controls: reachable in-workspace, debounced persistence, preview host, locked read-only (retry #1) (13.3s)
+  ✓   91 [applications] › test/e2e/design.spec.ts:68:1 › design controls: reachable in-workspace, debounced persistence, preview host, locked read-only (retry #2) (11.4s)
+  ✓   92 [applications] › test/e2e/design.spec.ts:329:3 › inline template picker applies a built-in template (v4-T041b) › selecting a built-in template card applies it (format PUT round trip), no popover (3.0s)
+  ✓   93 [applications] › test/e2e/detail-craft.spec.ts:58:3 › F503 — kicker dedup › kickers still render; the CardTitle that duplicated each one is gone (no ambiguous heading) (1.6s)
+  ✓   94 [applications] › test/e2e/detail-craft.spec.ts:86:3 › F503 — kicker dedup › heading order stays sequential (F208) with the kickers folded in as real headings (1.2s)
+  ✓   95 [applications] › test/e2e/detail-craft.spec.ts:107:3 › F504 — voice-source labels disambiguated › "Use resume as a voice source" and "Use letter as a voice source" are both present and distinct (1.4s)
+  ✓   96 [applications] › test/e2e/detail-craft.spec.ts:131:3 › F504 — action strip regroup › the primary action (Re-tailor) is first in DOM/tab order AND leftmost visually (1.8s)
+  ✓   97 [applications] › test/e2e/detail-craft.spec.ts:172:3 › F504 — action strip regroup › Download PDF + Plain text are a single grouped/split control, pinned right of the primary group (1.5s)
+  ✓   98 [applications] › test/e2e/detail-craft.spec.ts:200:3 › F504 — action strip regroup › Lock final is visually distinguished from the harmless Plain text export (1.2s)
+  ✓   99 [applications] › test/e2e/detail-craft.spec.ts:221:3 › F509 — metadata typography consistency › the resume and letter gen-state metadata share the same resolved font-family (1.4s)
+  ✓  100 [applications] › test/e2e/docked-panel-bounds.spec.ts:159:3 › F103 docked panels open fully within viewport (v4-T014, chrome-agnostic) › EntryEditor ('Add entry'): title and close fully in-viewport, clear of other chrome (663ms)
+  ✓  101 [applications] › test/e2e/docked-panel-bounds.spec.ts:168:3 › F103 docked panels open fully within viewport (v4-T014, chrome-agnostic) › ProfileEditor ('Edit profile'): title and close fully in-viewport, clear of other chrome (775ms)
+  ✓  102 [applications] › test/e2e/docked-panel-bounds.spec.ts:177:3 › F103 docked panels open fully within viewport (v4-T014, chrome-agnostic) › LayoutEditor ('Edit layout'): title and close fully in-viewport, clear of other chrome (704ms)
+  ✓  103 [applications] › test/e2e/export-busy.spec.ts:33:1 › export busy state (F402): PDF export disables + swaps label while in flight, and a double-click yields exactly one download (3.4s)
+  ✓  104 [applications] › test/e2e/gallery-bounds.spec.ts:60:3 › F102 inline template picker bounds (v4-T041b — re-homed from the deleted gallery popover) › the inline template picker is fully within the editor pane at 1280x720, non-degenerate, full roster (2.2s)
+  ✓  105 [applications] › test/e2e/letter-editing.spec.ts:42:1 › red-team #17: paragraph editing lives in the editor pane (not the preview), and the letter canvas stays ≥50% in-viewport at real scale while a paragraph field is focused (2.1s)
+  ✓  106 [applications] › test/e2e/letter-empty.spec.ts:22:1 › letter empty state mirrors the resume dashed-card + CTA, arrow on the CTA line (1.0s)
+  ✓  107 [applications] › test/e2e/motion.spec.ts:105:3 › Motion language (F403/F404): panel entry + section collapse in [100ms,300ms], silenced under reduced motion; select hover delta › docked panels (EntryEditor/ProfileEditor/LayoutEditor) animate in within the pinned band (1.0s)
+  ✓  108 [applications] › test/e2e/motion.spec.ts:132:3 › Motion language (F403/F404): panel entry + section collapse in [100ms,300ms], silenced under reduced motion; select hover delta › section collapse (ApplicationDetail's 'job' section) animates via grid-rows within the pinned band (1.3s)
+  ✓  109 [applications] › test/e2e/motion.spec.ts:161:3 › Motion language (F403/F404): panel entry + section collapse in [100ms,300ms], silenced under reduced motion; select hover delta › reduced motion: panel entry and section collapse both compute to no animation (1.3s)
+  ✓  110 [applications] › test/e2e/motion.spec.ts:200:3 › Motion language (F403/F404): panel entry + section collapse in [100ms,300ms], silenced under reduced motion; select hover delta › select trigger: hover produces a computed background-color delta with a non-zero transition-duration (1.0s)
+injected: canvas hidden
+caught error: expect(locator).toBeVisible() failed
+
+Locator:  locator('.document-preview canvas').first()
+Expected: visible
+Received: hidden
+Timeout:  5000ms
+
+Call log:
+  - Expect "toBeVisible" with timeout 5000ms
+  - waiting for locator('.document-preview canvas').first()
+    13 × locator resolved to <canvas width="918" height="1188" class="document-preview__canvas"></canvas>
+       - unexpected value "hidden"
+
+restored: canvas repainted
+  ✓  111 [applications] › test/e2e/mutation-probe.spec.ts:27:1 › expectResumeCanvasPainted fails on a hidden canvas and passes once restored (12.2s)
+  ✓  112 [applications] › test/e2e/new-application.spec.ts:46:3 › NewApplication inline panel (T032/F304) › desktop 1280: closed state is unaffected; opening pushes the grid down, covers no card, and the old anchored popover is gone from the DOM (785ms)
+  ✓  113 [applications] › test/e2e/new-application.spec.ts:130:3 › NewApplication inline panel (T032/F304) › below sm (375x812): the panel renders full-width and stays fully in-viewport (1.4s)
+  ✓  114 [applications] › test/e2e/new-application.spec.ts:159:3 › NewApplication inline panel (T032/F304) › create still works end-to-end through the inline panel (621ms)
+  ✓  115 [applications] › test/e2e/pane-arbitration.spec.ts:47:3 › Below-lg: full-width preview sheet swaps out the editor (F303/F207) › 768x1024: opening the sheet removes the editor, the preview fills >=60% of the viewport and paints; closing restores the editor (2.2s)
+  ✓  116 [applications] › test/e2e/pane-arbitration.spec.ts:107:3 › Below-lg: full-width preview sheet swaps out the editor (F303/F207) › sheet dismissal: Escape and the visible Close control both close it, restore the editor, and return focus to the trigger (2.1s)
+  ✓  117 [applications] › test/e2e/pane-arbitration.spec.ts:134:3 › >=xl: proportional preview width (red-team #10) › 1512x900 the preview is measurably wider than the old fixed 384px, within a sane clamp; 1280x800 it's still >=384px; the editor stays usable at both (1.7s)
+  ✓  118 [applications] › test/e2e/pane-arbitration.spec.ts:171:3 › Regime edges + no modality leak at >=lg › 1280 co-visible (no sheet, no swap toggle, no aria-modal); 1279 and 1024 both swap (rail + toggle strip); 1023 sheet regime (rail gone, bottom bar + trigger) (1.8s)
+  ✓  119 [applications] › test/e2e/panel-craft.spec.ts:53:5 › F508 panel craft (v4-T055) › Add entry: close control is a lucide X named "Close" (not a chevron) (674ms)
+  ✓  120 [applications] › test/e2e/panel-craft.spec.ts:72:5 › F508 panel craft (v4-T055) › Add entry: header stays put while the body scrolls (798ms)
+  ✓  121 [applications] › test/e2e/panel-craft.spec.ts:53:5 › F508 panel craft (v4-T055) › Edit profile: close control is a lucide X named "Close" (not a chevron) (600ms)
+  ✓  122 [applications] › test/e2e/panel-craft.spec.ts:72:5 › F508 panel craft (v4-T055) › Edit profile: header stays put while the body scrolls (780ms)
+  ✓  123 [applications] › test/e2e/panel-craft.spec.ts:53:5 › F508 panel craft (v4-T055) › Edit layout: close control is a lucide X named "Close" (not a chevron) (614ms)
+  ✓  124 [applications] › test/e2e/panel-craft.spec.ts:72:5 › F508 panel craft (v4-T055) › Edit layout: header stays put while the body scrolls (785ms)
+  ✓  125 [applications] › test/e2e/panel-craft.spec.ts:112:3 › F508 panel craft (v4-T055) › EntryEditor: sort label reads 'Sort date — newest first' (exact) (599ms)
+  ✓  126 [applications] › test/e2e/panel-craft.spec.ts:124:3 › F508 panel craft (v4-T055) › EntryEditor: a fact field grows in height with multi-line content (784ms)
+  ✓  127 [applications] › test/e2e/panel-sheet.spec.ts:72:7 › T062 below-lg sheet regime at 375x812 › EntryEditor: full-width sheet, no aria-modal, dismissible (Escape + Close), focus-managed (1.3s)
+  ✓  128 [applications] › test/e2e/panel-sheet.spec.ts:72:7 › T062 below-lg sheet regime at 375x812 › LayoutEditor: full-width sheet, no aria-modal, dismissible (Escape + Close), focus-managed (1.4s)
+  ✓  129 [applications] › test/e2e/panel-sheet.spec.ts:72:7 › T062 below-lg sheet regime at 375x812 › ProfileEditor: full-width sheet, no aria-modal, dismissible (Escape + Close), focus-managed (1.5s)
+  ✓  130 [applications] › test/e2e/panel-sheet.spec.ts:72:7 › T062 below-lg sheet regime at 768x1024 › EntryEditor: full-width sheet, no aria-modal, dismissible (Escape + Close), focus-managed (1.5s)
+  ✓  131 [applications] › test/e2e/panel-sheet.spec.ts:72:7 › T062 below-lg sheet regime at 768x1024 › LayoutEditor: full-width sheet, no aria-modal, dismissible (Escape + Close), focus-managed (1.5s)
+  ✓  132 [applications] › test/e2e/panel-sheet.spec.ts:72:7 › T062 below-lg sheet regime at 768x1024 › ProfileEditor: full-width sheet, no aria-modal, dismissible (Escape + Close), focus-managed (1.4s)
+  ✓  133 [applications] › test/e2e/panel-sheet.spec.ts:135:5 › T062 docked panels unchanged at 1280x720 (>= lg) › EntryEditor: docked, NOT a full-width sheet (880ms)
+  ✓  134 [applications] › test/e2e/panel-sheet.spec.ts:135:5 › T062 docked panels unchanged at 1280x720 (>= lg) › LayoutEditor: docked, NOT a full-width sheet (890ms)
+  ✓  135 [applications] › test/e2e/panel-sheet.spec.ts:135:5 › T062 docked panels unchanged at 1280x720 (>= lg) › ProfileEditor: docked, NOT a full-width sheet (790ms)
+  ✓  136 [applications] › test/e2e/phone-overflow.spec.ts:143:3 › Phone-width detail layout: stacked, zero horizontal overflow (F302) › at 375x812 the detail surface has zero horizontal overflow anywhere outside the deliberate-scroll whitelist (1.8s)
+  ✓  137 [applications] › test/e2e/phone-overflow.spec.ts:157:3 › Phone-width detail layout: stacked, zero horizontal overflow (F302) › at 375x812 the major detail regions (job/letter/design) stack vertically and are fully inside the 375px viewport (1.7s)
+  ✓  138 [applications] › test/e2e/phone-overflow.spec.ts:219:3 › Desktop regime regression guard (>=lg) — detail surface unchanged › at 1280x800 editor-pane and preview-pane are still both visible and side-by-side (1.0s)
+  ✓  139 [applications] › test/e2e/preview-zoom.spec.ts:70:3 › Zoom control absent below xl, present at the xl edge (F507) › 1279 the zoom toggle is not in the DOM at all; 1280 it is (2.1s)
+  ✓  140 [applications] › test/e2e/preview-zoom.spec.ts:97:3 › Zoom: real reflow, editor stays usable, non-modal, exact restore (F507) › activating zoom widens the preview >=1.5x via real layout, shrinks the editor (still >=240px), stays non-modal; toggling off restores prior widths (2.5s)
+  ✓  141 [applications] › test/e2e/preview-zoom.spec.ts:172:3 › Zoom is ephemeral: no storage write, resets on SPA navigate-away-and-back (F507/OQ6) › toggling zoom writes no localStorage/sessionStorage key; navigating away and back un-zooms (2.7s)
+  ✓  142 [applications] › test/e2e/preview-zoom.spec.ts:235:3 › Preview frame survives a re-render — no drop to bare loading text (F507) › changing a format axis (Body font) keeps the page frame in place, no bare-text collapse, no big layout jump (2.9s)
+  ✓  143 [applications] › test/e2e/rail-collapse.spec.ts:31:3 › collapsible rail (v4-T022, F207) › toggle transitions the rail's measured width between expanded (~224px) and the 40-64px collapsed band, and back (1.4s)
+  ✓  144 [applications] › test/e2e/rail-collapse.spec.ts:53:3 › collapsible rail (v4-T022, F207) › collapsed/icon-only mode: all three global nav items stay operable — activating each navigates (1.2s)
+  ✓  145 [applications] › test/e2e/rail-collapse.spec.ts:77:3 › collapsible rail (v4-T022, F207) › collapse state survives a full reload (localStorage) (764ms)
+  ✓  146 [applications] › test/e2e/rail-collapse.spec.ts:93:3 › collapsible rail (v4-T022, F207) › the toggle is network-zero: no requests fire, and no settings/sectionDisplay write occurs (1.3s)
+  ✘  147 [applications] › test/e2e/rail-collapse.spec.ts:137:3 › v5-T001 — collapsed-rail chrome polish › collapsed rail-pane is exactly 48px wide with zero descendant overflow (measured, not masked) (597ms)
+  ✘  148 [applications] › test/e2e/rail-collapse.spec.ts:137:3 › v5-T001 — collapsed-rail chrome polish › collapsed rail-pane is exactly 48px wide with zero descendant overflow (measured, not masked) (retry #1) (752ms)
+  ✘  149 [applications] › test/e2e/rail-collapse.spec.ts:137:3 › v5-T001 — collapsed-rail chrome polish › collapsed rail-pane is exactly 48px wide with zero descendant overflow (measured, not masked) (retry #2) (636ms)
+  ✓  150 [applications] › test/e2e/rail-collapse.spec.ts:175:3 › v5-T001 — collapsed-rail chrome polish › wordmark: collapsed hides the 'Lede' text but keeps the 'L' box visible; expanded restores 'Lede' (849ms)
+  ✘  151 [applications] › test/e2e/rail-collapse.spec.ts:204:3 › v5-T001 — collapsed-rail chrome polish › theme toggle + logout: collapsed hides visible text but stay aria-labeled, operable, and Radix-tooltipped (not a native title) (5.9s)
+  ✘  152 [applications] › test/e2e/rail-collapse.spec.ts:204:3 › v5-T001 — collapsed-rail chrome polish › theme toggle + logout: collapsed hides visible text but stay aria-labeled, operable, and Radix-tooltipped (not a native title) (retry #1) (6.0s)
+  ✘  153 [applications] › test/e2e/rail-collapse.spec.ts:204:3 › v5-T001 — collapsed-rail chrome polish › theme toggle + logout: collapsed hides visible text but stay aria-labeled, operable, and Radix-tooltipped (not a native title) (retry #2) (6.6s)
+  ✓  154 [applications] › test/e2e/rail-collapse.spec.ts:253:3 › v5-T001 — collapsed-rail chrome polish › every icon inside the collapsed rail renders at 16px (no 24px lucide default) (690ms)
+  ✘  155 [applications] › test/e2e/rail-collapse.spec.ts:272:3 › v5-T001 — collapsed-rail chrome polish › collapsed nav icons and footer icons share the rail's horizontal center (~24px) (689ms)
+  ✘  156 [applications] › test/e2e/rail-collapse.spec.ts:272:3 › v5-T001 — collapsed-rail chrome polish › collapsed nav icons and footer icons share the rail's horizontal center (~24px) (retry #1) (699ms)
+  ✘  157 [applications] › test/e2e/rail-collapse.spec.ts:272:3 › v5-T001 — collapsed-rail chrome polish › collapsed nav icons and footer icons share the rail's horizontal center (~24px) (retry #2) (946ms)
+  ✓  158 [applications] › test/e2e/rail-design.spec.ts:29:3 › rail design (v4-T021) › each global-nav item carries an icon (svg) alongside its label (680ms)
+  ✓  159 [applications] › test/e2e/rail-design.spec.ts:42:3 › rail design (v4-T021) › nav hover computes to the --ring-weak token AND differs from the resting background (772ms)
+  ✓  160 [applications] › test/e2e/rail-design.spec.ts:96:3 › rail design (v4-T021) › the SECTIONS mono-caps section-zone label renders on the detail surface's rail, and the back-link is gone (1.3s)
+  ✓  161 [applications] › test/e2e/rail-design.spec.ts:119:3 › rail design (v4-T021) › one-title convention: the detail surface's title lives ONLY in the editor pane's h1, never repeated in the rail (1.2s)
+  ✓  162 [applications] › test/e2e/rail-design.spec.ts:138:3 › rail design (v4-T021) › one-title convention holds on ALL FOUR shell surfaces: editor-pane h1 is the surface title, rail has no heading duplicating it (1.6s)
+  ✓  163 [applications] › test/e2e/responsive-nav.spec.ts:147:5 › compact nav (below lg) @ 375x812 › bottom tab bar replaces the rail on all four surfaces, no drawer/hamburger, and covers no interactive content (2.5s)
+  ✓  164 [applications] › test/e2e/responsive-nav.spec.ts:170:5 › compact nav (below lg) @ 375x812 › section nav is reachable inside the editor pane on the detail surface (2.1s)
+  ✓  165 [applications] › test/e2e/responsive-nav.spec.ts:147:5 › compact nav (below lg) @ 768x1024 › bottom tab bar replaces the rail on all four surfaces, no drawer/hamburger, and covers no interactive content (3.3s)
+  ✓  166 [applications] › test/e2e/responsive-nav.spec.ts:170:5 › compact nav (below lg) @ 768x1024 › section nav is reachable inside the editor pane on the detail surface (1.9s)
+  ✓  167 [applications] › test/e2e/responsive-nav.spec.ts:202:3 › desktop regime regression guard (>=lg) › at 1280px the rail is present and the bottom tab bar is absent from the DOM on all four surfaces (1.6s)
+  ✓  168 [applications] › test/e2e/route-transitions.spec.ts:64:3 › Scroll restoration (F203) + focus management (F208) › browser-BACK restores the editor pane's scrollTop within +/-24px; a fresh forward nav starts at top (4.1s)
+  ✓  169 [applications] › test/e2e/route-transitions.spec.ts:110:3 › Scroll restoration (F203) + focus management (F208) › keyed by location.key, not pathname: two visits to the SAME pathname with different scroll targets restore independently (4.7s)
+  ✓  170 [applications] › test/e2e/route-transitions.spec.ts:188:3 › Scroll restoration (F203) + focus management (F208) › focus: after a rail navigation, document.activeElement is the new surface's h1 (2.6s)
+  ✓  171 [applications] › test/e2e/route-transitions.spec.ts:250:3 › Single main landmark + sequential heading order (F208), all four shell surfaces › dashboard: exactly one <main>; heading order sequential (566ms)
+  ✓  172 [applications] › test/e2e/route-transitions.spec.ts:258:3 › Single main landmark + sequential heading order (F208), all four shell surfaces › library: exactly one <main>; heading order sequential (575ms)
+  ✓  173 [applications] › test/e2e/route-transitions.spec.ts:266:3 › Single main landmark + sequential heading order (F208), all four shell surfaces › settings: exactly one <main>; heading order sequential (744ms)
+  ✓  174 [applications] › test/e2e/route-transitions.spec.ts:274:3 › Single main landmark + sequential heading order (F208), all four shell surfaces › application detail: exactly one <main>; heading order sequential (1.8s)
+  ✓  175 [applications] › test/e2e/scroll-spy.spec.ts:71:1 › scroll-spy (v4-T023/F202): active section tracks the 30%-line rule across independently-computed scroll positions, the short-last-section escape at the bottom, and the marker provably moves (18.8s)
+  ✓  176 [applications] › test/e2e/scroll-spy.spec.ts:149:1 › section-row clarity (v4-T023/F209): the whole rail row navigates, with no second chevron/collapse control in the rail — collapse lives on the editor's own section headers instead (2.9s)
+  ✓  177 [applications] › test/e2e/tailor-failure.spec.ts:33:1 › tailor failure (F105): 422 renders an inline error + failure badge without navigation, and a successful retry clears both (1.5s)
+  ✓  178 [applications] › test/e2e/tap-targets.spec.ts:85:3 › Coarse-pointer 44px tap targets (T034/F305) › 1. bottom tab bar: all three primary nav items are >=44px on their short axis (435ms)
+  ✓  179 [applications] › test/e2e/tap-targets.spec.ts:101:3 › Coarse-pointer 44px tap targets (T034/F305) › 2. New application: trigger, submit, and close controls are all >=44px (469ms)
+  ✓  180 [applications] › test/e2e/tap-targets.spec.ts:129:3 › Coarse-pointer 44px tap targets (T034/F305) › 3. tailor-failure retry affordance (the Tailor/Re-tailor button) is >=44px (1.9s)
+  ✓  181 [applications] › test/e2e/tap-targets.spec.ts:155:3 › Coarse-pointer 44px tap targets (T034/F305) › 4. letter/preview sheet: open trigger and Close control are both >=44px (2.3s)
+  ✓  182 [applications] › test/e2e/tap-targets.spec.ts:176:3 › Coarse-pointer 44px tap targets (T034/F305) › 4b. lg..xl swap toggle (preview-swap-toggle) is >=44px (already h-11 w-11 — verified, not just asserted from source) (2.1s)
+  ✓  183 [applications] › test/e2e/tap-targets.spec.ts:197:3 › Coarse-pointer 44px tap targets (T034/F305) › 5. dashboard card actions (Duplicate/Download/Delete) are all >=44px (1.4s)
+  ✓  184 [applications] › test/e2e/tap-targets.spec.ts:218:3 › Coarse-pointer 44px tap targets (T034/F305) › 6. detail action strip (Lock final/Download PDF/Plain text/voice-source) are all >=44px (2.3s)
+  ✓  185 [applications] › test/e2e/tap-targets.spec.ts:240:3 › Coarse-pointer 44px tap targets (T034/F305) › 7. EntryEditor panel save/close controls are >=44px (713ms)
+  ✓  186 [applications] › test/e2e/tap-targets.spec.ts:263:3 › Coarse-pointer 44px tap targets (T034/F305) › excluded set: a listbox option (ui/select.tsx, not owned by this ticket) stays UNDER 44px — proves no blanket bump (949ms)
+  ✓  187 [applications] › test/e2e/tap-targets.spec.ts:285:3 › Coarse-pointer 44px tap targets (T034/F305) › EntryEditor fields render single-column below sm (F305), and restore multi-column at/above sm (573ms)
+  ✓  188 [applications] › test/e2e/toasts.spec.ts:57:1 › create application → one 'Application created' toast (5.1s)
+  ✓  189 [applications] › test/e2e/toasts.spec.ts:66:1 › duplicate application → one 'Application duplicated' toast (9.6s)
+  ✓  190 [applications] › test/e2e/toasts.spec.ts:77:1 › delete application → one 'Application deleted' toast (9.6s)
+  ✓  191 [applications] › test/e2e/toasts.spec.ts:89:1 › entry save → one 'Entry saved' toast (5.5s)
+  ✓  192 [applications] › test/e2e/toasts.spec.ts:102:1 › profile save → one 'Profile saved' toast (5.5s)
+  ✓  193 [applications] › test/e2e/toasts.spec.ts:116:1 › layout save → one 'Layout saved' toast (call-site, not the shared hook) (5.3s)
+  ✓  194 [applications] › test/e2e/toasts.spec.ts:129:1 › import → one 'Library imported' toast (5.0s)
+  ✓  195 [applications] › test/e2e/toasts.spec.ts:146:1 › export → one 'Backup exported' toast (5.1s)
+  ✓  196 [applications] › test/e2e/toasts.spec.ts:160:1 › FAILURE CONTRAST — a failed duplicate (real 404) shows an inline error and NO toast (5.1s)
+  ✓  197 [applications] › test/e2e/toasts.spec.ts:190:1 › FAILURE CONTRAST — an invalid import file (real 400) shows an inline error and NO toast (608ms)
+
+
+  1) [applications] › test/e2e/rail-collapse.spec.ts:137:3 › v5-T001 — collapsed-rail chrome polish › collapsed rail-pane is exactly 48px wide with zero descendant overflow (measured, not masked) 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 48
+    Received: 223
+
+      169 |     });
+      170 |
+    > 171 |     expect(result.clientWidth).toBe(48);
+          |                                ^
+      172 |     expect(result.violations, JSON.stringify(result.violations, null, 2)).toEqual([]);
+      173 |   });
+      174 |
+        at /workspace/test/e2e/rail-collapse.spec.ts:171:32
+
+    Error Context: test-results/rail-collapse-v5-T001-—-co-ac938-erflow-measured-not-masked--applications/error-context.md
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 48
+    Received: 223
+
+      169 |     });
+      170 |
+    > 171 |     expect(result.clientWidth).toBe(48);
+          |                                ^
+      172 |     expect(result.violations, JSON.stringify(result.violations, null, 2)).toEqual([]);
+      173 |   });
+      174 |
+        at /workspace/test/e2e/rail-collapse.spec.ts:171:32
+
+    Error Context: test-results/rail-collapse-v5-T001-—-co-ac938-erflow-measured-not-masked--applications-retry1/error-context.md
+
+    Retry #2 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 48
+    Received: 223
+
+      169 |     });
+      170 |
+    > 171 |     expect(result.clientWidth).toBe(48);
+          |                                ^
+      172 |     expect(result.violations, JSON.stringify(result.violations, null, 2)).toEqual([]);
+      173 |   });
+      174 |
+        at /workspace/test/e2e/rail-collapse.spec.ts:171:32
+
+    Error Context: test-results/rail-collapse-v5-T001-—-co-ac938-erflow-measured-not-masked--applications-retry2/error-context.md
+
+  2) [applications] › test/e2e/rail-collapse.spec.ts:204:3 › v5-T001 — collapsed-rail chrome polish › theme toggle + logout: collapsed hides visible text but stay aria-labeled, operable, and Radix-tooltipped (not a native title) 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('tooltip')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('tooltip')
+
+
+      238 |     // machinery, not a native title (already asserted absent above).
+      239 |     await theme.focus();
+    > 240 |     await expect(page.getByRole("tooltip")).toBeVisible();
+          |                                             ^
+      241 |     await expect(page.getByRole("tooltip")).toHaveText(labelAfterToggle!);
+      242 |
+      243 |     await logout.focus();
+        at /workspace/test/e2e/rail-collapse.spec.ts:240:45
+
+    Error Context: test-results/rail-collapse-v5-T001-—-co-f7194-ltipped-not-a-native-title--applications/error-context.md
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('tooltip')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('tooltip')
+
+
+      238 |     // machinery, not a native title (already asserted absent above).
+      239 |     await theme.focus();
+    > 240 |     await expect(page.getByRole("tooltip")).toBeVisible();
+          |                                             ^
+      241 |     await expect(page.getByRole("tooltip")).toHaveText(labelAfterToggle!);
+      242 |
+      243 |     await logout.focus();
+        at /workspace/test/e2e/rail-collapse.spec.ts:240:45
+
+    Error Context: test-results/rail-collapse-v5-T001-—-co-f7194-ltipped-not-a-native-title--applications-retry1/error-context.md
+
+    Retry #2 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('tooltip')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('tooltip')
+
+
+      238 |     // machinery, not a native title (already asserted absent above).
+      239 |     await theme.focus();
+    > 240 |     await expect(page.getByRole("tooltip")).toBeVisible();
+          |                                             ^
+      241 |     await expect(page.getByRole("tooltip")).toHaveText(labelAfterToggle!);
+      242 |
+      243 |     await logout.focus();
+        at /workspace/test/e2e/rail-collapse.spec.ts:240:45
+
+    Error Context: test-results/rail-collapse-v5-T001-—-co-f7194-ltipped-not-a-native-title--applications-retry2/error-context.md
+
+  3) [applications] › test/e2e/rail-collapse.spec.ts:272:3 › v5-T001 — collapsed-rail chrome polish › collapsed nav icons and footer icons share the rail's horizontal center (~24px) 
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 2
+    Received:    2.03125
+
+      294 |
+      295 |     for (const centerX of [...navCenters, themeCenter, logoutCenter]) {
+    > 296 |       expect(Math.abs(centerX - railCenterX)).toBeLessThanOrEqual(2);
+          |                                               ^
+      297 |     }
+      298 |   });
+      299 | });
+        at /workspace/test/e2e/rail-collapse.spec.ts:296:47
+
+    Error Context: test-results/rail-collapse-v5-T001-—-co-bd759-l-s-horizontal-center-24px--applications/error-context.md
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 2
+    Received:    8.03125
+
+      294 |
+      295 |     for (const centerX of [...navCenters, themeCenter, logoutCenter]) {
+    > 296 |       expect(Math.abs(centerX - railCenterX)).toBeLessThanOrEqual(2);
+          |                                               ^
+      297 |     }
+      298 |   });
+      299 | });
+        at /workspace/test/e2e/rail-collapse.spec.ts:296:47
+
+    Error Context: test-results/rail-collapse-v5-T001-—-co-bd759-l-s-horizontal-center-24px--applications-retry1/error-context.md
+
+    Retry #2 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 2
+    Received:    68.765625
+
+      294 |
+      295 |     for (const centerX of [...navCenters, themeCenter, logoutCenter]) {
+    > 296 |       expect(Math.abs(centerX - railCenterX)).toBeLessThanOrEqual(2);
+          |                                               ^
+      297 |     }
+      298 |   });
+      299 | });
+        at /workspace/test/e2e/rail-collapse.spec.ts:296:47
+
+    Error Context: test-results/rail-collapse-v5-T001-—-co-bd759-l-s-horizontal-center-24px--applications-retry2/error-context.md
+
+  4) [applications] › test/e2e/applications.spec.ts:138:1 › create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+    Call Log:
+    - Timeout 15000ms exceeded while waiting on the predicate
+
+      129 |       { timeout: 15000 },
+      130 |     )
+    > 131 |     .toBe(true);
+          |      ^
+      132 | }
+      133 |
+      134 | function thumbnailDataUrl(page: Page, templateId: string): Promise<string> {
+        at expectThumbnailPainted (/workspace/test/e2e/applications.spec.ts:131:6)
+        at /workspace/test/e2e/applications.spec.ts:251:5
+
+    Error Context: test-results/applications-create---tail-4eb21--persist---re-tailor---lock-applications/error-context.md
+
+  5) [applications] › test/e2e/design.spec.ts:68:1 › design controls: reachable in-workspace, debounced persistence, preview host, locked read-only 
+
+    Error: Timeout 5000ms exceeded while waiting on the predicate
+
+       at helpers/workspace.ts:237
+
+      235 |       }),
+      236 |     )
+    > 237 |     .toBe(true);
+          |      ^
+      238 | }
+      239 |
+      240 | export async function expectResumeCanvasPainted(page: Page): Promise<void> {
+        at expectLocatorCanvasPainted (/workspace/test/e2e/helpers/workspace.ts:237:6)
+        at expectResumeCanvasPainted (/workspace/test/e2e/helpers/workspace.ts:241:3)
+        at /workspace/test/e2e/design.spec.ts:270:3
+
+    Error Context: test-results/design-design-controls-rea-ecb8f-eview-host-locked-read-only-applications/error-context.md
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: Timeout 5000ms exceeded while waiting on the predicate
+
+       at helpers/workspace.ts:237
+
+      235 |       }),
+      236 |     )
+    > 237 |     .toBe(true);
+          |      ^
+      238 | }
+      239 |
+      240 | export async function expectResumeCanvasPainted(page: Page): Promise<void> {
+        at expectLocatorCanvasPainted (/workspace/test/e2e/helpers/workspace.ts:237:6)
+        at expectResumeCanvasPainted (/workspace/test/e2e/helpers/workspace.ts:241:3)
+        at /workspace/test/e2e/design.spec.ts:147:3
+
+    Error Context: test-results/design-design-controls-rea-ecb8f-eview-host-locked-read-only-applications-retry1/error-context.md
+
+  3 failed
+    [applications] › test/e2e/rail-collapse.spec.ts:137:3 › v5-T001 — collapsed-rail chrome polish › collapsed rail-pane is exactly 48px wide with zero descendant overflow (measured, not masked) 
+    [applications] › test/e2e/rail-collapse.spec.ts:204:3 › v5-T001 — collapsed-rail chrome polish › theme toggle + logout: collapsed hides visible text but stay aria-labeled, operable, and Radix-tooltipped (not a native title) 
+    [applications] › test/e2e/rail-collapse.spec.ts:272:3 › v5-T001 — collapsed-rail chrome polish › collapsed nav icons and footer icons share the rail's horizontal center (~24px) 
+  2 flaky
+    [applications] › test/e2e/applications.spec.ts:138:1 › create -> tailor -> render(token) -> reload-persist -> re-tailor -> lock 
+    [applications] › test/e2e/design.spec.ts:68:1 › design controls: reachable in-workspace, debounced persistence, preview host, locked read-only 
+  183 passed (9.8m)
+E2E_EXIT=1
+loadavg_after: 3.77 6.70 12.57 6/18729 3200258

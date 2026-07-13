@@ -1,0 +1,134 @@
+=== T004 full e2e regression (coordinator, PORT=9200 CI=1 fresh servers) ===
+loadavg: 4.83 3.04 2.70 12/15586 3974393
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+
+Running 198 tests using 1 worker
+································Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+····Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+············································
+·····························injected: canvas hidden
+caught error: expect(locator).toBeVisible() failed
+
+Locator:  locator('.document-preview canvas').first()
+Expected: visible
+Received: hidden
+Timeout:  5000ms
+
+Call log:
+  - Expect "toBeVisible" with timeout 5000ms
+  - waiting for locator('.document-preview canvas').first()
+    13 × locator resolved to <canvas width="918" height="1188" class="document-preview__canvas"></canvas>
+       - unexpected value "hidden"
+
+restored: canvas repainted
+···················································
+·××F····································
+
+  1) [applications] › test/e2e/rail-design.spec.ts:272:3 › rail footer design (v5-T002) › footer hover language: resting is neither --ring-weak nor --accent-bg; hovered resolves to --ring-weak; an active nav link stays --accent-bg 
+
+    Error: active nav link background must resolve to --accent-bg
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      326 |       sameColor(activeBg, accentBg),
+      327 |       "active nav link background must resolve to --accent-bg",
+    > 328 |     ).toBe(true);
+          |       ^
+      329 |   });
+      330 |
+      331 |   test("wordmark stays a quiet logo: hovering it changes neither background nor text color", async ({
+        at /workspace/test/e2e/rail-design.spec.ts:328:7
+
+    Error Context: test-results/rail-design-rail-footer-de-5d65a--nav-link-stays---accent-bg-applications/error-context.md
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: active nav link background must resolve to --accent-bg
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      326 |       sameColor(activeBg, accentBg),
+      327 |       "active nav link background must resolve to --accent-bg",
+    > 328 |     ).toBe(true);
+          |       ^
+      329 |   });
+      330 |
+      331 |   test("wordmark stays a quiet logo: hovering it changes neither background nor text color", async ({
+        at /workspace/test/e2e/rail-design.spec.ts:328:7
+
+    Error Context: test-results/rail-design-rail-footer-de-5d65a--nav-link-stays---accent-bg-applications-retry1/error-context.md
+
+    Retry #2 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: active nav link background must resolve to --accent-bg
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      326 |       sameColor(activeBg, accentBg),
+      327 |       "active nav link background must resolve to --accent-bg",
+    > 328 |     ).toBe(true);
+          |       ^
+      329 |   });
+      330 |
+      331 |   test("wordmark stays a quiet logo: hovering it changes neither background nor text color", async ({
+        at /workspace/test/e2e/rail-design.spec.ts:328:7
+
+    Error Context: test-results/rail-design-rail-footer-de-5d65a--nav-link-stays---accent-bg-applications-retry2/error-context.md
+
+  1 failed
+    [applications] › test/e2e/rail-design.spec.ts:272:3 › rail footer design (v5-T002) › footer hover language: resting is neither --ring-weak nor --accent-bg; hovered resolves to --ring-weak; an active nav link stays --accent-bg 
+  197 passed (7.5m)
+E2E_EXIT=1
+=== DONE e2e ===
+=== ISOLATION: rail-design v5-T002 hover-language test, 3x, fresh server PORT=9300 ===
+--- run 1 ---
+  1) [applications] › test/e2e/rail-design.spec.ts:272:3 › rail footer design (v5-T002) › footer hover language: resting is neither --ring-weak nor --accent-bg; hovered resolves to --ring-weak; an active nav link stays --accent-bg 
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+      327 |       "active nav link background must resolve to --accent-bg",
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+      327 |       "active nav link background must resolve to --accent-bg",
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+--- run 2 ---
+  1) [applications] › test/e2e/rail-design.spec.ts:272:3 › rail footer design (v5-T002) › footer hover language: resting is neither --ring-weak nor --accent-bg; hovered resolves to --ring-weak; an active nav link stays --accent-bg 
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+      327 |       "active nav link background must resolve to --accent-bg",
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+      327 |       "active nav link background must resolve to --accent-bg",
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+--- run 3 ---
+  1) [applications] › test/e2e/rail-design.spec.ts:272:3 › rail footer design (v5-T002) › footer hover language: resting is neither --ring-weak nor --accent-bg; hovered resolves to --ring-weak; an active nav link stays --accent-bg 
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+      327 |       "active nav link background must resolve to --accent-bg",
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+      327 |       "active nav link background must resolve to --accent-bg",
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+=== DONE isolation ===

@@ -1,0 +1,41 @@
+=== ISOLATION: rail-design v5-T002 hover-language test, 3x, fresh server PORT=9300 ===
+--- run 1 ---
+  1) [applications] › test/e2e/rail-design.spec.ts:272:3 › rail footer design (v5-T002) › footer hover language: resting is neither --ring-weak nor --accent-bg; hovered resolves to --ring-weak; an active nav link stays --accent-bg 
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+      327 |       "active nav link background must resolve to --accent-bg",
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+      327 |       "active nav link background must resolve to --accent-bg",
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+--- run 2 ---
+  1) [applications] › test/e2e/rail-design.spec.ts:272:3 › rail footer design (v5-T002) › footer hover language: resting is neither --ring-weak nor --accent-bg; hovered resolves to --ring-weak; an active nav link stays --accent-bg 
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+      327 |       "active nav link background must resolve to --accent-bg",
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+      327 |       "active nav link background must resolve to --accent-bg",
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+--- run 3 ---
+  1) [applications] › test/e2e/rail-design.spec.ts:272:3 › rail footer design (v5-T002) › footer hover language: resting is neither --ring-weak nor --accent-bg; hovered resolves to --ring-weak; an active nav link stays --accent-bg 
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+      327 |       "active nav link background must resolve to --accent-bg",
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+      327 |       "active nav link background must resolve to --accent-bg",
+    Error: active nav link background must resolve to --accent-bg
+    Expected: true
+    Received: false
+=== DONE isolation ===

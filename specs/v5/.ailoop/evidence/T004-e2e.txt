@@ -1,0 +1,30 @@
+=== T004 attempt-2 full e2e regression (coordinator, PORT=9200 CI=1 fresh servers) ===
+loadavg: 5.19 3.69 2.85 10/15765 4045229
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+[WebServer] $ tsx --env-file-if-exists=.env src/server/index.ts
+
+Running 199 tests using 1 worker
+································Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+····Warning: UnknownErrorException: Ensure that the `standardFontDataUrl` API parameter is provided.
+············································
+······························injected: canvas hidden
+caught error: expect(locator).toBeVisible() failed
+
+Locator:  locator('.document-preview canvas').first()
+Expected: visible
+Received: hidden
+Timeout:  5000ms
+
+Call log:
+  - Expect "toBeVisible" with timeout 5000ms
+  - waiting for locator('.document-preview canvas').first()
+    13 × locator resolved to <canvas width="918" height="1188" class="document-preview__canvas"></canvas>
+       - unexpected value "hidden"
+
+restored: canvas repainted
+··················································
+·······································
+  199 passed (7.1m)
+E2E_EXIT=0
+=== DONE e2e ===

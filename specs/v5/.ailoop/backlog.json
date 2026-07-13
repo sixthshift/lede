@@ -1,0 +1,109 @@
+{
+  "project": "lede-v5-rail-chrome",
+  "caps": {
+    "maxAttempts": 3,
+    "thrash": 2,
+    "chunk": 20
+  },
+  "tickets": [
+    {
+      "id": "T001",
+      "title": "Collapsed rail chrome correct: wordmark box-only, theme+logout icon-only+tooltips, nav fits 48px",
+      "status": "done",
+      "phase": "P0",
+      "depends_on": [],
+      "files": [
+        "src/client/App.tsx",
+        "src/client/components/ThemeToggle.tsx",
+        "src/client/components/NavTabs.tsx",
+        "test/e2e/rail-collapse.spec.ts"
+      ],
+      "origin": "spec Phase 0 (P3, P4, P9, P10-partial)",
+      "context": "Lede v5 rail-chrome polish. Cite .ailoop/oracle.md (locked decisions + resolved layout). ALREADY EXISTS: the desktop left rail is assembled in src/client/App.tsx — `RailWordmark` (an 'L' box + serif 'Lede' text), `NavTabs` (already collapse-aware, the REFERENCE pattern), a flex-1 portal target, and `RailBottomCluster` (theme toggle + logout). The rail collapses 224px<->48px; `WorkspaceShell` (src/client/components/WorkspaceShell.tsx) owns the collapse state and exposes it via the `useRailCollapsed()` context hook (exported from WorkspaceShell.tsx). The ENTIRE rail content (including RailWordmark and RailBottomCluster) renders inside that context provider, so both can call useRailCollapsed(). `NavTabs.tsx` already reads it: collapsed => icon-only `w-9 justify-center` + Radix tooltip (`Tooltip`/`TooltipContent` from ./ui/tooltip). THE PROBLEM: RailWordmark and RailBottomCluster do NOT read useRailCollapsed(), so at 48px the serif 'Lede' text and the horizontal theme+'Log out' cluster clip/overflow; also theme+logout icons render at lucide's default 24px (no size class) vs the rail's 16px, and the collapsed nav band overflows (w-9=36px link inside a p-2=16px wrapper => 52px in a 48px band). BUILD ONLY THIS (Phase 0 = make the collapsed rail CORRECT, not the expanded polish): (1) RailWordmark collapse-aware: collapsed => render only the 'L' box, hide the 'Lede' text; expanded => unchanged. (2) RailBottomCluster collapse-aware: collapsed => theme + logout become centered ICON-ONLY buttons (no text) stacked vertically, each wrapped in the SAME Radix Tooltip primitive NavTabs uses (side='right') so the name shows on hover/focus; give both icons an explicit 16px size (h-4 w-4) — this also fixes the 24px bug. Expanded => keep the existing labeled/behavior for now (T002 redesigns the expanded footer). (3) Fix the collapsed nav band so nothing overflows 48px and the icons optically center: make the nav section's padding collapse-aware (and/or the link width) so `rail-pane` has no descendant wider than it, and the collapsed nav icons + the collapsed footer icons share the rail's horizontal center (~24px). Do NOT touch tokens.css, WorkspaceShell.tsx, or the shared ui/button.tsx variant. Do NOT move the collapse toggle (that's T003).",
+      "acceptance": "Baseline gate (oracle.md) in full. PLUS new Playwright tests appended to test/e2e/rail-collapse.spec.ts (applications project; login helper + password per oracle.md), at desktop width >=1024 after toggling the rail collapsed (assert `[data-testid=\"rail-pane\"]` gets `data-collapsed=\"true\"`):\n- collapsed rail fits the icon band: POLL rail-pane boundingBox width until the 200ms CSS width transition SETTLES (use expect.poll — mirror the existing v4-T022 test at rail-collapse.spec.ts:31 which polls railWidth to <=64), then assert width in [40,64]. Do NOT read clientWidth in a single evaluate right after the state flip — that races the transition (measures ~223) and border-box makes clientWidth~47. AFTER the width settles: no descendant has scrollWidth>clientWidth (query all descendants) AND no descendant clips overflow (hidden/clip/scroll on EITHER axis) to mask it.\n- wordmark: collapsed => the serif 'Lede' text node is ABSENT and the 'L' box element is present with a non-zero bounding box; expanded => 'Lede' text present. (Deleting the whole wordmark must fail the 'L present' half.)\n- theme + logout: collapsed => visible text absent; both locatable by aria-label AND functionally LIVE (clicking theme toggles documentElement `dark` class + swaps aria-label Dark<->Light; clicking logout clears session / navigates to login gate) — a dead restyled button must fail; HOVERING each surfaces a role=tooltip with its name (Radix, not native title). IMPORTANT: do NOT assert the tooltip via `.focus()` on a control you just `.click()`ed — it is already focused so `.focus()` fires no focusin and Radix never opens (this was the attempt-1 failure). Use `.hover()` (or blur-then-focus a not-already-focused control).\n- every svg inside rail-pane has width 16 (no 24) in the collapsed state.\n- after the width transition settles (poll), each collapsed rail icon's horizontal center is within ~2px of rail-pane's center x (~24), and the nav icons share that center x with the theme/logout icons.",
+      "attempts": [
+        {
+          "n": 1,
+          "failed": [
+            "e2e: collapsed rail-pane 48px + zero overflow (rail-collapse.spec.ts:137)",
+            "e2e: theme+logout collapsed Radix tooltip (rail-collapse.spec.ts:204)",
+            "e2e: collapsed nav+footer icons share center (rail-collapse.spec.ts:272)"
+          ],
+          "hypothesis": "Production code CORRECT (all 4 existing v4-T022 collapse tests pass; wordmark + 16px-icon new tests pass; snapshots show proper collapse). The 3 failures are TEST bugs in the builder's own new tests: (1)&(3) read width/icon-centers in one evaluate immediately after the state flip, racing the rail's 200ms CSS width transition (measured width 223 not ~48); (2) calls theme.focus() right after theme.click() — element already focused, so no focusin fires and the Radix tooltip never opens. Scope+gaming+typecheck+lint+build+unit all clean.",
+          "fixNote": "Fix ONLY the three failing new tests in test/e2e/rail-collapse.spec.ts (production code is verified correct — do NOT change component behavior unless a test proves a real defect): (1) width test: replace the single-evaluate clientWidth read with expect.poll on boundingBox width until it settles into [40,64] (mirror rail-collapse.spec.ts:31); run the no-descendant-overflow + no-clip-mask checks AFTER that poll settles. (2) center test: same — poll until width settles, THEN measure icon centers. (3) tooltip test: trigger the tooltip via .hover() (not .focus() after .click()); keep asserting role=tooltip text + native title absent. Keep every anti-gaming guarantee intact (measured-not-masked overflow, L-box-visible, functionally-live theme/logout)."
+        }
+      ],
+      "evidence": ".ailoop/evidence/T001a2-e2e-final.txt (e2e 188 passed, E2E_EXIT=0) + T001a2-unit-final.txt (VITEST_EXIT=0) + T001a2-build.txt (BUILD_EXIT=0); scope=4 declared files, gaming clean, check/lint 0"
+    },
+    {
+      "id": "T002",
+      "title": "Expanded footer = two labeled rows; all rail icons 16px; footer hover = ring-weak not bg-accent; wordmark no hover",
+      "status": "done",
+      "phase": "P1",
+      "depends_on": [
+        "T001"
+      ],
+      "files": [
+        "src/client/App.tsx",
+        "src/client/components/ThemeToggle.tsx",
+        "test/e2e/rail-design.spec.ts"
+      ],
+      "origin": "spec Phase 1 (P1, P5, P6/OQ5, icon-size)",
+      "context": "Lede v5 rail-chrome polish. Cite .ailoop/oracle.md. DEPENDS ON T001 (collapsed rail is now correct; RailBottomCluster already reads useRailCollapsed() and collapsed=icon-only). THE PROBLEM (expanded state only): RailBottomCluster in src/client/App.tsx uses `flex justify-between` pushing a bare theme icon to one end and an icon+text 'Log out' button to the other — mismatched, ungrouped. Also both footer controls are ghost `Button`s whose HOVER background is `bg-accent` (see components/ui/button.tsx ghost variant) — the SAME token NavTabs paints the ACTIVE tab with (`--accent-bg`), so hovering theme/logout reads as 'selected'. NavTabs' own hover is a different, correct language: `hover:bg-[var(--ring-weak)]` (a background-color wash). The wordmark (`RailWordmark`, a clickable <Link>) currently has no hover — that is now the INTENDED 'quiet logo' behavior and must stay. BUILD ONLY THIS (expanded footer redesign; leave the collapsed icon-only behavior from T001 intact): (1) When expanded, lay theme + logout out as TWO matching, evenly-sized, full-width labeled rows STACKED vertically (a grouped pair) — theme row labeled with the mode it switches to ('Dark mode' in light, 'Light mode' in dark, consistent with ThemeToggle's existing aria-label), logout row labeled 'Log out'. Drop `justify-between`. (2) All rail icons 16px (h-4 w-4) — carry through the theme/logout 16px from T001. (3) Give the footer controls the rail's canonical hover applied RAIL-LOCALLY (a `hover:bg-[var(--ring-weak)]` class on the control), NOT by editing the shared ghost variant in ui/button.tsx (forbidden — scope tripwire). (4) Leave the wordmark with NO hover (quiet logo) — do not add one. Do NOT touch WorkspaceShell.tsx, tokens.css, or ui/button.tsx. Do NOT move the collapse toggle (T003).",
+      "acceptance": "Baseline gate in full. PLUS new Playwright tests in test/e2e/rail-design.spec.ts (applications project), expanded rail (>=1024, not collapsed):\n- every svg inside rail-pane has width 16 (contrast: these were 24 before).\n- theme + logout are two rows that (a) share the same left-edge x, (b) have equal width within ~2px and ~ the rail's content width (full-width, not short), (c) have equal height, (d) are vertically adjacent (vertical gap < one row height). This excludes both horizontal justify-between and flex-col-justify-between (rows at opposite vertical ends).\n- hover language: read `--ring-weak` and `--accent-bg` resolved values; a footer control's RESTING background is transparent/canvas (NOT --ring-weak, NOT --accent-bg); on hover it becomes === --ring-weak; assert resting !== hovered (encoded as assertions, not merely noted — an always-ring-weak background must FAIL). An active nav link's background stays --accent-bg.\n- wordmark quiet logo: the wordmark <Link> computed background-color AND color are identical hovered vs not-hovered.",
+      "attempts": [],
+      "evidence": ".ailoop/evidence/T002-fast.txt (check/lint/build exit 0, vitest 1079/1079) + T002-e2e.txt (192 passed, E2E_EXIT=0; +4 new T002 tests over T001's 188); scope=3 declared files, gaming clean"
+    },
+    {
+      "id": "T003",
+      "title": "Relocate collapse toggle to rail top beside wordmark; single footer divider + p-2; focus-ring uniformity; toggle glyph/aria-pressed",
+      "status": "done",
+      "phase": "P1",
+      "depends_on": [
+        "T002"
+      ],
+      "files": [
+        "src/client/components/WorkspaceShell.tsx",
+        "src/client/App.tsx",
+        "src/client/components/NavTabs.tsx",
+        "test/e2e/rail-collapse.spec.ts"
+      ],
+      "origin": "spec Phase 1 (P2, P7, P8, P11, P10-toggle)",
+      "context": "Lede v5 rail-chrome polish. Cite .ailoop/oracle.md. DEPENDS ON T002. ALREADY EXISTS: `WorkspaceShell` (src/client/components/WorkspaceShell.tsx) owns the collapse state (`railCollapsed` + `toggleRailCollapsed`) and currently renders the collapse toggle as a FULL-WIDTH ghost button in a `border-t p-1.5` FOOTER block below the rail content (search `rail-collapse-toggle`). The rail content (wordmark etc.) is assembled in src/client/App.tsx and rendered inside WorkspaceShell's `RailCollapseContext.Provider`; that context currently exposes only the `railCollapsed` boolean via `useRailCollapsed()`. App.tsx's rail has a top wordmark zone (`border-b p-2`), a nav zone (`border-b p-2`), a flex-1 portal target, and the footer cluster zone (`border-t p-2`). THE PROBLEM: the full-width footer toggle reads as dead space (P2); there is a DOUBLED divider at the rail base — App.tsx's footer `border-t p-2` block stacked above WorkspaceShell's own `border-t p-1.5` toggle block (P8); focus rings are inconsistent (wordmark + nav links use `ring-2` with NO offset; the Button primitive adds `ring-offset-2` — P7); the toggle's `aria-pressed` has no visual distinction beyond the icon glyph (P11). BUILD ONLY THIS: (1) MOVE the collapse toggle out of the WorkspaceShell footer and into the rail's TOP zone beside the wordmark. To do this, expose the toggle action to the rail content: extend the collapse context (or add a sibling context) in WorkspaceShell to also provide `toggleRailCollapsed`, and render the toggle inside App.tsx's wordmark zone. Expanded => the toggle sits on the wordmark's row (e.g. pushed to the right); collapsed (48px, where 'beside' can't fit) => the toggle is centered directly BELOW the 'L' box. It must be a small icon button (<=40px), NOT full-width. Keep its existing icon-glyph swap (PanelLeftClose expanded <-> PanelLeftOpen collapsed), aria-pressed, aria-label/title, and data-testid='rail-collapse-toggle'. When collapsed, wrap it in the SAME Radix tooltip NavTabs/T001 use. Remove the now-empty WorkspaceShell footer toggle block. (2) Collapse the doubled divider: exactly ONE border-t between the nav section and the footer cluster, and make the footer cluster's padding match the wordmark/nav sections (p-2). (3) Focus-ring uniformity: make ALL rail controls (wordmark, nav links, theme, logout, relocated toggle) share ONE focus-ring footprint (same ring width AND offset) — pick one (e.g. no offset, matching the nav links) and apply consistently rail-locally; do NOT edit the shared ui/button.tsx variant globally. Do NOT change collapse behavior/width/persistence. Do NOT touch tokens.css.",
+      "acceptance": "Baseline gate in full. PLUS new Playwright tests in test/e2e/rail-collapse.spec.ts (applications project), both rail states at >=1024:\n- toggle placement (VISUAL, not DOM-order): rail-collapse-toggle's bounding-box top is above the primary nav's bounding-box top; its width <= 40px (not merely < rail width). Expanded => the toggle's vertical center overlaps the wordmark row (y-ranges intersect) AND the toggle's x-range is entirely to the RIGHT of the 'L' box (no horizontal overlap — 'beside' the wordmark, not stacked over it). Collapsed => the toggle's horizontal center ~ rail-pane center (~24px) and it sits below the 'L' box (toggle top >= wordmark box bottom).\n- exactly ONE horizontal divider in the rail-base region counting ANY mechanism (border-top OR border-bottom OR <hr> OR a box-shadow rule) === 1 (not gamed by moving the second rule off border-top); footer cluster padding equals the nav section padding.\n- focus-ring uniformity: focus each rail control in turn (wordmark, a nav link, theme, logout, toggle) and assert identical computed outline/box-shadow ring width and offset across all of them (no control mixes an offset while another has none) AND the shared ring is non-zero / visible (a width-0 or 'none' ring on all of them must FAIL — the intent is consistent VISIBLE focus, not removed focus).\n- toggle: glyph element differs between collapsed vs expanded state; the toggle's computed background-color is identical between the two states (glyph is the only visual distinction); AND its `aria-pressed` reads 'true' in one state and 'false' in the other. Collapsed => focusing the toggle shows a role=tooltip with its name.",
+      "attempts": [],
+      "evidence": ".ailoop/evidence/T003-fast.txt (check/lint/build exit 0, vitest 1079/1079) + T003-e2e.txt (196 passed, E2E_EXIT=0; +4 new T003 tests over T002's 192); scope=4 declared files, gaming clean"
+    },
+    {
+      "id": "T004",
+      "title": "Collapse motion: labels fade with the 200ms width slide; instant under reduced-motion",
+      "status": "done",
+      "phase": "P2",
+      "depends_on": [
+        "T003"
+      ],
+      "files": [
+        "src/client/components/WorkspaceShell.tsx",
+        "src/client/App.tsx",
+        "src/client/components/NavTabs.tsx",
+        "src/client/components/ThemeToggle.tsx",
+        "test/e2e/motion.spec.ts"
+      ],
+      "origin": "spec Phase 2 (P12/OQ6)",
+      "context": "Lede v5 rail-chrome polish. Cite .ailoop/oracle.md. DEPENDS ON T003 (rail chrome is now in final form). ALREADY EXISTS: the rail `<aside>` in src/client/components/WorkspaceShell.tsx animates `transition-[width] duration-200 ease-in-out motion-reduce:transition-none` (224px<->48px). But the labels it shows/hides are HARD conditional renders (`{collapsed ? null : tab.label}` in NavTabs.tsx:~51; the wordmark 'Lede' text in App.tsx; the footer row labels from T002) — so the frame slides for 200ms while text snaps in/out at t=0 (the 'pop' the human flagged). THE DECISION (SPEC OQ6): labels FADE (opacity) coordinated with the 200ms width slide; under prefers-reduced-motion: reduce the swap is instant (no fade). BUILD ONLY THIS: make the rail's collapsible labels (nav labels, wordmark 'Lede' text, expanded footer row labels) animate their opacity 0<->1 in step with the width transition (~200ms), instead of hard mount/unmount. Under `prefers-reduced-motion: reduce`, no fade — instant swap (reuse the existing motion-reduce pattern). Keep the labels' collapsed END STATE identical to today (absent/opacity-0 and not occupying width — must not re-introduce the 48px overflow T001 fixed; a faded-out label must be visually gone and not add horizontal overflow). Do NOT change tokens.css or the collapse behavior/persistence.",
+      "acceptance": "Baseline gate in full — INCLUDING re-running the T001 collapsed-overflow test (a faded label must not reintroduce scrollWidth>clientWidth in the 48px band). PLUS new Playwright tests in test/e2e/motion.spec.ts (applications project), >=1024:\n- prefers-reduced-motion no-preference: for EACH of the three label groups (nav labels, wordmark 'Lede' text, expanded footer row labels) — not just one sampled label — computed opacity is ~0 collapsed and ~1 expanded; AND sampled MID-SLIDE (while the aside width is strictly between 48 and 224) each label's opacity is SIMULTANEOUSLY strictly between 0 and 1, so the fade runs IN STEP with the 200ms width slide (no start delay; a `transition: opacity 1ms`, a delayed/late fade, or a hard mount/unmount on any of the three groups must FAIL because at mid-slide it is already 0 or 1).\n- prefers-reduced-motion reduce (page.emulateMedia): the same labels' opacity goes 0<->1 with NO intermediate value (instant).\n- collapsed 48px band still has no descendant scrollWidth>clientWidth (T001 invariant holds with faded labels — a faded-out label must not occupy width).",
+      "attempts": [
+        {
+          "n": 1,
+          "failed": [
+            "e2e: rail-design.spec.ts:272 v5-T002 active nav link background === --accent-bg (regression; active link bg = rgba(0,0,0,0))"
+          ],
+          "hypothesis": "The render-path unification wrapped the EXPANDED NavLinks in Radix <TooltipTrigger asChild> (they were bare before). Radix's Slot merges `className` as a STRING, but react-router NavLink's className is a FUNCTION (({isActive})=>cn(...)). Slot stringifies the function — the active link's class attribute becomes the literal function source (+ react-router's default ' active'), so `bg-accent` never applies and the active link paints transparent. DIAG dump confirmed: activeClass = the function source string, activeBg = rgba(0,0,0,0), aria-current=page present. Fade approach + all other T004 work is sound (unit 1079/1079, fast tier 0, 197/198 e2e). This ALSO means the COLLAPSED active nav link has had broken bg-accent since T001 (same asChild+function-className path) — latent, never asserted.",
+          "fixNote": "Keep the unified single-render-path (needed for the fade). Fix ONLY the NavLink className: it must be a STRING, not a function, so Radix Slot merges it correctly. Compute isActive with a react-router hook (useLocation or useMatch/useResolvedPath) inside NavTabs, build the class string yourself (isActive ? 'bg-accent font-medium text-primary' : '...'), and pass that string to NavLink's className. Do NOT keep the ({isActive})=>cn(...) function form on a NavLink that is a TooltipTrigger asChild child. Re-run rail-design.spec.ts (v5-T002 active-nav-link assertion must pass) AND rail-collapse.spec.ts + motion.spec.ts. ESCAPED-BUG STRENGTHENING: add a small assertion IN motion.spec.ts (your declared file) that the ACTIVE nav link's computed background-color === resolved --accent-bg in BOTH expanded AND collapsed states — the collapsed case was never covered and silently regressed since T001. Touch ONLY your declared files: WorkspaceShell.tsx, App.tsx, NavTabs.tsx, ThemeToggle.tsx, motion.spec.ts. Do NOT touch rail-collapse.spec.ts or rail-design.spec.ts.",
+          "evidence": ".ailoop/evidence/T004-a1.txt"
+        }
+      ],
+      "evidence": ".ailoop/evidence/T004-fast.txt (check/lint/build exit 0, vitest 1079/1079) + T004-e2e.txt (199 passed, E2E_EXIT=0; +3 new T004 tests over T003's 196, incl. escaped-bug active-nav-link bg in both states). Attempt 2 (resumed builder) fixed the NavLink function-className × Radix Slot regression via string className + isTabActive. scope=5 declared files (ThemeToggle footprint corrected [0020]), gaming clean"
+    }
+  ]
+}
