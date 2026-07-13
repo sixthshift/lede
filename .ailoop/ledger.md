@@ -106,3 +106,19 @@ Append-only journal. Newest at the bottom.
     evidence: .ailoop/evidence/T002-fast.txt + T002-e2e.txt
   decision: ACCEPT T002, status=done. Committing (commit = merge, env-adaptation). No worker branches to prune (on-main model). P1 not yet drained: T003 remains.
   chunk accounting: MY builder dispatches this invocation = 1.
+
+[0017] T003 — dispatched (MY dispatch 2 this invocation), single-agent on main, model sonnet, baseSha 37bd7186c112353d9ff3bd4bebbc423bb479cb33
+  decision: dispatch T003 (P1, last) attempt 1 — relocate collapse toggle to rail top, collapse doubled divider + p-2, focus-ring uniformity, toggle glyph/aria-pressed. Ready per scheduler; no problems/breaches. Independent re-verify by me (full baseline + acceptance + scope diff from 37bd7186c112353d9ff3bd4bebbc423bb479cb33 + gaming read), commit on accept. On T003 accept, P1 drains → run P1 phase oracle on merged tree (it is the e2e I run each ticket anyway).
+  attempt: 1/3
+
+[0018] T003 attempt 1 — ACCEPTED (independent re-verify GREEN) — P1 CLOSED
+  builder: stopped WITHOUT a clean verdict (left an e2e running in background, never reported its result) — treated as an un-attested claim; re-verified from scratch. No ports held by any orphan (8787-8789/9200 free), tree = 4 declared files modified.
+  INDEPENDENT RE-VERIFY (coordinator, on main tree, baseSha 37bd718, loadavg healthy):
+    - scope: PASS — git diff --name-only 37bd718 = exactly WorkspaceShell.tsx, App.tsx, NavTabs.tsx, rail-collapse.spec.ts. Helpers railCollapseToggle/railPane/railWidth pre-existed (only railWordmark newly imported).
+    - gaming: CLEAN — RailCollapseContext extended to {collapsed,toggle} (useRailCollapsed preserved + new useToggleRailCollapsed); toggle relocated into RailWordmark (expanded justify-between right of L box; collapsed flex-col below L box + Radix tooltip; size=icon 32px; glyph swap + aria-pressed + testid kept); WorkspaceShell footer toggle block DELETED (kills the doubled divider). Focus-ring unified via rail-LOCAL <style> neutralizing --tw-ring-offset-width on rail buttons (ring itself untouched/visible; button.tsx NOT edited). NavTabs/RailBottomCluster gained only data-testid hooks. Tests GREW +4 with strong teeth: divider count sums border-t/b + hr + box-shadow on footer AND prev sibling (any-mechanism); focus-ring asserts all 5 controls share one boxShadow|outlineWidth|outlineStyle AND != none|0px|none; toggle bg identical across states + glyph differs + aria-pressed flip; tooltip via .hover().
+    - typecheck 0, lint 0, build 0.
+    - unit: VITEST_EXIT=0, 1079/1079.
+    - e2e: E2E_EXIT=0, 196 passed (full chromium+auth+applications, PORT=9200 CI=1) = T002's 192 + exactly 4 new T003 tests → verified AND no regression (T001/T002 assertions on App.tsx/NavTabs still green).
+    evidence: .ailoop/evidence/T003-fast.txt + T003-e2e.txt
+  decision: ACCEPT T003, status=done. Committing (commit = merge). P1 now drained (scheduler) AND its phase oracle = the rail-design + rail-collapse e2e within the 196-pass run on the committed tree → P1 CLOSED. On-main model: no worker branches to prune. Remaining: T004 (P2, last).
+  chunk accounting: MY builder dispatches this invocation = 2.

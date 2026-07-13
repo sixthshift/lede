@@ -73,15 +73,7 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
-  X,
-  ZoomIn,
-  ZoomOut,
-} from "lucide-react";
+import { PanelRightClose, PanelRightOpen, X, ZoomIn, ZoomOut } from "lucide-react";
 
 import { cn } from "../lib/utils";
 import { Button } from "./ui/button";
@@ -213,11 +205,28 @@ function readRailCollapsed(): boolean {
   }
 }
 
-const RailCollapseContext = createContext(false);
+interface RailCollapseContextValue {
+  collapsed: boolean;
+  toggle: () => void;
+}
+
+const RailCollapseContext = createContext<RailCollapseContextValue>({
+  collapsed: false,
+  toggle: () => {},
+});
 
 /** Whether the rail is currently in its icon-only collapsed band. */
 export function useRailCollapsed(): boolean {
-  return useContext(RailCollapseContext);
+  return useContext(RailCollapseContext).collapsed;
+}
+
+// v5-T003: the collapse TOGGLE action, exposed alongside the boolean above so
+// the relocated toggle control (App.tsx's RailWordmark, beside the wordmark)
+// can flip state from inside the rail's portaled content — same "no prop
+// threaded through every intermediate layer" rationale the boolean already
+// established.
+export function useToggleRailCollapsed(): () => void {
+  return useContext(RailCollapseContext).toggle;
 }
 
 export function WorkspaceShell({ rail, editor, preview, editorPaneRef }: WorkspaceShellProps) {
@@ -316,32 +325,25 @@ export function WorkspaceShell({ rail, editor, preview, editorPaneRef }: Workspa
               `aria-label="Sections"` a11y contract we hide by, rather than
               reaching into that file to add a collapse-aware prop. */}
           <style>
-            {
-              '[data-testid="rail-pane"][data-collapsed="true"] div:has(> nav[aria-label="Sections"]) { display: none; }'
-            }
+            {'[data-testid="rail-pane"][data-collapsed="true"] div:has(> nav[aria-label="Sections"]) { display: none; }' +
+              // v5-T003 (P7): every Button-based rail control (theme, logout,
+              // the collapse toggle — now relocated to the wordmark row)
+              // inherits ui/button.tsx's shared `ring-offset-2`, while the
+              // wordmark/nav links (plain <a> tags) never opted into an
+              // offset at all (Tailwind's preflight default is 0px) — the
+              // two families' focus rings therefore had different
+              // footprints. Neutralizing the OFFSET WIDTH here, rail-locally
+              // (never touching button.tsx's shared variant, per the
+              // tripwire), is what makes every rail control share one ring
+              // footprint; the ring itself (width, color) is untouched and
+              // stays fully visible.
+              '[data-testid="rail-pane"] button:focus-visible { --tw-ring-offset-width: 0px; }'}
           </style>
-          <RailCollapseContext.Provider value={railCollapsed}>
+          <RailCollapseContext.Provider
+            value={{ collapsed: railCollapsed, toggle: toggleRailCollapsed }}
+          >
             <div className="min-h-0 flex-1 overflow-y-auto">{rail}</div>
           </RailCollapseContext.Provider>
-          <div className="flex shrink-0 justify-center border-t border-border p-1.5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-pressed={railCollapsed}
-              aria-label={railCollapsed ? "Expand rail" : "Collapse rail"}
-              title={railCollapsed ? "Expand rail" : "Collapse rail"}
-              data-testid="rail-collapse-toggle"
-              className="w-full justify-center text-muted-foreground"
-              onClick={toggleRailCollapsed}
-            >
-              {railCollapsed ? (
-                <PanelLeftOpen aria-hidden className="h-4 w-4" />
-              ) : (
-                <PanelLeftClose aria-hidden className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
         </aside>
       )}
 

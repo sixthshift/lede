@@ -54,7 +54,7 @@ export function NavTabs() {
 
   if (!collapsed) {
     return (
-      <div className="shrink-0 border-b border-border p-2">
+      <div data-testid="rail-nav-section" className="shrink-0 border-b border-border p-2">
         <nav className="flex flex-col gap-1" aria-label="Primary">
           {links}
         </nav>
@@ -69,7 +69,7 @@ export function NavTabs() {
   // on the band's horizontal center, matching the collapsed footer cluster's
   // own center (RailBottomCluster, App.tsx).
   return (
-    <div className="shrink-0 border-b border-border p-1.5">
+    <div data-testid="rail-nav-section" className="shrink-0 border-b border-border p-1.5">
       <TooltipProvider delayDuration={200}>
         <nav className="flex flex-col items-center gap-1" aria-label="Primary">
           {TABS.map((tab, i) => (

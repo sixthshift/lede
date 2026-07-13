@@ -9,7 +9,13 @@
 // first-run set-password -> login, gate ON) — PASSWORD MUST match that
 // file's exactly (single server-wide secret, playwright.config.ts).
 import { test, expect, type Page } from "@playwright/test";
-import { login, railLogoutButton, themeToggleButton, logoutViaRail } from "./helpers/workspace";
+import {
+  login,
+  railLogoutButton,
+  themeToggleButton,
+  railWordmark,
+  logoutViaRail,
+} from "./helpers/workspace";
 
 const PASSWORD = "correct horse battery staple e2e applications";
 
@@ -302,5 +308,215 @@ test.describe("v5-T001 — collapsed-rail chrome polish", () => {
     for (const centerX of svgCenters) {
       expect(Math.abs(centerX - paneCenterX)).toBeLessThanOrEqual(2);
     }
+  });
+});
+
+// v5-T003 — the collapse toggle relocates to the rail's TOP zone (beside the
+// wordmark), the rail-base's doubled divider collapses to exactly one, every
+// rail control shares one focus-ring footprint, and the toggle's ONLY visual
+// distinction between states is its glyph. Both rail states, >=1024.
+test.describe("v5-T003 — relocated toggle, single divider, focus-ring uniformity", () => {
+  /** Clicks the toggle and polls the rail width until the 200ms CSS transition has genuinely settled — mirrors loginAndCollapse's pattern above. */
+  async function toggleAndSettle(page: Page, expectCollapsed: boolean): Promise<void> {
+    await railCollapseToggle(page).click();
+    await expect(railPane(page)).toHaveAttribute("data-collapsed", String(expectCollapsed));
+    if (expectCollapsed) {
+      await expect.poll(() => railWidth(page), { timeout: 5000 }).toBeLessThanOrEqual(64);
+    } else {
+      await expect.poll(() => railWidth(page), { timeout: 5000 }).toBeGreaterThan(200);
+    }
+    await page.waitForTimeout(250);
+  }
+
+  test("toggle sits above the primary nav, <=40px wide, beside the wordmark expanded and below the 'L' box collapsed", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await login(page, PASSWORD);
+    await expect(page).toHaveURL(/\/applications$/);
+
+    const nav = page.getByRole("navigation", { name: "Primary" });
+    const toggle = railCollapseToggle(page);
+    const lBox = railWordmark(page).locator("span[aria-hidden]").first();
+
+    // Expanded: toggle's top is above the nav's top; its width is a small
+    // icon button (<=40px); its vertical center overlaps the wordmark row
+    // (the 'L' box's y-range); its x-range is ENTIRELY to the right of the
+    // 'L' box (no horizontal overlap — beside, not stacked over).
+    const toggleBoxExpanded = await toggle.boundingBox();
+    const navBoxExpanded = await nav.boundingBox();
+    const lBoxExpanded = await lBox.boundingBox();
+    expect(toggleBoxExpanded && navBoxExpanded && lBoxExpanded).toBeTruthy();
+    expect(toggleBoxExpanded!.y).toBeLessThan(navBoxExpanded!.y);
+    expect(toggleBoxExpanded!.width).toBeLessThanOrEqual(40);
+    const toggleCenterYExpanded = toggleBoxExpanded!.y + toggleBoxExpanded!.height / 2;
+    expect(toggleCenterYExpanded).toBeGreaterThanOrEqual(lBoxExpanded!.y);
+    expect(toggleCenterYExpanded).toBeLessThanOrEqual(lBoxExpanded!.y + lBoxExpanded!.height);
+    expect(toggleBoxExpanded!.x).toBeGreaterThanOrEqual(lBoxExpanded!.x + lBoxExpanded!.width);
+
+    // Collapse — poll the width transition to settle before re-measuring.
+    await toggleAndSettle(page, true);
+
+    // Collapsed: toggle stays above the nav, stays <=40px, sits BELOW the
+    // 'L' box (top >= wordmark box's bottom), and its horizontal center is
+    // ~= the rail-pane's own center (~24px).
+    const toggleBoxCollapsed = await toggle.boundingBox();
+    const navBoxCollapsed = await nav.boundingBox();
+    const lBoxCollapsed = await lBox.boundingBox();
+    const paneBoxCollapsed = await railPane(page).boundingBox();
+    expect(toggleBoxCollapsed && navBoxCollapsed && lBoxCollapsed && paneBoxCollapsed).toBeTruthy();
+    expect(toggleBoxCollapsed!.y).toBeLessThan(navBoxCollapsed!.y);
+    expect(toggleBoxCollapsed!.width).toBeLessThanOrEqual(40);
+    expect(toggleBoxCollapsed!.y).toBeGreaterThanOrEqual(lBoxCollapsed!.y + lBoxCollapsed!.height);
+    const paneCenterX = paneBoxCollapsed!.x + paneBoxCollapsed!.width / 2;
+    const toggleCenterXCollapsed = toggleBoxCollapsed!.x + toggleBoxCollapsed!.width / 2;
+    expect(Math.abs(toggleCenterXCollapsed - paneCenterX)).toBeLessThanOrEqual(3);
+
+    // Back to expanded — a real two-way relocation, not one-directional.
+    await toggleAndSettle(page, false);
+    await expect(railPane(page)).toHaveAttribute("data-collapsed", "false");
+  });
+
+  test("exactly one horizontal divider between the nav section and the footer cluster, in both rail states", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await login(page, PASSWORD);
+    await expect(page).toHaveURL(/\/applications$/);
+
+    async function countBaseDividers(): Promise<number> {
+      return page.evaluate(() => {
+        const footer = document.querySelector('[data-testid="rail-footer-cluster"]');
+        if (!footer) return -1;
+        const prev = footer.previousElementSibling;
+        // Any mechanism — border-top, border-bottom (on the section ABOVE
+        // the footer, not just the footer's own border-top), an <hr>, or a
+        // box-shadow rule — counts, so moving the second rule off
+        // border-top can't quietly dodge the count.
+        function dividerCount(el: Element | null): number {
+          if (!el) return 0;
+          let n = 0;
+          if (el.tagName === "HR") n++;
+          const style = getComputedStyle(el);
+          if (style.borderTopWidth !== "0px" && style.borderTopStyle !== "none") n++;
+          if (style.borderBottomWidth !== "0px" && style.borderBottomStyle !== "none") n++;
+          if (style.boxShadow !== "none") n++;
+          return n;
+        }
+        return dividerCount(footer) + dividerCount(prev);
+      });
+    }
+
+    expect(await countBaseDividers(), "expanded: exactly one rail-base divider").toBe(1);
+
+    await toggleAndSettle(page, true);
+    expect(await countBaseDividers(), "collapsed: exactly one rail-base divider").toBe(1);
+
+    const navPaddingCollapsed = await page
+      .getByTestId("rail-nav-section")
+      .evaluate((el) => getComputedStyle(el).padding);
+    const footerPaddingCollapsed = await page
+      .getByTestId("rail-footer-cluster")
+      .evaluate((el) => getComputedStyle(el).padding);
+    expect(footerPaddingCollapsed, "collapsed: footer padding must equal nav padding").toBe(
+      navPaddingCollapsed,
+    );
+
+    await toggleAndSettle(page, false);
+
+    const navPaddingExpanded = await page
+      .getByTestId("rail-nav-section")
+      .evaluate((el) => getComputedStyle(el).padding);
+    const footerPaddingExpanded = await page
+      .getByTestId("rail-footer-cluster")
+      .evaluate((el) => getComputedStyle(el).padding);
+    expect(footerPaddingExpanded, "expanded: footer padding must equal nav padding").toBe(
+      navPaddingExpanded,
+    );
+  });
+
+  test("focus-ring is uniform (same width+offset) across every rail control, non-zero/visible, in both rail states", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await login(page, PASSWORD);
+    await expect(page).toHaveURL(/\/applications$/);
+
+    async function ringFootprints(): Promise<string[]> {
+      const controls = [
+        railWordmark(page),
+        page.getByRole("navigation", { name: "Primary" }).getByRole("link").first(),
+        themeToggleButton(page),
+        railLogoutButton(page),
+        railCollapseToggle(page),
+      ];
+      const footprints: string[] = [];
+      for (const control of controls) {
+        await control.focus();
+        await expect(control).toBeFocused();
+        const footprint = await control.evaluate((el) => {
+          const style = getComputedStyle(el);
+          return `${style.boxShadow}|${style.outlineWidth}|${style.outlineStyle}`;
+        });
+        footprints.push(footprint);
+      }
+      return footprints;
+    }
+
+    const expandedFootprints = await ringFootprints();
+    const [firstExpanded, ...restExpanded] = expandedFootprints;
+    for (const footprint of restExpanded) {
+      expect(
+        footprint,
+        `all rail controls must share one ring footprint: ${expandedFootprints}`,
+      ).toBe(firstExpanded);
+    }
+    expect(firstExpanded, "the shared ring must stay visible (non-zero)").not.toBe("none|0px|none");
+
+    await toggleAndSettle(page, true);
+
+    const collapsedFootprints = await ringFootprints();
+    const [firstCollapsed, ...restCollapsed] = collapsedFootprints;
+    for (const footprint of restCollapsed) {
+      expect(
+        footprint,
+        `all rail controls must share one ring footprint: ${collapsedFootprints}`,
+      ).toBe(firstCollapsed);
+    }
+    expect(firstCollapsed, "the shared ring must stay visible (non-zero)").not.toBe(
+      "none|0px|none",
+    );
+  });
+
+  test("toggle: glyph swaps, background stays identical, aria-pressed flips, and collapsed hover surfaces a named tooltip", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await login(page, PASSWORD);
+    await expect(page).toHaveURL(/\/applications$/);
+
+    const toggle = railCollapseToggle(page);
+
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    const glyphExpanded = await toggle.evaluate((el) => el.querySelector("svg")?.outerHTML);
+    const bgExpanded = await toggle.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+    await toggleAndSettle(page, true);
+
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const glyphCollapsed = await toggle.evaluate((el) => el.querySelector("svg")?.outerHTML);
+    const bgCollapsed = await toggle.evaluate((el) => getComputedStyle(el).backgroundColor);
+
+    expect(glyphCollapsed, "the glyph must differ between states").not.toBe(glyphExpanded);
+    expect(bgCollapsed, "background must be identical across states — glyph is the only tell").toBe(
+      bgExpanded,
+    );
+
+    // Collapsed: hovering the toggle (not a click-then-focus, which would
+    // already be focused and fire no fresh focusin) surfaces a named Radix
+    // tooltip.
+    await page.mouse.move(0, 0);
+    await toggle.hover();
+    await expect(page.getByRole("tooltip", { name: "Expand rail" })).toBeVisible();
   });
 });

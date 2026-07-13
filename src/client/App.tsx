@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigationType, Link } from "react-router-dom";
-import { LogOut } from "lucide-react";
+import { LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import { useAuthLogout } from "./hooks/queries";
 import { LoginGate } from "./components/LoginGate";
@@ -10,14 +10,17 @@ import { ThemeToggle } from "./components/ThemeToggle";
 import { Button } from "./components/ui/button";
 import { Toaster } from "./components/ui/sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./components/ui/tooltip";
-import { useRailCollapsed, WorkspaceShell } from "./components/WorkspaceShell";
+import {
+  useRailCollapsed,
+  useToggleRailCollapsed,
+  WorkspaceShell,
+} from "./components/WorkspaceShell";
 import { WorkspaceShellSlotsContext } from "./components/WorkspaceShellSlots";
 
 // v4-T020 (single-chrome merge, OQ1): the header bar (AppShell) is gone — the
 // wordmark moves to the rail's top anchor, theme toggle + logout move to its
-// bottom cluster (a collapse toggle joins them in T022). AppShell used to own
-// the `h-screen` frame; that ownership moves here since it dissolved into
-// this shell.
+// bottom cluster. AppShell used to own the `h-screen` frame; that ownership
+// moves here since it dissolved into this shell.
 //
 // v5-T001: this zone owns its own outer chrome (border + padding), not
 // App()'s `rail` JSX — App() renders above WorkspaceShell's
@@ -28,29 +31,76 @@ import { WorkspaceShellSlotsContext } from "./components/WorkspaceShellSlots";
 // CSS-hidden) and the link picks up `aria-label="Lede"` so its accessible
 // name survives losing that text; the "L" box stays, unconditionally, as the
 // one thing collapsed mode still shows.
+//
+// v5-T003 (P2/P8/P11): the collapse toggle relocates HERE, beside the
+// wordmark, out of WorkspaceShell's old full-width footer block (dead space,
+// and the source of the rail-base's doubled divider — WorkspaceShell no
+// longer renders a footer block of its own at all now). Expanded: a small
+// icon button sits to the right of the wordmark, same row (`justify-between`
+// — never stacked over the "L" box). Collapsed: the same button drops BELOW
+// the "L" box (`flex-col`, centered on the rail's horizontal center, matching
+// every other collapsed-band control) and picks up the same Radix tooltip
+// convention RailBottomCluster/NavTabs already use for their collapsed
+// icon-only controls. `useToggleRailCollapsed()` is the sibling of
+// `useRailCollapsed()` on the same context (WorkspaceShell.tsx) — the toggle
+// ACTION reaching this portaled content the same way the boolean already did.
 function RailWordmark() {
   const collapsed = useRailCollapsed();
+  const toggleRailCollapsed = useToggleRailCollapsed();
+
+  const toggleLabel = collapsed ? "Expand rail" : "Collapse rail";
+  const toggleButton = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      aria-pressed={collapsed}
+      aria-label={toggleLabel}
+      title={toggleLabel}
+      data-testid="rail-collapse-toggle"
+      className="h-8 w-8 shrink-0 text-muted-foreground"
+      onClick={toggleRailCollapsed}
+    >
+      {collapsed ? (
+        <PanelLeftOpen aria-hidden className="h-4 w-4" />
+      ) : (
+        <PanelLeftClose aria-hidden className="h-4 w-4" />
+      )}
+    </Button>
+  );
 
   return (
     <div className={cn("shrink-0 border-b border-border", collapsed ? "p-1.5" : "p-2")}>
-      <Link
-        to="/applications"
-        aria-label={collapsed ? "Lede" : undefined}
-        className={cn(
-          "flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          collapsed && "justify-center",
-        )}
-      >
-        <span
-          aria-hidden
-          className="flex h-6 w-6 items-center justify-center rounded-md bg-primary pb-0.5 font-serif text-md font-medium leading-none text-primary-foreground"
+      <div className={cn("flex items-center", collapsed ? "flex-col gap-1" : "justify-between")}>
+        <Link
+          to="/applications"
+          aria-label={collapsed ? "Lede" : undefined}
+          className={cn(
+            "flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            collapsed && "justify-center",
+          )}
         >
-          L
-        </span>
-        {collapsed ? null : (
-          <span className="font-serif text-md font-medium tracking-tight">Lede</span>
+          <span
+            aria-hidden
+            className="flex h-6 w-6 items-center justify-center rounded-md bg-primary pb-0.5 font-serif text-md font-medium leading-none text-primary-foreground"
+          >
+            L
+          </span>
+          {collapsed ? null : (
+            <span className="font-serif text-md font-medium tracking-tight">Lede</span>
+          )}
+        </Link>
+        {collapsed ? (
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>{toggleButton}</TooltipTrigger>
+              <TooltipContent side="right">{toggleLabel}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
+          toggleButton
         )}
-      </Link>
+      </div>
     </div>
   );
 }
@@ -91,7 +141,10 @@ function RailBottomCluster() {
   );
 
   return (
-    <div className={cn("shrink-0 border-t border-border", collapsed ? "p-1.5" : "p-2")}>
+    <div
+      data-testid="rail-footer-cluster"
+      className={cn("shrink-0 border-t border-border", collapsed ? "p-1.5" : "p-2")}
+    >
       {collapsed ? (
         <TooltipProvider delayDuration={200}>
           <div className="flex flex-col items-center gap-1">
