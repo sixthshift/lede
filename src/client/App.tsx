@@ -59,8 +59,16 @@ function RailWordmark() {
 // Collapsed: theme + logout become centered, icon-only, vertically stacked
 // controls, each named via `aria-label` and surfaced via the SAME Radix
 // Tooltip primitive NavTabs' collapsed band already uses (one shared
-// TooltipProvider for the pair, side="right"). Expanded: unchanged from
-// before this ticket (a later ticket redesigns that labeled footer).
+// TooltipProvider for the pair, side="right").
+//
+// v5-T002 (expanded only): theme + logout are a matched PAIR, not a
+// mismatched `justify-between` split — same full-width row shape, same
+// hover language. `hover:bg-[var(--ring-weak)]` is applied per-control
+// (rail-local), not by editing the shared ghost variant (button.tsx), since
+// that variant's `hover:bg-accent` is the SAME token NavTabs paints the
+// ACTIVE tab with — painting it on hover here would read as "selected".
+// twMerge (`cn`) resolves the conflict because this class is appended after
+// the variant's own classes, so it — not `hover:bg-accent` — wins.
 function RailBottomCluster() {
   const logout = useAuthLogout();
   const collapsed = useRailCollapsed();
@@ -71,7 +79,10 @@ function RailBottomCluster() {
       variant="ghost"
       size="sm"
       aria-label="Log out"
-      className={cn("text-muted-foreground", collapsed && "w-9 justify-center px-0")}
+      className={cn(
+        "text-muted-foreground hover:bg-[var(--ring-weak)]",
+        collapsed ? "w-9 justify-center px-0" : "w-full justify-start gap-2.5 px-3",
+      )}
       onClick={() => logout.mutate()}
     >
       <LogOut aria-hidden className="h-4 w-4" />
@@ -92,7 +103,7 @@ function RailBottomCluster() {
           </div>
         </TooltipProvider>
       ) : (
-        <div className="flex items-center justify-between gap-1">
+        <div className="flex flex-col gap-1">
           <ThemeToggle />
           {logoutButton}
         </div>

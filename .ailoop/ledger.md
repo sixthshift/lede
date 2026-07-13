@@ -89,3 +89,20 @@ Append-only journal. Newest at the bottom.
     evidence: .ailoop/evidence/T001a2-{build,unit-final,e2e-final}.txt
   decision: ACCEPT T001, status=done. P0 drained (scheduler) + its phase oracle (rail-collapse acceptance) green within the 188-pass regression → P0 CLOSED. No worker branches (env-adaptation = on-main commits), nothing to prune. Committing the ticket (commit = merge). Scheduler now: ready=[T002] (P1).
   chunk accounting: MY builder dispatches this invocation = 1/20.
+
+[0015] RESUME (this invocation, sole coordinator) — reconciled clean, dispatching T002
+  state: contract sha256 MATCHES (no drift); scheduler: complete=false, ready=[T002], no problems/cycles/staleInProgress/capBreaches/thrashBreaches; P0 done+committed at 2e21b68; tree CLEAN. Env-adaptation dispatch model (oracle) stands.
+  decision: dispatch T002 (P1) attempt 1 — single-agent on main, model sonnet, baseSha 2e21b68. Independent re-verify by me on the same tree (full baseline + acceptance, scope via git diff --name-only 2e21b68, gaming read), commit on accept.
+  chunk accounting: MY builder dispatches this invocation = 1.
+
+[0016] T002 attempt 1 — ACCEPTED (independent re-verify GREEN) — P1 progress (1/2)
+  builder: attempt 1 (MY dispatch 1) returned done. Its 18/18 + 9/9 scoped-e2e claim was only a claim.
+  INDEPENDENT RE-VERIFY (coordinator, on main tree, baseSha 2e21b68, loadavg ~2.6/nproc10):
+    - scope: PASS — git diff --name-only 2e21b68 = exactly the 3 declared files (App.tsx, ThemeToggle.tsx, rail-design.spec.ts). workspace.ts helpers (themeToggleButton/railLogoutButton/railWordmark) pre-existed at baseSha — NOT an undeclared touch.
+    - gaming: CLEAN — expanded footer flex-col grouped pair (dropped justify-between); logout+theme w-full justify-start + rail-LOCAL hover:bg-[var(--ring-weak)] (NOT the shared ghost variant — comment documents twMerge/cn winning over hover:bg-accent); aria-label preserved (visible rowLabel is additive); collapsed path untouched; wordmark untouched (quiet logo). Tests GREW +4, anti-gaming teeth intact: resting!=hovered AND resting!=accent-bg; geometry rules out BOTH justify-between (opposite horizontal ends) AND flex-col-justify-between (opposite vertical ends); active nav link still --accent-bg.
+    - typecheck 0, lint 0, build 0.
+    - unit: VITEST_EXIT=0, 1079/1079 (83 files).
+    - e2e: E2E_EXIT=0, 192 passed (full chromium+auth+applications, PORT=9200 CI=1 fresh servers) = T001's 188 + exactly the 4 new T002 tests → new behavior verified AND no regression. (The one "caught error:" line is a deliberate degrade-path test's internal catch, not a suite failure.)
+    evidence: .ailoop/evidence/T002-fast.txt + T002-e2e.txt
+  decision: ACCEPT T002, status=done. Committing (commit = merge, env-adaptation). No worker branches to prune (on-main model). P1 not yet drained: T003 remains.
+  chunk accounting: MY builder dispatches this invocation = 1.

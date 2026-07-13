@@ -29,17 +29,26 @@ export function ThemeToggle() {
   }
 
   const label = dark ? "Switch to light mode" : "Switch to dark mode";
+  // v5-T002: the expanded footer row is labeled with the mode it switches
+  // TO (not the imperative aria-label sentence) — `aria-label` still carries
+  // the full "Switch to ... mode" accessible name unconditionally, so this
+  // visible text never overrides what screen readers/tests key off.
+  const rowLabel = dark ? "Light mode" : "Dark mode";
 
   const button = (
     <Button
       type="button"
       variant="ghost"
       size="sm"
-      className={cn("text-muted-foreground", collapsed && "w-9 justify-center px-0")}
+      className={cn(
+        "text-muted-foreground hover:bg-[var(--ring-weak)]",
+        collapsed ? "w-9 justify-center px-0" : "w-full justify-start gap-2.5 px-3",
+      )}
       onClick={toggle}
       aria-label={label}
     >
       {dark ? <Sun aria-hidden className="h-4 w-4" /> : <Moon aria-hidden className="h-4 w-4" />}
+      {collapsed ? null : rowLabel}
     </Button>
   );
 

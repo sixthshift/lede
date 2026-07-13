@@ -38,7 +38,7 @@
     {
       "id": "T002",
       "title": "Expanded footer = two labeled rows; all rail icons 16px; footer hover = ring-weak not bg-accent; wordmark no hover",
-      "status": "todo",
+      "status": "done",
       "phase": "P1",
       "depends_on": [
         "T001"
@@ -52,7 +52,7 @@
       "context": "Lede v5 rail-chrome polish. Cite .ailoop/oracle.md. DEPENDS ON T001 (collapsed rail is now correct; RailBottomCluster already reads useRailCollapsed() and collapsed=icon-only). THE PROBLEM (expanded state only): RailBottomCluster in src/client/App.tsx uses `flex justify-between` pushing a bare theme icon to one end and an icon+text 'Log out' button to the other — mismatched, ungrouped. Also both footer controls are ghost `Button`s whose HOVER background is `bg-accent` (see components/ui/button.tsx ghost variant) — the SAME token NavTabs paints the ACTIVE tab with (`--accent-bg`), so hovering theme/logout reads as 'selected'. NavTabs' own hover is a different, correct language: `hover:bg-[var(--ring-weak)]` (a background-color wash). The wordmark (`RailWordmark`, a clickable <Link>) currently has no hover — that is now the INTENDED 'quiet logo' behavior and must stay. BUILD ONLY THIS (expanded footer redesign; leave the collapsed icon-only behavior from T001 intact): (1) When expanded, lay theme + logout out as TWO matching, evenly-sized, full-width labeled rows STACKED vertically (a grouped pair) — theme row labeled with the mode it switches to ('Dark mode' in light, 'Light mode' in dark, consistent with ThemeToggle's existing aria-label), logout row labeled 'Log out'. Drop `justify-between`. (2) All rail icons 16px (h-4 w-4) — carry through the theme/logout 16px from T001. (3) Give the footer controls the rail's canonical hover applied RAIL-LOCALLY (a `hover:bg-[var(--ring-weak)]` class on the control), NOT by editing the shared ghost variant in ui/button.tsx (forbidden — scope tripwire). (4) Leave the wordmark with NO hover (quiet logo) — do not add one. Do NOT touch WorkspaceShell.tsx, tokens.css, or ui/button.tsx. Do NOT move the collapse toggle (T003).",
       "acceptance": "Baseline gate in full. PLUS new Playwright tests in test/e2e/rail-design.spec.ts (applications project), expanded rail (>=1024, not collapsed):\n- every svg inside rail-pane has width 16 (contrast: these were 24 before).\n- theme + logout are two rows that (a) share the same left-edge x, (b) have equal width within ~2px and ~ the rail's content width (full-width, not short), (c) have equal height, (d) are vertically adjacent (vertical gap < one row height). This excludes both horizontal justify-between and flex-col-justify-between (rows at opposite vertical ends).\n- hover language: read `--ring-weak` and `--accent-bg` resolved values; a footer control's RESTING background is transparent/canvas (NOT --ring-weak, NOT --accent-bg); on hover it becomes === --ring-weak; assert resting !== hovered (encoded as assertions, not merely noted — an always-ring-weak background must FAIL). An active nav link's background stays --accent-bg.\n- wordmark quiet logo: the wordmark <Link> computed background-color AND color are identical hovered vs not-hovered.",
       "attempts": [],
-      "evidence": null
+      "evidence": ".ailoop/evidence/T002-fast.txt (check/lint/build exit 0, vitest 1079/1079) + T002-e2e.txt (192 passed, E2E_EXIT=0; +4 new T002 tests over T001's 188); scope=3 declared files, gaming clean"
     },
     {
       "id": "T003",
