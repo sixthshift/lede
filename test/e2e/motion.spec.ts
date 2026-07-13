@@ -17,9 +17,15 @@
 // playwright.config.ts). No tailoring needed here — the "job" section
 // renders (and its collapse is exercised) with no fixture dependency, so JD
 // content is incidental.
-import { test, expect, type Locator } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import { CONTRAST_JDS } from "../../src/server/tailor/evalcore";
-import { login, createApplication } from "./helpers/workspace";
+import {
+  login,
+  createApplication,
+  railWordmark,
+  themeToggleButton,
+  railLogoutButton,
+} from "./helpers/workspace";
 
 const PASSWORD = "correct horse battery staple e2e applications";
 const JD = CONTRAST_JDS[0]!.jd; // "platform-sdk" scenario — byte-for-byte, see applications.spec.ts
@@ -234,5 +240,332 @@ test.describe("Motion language (F403/F404): panel entry + section collapse in [1
       cssTimeToMs(transitionDuration),
       "select trigger must declare a non-zero transition-duration",
     ).toBeGreaterThan(0);
+  });
+});
+
+// v5-T004 (OQ6) — the rail's collapsible labels (nav labels, the wordmark
+// "Lede" text, the expanded footer row labels) used to hard mount/unmount at
+// t=0 while the rail `<aside>`'s own 200ms width slide (rail-collapse.spec.ts)
+// was still running — the "pop" a human flagged. They now fade opacity IN
+// STEP with that slide (no start delay), swap instantly under
+// prefers-reduced-motion, and — this is the ticket's hard constraint — the
+// SETTLED collapsed state is unchanged from before: the label is genuinely
+// GONE (unmounted, zero width), never merely CSS-hidden behind an
+// overflow-clip (T001's own invariant, re-checked below, forbids that).
+//
+// "Mid-slide" is proven DETERMINISTICALLY, not by racing a real 200ms
+// transition from Node: `Element.getAnimations()` returns the live
+// CSSTransition for a property once triggered, and pausing it + setting
+// `.currentTime` scrubs it to an exact, reproducible point on its own
+// timeline — immune to CI scheduling jitter. `duration-200 ease-in-out` is
+// symmetric about its own midpoint, so freezing at 100ms of a 200ms
+// transition lands both the aside's width and a label's opacity at their
+// distinct-from-either-endpoint 50% value; a `transition: opacity 1ms` or a
+// hard mount/unmount (no transition at all) fails to produce an Animation to
+// scrub at all, so `findTransition` below returns null and the assertion
+// fails loud rather than silently passing.
+test.describe("v5-T004 — rail label fade coordinated with the 200ms width slide", () => {
+  function railPane(page: Page): Locator {
+    return page.getByTestId("rail-pane");
+  }
+  function railCollapseToggle(page: Page): Locator {
+    return page.getByTestId("rail-collapse-toggle");
+  }
+  async function railWidth(page: Page): Promise<number> {
+    const box = await railPane(page).boundingBox();
+    expect(box, "rail-pane must have a boundingBox").toBeTruthy();
+    return box!.width;
+  }
+
+  /**
+   * The three label groups, EVERY individual label (not one sampled per
+   * group): the three nav items, the wordmark text, and both footer rows
+   * (theme + logout). Each locator resolves to the `<span>` actually carrying
+   * the fade classes — `span:not([aria-hidden])` for the wordmark excludes
+   * the always-visible "L" box, which is a sibling `<span>` in the same link.
+   */
+  function labelGroups(page: Page): { name: string; locator: Locator }[] {
+    const nav = page.getByRole("navigation", { name: "Primary" });
+    return [
+      {
+        name: "nav:Applications",
+        locator: nav.getByRole("link", { name: "Applications" }).locator("span"),
+      },
+      { name: "nav:Library", locator: nav.getByRole("link", { name: "Library" }).locator("span") },
+      {
+        name: "nav:Settings",
+        locator: nav.getByRole("link", { name: "Settings" }).locator("span"),
+      },
+      { name: "wordmark:Lede", locator: railWordmark(page).locator("span:not([aria-hidden])") },
+      { name: "footer:theme", locator: themeToggleButton(page).locator("span") },
+      { name: "footer:logout", locator: railLogoutButton(page).locator("span") },
+    ];
+  }
+
+  /**
+   * Finds the live CSSTransition Animation for `property` on `handle` inside
+   * the page, pauses it, and scrubs it to `atMs` on its OWN timeline — then
+   * resumes it (`.play()`) so it continues settling naturally afterward
+   * (this is a diagnostic freeze-and-read, not meant to leave the real
+   * collapse transition stuck). Returns `null` if no such transition is
+   * running (the reduced-motion case, or a regression that removed the
+   * transition entirely).
+   */
+  async function scrubTransition(
+    locator: Locator,
+    property: string,
+    atMs: number,
+  ): Promise<{ value: string } | null> {
+    return locator.evaluate(
+      async (el, { property, atMs }) => {
+        let anim: Animation | undefined;
+        for (let i = 0; i < 60 && !anim; i++) {
+          anim = el
+            .getAnimations()
+            .find(
+              (a) =>
+                (a as unknown as { transitionProperty?: string }).transitionProperty === property,
+            );
+          if (!anim) await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        }
+        if (!anim) return null;
+        anim.pause();
+        anim.currentTime = atMs;
+        const value = getComputedStyle(el).getPropertyValue(property);
+        anim.play();
+        return { value };
+      },
+      { property, atMs },
+    );
+  }
+
+  test("no-preference: every label fades in step with the 200ms width slide, and is genuinely gone (not just invisible) once settled — collapsing and expanding both directions", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await login(page, PASSWORD);
+    await expect(page).toHaveURL(/\/applications$/);
+
+    // Expanded baseline: every label present, opacity ~1.
+    for (const { name, locator } of labelGroups(page)) {
+      await expect(locator, `${name}: must be present expanded`).toHaveCount(1);
+      const opacity = await locator.evaluate((el) => getComputedStyle(el).opacity);
+      expect(Number.parseFloat(opacity), `${name}: expanded opacity must be ~1`).toBeGreaterThan(
+        0.95,
+      );
+    }
+
+    // Collapse — freeze the aside's own width transition AND every label's
+    // opacity transition mid-flight (100ms into their shared 200ms window),
+    // proving the fade runs IN STEP with the slide, not delayed or instant.
+    await railCollapseToggle(page).click();
+
+    const asideMid = await scrubTransition(railPane(page), "width", 100);
+    expect(asideMid, "rail-pane width transition must be running mid-collapse").not.toBeNull();
+    const asideWidthMid = Number.parseFloat(asideMid!.value);
+    expect(
+      asideWidthMid,
+      "mid-slide aside width must be strictly between 48 and 224",
+    ).toBeGreaterThan(48);
+    expect(asideWidthMid).toBeLessThan(224);
+
+    for (const { name, locator } of labelGroups(page)) {
+      const mid = await scrubTransition(locator, "opacity", 100);
+      expect(
+        mid,
+        `${name}: opacity transition must be running mid-slide (no hard mount/unmount, no 1ms transition)`,
+      ).not.toBeNull();
+      const opacityMid = Number.parseFloat(mid!.value);
+      expect(
+        opacityMid,
+        `${name}: mid-slide opacity (${opacityMid}) must be strictly between 0 and 1, simultaneously with the width slide`,
+      ).toBeGreaterThan(0.05);
+      expect(opacityMid).toBeLessThan(0.95);
+    }
+
+    // Let the (now-resumed) transitions actually settle.
+    await expect.poll(() => railWidth(page), { timeout: 5000 }).toBeLessThanOrEqual(64);
+    await page.waitForTimeout(250);
+    await expect(railPane(page)).toHaveAttribute("data-collapsed", "true");
+
+    // Settled collapsed: every label genuinely GONE — not present-but-faded.
+    for (const { name, locator } of labelGroups(page)) {
+      await expect(
+        locator,
+        `${name}: must be unmounted (not just invisible) once settled collapsed`,
+      ).toHaveCount(0);
+    }
+
+    // T001's own invariant, re-checked here with faded labels in play: no
+    // rail-pane descendant may overflow, and nothing may mask overflow with
+    // a clipper — a faded-out label must add zero width, never be clipped.
+    const violations = await page.evaluate(() => {
+      const pane = document.querySelector('[data-testid="rail-pane"]');
+      if (!pane) return [{ tag: "MISSING", detail: "rail-pane not found" }];
+      const masking = new Set(["hidden", "clip", "scroll"]);
+      const found: { tag: string; detail: string }[] = [];
+      for (const el of Array.from(pane.querySelectorAll("*"))) {
+        const widthOverflows = el.scrollWidth > el.clientWidth + 1;
+        const heightOverflows = el.scrollHeight > el.clientHeight + 1;
+        if (widthOverflows) {
+          found.push({
+            tag: el.tagName,
+            detail: `scrollWidth ${el.scrollWidth} > clientWidth ${el.clientWidth}`,
+          });
+        }
+        if (widthOverflows || heightOverflows) {
+          const style = getComputedStyle(el);
+          if (masking.has(style.overflowX) || masking.has(style.overflowY)) {
+            found.push({
+              tag: el.tagName,
+              detail: `masks overflow (x=${style.overflowX}, y=${style.overflowY})`,
+            });
+          }
+        }
+      }
+      return found;
+    });
+    expect(
+      violations,
+      `rail-pane overflow/masking violations: ${JSON.stringify(violations)}`,
+    ).toEqual([]);
+
+    // Expand back — a real two-way fade, not one-directional.
+    await railCollapseToggle(page).click();
+    await expect.poll(() => railWidth(page), { timeout: 5000 }).toBeGreaterThan(200);
+    await page.waitForTimeout(250);
+    await expect(railPane(page)).toHaveAttribute("data-collapsed", "false");
+
+    for (const { name, locator } of labelGroups(page)) {
+      await expect(locator, `${name}: must be present again expanded`).toHaveCount(1);
+      const opacity = await locator.evaluate((el) => getComputedStyle(el).opacity);
+      expect(
+        Number.parseFloat(opacity),
+        `${name}: opacity must be back to ~1 once re-expanded`,
+      ).toBeGreaterThan(0.95);
+    }
+  });
+
+  test("reduced motion: every label swaps 0<->1 instantly, with no mounted-but-fading intermediate frame", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await login(page, PASSWORD);
+    await expect(page).toHaveURL(/\/applications$/);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+
+    for (const { name, locator } of labelGroups(page)) {
+      await expect(locator, `${name}: must be present expanded`).toHaveCount(1);
+    }
+
+    await railCollapseToggle(page).click();
+    await expect(railPane(page)).toHaveAttribute("data-collapsed", "true");
+
+    // No wall-clock wait: under reduced motion the swap must already be
+    // complete by the time React has committed the collapse — no lingering
+    // mounted-but-opacity-fading frame to catch, and no Animation to scrub.
+    for (const { name, locator } of labelGroups(page)) {
+      await expect(
+        locator,
+        `${name}: must already be unmounted — no fade frame under reduced motion`,
+      ).toHaveCount(0);
+    }
+    const asideAnimUnderReducedMotion = await railPane(page).evaluate((el) =>
+      el
+        .getAnimations()
+        .some(
+          (a) => (a as unknown as { transitionProperty?: string }).transitionProperty === "width",
+        ),
+    );
+    expect(
+      asideAnimUnderReducedMotion,
+      "the aside's own width transition must be off under reduced motion too",
+    ).toBe(false);
+
+    // And back — instant reveal, no intermediate opacity-0-but-mounted frame.
+    await railCollapseToggle(page).click();
+    await expect(railPane(page)).toHaveAttribute("data-collapsed", "false");
+    for (const { name, locator } of labelGroups(page)) {
+      await expect(
+        locator,
+        `${name}: must already be mounted at opacity ~1 — instant reveal under reduced motion`,
+      ).toHaveCount(1);
+      const opacity = await locator.evaluate((el) => getComputedStyle(el).opacity);
+      expect(Number.parseFloat(opacity)).toBeGreaterThan(0.95);
+    }
+  });
+
+  // Escaped-bug strengthening (coordinator re-verify of T004): unifying the
+  // nav render path put every NavLink under `<TooltipTrigger asChild>`, and
+  // Radix's Slot string-JOINS a child's `className` — so NavLink's
+  // `({ isActive }) => …` FUNCTION className got stringified to its own
+  // source text and `bg-accent` silently stopped applying to the ACTIVE tab.
+  // rail-design.spec.ts (v5-T002) asserts this for the EXPANDED active link;
+  // the COLLAPSED active link went through the identical asChild+function
+  // path and had been broken since T001 with no test covering it. This
+  // pins BOTH states: the active nav link's computed background-color must
+  // resolve to the --accent-bg token in expanded AND collapsed.
+  test("active nav link keeps its --accent-bg highlight in BOTH expanded and collapsed (asChild + string className, not a stringified function)", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await login(page, PASSWORD);
+    await expect(page).toHaveURL(/\/applications$/);
+
+    function parseRgbaChannels(css: string): [number, number, number, number] {
+      const [r, g, b, a] = css
+        .replace(/[^\d.,]/g, "")
+        .split(",")
+        .map(Number);
+      return [r ?? 0, g ?? 0, b ?? 0, a ?? 1];
+    }
+    async function resolveToken(raw: string): Promise<[number, number, number, number]> {
+      const resolved = await page.evaluate((value) => {
+        const probe = document.createElement("div");
+        probe.style.color = value;
+        document.body.appendChild(probe);
+        const computed = getComputedStyle(probe).color;
+        probe.remove();
+        return computed;
+      }, raw);
+      return parseRgbaChannels(resolved);
+    }
+    function sameColor(
+      a: [number, number, number, number],
+      b: [number, number, number, number],
+    ): boolean {
+      return a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && Math.abs(a[3] - b[3]) < 0.02;
+    }
+
+    const accentBgRaw = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue("--accent-bg").trim(),
+    );
+    expect(accentBgRaw.length, "--accent-bg must be a defined token").toBeGreaterThan(0);
+    const accentBg = await resolveToken(accentBgRaw);
+
+    // Default landing route is /applications, so its nav link is active.
+    const activeLink = page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("link", { name: "Applications" });
+
+    const expandedBg = parseRgbaChannels(
+      await activeLink.evaluate((el) => getComputedStyle(el).backgroundColor),
+    );
+    expect(
+      sameColor(expandedBg, accentBg),
+      `expanded active nav link background (${JSON.stringify(expandedBg)}) must resolve to --accent-bg (${JSON.stringify(accentBg)}) — a stringified function className fails this`,
+    ).toBe(true);
+
+    await railCollapseToggle(page).click();
+    await expect(railPane(page)).toHaveAttribute("data-collapsed", "true");
+    await page.waitForTimeout(250);
+
+    const collapsedBg = parseRgbaChannels(
+      await activeLink.evaluate((el) => getComputedStyle(el).backgroundColor),
+    );
+    expect(
+      sameColor(collapsedBg, accentBg),
+      `collapsed active nav link background (${JSON.stringify(collapsedBg)}) must resolve to --accent-bg (${JSON.stringify(accentBg)}) — the silent gap since T001`,
+    ).toBe(true);
   });
 });

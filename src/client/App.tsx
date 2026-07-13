@@ -12,6 +12,7 @@ import { Toaster } from "./components/ui/sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./components/ui/tooltip";
 import {
   useRailCollapsed,
+  useRailLabelFade,
   useToggleRailCollapsed,
   WorkspaceShell,
 } from "./components/WorkspaceShell";
@@ -47,6 +48,14 @@ import { WorkspaceShellSlotsContext } from "./components/WorkspaceShellSlots";
 function RailWordmark() {
   const collapsed = useRailCollapsed();
   const toggleRailCollapsed = useToggleRailCollapsed();
+  // v5-T004: the "Lede" text node used to be a hard `{collapsed ? null :
+  // <span>}` — mount/unmount at t=0 while the aside's own width slide ran
+  // for 200ms, the "pop" the label fade fixes. It's a plain sibling next to
+  // the "L" box (never itself wrapped by a conditionally-present ancestor
+  // like the toggle button below is), so unlike NavTabs/RailBottomCluster it
+  // needs no render-tree unification — only swapping the null for an
+  // always-mounted, fade-driven span.
+  const { faded, hidden } = useRailLabelFade(collapsed);
 
   const toggleLabel = collapsed ? "Expand rail" : "Collapse rail";
   const toggleButton = (
@@ -86,8 +95,16 @@ function RailWordmark() {
           >
             L
           </span>
-          {collapsed ? null : (
-            <span className="font-serif text-md font-medium tracking-tight">Lede</span>
+          {hidden ? null : (
+            <span
+              className={cn(
+                "font-serif text-md font-medium tracking-tight",
+                "transition-opacity duration-200 ease-in-out motion-reduce:transition-none",
+                faded ? "opacity-0" : "opacity-100",
+              )}
+            >
+              Lede
+            </span>
           )}
         </Link>
         {collapsed ? (
@@ -119,9 +136,17 @@ function RailWordmark() {
 // ACTIVE tab with — painting it on hover here would read as "selected".
 // twMerge (`cn`) resolves the conflict because this class is appended after
 // the variant's own classes, so it — not `hover:bg-accent` — wins.
+// v5-T004: unified into one render path, same rationale as NavTabs above —
+// the logout button used to be wrapped in a Tooltip only while collapsed,
+// which remounted its `<button>` (and the "Log out" text along with it) on
+// every toggle; Tooltip now wraps it unconditionally so the label can
+// actually fade instead of popping. ThemeToggle owns its OWN internal
+// collapse branching (ThemeToggle.tsx) — unified there too, for the same
+// reason, so its row label fades rather than pops.
 function RailBottomCluster() {
   const logout = useAuthLogout();
   const collapsed = useRailCollapsed();
+  const { faded, hidden } = useRailLabelFade(collapsed);
 
   const logoutButton = (
     <Button
@@ -136,7 +161,16 @@ function RailBottomCluster() {
       onClick={() => logout.mutate()}
     >
       <LogOut aria-hidden className="h-4 w-4" />
-      {collapsed ? null : "Log out"}
+      {hidden ? null : (
+        <span
+          className={cn(
+            "transition-opacity duration-200 ease-in-out motion-reduce:transition-none",
+            faded ? "opacity-0" : "opacity-100",
+          )}
+        >
+          Log out
+        </span>
+      )}
     </Button>
   );
 
@@ -145,22 +179,15 @@ function RailBottomCluster() {
       data-testid="rail-footer-cluster"
       className={cn("shrink-0 border-t border-border", collapsed ? "p-1.5" : "p-2")}
     >
-      {collapsed ? (
-        <TooltipProvider delayDuration={200}>
-          <div className="flex flex-col items-center gap-1">
-            <ThemeToggle />
-            <Tooltip>
-              <TooltipTrigger asChild>{logoutButton}</TooltipTrigger>
-              <TooltipContent side="right">Log out</TooltipContent>
-            </Tooltip>
-          </div>
-        </TooltipProvider>
-      ) : (
-        <div className="flex flex-col gap-1">
+      <TooltipProvider delayDuration={200}>
+        <div className={cn("flex gap-1", collapsed ? "flex-col items-center" : "flex-col")}>
           <ThemeToggle />
-          {logoutButton}
+          <Tooltip>
+            <TooltipTrigger asChild>{logoutButton}</TooltipTrigger>
+            <TooltipContent side="right">Log out</TooltipContent>
+          </Tooltip>
         </div>
-      )}
+      </TooltipProvider>
     </div>
   );
 }

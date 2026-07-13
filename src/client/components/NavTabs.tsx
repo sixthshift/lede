@@ -18,9 +18,9 @@
 // hover/focus. Tooltip machinery only mounts when actually collapsed, so
 // the expanded (default) tree stays exactly what it was before this ticket.
 import { Files, BookOpen, Settings2 } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "../lib/utils";
-import { useRailCollapsed } from "./WorkspaceShell";
+import { useRailCollapsed, useRailLabelFade } from "./WorkspaceShell";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
 const TABS = [
@@ -29,55 +29,87 @@ const TABS = [
   { to: "/settings", label: "Settings", icon: Settings2 },
 ];
 
+// react-router's own default (non-`end`) NavLink active rule, computed
+// ourselves rather than delegating to NavLink's `className` FUNCTION form —
+// see the render-path note below for WHY the function form can't survive
+// here. A destination is active for its exact path AND any deeper segment
+// under it (so "Applications" stays active on /applications/:id), matched on
+// segment boundaries so /app never lights up /applications.
+function isTabActive(pathname: string, to: string): boolean {
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
+
+// v5-T004: ONE render path for both rail states (no more `if (!collapsed)
+// return …; return …` two-branch split) — each branch used to be a
+// DIFFERENT top-level element type wrapping the link (bare vs.
+// Tooltip>Trigger>), so React unmounted+remounted every `<NavLink>`'s DOM
+// node on every collapse toggle. A label that gets torn down and recreated
+// has no prior painted frame to fade FROM, so it could only ever hard
+// pop — the opacity transition below needs the same `<a>` to persist across
+// the toggle. Tooltip/Trigger/Content now wrap every tab unconditionally
+// (Trigger's `asChild` still adds no DOM node of its own), at the cost of a
+// tooltip also being technically reachable on a sustained expanded-rail
+// hover — harmless (it only echoes the already-visible label) and a smaller
+// footprint than reintroducing the remount.
+//
+// v5-T004 (fix): NavLink's `className` MUST be a STRING here, never the
+// `({ isActive }) => …` FUNCTION form. Because the NavLink is now a
+// `<TooltipTrigger asChild>` child, Radix's Slot merges the child's
+// `className` by string-joining it — a function className gets stringified
+// to its own SOURCE TEXT ("({isActive})=>cn(...)"), so `bg-accent` never
+// applied and the active tab lost its highlight (rail-design.spec.ts
+// v5-T002 caught this; it was silently broken for the collapsed active tab
+// since T001's own asChild path). We compute `isActive` ourselves (above)
+// and hand NavLink a plain string. NavLink still sets `aria-current` off its
+// OWN internal match, independent of className, so that stays correct.
 export function NavTabs() {
   const collapsed = useRailCollapsed();
+  const { faded, hidden } = useRailLabelFade(collapsed);
+  const { pathname } = useLocation();
 
-  const links = TABS.map((tab) => (
-    <NavLink
-      key={tab.to}
-      to={tab.to}
-      aria-label={collapsed ? tab.label : undefined}
-      className={({ isActive }) =>
-        cn(
-          "flex items-center gap-2.5 whitespace-nowrap rounded-md py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          collapsed ? "w-9 justify-center px-0" : "w-full px-3",
-          isActive
-            ? "bg-accent font-medium text-primary"
-            : "font-normal text-muted-foreground hover:bg-[var(--ring-weak)] hover:text-foreground",
-        )
-      }
-    >
-      <tab.icon aria-hidden className="h-4 w-4 shrink-0" strokeWidth={2} />
-      {collapsed ? null : tab.label}
-    </NavLink>
-  ));
-
-  if (!collapsed) {
-    return (
-      <div data-testid="rail-nav-section" className="shrink-0 border-b border-border p-2">
-        <nav className="flex flex-col gap-1" aria-label="Primary">
-          {links}
-        </nav>
-      </div>
-    );
-  }
-
-  // v5-T001: this zone owns its own outer chrome (border + padding), moved
-  // in from App.tsx's `rail` JSX — a p-1.5 (6px/side) band, not p-2, is what
-  // lets a collapsed w-9 (36px) link actually fit inside the rail's 48px
-  // band without overflowing it. `items-center` centers each icon-only link
-  // on the band's horizontal center, matching the collapsed footer cluster's
-  // own center (RailBottomCluster, App.tsx).
   return (
-    <div data-testid="rail-nav-section" className="shrink-0 border-b border-border p-1.5">
+    <div
+      data-testid="rail-nav-section"
+      className={cn("shrink-0 border-b border-border", collapsed ? "p-1.5" : "p-2")}
+    >
       <TooltipProvider delayDuration={200}>
-        <nav className="flex flex-col items-center gap-1" aria-label="Primary">
-          {TABS.map((tab, i) => (
-            <Tooltip key={tab.to}>
-              <TooltipTrigger asChild>{links[i]}</TooltipTrigger>
-              <TooltipContent side="right">{tab.label}</TooltipContent>
-            </Tooltip>
-          ))}
+        <nav
+          className={cn("flex flex-col gap-1", collapsed && "items-center")}
+          aria-label="Primary"
+        >
+          {TABS.map((tab) => {
+            const active = isTabActive(pathname, tab.to);
+            return (
+              <Tooltip key={tab.to}>
+                <TooltipTrigger asChild>
+                  <NavLink
+                    to={tab.to}
+                    aria-label={collapsed ? tab.label : undefined}
+                    className={cn(
+                      "flex items-center gap-2.5 whitespace-nowrap rounded-md py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      collapsed ? "w-9 justify-center px-0" : "w-full px-3",
+                      active
+                        ? "bg-accent font-medium text-primary"
+                        : "font-normal text-muted-foreground hover:bg-[var(--ring-weak)] hover:text-foreground",
+                    )}
+                  >
+                    <tab.icon aria-hidden className="h-4 w-4 shrink-0" strokeWidth={2} />
+                    {hidden ? null : (
+                      <span
+                        className={cn(
+                          "transition-opacity duration-200 ease-in-out motion-reduce:transition-none",
+                          faded ? "opacity-0" : "opacity-100",
+                        )}
+                      >
+                        {tab.label}
+                      </span>
+                    )}
+                  </NavLink>
+                </TooltipTrigger>
+                <TooltipContent side="right">{tab.label}</TooltipContent>
+              </Tooltip>
+            );
+          })}
         </nav>
       </TooltipProvider>
     </div>

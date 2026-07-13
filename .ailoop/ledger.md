@@ -122,3 +122,31 @@ Append-only journal. Newest at the bottom.
     evidence: .ailoop/evidence/T003-fast.txt + T003-e2e.txt
   decision: ACCEPT T003, status=done. Committing (commit = merge). P1 now drained (scheduler) AND its phase oracle = the rail-design + rail-collapse e2e within the 196-pass run on the committed tree → P1 CLOSED. On-main model: no worker branches to prune. Remaining: T004 (P2, last).
   chunk accounting: MY builder dispatches this invocation = 2.
+
+[0019] T004 — dispatched (MY dispatch 3 this invocation), single-agent on main, model sonnet, baseSha b1ff8ea487b1ca2c9c65d59a20eb54db7e302ec2
+  decision: dispatch T004 (P2, last) attempt 1 — collapse-motion: nav labels + wordmark 'Lede' + expanded footer row labels FADE opacity 0<->1 in step with the 200ms width slide; instant under prefers-reduced-motion. Ready per scheduler; no problems/breaches. Independent re-verify by me (full baseline + acceptance + scope diff from b1ff8ea487b1ca2c9c65d59a20eb54db7e302ec2 + gaming read + RE-RUN T001 collapsed-overflow invariant), commit on accept. On accept, P2 drains -> final coverage pass + termination report.
+  attempt: 1/3
+
+[0020] T004 — footprint declaration bug corrected (mechanical, self-serve + ledger)
+  finding: builder touched src/client/components/ThemeToggle.tsx, NOT in T004's declared files. VERIFIED it is a genuine footprint gap, not a scope violation: `rowLabel` (the theme footer-row visible text — one of the THREE label groups T004 must fade, established by T002) is computed and rendered ONLY in ThemeToggle.tsx (grep: sole hit at ThemeToggle.tsx:50). Fading it is impossible without editing that file; the collapse-branching that caused its remount also lives there. Intake under-declared T004's footprint (it named App.tsx but the theme label had moved to ThemeToggle.tsx in T002). Builder flagged the touch honestly in an in-file comment rather than patching silently.
+  decision: EXPAND T004.files to include src/client/components/ThemeToggle.tsx (mechanical footprint correction — does NOT change what "done" means, so not a semantic amendment). Scope now: touched {App.tsx, NavTabs.tsx, WorkspaceShell.tsx, ThemeToggle.tsx, motion.spec.ts} = declared set. No OTHER undeclared touches.
+
+[0021] T004 attempt 1 — RE-VERIFY RED (real regression) — diagnosed, resuming same builder
+  re-verify: fast tier GREEN (check/lint/build 0, unit 1079/1079); e2e 197/198, E2E_EXIT=1. 1 FAILED = rail-design.spec.ts:272 (v5-T002 "active nav link background === --accent-bg").
+  flake discriminator: FAILS deterministically in ISOLATION 3/3 (evidence T004-diag-isolation.txt) → REAL regression, not a flake, not contamination.
+  root cause (DIAG dump via throwaway _diag-motion.spec.ts, since removed): the active NavLink's `class` attribute = the STRINGIFIED className FUNCTION source (+ react-router default ' active'); activeBg = rgba(0,0,0,0). T004's render-path unification wrapped the EXPANDED NavLinks in Radix <TooltipTrigger asChild> (bare before). Radix Slot merges className as a STRING; react-router NavLink uses a FUNCTION className (({isActive})=>cn(...)); Slot stringifies it → `bg-accent` never applies. Also implicates a LATENT bug: the COLLAPSED active nav link has had broken bg-accent since T001 (same asChild+function-className), never asserted.
+  scope note: ThemeToggle.tsx footprint already corrected [0020]; the a1 diff = the 5 declared files only (no other undeclared touch).
+  decision: RESUME the SAME builder (a3e96035…) via SendMessage — its fade approach + everything else is sound; the fix is incremental (make NavLink className a STRING via a react-router isActive hook, not a function). Attempt 1 logged (attempts[0], failed set = the one regression). Escaped-bug rule: fix ALSO strengthens the check — add an active-nav-link bg === --accent-bg assertion in motion.spec.ts for BOTH states (collapsed case was the silent gap). fixNote keeps scope to the 5 declared files. Not a fresh dispatch (session alive, work sound, fix is coverage not approach). Attempt 2 pending.
+  chunk accounting: MY builder dispatches this invocation = 3 (T004 attempt-1 dispatch); the resume is attempt 2 (dispatch 4).
+
+[0022] T004 attempt 2 (resumed builder) — ACCEPTED (independent re-verify GREEN) — P2 CLOSED, backlog DRAINED
+  fix: same builder resumed via SendMessage — NavTabs.tsx now computes isTabActive(pathname,to) = (pathname===to || startsWith(to+"/")) via useLocation and hands NavLink a STRING className (kept the unified single render path for the fade; NavLink still sets aria-current off its own match). Escaped-bug strengthening: new motion.spec.ts test asserts active nav link bg === resolved --accent-bg in BOTH expanded AND collapsed (the silent-since-T001 gap).
+  INDEPENDENT RE-VERIFY (coordinator, on main tree, baseSha b1ff8ea, PORT=9200 CI=1 fresh servers):
+    - scope: PASS — git diff --name-only b1ff8ea = App.tsx, NavTabs.tsx, ThemeToggle.tsx, WorkspaceShell.tsx, motion.spec.ts = the 5 declared files (ThemeToggle footprint corrected [0020]). No rail-collapse/rail-design.spec.ts touch.
+    - gaming: CLEAN — isTabActive replicates react-router non-`end` semantics (not degenerate); string className restores bg-accent; strengthening test is real (both states).
+    - typecheck 0, lint 0, build 0.
+    - unit: VITEST_EXIT=0, 1079/1079 (fit-ui.test.tsx GREEN here — builder's 1-fail was its own host load, passes authoritatively).
+    - e2e: E2E_EXIT=0, 199 passed (full chromium+auth+applications) = T003's 196 + 3 new T004 tests; the previously-failing v5-T002 active-nav-link assertion NOW GREEN; T001 collapsed-overflow invariant re-checked green with faded labels. (One preview-zoom canvas test flaked and recovered on retry — counted passed.)
+    evidence: .ailoop/evidence/T004-fast.txt + T004-e2e.txt (+ failed attempt-1 at T004-a1.txt)
+  decision: ACCEPT T004, status=done. Committing (commit = merge). P2 drained (scheduler) + its phase oracle (motion.spec.ts fade/reduced-motion + T001 invariant) green within the 199-pass run on the committed tree → P2 CLOSED. Backlog now complete:true. On-main model: no worker branches to prune.
+  chunk accounting: MY builder dispatches this invocation = 4 (T004 attempt-1 + attempt-2 resume). Proceeding to coverage pass + termination report.

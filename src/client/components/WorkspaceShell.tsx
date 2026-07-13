@@ -70,6 +70,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -227,6 +228,69 @@ export function useRailCollapsed(): boolean {
 // established.
 export function useToggleRailCollapsed(): () => void {
   return useContext(RailCollapseContext).toggle;
+}
+
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+// Matches the rail `<aside>`'s own width-slide duration exactly — the whole
+// point (spec OQ6) is the label fade running IN STEP with that transition,
+// not on its own independent clock.
+const LABEL_FADE_MS = 200;
+
+/**
+ * v5-T004: coordinates a rail label's opacity fade with the 200ms width
+ * slide, for every label that used to hard mount/unmount on collapse (nav
+ * labels, the wordmark text, the footer row labels). `faded` drives
+ * `opacity-0`/`opacity-100` on a MOUNTED label; `hidden` tells the caller
+ * when to stop rendering it (`{hidden ? null : <span>…</span>}`) — a plain
+ * CSS `display:none` isn't enough here, because Playwright's text-matching
+ * (`getByText`/`toHaveText`) walks descendant text nodes regardless of
+ * `display`, so a `display:none`-but-still-mounted label would still count
+ * as "present" to the very assertions (rail-collapse.spec.ts) this ticket's
+ * baseline gate re-runs. The two are deliberately out of phase:
+ *
+ * - Collapsing: `faded` flips true immediately (fade starts with no delay);
+ *   `hidden` only flips true LABEL_FADE_MS later. The label stays mounted
+ *   and occupying width for that whole window — it's allowed to (this is
+ *   what makes it visible mid-fade at all) — and only unmounts once the
+ *   fade has actually finished, never via an overflow-clip (the one thing
+ *   T001's own invariant test forbids).
+ * - Expanding: `hidden` clears on the SAME tick collapse flips (so the
+ *   label remounts immediately), but `faded` only clears one animation
+ *   frame later. Flipping both together would give the browser no rendered
+ *   "opacity:0" frame to transition FROM (a freshly mounted element has no
+ *   prior painted frame) — the fade-in would just be skipped.
+ * - Reduced motion: both flip together, instantly, on the same tick as
+ *   `collapsed` — no fade, matching the aside's own
+ *   `motion-reduce:transition-none`.
+ *
+ * `useLayoutEffect` (not `useEffect`) throughout so the "start the fade"/
+ * "flip both instantly" edges land in the SAME paint as the `collapsed`
+ * change, not one frame late.
+ */
+export function useRailLabelFade(collapsed: boolean): { faded: boolean; hidden: boolean } {
+  const reducedMotion = useMatchMedia(REDUCED_MOTION_QUERY);
+  const [hidden, setHidden] = useState(collapsed);
+  const [faded, setFaded] = useState(collapsed);
+
+  useLayoutEffect(() => {
+    if (reducedMotion) {
+      setHidden(collapsed);
+      setFaded(collapsed);
+      return;
+    }
+
+    if (collapsed) {
+      setFaded(true);
+      const timer = setTimeout(() => setHidden(true), LABEL_FADE_MS);
+      return () => clearTimeout(timer);
+    }
+
+    setHidden(false);
+    const raf = requestAnimationFrame(() => setFaded(false));
+    return () => cancelAnimationFrame(raf);
+  }, [collapsed, reducedMotion]);
+
+  return { faded, hidden };
 }
 
 export function WorkspaceShell({ rail, editor, preview, editorPaneRef }: WorkspaceShellProps) {

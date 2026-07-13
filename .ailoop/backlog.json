@@ -77,7 +77,7 @@
     {
       "id": "T004",
       "title": "Collapse motion: labels fade with the 200ms width slide; instant under reduced-motion",
-      "status": "todo",
+      "status": "done",
       "phase": "P2",
       "depends_on": [
         "T003"
@@ -86,13 +86,24 @@
         "src/client/components/WorkspaceShell.tsx",
         "src/client/App.tsx",
         "src/client/components/NavTabs.tsx",
+        "src/client/components/ThemeToggle.tsx",
         "test/e2e/motion.spec.ts"
       ],
       "origin": "spec Phase 2 (P12/OQ6)",
       "context": "Lede v5 rail-chrome polish. Cite .ailoop/oracle.md. DEPENDS ON T003 (rail chrome is now in final form). ALREADY EXISTS: the rail `<aside>` in src/client/components/WorkspaceShell.tsx animates `transition-[width] duration-200 ease-in-out motion-reduce:transition-none` (224px<->48px). But the labels it shows/hides are HARD conditional renders (`{collapsed ? null : tab.label}` in NavTabs.tsx:~51; the wordmark 'Lede' text in App.tsx; the footer row labels from T002) — so the frame slides for 200ms while text snaps in/out at t=0 (the 'pop' the human flagged). THE DECISION (SPEC OQ6): labels FADE (opacity) coordinated with the 200ms width slide; under prefers-reduced-motion: reduce the swap is instant (no fade). BUILD ONLY THIS: make the rail's collapsible labels (nav labels, wordmark 'Lede' text, expanded footer row labels) animate their opacity 0<->1 in step with the width transition (~200ms), instead of hard mount/unmount. Under `prefers-reduced-motion: reduce`, no fade — instant swap (reuse the existing motion-reduce pattern). Keep the labels' collapsed END STATE identical to today (absent/opacity-0 and not occupying width — must not re-introduce the 48px overflow T001 fixed; a faded-out label must be visually gone and not add horizontal overflow). Do NOT change tokens.css or the collapse behavior/persistence.",
       "acceptance": "Baseline gate in full — INCLUDING re-running the T001 collapsed-overflow test (a faded label must not reintroduce scrollWidth>clientWidth in the 48px band). PLUS new Playwright tests in test/e2e/motion.spec.ts (applications project), >=1024:\n- prefers-reduced-motion no-preference: for EACH of the three label groups (nav labels, wordmark 'Lede' text, expanded footer row labels) — not just one sampled label — computed opacity is ~0 collapsed and ~1 expanded; AND sampled MID-SLIDE (while the aside width is strictly between 48 and 224) each label's opacity is SIMULTANEOUSLY strictly between 0 and 1, so the fade runs IN STEP with the 200ms width slide (no start delay; a `transition: opacity 1ms`, a delayed/late fade, or a hard mount/unmount on any of the three groups must FAIL because at mid-slide it is already 0 or 1).\n- prefers-reduced-motion reduce (page.emulateMedia): the same labels' opacity goes 0<->1 with NO intermediate value (instant).\n- collapsed 48px band still has no descendant scrollWidth>clientWidth (T001 invariant holds with faded labels — a faded-out label must not occupy width).",
-      "attempts": [],
-      "evidence": null
+      "attempts": [
+        {
+          "n": 1,
+          "failed": [
+            "e2e: rail-design.spec.ts:272 v5-T002 active nav link background === --accent-bg (regression; active link bg = rgba(0,0,0,0))"
+          ],
+          "hypothesis": "The render-path unification wrapped the EXPANDED NavLinks in Radix <TooltipTrigger asChild> (they were bare before). Radix's Slot merges `className` as a STRING, but react-router NavLink's className is a FUNCTION (({isActive})=>cn(...)). Slot stringifies the function — the active link's class attribute becomes the literal function source (+ react-router's default ' active'), so `bg-accent` never applies and the active link paints transparent. DIAG dump confirmed: activeClass = the function source string, activeBg = rgba(0,0,0,0), aria-current=page present. Fade approach + all other T004 work is sound (unit 1079/1079, fast tier 0, 197/198 e2e). This ALSO means the COLLAPSED active nav link has had broken bg-accent since T001 (same asChild+function-className path) — latent, never asserted.",
+          "fixNote": "Keep the unified single-render-path (needed for the fade). Fix ONLY the NavLink className: it must be a STRING, not a function, so Radix Slot merges it correctly. Compute isActive with a react-router hook (useLocation or useMatch/useResolvedPath) inside NavTabs, build the class string yourself (isActive ? 'bg-accent font-medium text-primary' : '...'), and pass that string to NavLink's className. Do NOT keep the ({isActive})=>cn(...) function form on a NavLink that is a TooltipTrigger asChild child. Re-run rail-design.spec.ts (v5-T002 active-nav-link assertion must pass) AND rail-collapse.spec.ts + motion.spec.ts. ESCAPED-BUG STRENGTHENING: add a small assertion IN motion.spec.ts (your declared file) that the ACTIVE nav link's computed background-color === resolved --accent-bg in BOTH expanded AND collapsed states — the collapsed case was never covered and silently regressed since T001. Touch ONLY your declared files: WorkspaceShell.tsx, App.tsx, NavTabs.tsx, ThemeToggle.tsx, motion.spec.ts. Do NOT touch rail-collapse.spec.ts or rail-design.spec.ts.",
+          "evidence": ".ailoop/evidence/T004-a1.txt"
+        }
+      ],
+      "evidence": ".ailoop/evidence/T004-fast.txt (check/lint/build exit 0, vitest 1079/1079) + T004-e2e.txt (199 passed, E2E_EXIT=0; +3 new T004 tests over T003's 196, incl. escaped-bug active-nav-link bg in both states). Attempt 2 (resumed builder) fixed the NavLink function-className × Radix Slot regression via string className + isTabActive. scope=5 declared files (ThemeToggle footprint corrected [0020]), gaming clean"
     }
   ]
 }
