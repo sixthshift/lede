@@ -1,0 +1,18 @@
+T004 — independent re-verify (coordinator, on main, baseSha e0d17a4)
+
+SCOPE (git delta, subtracting T001+T002+T003+WIP) — PASS
+  = src/client/components/ReasoningPanel.tsx (M), playwright.config.ts (M), test/reasoning-coverage.test.tsx (new), test/e2e/signal-coverage.spec.ts (new) — exactly the 4 declared files.
+
+GAMING READ — CLEAN
+  ReasoningPanel.tsx: uncovered = uncoveredSignals(resume) called PER RENDER (not a prop); props stay {resume: TailoredResume} (prop-injection can't typecheck). Render gated `hasLedes && uncovered.length > 0`, where hasLedes = resume.sections.some(s => s.groups.length > 0) — CORRECT zero-lede definition ("groups exist", not "rationales exist"): a groups-but-no-rationale resume honestly SHOWS. Copy: "No lede addresses these signals: {uncovered.join(', ')}" — factual, matches /no lede addresses/i; NO evaluative phrasing in shipped copy (the word "lacks" appears only in an explanatory comment stating what NOT to do).
+  playwright.config.ts: `|signal-coverage` appended to the applications project testMatch alternation (a spec, not a new project).
+  reasoning-coverage.test.tsx (component, jsdom): (1) renders <ReasoningPanel resume=..> with ONLY resume prop, asserts exact uncovered signal scoped to .reasoning-panel__uncovered, covered weight + covered hardReq ABSENT from that element; (2) hide when all covered (queryByText /no lede addresses/i not in doc); (3) hide when ZERO ledes despite non-empty signals. Verbatim copy asserted.
+  signal-coverage.spec.ts (applications e2e): real data path — login -> createApplication(jd=CONTRAST_JDS[0] platform-sdk) -> tailor -> ReasoningPanel renders -> uncoveredSignals(resume) at render (NOT injected). Scopes assertions to .reasoning-panel__uncovered (so WeightBar's full-signal render elsewhere can't false-positive "covered absent"). Asserts EXACT identities: uncovered = "Creating stable contracts, versioning, and documentation" present; covered = "Designing and shipping a public-facing developer surface" absent. The platform-sdk split (4/5 covered incl. the "with"-stopword false-positive on weights 4&5) is honestly documented in the spec header — the asserted pair (weight-1 legit-covered / weight-2 genuine-uncovered) is clean; ≥1 covered AND ≥1 uncovered satisfied.
+
+FAST TIER (authoritative, coordinator re-run)
+  check 0; build 0 (before playwright); lint 0; vitest 0 -> 86 files, 1122/1122 fully clean (no flakes this run).
+
+P1 PHASE GATE (gate tier, merged/working tree)
+  bunx playwright test --project=applications on PORT=9200 CI=1 (fresh port base — 8787 was held by an orphaned webServer from the builder's own --grep run; documented CLAUDE.md quirk, sidestepped exactly as v5 did): 170 passed (6.5m), PW_EXIT=0, no "already used", zero failures, zero flakes. Includes the new signal-coverage.spec.ts (testMatch verified + builder's isolated --grep signal-coverage = 1 passed). Two earlier gate attempts hit a transient 8787 collision (orphan webServer), NOT test failures.
+
+VERDICT: ACCEPT T004. P1 (T003+T004) drained; P1 phase oracle green on the merged tree -> P1 CLOSED. Backlog complete.

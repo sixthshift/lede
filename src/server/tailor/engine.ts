@@ -20,7 +20,7 @@ import { LetterDecisionZ, TailorDecisionZ } from "@shared/schema";
 import { SYSTEM_PROMPT, renderLibrary } from "./prompt";
 import { LETTER_SYSTEM_PROMPT, buildLetterUserPrompt } from "./letter-prompt";
 import { assemble } from "./assemble";
-import { validateNoFabrication } from "./validate";
+import { validateDecisionContract, validateLedeRationale, validateNoFabrication } from "./validate";
 import { hashKey } from "./evalcore";
 
 export interface TailorEngine {
@@ -261,11 +261,16 @@ export async function tailor(
   voice?: string | null,
 ): Promise<TailoredResume> {
   const decision = await engine.decide(jd, entries, context, budget, voice);
+  // Flat contract checks (partition + rank) run on the RAW decision, before
+  // assemble() — no self-repair, no extra model retry on a violation (§6.1);
+  // decide() already retried once internally, so a violation here just throws.
+  validateDecisionContract(decision, entries);
   const resume = assemble(decision, entries, layout, SECTIONS);
   // validateNoFabrication takes entries (+baseSummary) only — context and
   // voice guide emphasis/phrasing, never a fact source (§27; T43), so
   // neither is ever checked against as if it were one.
   validateNoFabrication(resume, entries, baseSummary);
+  validateLedeRationale(resume);
   return resume;
 }
 

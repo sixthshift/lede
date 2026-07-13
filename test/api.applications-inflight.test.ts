@@ -40,11 +40,19 @@ async function get(app: FastifyInstance, url: string) {
   return app.inject({ method: "GET", url });
 }
 
+// All three SEED_ENTRIES sit in `cut` so the partition is exact
+// (validateDecisionContract now runs in tailor()); empty items means no group
+// ledes, so validateLedeRationale is a no-op — this decision stays a valid,
+// content-free success, which is all these in-flight-guard tests need.
 const OK_DECISION: TailorDecision = {
   signals: { roleLevel: "", weights: [], hardRequirements: [] },
   summary: "",
   items: [],
-  cut: [],
+  cut: [
+    { entryId: "cloudcase-rules-engine", reason: "in-flight-guard test: content irrelevant" },
+    { entryId: "cloudcase-frontend-rewrite", reason: "in-flight-guard test: content irrelevant" },
+    { entryId: "cloudcase-platform-sdk", reason: "in-flight-guard test: content irrelevant" },
+  ],
 };
 
 const OK_LETTER: LetterDecision = {

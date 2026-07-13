@@ -1,272 +1,265 @@
 ---
-status: locked           # locked 2026-07-12 — human go-ahead after red-team (12 findings folded) + de-risk order confirmed
+status: locked           # locked 2026-07-13 — human go-ahead; de-risk order confirmed (contract-first); red-team folded (16 findings)
 spec_version: 1          # bumped by change orders after lock
 ---
 
-# Lede v5 — Rail chrome polish
+# Tailor Engine Hardening — Build Spec
 
-v4 gave the rail's *primary navigation* (`NavTabs`) a designed icon-rail
-treatment — consistent 16px icons, hover wash, collapse-aware (icon-only band +
-tooltips). But the rail's *other* chrome never got the same pass: the wordmark,
-the theme toggle, the logout button, and the collapse toggle. The result reads
-as unfinished exactly where v4 declared the shell "final": the bottom cluster
-looks mismatched, the collapse button looks stranded, and when the rail
-collapses to its icon band the wordmark and bottom cluster clip because they're
-not collapse-aware. This campaign extends v4's icon-rail language to the whole
-rail so the shell reads as one designed surface at every width.
+Proactive hardening of Lede's tailoring engine *before* its first real use. Two
+deliverables: (1) make the deterministic contract around the model's judgment
+**airtight** — a malformed decision must fail loud, never degrade silently — so
+the first live run yields either a clean document or a clear failure; and (2)
+extend the always-on decision-report with a **JD-signal coverage** readout: which
+of the job's weighted signals / hard requirements no lede addresses. Both are
+mechanical and keyless. Explicitly NOT in scope: the model prompt or the
+repositioning judgment itself — that is tuned against observed output, never
+blind.
 
-Origin: human directive 2026-07-12 — *"the logout and the theme dark toggle
-looks weird, as well as the collapse button below, and as well when the side
-nav is collapsed, it looks bad too."*
-
-## Standing constraints (cited, not restated)
-
-These are permanent policy in the repo's durable docs — v5 inherits, never
-re-decides them. See `/workspace/CLAUDE.md` "Standing policies" + "Design
-system" and `specs/v4/spec.md` (archive, record only):
-
-- **Visual identity frozen.** Palette, IBM Plex families, 8px radius, shadow
-  philosophy, single blue accent (`#2643bd`). `src/client/styles/tokens.css` is
-  the single source of color/radius/shadow truth. v5 MAY correct token *values*
-  a finding demands, never the identity, never a new/unbounded design axis.
-- **No new UI dependency.** Stack unchanged, client-only. `lucide-react`,
-  `sonner`, radix primitives already present; anything else is a fork.
-- **De-modal, forever** (v3; v4 viewport-scoped exception). Nothing here
-  introduces modality.
-- **Rail collapse is view-state only** (v3/v4) — localStorage at most, never a
-  `settings.layout`/`sectionDisplay` write, no network on toggle.
-- **Keyless by default** — build, boot, full suite need no API key (fixtures).
-
-## Already exists (read from reality — `src/client/`, not the v4 archive)
-
-- `App.tsx` — assembles the rail: `RailWordmark` (top), `NavTabs` (below it),
-  a flex-1 portal target, `RailBottomCluster` (bottom). The rail itself is
-  handed to `WorkspaceShell` which owns the collapse state + the collapse
-  toggle in a bordered footer below the rail content.
-- `RailWordmark` (App.tsx:19) — `L` box + serif "Lede" text. **Not
-  collapse-aware.**
-- `RailBottomCluster` (App.tsx:36) — `flex justify-between`: `<ThemeToggle/>`
-  and a ghost `Log out` button (`LogOut` icon + "Log out" text). **Not
-  collapse-aware.** Both icons lack a size class → render at lucide's default
-  24px while every other rail icon is 16px.
-- `ThemeToggle` (ThemeToggle.tsx) — ghost `sm` button, bare Moon/Sun icon (no
-  label text, no size class). Flips `dark` on `<html>`, persists to
-  localStorage.
-- `NavTabs` (NavTabs.tsx) — the v4 reference treatment: 16px icons, gap-2.5,
-  `--ring-weak` hover wash, active = `bg-accent`. Collapse-aware via
-  `useRailCollapsed()`: icon-only (`w-9 justify-center`) + tooltip when
-  collapsed.
-- `WorkspaceShell` (WorkspaceShell.tsx:326) — the collapse toggle: a `w-full`
-  ghost button in a `border-t p-1.5` footer, `PanelLeftClose`/`PanelLeftOpen`
-  16px icon, `aria-pressed`, `data-testid="rail-collapse-toggle"`. Rail is
-  `w-56` expanded, `w-12` collapsed. `useRailCollapsed()` context is the
-  collapse-aware signal any rail content reads.
-- Below `lg` (1024px) the rail is replaced by `BottomTabBar` — a separate
-  regime, out of scope here (v5 is the desktop rail only unless OQ says
-  otherwise).
-
-## Findings (2026-07-12)
-
-- **P1 — bottom cluster mismatched (expanded).** `justify-between` pushes a bare
-  theme icon and an icon+text logout button to opposite ends; oversized 24px
-  icons; reads as two unrelated controls, not a designed cluster.
-- **P2 — collapse toggle stranded.** Full-width ghost button across the rail
-  footer looks like empty dead space, not an affordance.
-- **P3 — wordmark not collapse-aware.** "Lede" serif text + box clip in the
-  48px icon band.
-- **P4 — bottom cluster not collapse-aware.** Theme + "Log out" laid out
-  horizontally with text clip in the 48px band.
-
-### Audit sweep (2026-07-12, OQ4 "widen")
-
-Mechanical = derivable from locked decisions, defaulted (no fork). Fork = taste.
-
-- **P5 — hover fill = active-nav fill (mechanical).** Ghost `Button`'s hover is
-  `bg-accent` (`ui/button.tsx:17`) — the SAME swatch NavTabs uses for the
-  *active* tab (`NavTabs.tsx:45`). So hovering theme/logout/collapse reads as
-  "selected." NavTabs' own hover is a different language (`--ring-weak` wash).
-  → Default: rail footer controls adopt the `--ring-weak` hover, applied
-  rail-locally (never mutate the global ghost variant — identity-frozen).
-- **P6 — wordmark has no hover feedback (FORK).** `RailWordmark` is an
-  interactive `<Link>` (App.tsx:22) with only a focus ring, no hover — the one
-  clickable rail element with zero hover affordance. See OQ5.
-- **P7 — focus-ring geometry inconsistent (mechanical).** Wordmark + NavTabs use
-  `ring-2` with no offset; `Button` adds `ring-offset-2`. → Default: one ring
-  footprint across all rail controls.
-- **P8 — doubled footer divider + mismatched padding (mechanical).** The footer
-  cluster (`border-t p-2`, App.tsx:160) stacks above the collapse toggle's own
-  `border-t p-1.5` block (WorkspaceShell:326) → two borders, 8px vs 6px. OQ3
-  already removes the toggle from the footer; → Default: single divider, unified
-  `p-2` rhythm matching the wordmark/nav sections.
-- **P9 — collapsed nav overflows 48px (mechanical).** `w-9` link (36px) inside
-  `p-2` nav section (16px) = 52px in the 48px band (NavTabs:43 / App.tsx:156).
-  → Default: collapsed-mode nav-section padding shrinks so icons center in the
-  band and optically align with the footer icons.
-- **P10 — collapsed footer controls have no tooltip (mechanical, given OQ1).**
-  OQ1 makes theme/logout icon-only when collapsed; they currently carry only
-  `aria-label`, and the collapse toggle uses a bare native `title` vs NavTabs'
-  Radix tooltip. → Default: route all collapsed rail controls through the SAME
-  Radix tooltip primitive NavTabs uses.
-- **P11 — collapse toggle `aria-pressed` not visually distinct (mechanical).**
-  Announced to AT but classes identical both states; only the icon glyph swaps
-  (WorkspaceShell:331/338). → Default: the glyph swap (open↔close panel icon) IS
-  the visual distinction — sufficient for a ghost control; no bg change.
-- **P12 — collapse animates width, content pops (FORK).** The `<aside>` animates
-  `transition-[width] 200ms` but labels are hard `{collapsed ? null : …}`
-  renders — text snaps while the frame slides. See OQ6.
+Context (reality at spec time, read from code — not inherited from any prior
+spec):
+- The tailoring engine is a single structured LLM call returning flat judgment
+  (`TailorDecision`: `signals`, `summary`, `items[{entryId,text,rank,
+  leadRationale?}]`, `cut[{entryId,reason}]`); the server assembles all
+  structure (`src/server/tailor/assemble.ts`) and mechanically rejects
+  fabricated *numbers* (`validate.ts`).
+- The flip-eval quality gate **already exists** and is complete
+  (`scripts/eval.ts` + `evalcore.ts`): key-gated, runs 3 contrast JDs against
+  the seed library, asserts each lede flips + names a signal + a tag-shuffle
+  control. Not in scope to rebuild.
+- The decision-report **already exists** in-product
+  (`src/client/components/ReasoningPanel.tsx`): renders `signals` (WeightBar),
+  per-lede `leadRationale`, and the `CutList`. This drive *extends* it, does
+  not rebuild it.
 
 ## Locked decisions
 
-- **Extend v4's icon-rail language; don't invent a new one.** The rail chrome
-  (wordmark, theme, logout, collapse) adopts the same 16px-icon / consistent-
-  spacing / collapse-aware pattern `NavTabs` already uses. `NavTabs.tsx` is the
-  reference.
-- **Icon size fix is a bare default.** Theme + logout icons become 16px
-  (`h-4 w-4`) to match every other rail icon. No fork — it's a consistency bug.
-- **No new destinations, no new controls.** v5 restyles the four existing
-  chrome elements; it does not add rail items, menus, or settings.
-- **No collapse-behavior change.** `w-56`/`w-12`, localStorage persistence, the
-  `useRailCollapsed()` contract all stay; v5 only makes the un-adapted chrome
-  respond to the signal that already exists.
+Standing constraints (CITED from `CLAUDE.md`, not restated — permanent policy
+binding this drive):
+- The model returns judgment only; the server assembles all structure. This
+  drive hardens/reads the server side only.
+- **No LLM-checks-LLM validation pass.** Every check added here is mechanical.
+- Facts, not tags. The fact-lock. Keyless by default (both deliverables run
+  with no API key).
+- **`SYSTEM_PROMPT` is FROZEN for this drive** — no instruction edits, no
+  tuning. *Over prompt tuning: deferred until after the first live runs; tuning
+  judgment never observed is guessing.*
 
-### Resolved layout (OQ1–OQ3, 2026-07-12)
+### Deliverable 1 — Contract invariants
 
-- **Collapsed rail (48px) = icon-only stack** (OQ1). Wordmark → "L" box only;
-  theme + logout → centered 16px icon buttons with hover/focus tooltips, same
-  pattern `NavTabs` uses collapsed. Everything stays reachable in the band.
-- **Expanded rail (224px) footer = two matching labeled rows** (OQ2). Theme and
-  logout each a full-width labeled row ("Dark mode" / "Log out"), evenly sized,
-  stacked, grouped as a pair — over the old `justify-between` mismatched cluster
-  (asymmetry + 24px icons were the defect).
-- **Collapse toggle moves to the rail top, beside the wordmark** (OQ3) —
-  footer freed of it. **Default (reconciling OQ3 with the 48px band):** when
-  collapsed, the toggle sits directly *below* the "L" box in the top zone (same
-  icon rhythm), since "beside" can't fit 48px. Overridable.
-- **Icon size = 16px** everywhere in the rail (bare default — the 24px theme +
-  logout icons were a consistency bug).
-- **Wordmark is a quiet logo** (OQ5/P6) — clickable, but deliberately no hover
-  state; over "real nav target" — it's an identity mark, the nav below carries
-  wayfinding, and a hover there would compete with the Applications link
-  directly beneath it. "No hover" is now intentional, not an oversight.
-- **Collapse fades labels with the slide** (OQ6/P12) — labels ease in/out
-  (opacity) coordinated with the existing 200ms width transition; under
-  `prefers-reduced-motion: reduce` the swap is instant (no fade), matching the
-  rail's existing `motion-reduce:transition-none`.
+A new **mechanical** validator (no LLM, sibling to `validateNoFabrication`)
+enforces, over the flat `TailorDecision` + the entry library:
+- **Partition** — the library's entry-id set equals `entryIds(items) ∪
+  entryIds(cut)` *exactly*, and `items`/`cut` are disjoint: no library entry
+  omitted from both; no id in both lists; **no id in `items` or `cut` that is
+  absent from the library** (foreign/unknown ids rejected); **no id appearing
+  twice within `items` or within `cut`**.
+- **Rank** — each item's `rank` is an **integer `≥ 1`**, unique **within its
+  section**, where an item's section is resolved by looking its `entryId` up in
+  the library (`entry.section`) — the raw decision has no section field.
+  Equal ranks in the **same** section are rejected; equal ranks in **different**
+  sections are fine (each section leads with a rank-1). Matches `prompt.ts:76`;
+  today `z.number()` allows floats/dupes/negatives.
+- **Lede rationale** — every lede in a **`rephrase:"full"` section**
+  (experience, project) carries a **non-empty (trimmed, non-blank)**
+  `leadRationale`. A lede is the lowest-rank item within a group; groups are
+  sub-partitions of a section (assemble groups a section's items by the
+  registry `groupBy`). *Scoped to full-rephrase sections — see the loud default
+  and precondition below; "lead" is a judged decision only where the model was
+  asked to reason about it (jobs/projects), so requiring rationale on a
+  skills-category or education lede would over-reject valid decisions.* Checked
+  post-assemble, where grouping determines ledes.
+
+Loud defaults (bare — nobody fought over these; listed for override in the
+session report):
+- **Failure mode mirrors fabrication exactly**: a violation throws a typed
+  `DecisionContractError`; `mapTailorError` maps it to a distinct HTTP code;
+  `genState → "failed"`; prior `current` untouched. No self-repair, no extra
+  model retry. *Consistency with `validateNoFabrication` beats a marginal
+  re-ask.*
+- **Placement mirrors fabrication**: flat checks (partition, rank) on the raw
+  decision before `assemble`; lede-rationale check post-assemble; both inside
+  `tailor()`, outside the provider retry envelope.
+- **Extra `leadRationale` on non-lede items is tolerated and discarded** (the
+  current `assemble` behavior) — not rejected. *Harmless; policing it adds a
+  rule guarding no failure.*
+- **Lede-rationale invariant scoped to `rephrase:"full"` sections.** *Derived,
+  not intent-guessed: the prompt emphasizes the lede only for jobs/projects, the
+  flip-eval checks only those, and the recorded fixtures are the empirical
+  ground truth (see precondition — if a fixture violates the scope, the scope is
+  wrong, not the fixture). Listed for override.*
+
+### Deliverable 2 — JD-signal coverage readout
+
+A pure, keyless function derives, from the assembled `TailoredResume`, which of
+its signals are **addressed** vs not, and the ReasoningPanel surfaces the
+uncovered set.
+
+- **Signal source: `resume.signals`** — specifically its `weights` and
+  `hardRequirements` arrays, folded into one uncovered set. This is the model's
+  extracted signals (`assemble` copies `decision.signals` through unchanged; it
+  is the same object `WeightBar` already renders) — there is no separate
+  "authoritative JD signals" object. `roleLevel` is excluded (a framing, not a
+  coverage target).
+- **Coverage reads lede rationales ONLY.** A signal is addressed iff a **lede's**
+  `leadRationale` references it — never a non-lede item's rationale, never any
+  item's `text`. *This is load-bearing: crediting a non-lede rationale or body
+  text would let a signal read "covered" when no lede leads on it, defeating the
+  "no lede addresses X" claim.*
+- **Documented limit (the scar):** `rationaleReferencesSignal` matches on ANY
+  shared ≥4-char token, so two signals sharing a token (e.g. "API versioning"
+  and "content versioning") can both read as covered when only one is named.
+  Accepted as a known limit — reuse/single-source with the flip-eval beats a
+  bespoke tighter matcher — and disclosed here rather than silently shipped.
+
+  *Chosen over kept-text matching: text matching risks a false "covered" — a
+  stray token marking a signal addressed when the entry doesn't speak to it —
+  the more misleading failure direction.*
+- **Honest framing is load-bearing.** The readout says "no lede addresses X",
+  never "your resume lacks X" — an uncovered signal may be touched by a non-lede
+  bullet, and the copy must not imply otherwise. This is the whole reason the
+  rationale-referenced definition was chosen; a build that mislabels it defeats
+  the deliverable.
+- Loud defaults:
+  - Surface: extend `ReasoningPanel` (where the decision-report lives) with an
+    "uncovered signals" section; keyless, always-on, derived per render from the
+    assembled resume.
+  - Reusing `rationaleReferencesSignal`/`tokenize` is mandatory (not a fresh
+    matcher) — single source, so the readout and the flip-eval can never drift
+    on what "references a signal" means.
+  - **The section is hidden when the uncovered set is empty, and when the resume
+    has zero ledes** (e.g. everything cut). *A zero-lede resume would otherwise
+    mark every signal "uncovered" — factually "no lede addresses X", but with no
+    ledes at all it reads as "your resume lacks X", the evaluative implication
+    the deliverable forbids.*
 
 ## Out of scope
 
-- The header bar (dissolved in v4 — not revived).
-- `BottomTabBar` / below-`lg` regime (unless OQ4 pulls it in).
-- New theme options beyond light/dark; theming settings UI.
-- Any `settings`/server write from the rail.
-- New nav destinations or an overflow/account menu (unless an OQ elects one).
+Tripwire — ailoop halts if a build crosses these:
+- Any change to `SYSTEM_PROMPT` or the model's judgment/phrasing.
+- Any **LLM-based** validation or LLM-judge quality/coverage scoring.
+- Rebuilding the flip-eval or the ReasoningPanel — both exist; this drive
+  extends/aliases at most.
+- Mechanical *semantic* checks beyond numbers (e.g. "contributed to" vs "led"
+  verb-strengthening). *Rejected: not reliably mechanizable without an
+  LLM-judge; the no-strengthen rule stays prompt-only.*
+- Fabrication self-repair / re-prompt loops. *Deferred: build recovery only
+  after observing real fabrication rates.*
+- A `bun run eval` alias / eval packaging. *Considered, dropped from this scope
+  — run the existing eval via `bunx tsx scripts/eval.ts`.*
+- New configurable settings/knobs — ambient defaults only.
+- Cutting content to fit pages / altering the density ladder.
+- Tag-scoring or level-scoring.
+- Any coverage judgment about whether an uncovered signal is *good or bad* — the
+  readout is factual ("no lede addresses X"), never evaluative.
+- **Editing or re-recording existing fixture decisions** to satisfy the new
+  validator (see Fixture reconciliation) — recorded model output is not ours to
+  rewrite.
 
 ## Phases (de-risk order)
 
-De-risk order: the collapsed-rail **clipping/overflow is the only actual
-breakage** (P3/P4/P9) — structural, so it builds and gates first. The
-single-language cleanup (P1/P2/P5/P7/P8/P10/P11) is consistency work on top of a
-now-correct layout. Motion (P12) is the cosmetic tail. Each phase's checks run
-in the `applications` Playwright project (where `design.spec.ts` lives) at
-desktop width (≥1024, the rail regime); `bun run build` before the suite (stale
-`dist/` caveat). Test IDs already exist: `rail-pane` (with `data-collapsed`),
-`rail-collapse-toggle`; the theme/logout buttons are addressable by their
-`aria-label`.
+*Order confirmed with human at lock: contract-first. Rationale: the coverage
+readout's only design risk (being honest without an LLM) is already retired by
+its locked definition, so it is low-risk to build. The live uncertainty is
+whether the lede-rationale invariant is correctly scoped — which only reveals
+itself when the validator meets the real recorded fixtures — so the contract
+work gates first, surfacing any mis-scoping before anything depends on it.*
 
-### Phase 0 — Collapsed-rail correctness (P3, P4, P9)
+### Phase 0 — Contract invariants
 
-**Why first:** clipping/overflow is real breakage, not polish — everything else
-assumes a rail that fits its own 48px band.
+**Why first:** retires the one still-open risk — whether the invariants (esp.
+lede-rationale scoping, #5) match the real recorded fixtures. A mis-scoped
+invariant fails a fixture immediately here, before the coverage work builds on
+the same assembled-resume shape.
 
-**Deliverable:** wordmark, theme, logout all consume `useRailCollapsed()` and go
-icon-only when collapsed; collapsed nav padding fixed so nothing overflows 48px.
-
-**Done means (executable):**
-- At ≥1024px, collapse the rail (`data-collapsed="true"`): `rail-pane`
-  `clientWidth === 48`, and **no descendant** of `rail-pane` has
-  `scrollWidth > clientWidth` (not just the top-level pane — RT#2). Overflow may
-  not be masked with `overflow:hidden` on an inner wrapper; the collapsed rail
-  is additionally screenshot-diffed against a committed baseline.
-- Wordmark contrast (RT#1): collapsed → the serif "Lede" text node is ABSENT
-  **AND** the "L" box element is present and visibly rendered (non-zero bounding
-  box); expanded → "Lede" text present. Cheat closed: `display:none`-ing the
-  whole wordmark fails the "L present" half.
-- Theme + logout contrast: expanded → visible text ("Dark mode"/"Light mode",
-  "Log out") present; collapsed → text ABSENT, both buttons still queryable by
-  `aria-label` and operable (click fires).
-- Centering (RT#3, gates P9): each collapsed rail icon's horizontal center is
-  within a small tolerance of `rail-pane`'s center x (≈24px), and the nav icons
-  and the footer (theme/logout) icons share that same center x — proves
-  "optically aligned," not merely "not overflowing."
-
-### Phase 1 — One rail language (P1, P2, P5, P7, P8, P10, P11)
-
-**Deliverable:** footer = two matching labeled rows (theme / "Log out"), 16px
-icons throughout; footer controls use the `--ring-weak` hover (not
-`bg-accent`); one focus-ring footprint; a single footer divider on unified `p-2`
-rhythm; collapse toggle relocated to the rail top beside the wordmark;
-collapsed footer controls carry Radix tooltips.
+**Deliverable:** the mechanical decision-contract validator, wired into
+`tailor()` and `mapTailorError`, with unit tests.
 
 **Done means (executable):**
-- Icon size: every `<svg>` rendered inside `rail-pane` has `width === 16`
-  (no 24px). Contrast: pre-change theme/logout svgs are 24 → must become 16.
-- Footer layout (RT#4): expanded, theme + logout are two rows that (a) share the
-  same left edge x, (b) have equal width ≈ the rail's content width (full-width,
-  not short), (c) have equal height, and (d) are vertically adjacent — gap
-  between them < one row height. This proves a "grouped pair," excluding both
-  `justify-between` (horizontal) and `flex-col justify-between` (rows pushed to
-  opposite vertical ends).
-- Hover language (RT#8): pin the mechanism to `background-color` — NavTabs' hover
-  IS `hover:bg-[var(--ring-weak)]` (a background), so footer controls match the
-  SAME property. Hovering a footer control, computed `background-color` equals
-  the `--ring-weak` resolved color, NOT `--accent-bg` (the active-nav swatch).
-  Contrast: active nav link stays `--accent-bg`; hovered footer control ≠ it.
-- Collapse toggle placement (RT#5, RT#6): visual, not DOM-order — the toggle's
-  bounding-box top is above the primary nav's top; its width ≤ an icon-button
-  size (≤40px), not merely < rail width; **expanded** → the toggle shares the
-  wordmark's row (y-overlap with the wordmark box); **collapsed** → the toggle
-  is centered directly below the "L" box.
-- Focus ring (RT#9, gates P7): focusing each rail control in turn (wordmark,
-  each nav link, theme, logout, collapse toggle) yields an identical ring width
-  AND offset — no control mixes `ring-offset-2` with a no-offset sibling.
-- Divider + rhythm (RT#10, gates P8): exactly one `border-t` between the nav
-  section and the footer, and the footer section's padding === the wordmark/nav
-  sections' padding (`p-2`).
-- Wordmark quiet-logo (RT#11, gates P6/OQ5): the wordmark `<Link>`'s computed
-  `background-color` (and text color) are identical hovered vs. not — no hover
-  wash. Defends the "deliberately no hover" decision against silent drift.
-- Collapse-toggle glyph (RT#12, gates P11): the toggle's icon glyph swaps
-  between collapsed/expanded (`PanelLeftOpen` ↔ `PanelLeftClose`) while its
-  `background-color` does not change between the two states.
-- Tooltips: with the rail collapsed, focusing the theme, logout, and collapse
-  controls each surfaces a `role="tooltip"` with the control's name (same Radix
-  primitive NavTabs uses; native `title` alone does not satisfy this).
+- `bunx vitest run` green, incl. new contrast tests:
+  - Partition: a decision **omitting** a library entry from both lists → throws;
+    a decision partitioning the library exactly → passes. An id in **both**
+    lists → throws; in exactly one → passes. An id in `items`/`cut` **absent
+    from the library** → throws. The **same id twice within `items`** (or within
+    `cut`) → throws.
+  - Rank: two items in the **same** section with equal `rank` → throws; **two
+    items in DIFFERENT sections sharing a `rank` → passes**; a non-integer or
+    `< 1` rank → throws; unique integer ranks → passes.
+  - Lede rationale: a `rephrase:"full"`-section group whose lowest-rank item has
+    empty/whitespace/missing `leadRationale` → throws; every full-section lede
+    with a non-blank rationale → passes. **A lede in a `rephrase:"light"`/`"none"`
+    section (e.g. education, skill) with NO rationale → passes** (proves the
+    invariant is scoped, not global).
+- **Integration (not isolation):** feeding `tailor()` a genuinely
+  contract-violating **fixture decision** (a recorded/constructed decision, not
+  a hand-thrown error) drives the real pipeline to throw `DecisionContractError`
+  — proving the validator is actually *called* by `tailor()`, not merely
+  importable.
+- `bun run check` clean.
+- The route maps `DecisionContractError` to **its own HTTP code, distinct from
+  the fabrication code**, sets `genState:"failed"`, and — with a **non-null
+  prior `current` of known content** — leaves that `current` **byte-identical**
+  after the failure (mirrors and extends the existing fabrication persistence
+  test).
 
-### Phase 2 — Collapse motion (P12)
+### Phase 1 — JD-signal coverage readout
 
-**Deliverable:** labels fade in/out coordinated with the 200ms width slide;
-instant under reduced motion.
+**Deliverable:** the pure coverage function + ReasoningPanel surfacing.
 
 **Done means (executable):**
-- RT#7 — assert the opacity actually CHANGES, not just that a transition is
-  declared. Under `prefers-reduced-motion: no-preference`: a rail label's
-  computed opacity is ≈0 when collapsed and ≈1 when expanded, animating over
-  ~200ms (mid-transition sample is strictly between 0 and 1). Cheat closed: a
-  `transition: opacity 1ms` on an always-opacity-1 label fails the 0↔1 delta.
-- Under `prefers-reduced-motion: reduce`: the same 0↔1 change is instantaneous
-  (no mid-transition intermediate). (Playwright emulates both media states.)
+- `bunx vitest run` green, incl. keyless contrast tests on the pure coverage
+  function:
+  - Given `weights = ["platform SDK productization", "API versioning"]` and one
+    lede whose `leadRationale` = "leads with platform/SDK productization — the
+    JD's top weighted requirement" → uncovered = `["API versioning"]`.
+  - Given a second lede whose rationale also names "API versioning" → uncovered
+    = `[]`.
+  - **`hardRequirements` are folded into the same uncovered set as `weights`**:
+    a signal present only in `hardRequirements`, named by no lede rationale →
+    appears in uncovered; named by a lede rationale → does not.
+  - `roleLevel` is excluded from both covered and uncovered computation.
+  - **A signal named only by a NON-lede item's `leadRationale` → still
+    uncovered** (proves lede-only, not any-rationale).
+  - **A signal token present only in a lede item's `text` (not its rationale) →
+    still uncovered** (proves rationale-referenced, not text-match).
+  - **Documented-limit case:** two signals sharing a ≥4-char token, one named by
+    a lede rationale → the test asserts BOTH read as covered, pinning the known
+    ANY-token behavior as intended, not a bug.
+- A component/e2e assertion (`applications` project) that drives the
+  ReasoningPanel from **real decision data** (application fixture → assembled
+  resume → derived uncovered), NOT an injected `uncovered` prop, with a fixture
+  pinned so **≥1 signal is covered and ≥1 uncovered**: the uncovered one renders
+  under non-evaluative copy ("no lede addresses …"); the covered one is
+  **absent** from that list. A separate case with an empty uncovered set asserts
+  the section is **not rendered**.
+- `bun run check` clean.
 
 ## Environment & preconditions
 
-- None beyond the standing keyless dev/test setup (`bun install`, Playwright
-  projects). No API key, no external service.
+- Both phases are **keyless** — vitest + fixtures, no API key. Commands: `bun
+  run check`, `bunx vitest run`, `bunx playwright test --project=applications`
+  (for any ReasoningPanel e2e; note design.spec lives in that project).
+- The pre-use *test* the human will run separately (the existing flip-eval,
+  `bunx tsx scripts/eval.ts`) needs `GOOGLE_GENERATIVE_AI_API_KEY` — but that is
+  a run, not a build target of this spec.
+- **Fixture reconciliation.** Wiring the validator into `tailor()` puts it on
+  the keyless (`FixtureEngine`) path, so every recorded decision in
+  `test/fixtures/decisions/` must satisfy the new invariants or the keyless
+  suite breaks. Precondition: run the validator over all recorded fixtures. **If
+  a fixture fails, that is evidence the invariant is mis-scoped — loosen the
+  invariant; do NOT edit the recorded decision.** Recorded fixtures are captured
+  real model output (fact-lock provenance); rewriting them to pass is
+  out-of-scope fabrication-adjacent editing, not reconciliation.
 
 ## Open questions
 
-*(empty — OQ1–OQ6 resolved 2026-07-12: OQ1 icon-only stack, OQ2 two labeled
-rows, OQ3 toggle beside wordmark, OQ4 widen→audit folded in as P5–P12, OQ5
-quiet logo, OQ6 fade-with-slide. Audit's mechanical findings defaulted.)*
+*(empty — all resolved.)*
 
 ## Change orders
 
 <!-- Post-lock only. -->
+
+## Braindump (raw)
+
+<!-- empty — first-session material was captured structured directly into the
+     sections above (engine reality read from code; the five hardening
+     candidates; the scope decisions). -->

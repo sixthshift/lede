@@ -8,12 +8,13 @@ import path from "node:path";
 import Fastify from "fastify";
 import type { FastifyInstance } from "fastify";
 
-import type { Entry, TailorDecision } from "@shared/types";
+import type { Entry, Layout, TailorDecision } from "@shared/types";
 import { buildApp } from "../src/server/index";
 import { initDb, type Db } from "../src/server/db";
 import { seedIfEmpty } from "../src/server/seed";
 import { CONTRAST_JDS } from "../src/server/tailor/evalcore";
-import { buildUserPrompt, type TailorEngine } from "../src/server/tailor/engine";
+import { buildUserPrompt, tailor, type TailorEngine } from "../src/server/tailor/engine";
+import { DecisionContractError } from "../src/server/tailor/validate";
 import { deriveContentBudget } from "../src/server/tailor/budget";
 import { DEFAULT_FORMAT_V2 } from "@shared/format-v2";
 import { applicationsRoutes } from "../src/server/routes/applications";
@@ -279,5 +280,152 @@ describe("LIVE mode with no stored key -> 400 {error: 'no_api_key'}, before any 
 
     const fetched = await app.inject({ method: "GET", url: `/api/applications/${id}` });
     expect(fetched.json().genState).toBe("untailored");
+  });
+});
+
+// T002 — validateDecisionContract wired into tailor(), BEFORE assemble(), and
+// OUTSIDE any retry: a flat-contract violation (here, a duplicate rank within
+// one section — assemble() itself never guards against this; it only throws
+// on a foreign/unknown entryId) must surface as DecisionContractError, and
+// decide() must be called exactly once (no self-repair, no extra retry —
+// §6.1: decide() already retries once internally inside ProviderEngine;
+// tailor() sits outside that envelope and must not add a second layer).
+describe("tailor() wires validateDecisionContract before assemble(), outside any retry", () => {
+  const e1: Entry = {
+    id: "e1",
+    section: "experience",
+    sortKey: 202101,
+    meta: { section: "experience", company: "Acme", role: "Eng", period: "2021-present" },
+    facts: ["did a thing"],
+    tags: [],
+  };
+  const e2: Entry = {
+    id: "e2",
+    section: "experience",
+    sortKey: 202102,
+    meta: { section: "experience", company: "Acme", role: "Eng", period: "2021-present" },
+    facts: ["did another thing"],
+    tags: [],
+  };
+  const layout: Layout = [{ section: "experience", enabled: true }];
+
+  // Partition is exact (both e1/e2 in items, none cut) — this violation is
+  // ONLY the duplicate rank, isolating the rank check from the partition check.
+  const duplicateRankDecision: TailorDecision = {
+    signals: { roleLevel: "senior", weights: [], hardRequirements: [] },
+    summary: "Summary.",
+    items: [
+      { entryId: "e1", text: "t", rank: 1 },
+      { entryId: "e2", text: "t", rank: 1 },
+    ],
+    cut: [],
+  };
+
+  class CountingEngine implements TailorEngine {
+    calls = 0;
+    async decide(): Promise<TailorDecision> {
+      this.calls += 1;
+      return duplicateRankDecision;
+    }
+    async decideLetter(): ReturnType<TailorEngine["decideLetter"]> {
+      throw new Error("not used");
+    }
+  }
+
+  it("a duplicate rank within one section throws DecisionContractError, and decide() is called exactly once", async () => {
+    const engine = new CountingEngine();
+
+    let error: unknown;
+    try {
+      await tailor(engine, "Hiring an engineer.", [e1, e2], layout);
+    } catch (err) {
+      error = err;
+    }
+
+    expect(error).toBeInstanceOf(DecisionContractError);
+    expect(engine.calls).toBe(1);
+  });
+});
+
+// T002 — route/persistence: a contract-violating re-tailor is mapped to its
+// OWN distinct HTTP code (not 502/fabrication, not 422/no_fixture), and
+// leaves `current`/genState exactly like RED-TEAM #11's provider-failure
+// case: 'tailored' (positive control) -> 'failed', with `current` still
+// deep-equaling the prior success (never touched by the failed re-tailor).
+describe("RED-TEAM #12: a decision-contract violation on re-tailor maps to a distinct HTTP code and leaves `current`/genState untouched-then-failed", () => {
+  it("current still deep-equals the prior success after a contract-violating re-tailor; HTTP code and error string are both distinct from fabrication/no_fixture", async () => {
+    const db = freshDb();
+    seedIfEmpty(db);
+
+    // The three seeded entries share company/role/period, so assemble()
+    // groups them into one experience group — same shape as the recorded
+    // fixtures (see test/decision-contract.test.ts's fixture-reconciliation
+    // suite). The first (successful) decision partitions them exactly and
+    // gives the lede (rank 1) a leadRationale, satisfying validateLedeRationale.
+    const validDecision: TailorDecision = {
+      signals: { roleLevel: "senior", weights: [], hardRequirements: [] },
+      summary: "Summary.",
+      items: [
+        {
+          entryId: "cloudcase-rules-engine",
+          text: "t",
+          rank: 1,
+          leadRationale: "Because it's the strongest match.",
+        },
+        { entryId: "cloudcase-frontend-rewrite", text: "t", rank: 2 },
+        { entryId: "cloudcase-platform-sdk", text: "t", rank: 3 },
+      ],
+      cut: [],
+    };
+    // Same partition (still exact — assemble would happily accept this), but
+    // rules-engine and frontend-rewrite now collide on rank 1 within the same
+    // "experience" section — the flat rank check catches it before assemble.
+    const violatingDecision: TailorDecision = {
+      signals: { roleLevel: "senior", weights: [], hardRequirements: [] },
+      summary: "Summary.",
+      items: [
+        {
+          entryId: "cloudcase-rules-engine",
+          text: "t",
+          rank: 1,
+          leadRationale: "Because it's the strongest match.",
+        },
+        { entryId: "cloudcase-frontend-rewrite", text: "t", rank: 1 },
+        { entryId: "cloudcase-platform-sdk", text: "t", rank: 2 },
+      ],
+      cut: [],
+    };
+
+    class ContractViolatingEngine implements TailorEngine {
+      calls = 0;
+      async decide(): Promise<TailorDecision> {
+        this.calls += 1;
+        return this.calls === 1 ? validDecision : violatingDecision;
+      }
+    }
+    const engine = new ContractViolatingEngine();
+    const app = appWithSpy(db, engine);
+
+    const created = await post(app, "/api/applications", { jobDescription: "Hiring an engineer." });
+    const id = created.json().id as string;
+
+    // positive control — a real success, so the before/after/before shape
+    // proves the failure below leaves a genuine prior snapshot untouched.
+    const first = await post(app, `/api/applications/${id}/tailor`);
+    expect(first.statusCode).toBe(200);
+    expect(first.json().genState).toBe("tailored");
+    const successCurrent = first.json().current;
+    expect(successCurrent).not.toBeNull();
+
+    const second = await post(app, `/api/applications/${id}/tailor`);
+    expect(second.statusCode).toBe(424);
+    expect(second.statusCode).not.toBe(502);
+    expect(second.statusCode).not.toBe(422);
+    expect(second.json()).toEqual({ error: "decision_contract" });
+    expect(second.json().error).not.toBe("fabrication");
+
+    const fetched = await app.inject({ method: "GET", url: `/api/applications/${id}` });
+    expect(fetched.json().current).toEqual(successCurrent);
+    expect(fetched.json().genState).toBe("failed");
   });
 });

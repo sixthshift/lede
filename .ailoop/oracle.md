@@ -1,170 +1,170 @@
-# Oracle — Lede v5 (Rail chrome polish)
+# Oracle — Tailor Engine Hardening
 
-**Contract:** `SPEC.md` · spec_version 1 · sha256 `4b70505a8b611fca05d341ca3d0de343b72359e47a3050e4124f12af1283adb2`
+**Contract:** `SPEC.md` · spec_version 1 · sha256 `092dcb73de810a75c5726db9873887ec2542cd7fbce9f531f0d1f3735b017571`
 <!-- Resume recomputes the hash and refuses to dispatch on a mismatch. -->
-<!-- Prior campaigns v1–v4 archived under specs/. This is v5, a fresh spec. -->
 
-The definition of done. Workers cite it; the coordinator gates against it.
-
-## Environment adaptation (mechanical, intake — ledgered)
-
-This project's `CLAUDE.md` **contraindicates ailoop's default worktree fan-out**:
-"Agent worktrees are unreliable here: they branch stale and their in-worktree
-builds hit font-path ENOENTs. Prefer single-agent-on-main for build tasks." It
-also forbids running Playwright suites concurrently (each boots a webServer on
-ports 8787–8789). Since v5 is also inherently serial (every ticket touches
-`src/client/App.tsx`), fan-out yields nothing.
-
-**Adaptation:** builders are dispatched **single-agent, serially, on the main
-working tree** (no `isolation: 'worktree'`). Per ticket the coordinator:
-1. captures `baseSha = git rev-parse HEAD` before dispatch;
-2. the builder edits only its declared `files`, runs baseline + acceptance,
-   reports;
-3. the coordinator **independently re-verifies** on the same tree: re-runs
-   baseline + acceptance, computes scope via `git diff --name-only HEAD` (working
-   tree vs the pre-dispatch commit), reads the diff for gaming;
-4. on accept, **commits** the ticket (the commit is the merge — mainline moves
-   forward one ticket at a time); on reject, `git checkout -- .` / `git clean`
-   the ticket's files and re-dispatch with the `attempts` log.
-Interruption leaves uncommitted changes on main; resume reconciles via
-`git status` (re-verify or discard). This replaces the branch/worktree
-reconcile path in SKILL.md's Resume section for this project only.
+Definition of done for the two-deliverable hardening drive: (1) an airtight
+mechanical decision-contract validator around the model's judgment; (2) a
+JD-signal coverage readout in the ReasoningPanel. Both keyless & mechanical.
 
 ## Locked decisions (never re-litigated — cite in every worker prompt)
 
-From `SPEC.md` "Standing constraints" + "Locked decisions" and the repo's
-`CLAUDE.md`:
-
-- **Visual identity frozen.** Palette, IBM Plex families, 8px radius, shadow
-  philosophy, single blue accent `#2643bd`. `src/client/styles/tokens.css` is
-  the single source of color/radius/shadow truth. May correct a token *value* a
-  finding demands; never the identity, never a new/unbounded design axis.
-- **No new UI dependency.** Stack unchanged, client-only. `lucide-react`,
-  `sonner`, radix primitives already present. Anything else is a fork → escalate.
-- **De-modal, forever** (v3; v4 viewport exception). Nothing here adds modality.
-- **Rail collapse is view-state only.** localStorage at most; never a
-  `settings.layout`/`sectionDisplay` write, no network request on toggle. The
-  existing `useRailCollapsed()` context is the collapse signal.
-- **Extend v4's icon-rail language; don't invent one.** `NavTabs.tsx` is the
-  reference (16px icons, `--ring-weak` hover wash, `bg-accent` active, collapsed
-  = icon-only + Radix tooltip).
-- **Keyless.** Build, boot, full suite need no API key (fixtures).
-
-### Resolved layout (SPEC OQ1–OQ6 — the design contract)
-
-- Collapsed rail (48px) = icon-only stack: wordmark → "L" box only; theme +
-  logout → centered 16px icon buttons + hover/focus Radix tooltips.
-- Expanded rail (224px) footer = two matching labeled rows ("Dark mode"/"Light
-  mode", "Log out"), evenly sized, stacked, grouped (not `justify-between`).
-- Collapse toggle → rail top, beside the wordmark; when collapsed, centered
-  directly below the "L" box. Removed from the footer.
-- Icon size = 16px everywhere in the rail.
-- Wordmark = quiet logo: clickable, deliberately NO hover state.
-- Collapse = labels fade (opacity) with the 200ms width slide; instant under
-  `prefers-reduced-motion: reduce`.
+- **The model returns judgment only; the server assembles all structure.** This
+  drive hardens/reads the SERVER side only.
+- **No LLM-checks-LLM validation.** Every check added here is mechanical (no
+  `generate*` / no model call in any validator or the coverage function).
+- **`SYSTEM_PROMPT` is FROZEN** — no instruction edits, no tuning (`prompt.ts`,
+  `letter-prompt.ts` are off-limits for content).
+- Facts, not tags. The fact-lock. Keyless by default (both deliverables run with
+  no API key; `NODE_ENV=test` → `FixtureEngine`).
+- **Recorded fixtures are captured real model output — NOT ours to rewrite.** If
+  the validator rejects a recorded fixture, the INVARIANT is mis-scoped: loosen
+  the invariant, never edit `test/fixtures/decisions/*.json`.
+- Standing (CLAUDE.md): react-pdf only; renderer never cuts; reasoning strings
+  (`leadRationale`/`cut`) never enter the PDF subtree; de-modal; bounded axes.
 
 ## Scope tripwire (halt if crossed)
 
-From `SPEC.md` "Out of scope":
-- Reviving the header bar (dissolved in v4).
-- `BottomTabBar` / the below-`lg` regime (v5 is the desktop rail only).
-- New theme options beyond light/dark; any theming settings UI.
-- Any `settings`/server write from the rail (collapse stays localStorage-only).
-- New nav destinations or an account/overflow menu.
-- Mutating `src/client/styles/tokens.css` identity, or the shared
-  `components/ui/button.tsx` ghost variant globally (rail hover fixes are
-  applied **rail-locally**, never by changing the app-wide variant).
+- Any change to `SYSTEM_PROMPT` or the model's judgment/phrasing.
+- Any LLM-based validation or LLM-judge quality/coverage scoring.
+- Rebuilding the flip-eval (`scripts/eval.ts` + `evalcore.ts`) or the
+  ReasoningPanel — both exist; extend/alias at most.
+- Mechanical *semantic* checks beyond numbers (verb-strengthening etc.).
+- Fabrication self-repair / re-prompt loops.
+- A `bun run eval` alias / eval packaging.
+- New configurable settings/knobs — ambient defaults only.
+- Cutting content to fit pages / altering the density ladder.
+- Tag-scoring or level-scoring.
+- Any evaluative coverage judgment (good/bad) — the readout is FACTUAL only
+  ("no lede addresses X"), never "your resume lacks X".
+- **Editing or re-recording existing fixture decisions** to satisfy the
+  validator.
 
 ## Baseline gate (every ticket, no exceptions)
 
-Run by the builder (may scope the e2e step to affected specs) AND
-authoritatively re-run **in full** by the coordinator:
+Fast tier (per ticket — independent verifier always runs the FULL tier):
+- [ ] type-check: `bun run check` → exit 0 (both client + server tsconfigs)
+- [ ] build: `bun run build` → exit 0
+- [ ] lint: `bun run lint` → exit 0 (biome)
+- [ ] full unit suite: `bunx vitest run` → all pass
+- [ ] new behavior ships with new tests, green under the above
 
-- [ ] type-check: `bun run check` → exit 0
-- [ ] build: `bun run build` → exit 0  *(required before e2e — stale `dist/`
-      breaks design specs per CLAUDE.md)*
-- [ ] lint: `bun run lint` → exit 0
-- [ ] unit tests: `bunx vitest run` → all pass
-- [ ] e2e regression (docker excluded — milestone-only per CLAUDE.md):
-      `bunx playwright test --project=chromium --project=auth --project=applications`
-      → all pass. **Never run concurrently with another suite.**
-- [ ] new behavior ships with new tests (Playwright, `applications` project),
-      green under the above.
+Gate tier (per phase close, merged tree):
+- [ ] e2e: `bunx playwright test --project=applications` → all pass
+  <!-- design.spec.ts lives in this project; --project=chromium finds no
+       ReasoningPanel test. Run `bun run build` first (stale dist/ fails
+       design.spec with fitToPages fetch errors). Never run suites
+       concurrently (each boots its own webServer on PORT-derived ports). -->
 
-Note: rail specs live in the **`applications`** project. Test files
-`rail-collapse.spec.ts`, `rail-design.spec.ts`, `motion.spec.ts` are already in
-that project's `testMatch` — append v5 assertions to them; **no
-`playwright.config.ts` edit needed** (avoids a shared-file touch). Login helper:
-`test/e2e/helpers/workspace.ts` (`login`, `createApplication`); the
-`applications` server password is `"correct horse battery staple e2e
-applications"` (must match `rail-design.spec.ts` exactly — single server secret).
+A ticket shipping a NEW gate-tier (playwright) test runs THAT test itself
+(builder + verifier); everything else defers to phase close.
 
-## Per-phase acceptance (executable, on the merged/committed tree)
+## Flake quarantine
 
-### Phase 0 — Collapsed-rail correctness (T001)
-At ≥1024px, collapse the rail (`[data-testid="rail-pane"][data-collapsed="true"]`):
-- [ ] The rail collapses to the icon band: **poll** `rail-pane` boundingBox width
-      until the 200ms width transition settles, then assert it is in `[40,64]`
-      (the established v4-T022 band; exact `clientWidth===48` was wrong in letter
-      — border-box makes clientWidth≈47, and a single post-flip read races the
-      CSS transition → **mechanical amendment 2026-07-13, ledger [0010]**). AFTER
-      the width settles: **no descendant** has `scrollWidth > clientWidth`, and no
-      descendant clips overflow (hidden/clip/scroll on either axis) to mask it.
-- [ ] Wordmark: collapsed → serif "Lede" text ABSENT **and** the "L" box present
-      + visible (non-zero box); expanded → "Lede" present.
-- [ ] Theme + logout: collapsed → visible text absent, both still queryable by
-      `aria-label` + operable (click fires); focusing each surfaces a
-      `role="tooltip"` with its name (Radix, not native `title`).
-- [ ] Each collapsed rail icon's horizontal center ≈ `rail-pane` center (≈24px);
-      nav icons and footer icons share that center x.
+<!-- Known env quirks (CLAUDE.md), not yet observed here — recorded so a verify
+     applies the discriminator without re-deriving. A quarantined test failing
+     IN ISOLATION is still a hard red. -->
 
-### Phase 1 — One rail language (T002, T003)
-- [ ] Every `<svg>` inside `rail-pane` has `width === 16` (no 24px).
-- [ ] Expanded footer: theme + logout are two rows sharing a left edge x, equal
-      width ≈ rail content width, equal height, vertically adjacent (gap < row
-      height) — a grouped pair, not `justify-between` (horizontal) nor
-      `flex-col justify-between` (split to opposite ends).
-- [ ] Hover language: hovering a footer control, computed `background-color` ===
-      the `--ring-weak` resolved color, ≠ `--accent-bg` (active-nav swatch);
-      active nav link stays `--accent-bg`.
-- [ ] Collapse toggle: bounding-box top above the primary nav's top; width ≤ an
-      icon-button size (≤40px), not merely < rail width; expanded → shares the
-      wordmark's row (y-overlap); collapsed → centered directly below the "L" box.
-- [ ] Focus ring: each rail control (wordmark, each nav link, theme, logout,
-      collapse toggle) yields identical ring width AND offset — no mixed
-      `ring-offset`.
-- [ ] Exactly one `border-t` between the nav section and the footer; footer
-      padding === the wordmark/nav sections' padding (`p-2`).
-- [ ] Wordmark `<Link>` computed `background-color` + text color identical
-      hovered vs not (quiet logo — no hover wash).
-- [ ] Collapse toggle glyph swaps between states (`PanelLeftOpen` ↔
-      `PanelLeftClose`); its `background-color` unchanged between states.
+| Test | Failure mode | Discriminator | Root cause (out of scope because…) |
+|---|---|---|---|
+| any playwright spec | `@fontsource` fetch flake under full-suite run | re-run the spec ALONE 3–5× | pre-existing test-infra font-path timing (CLAUDE.md documents it) |
+| `test/library-filter.test.tsx`, `test/fit-ui.test.tsx`, `test/application-detail-design.test.tsx` | timeout (30–46s durations) under the loaded full 84-file `bunx vitest run` — timing-fragile jsdom UI tests (debounce/async waits) | re-run the 3 files together in isolation 3× → 12/12 pass (confirmed T001: ISO_1/2/3 EXIT=0) | jsdom component-test timing under suite load; product code they exercise is client UI unrelated to this server-side spec — a vitest EXIT=1 whose ONLY reds are these three files, all passing in isolation, is green for acceptance. Failing IN ISOLATION is still a hard red. |
 
-### Phase 2 — Collapse motion (T004)
-- [ ] `prefers-reduced-motion: no-preference`: a rail label's computed opacity is
-      ≈0 collapsed and ≈1 expanded, mid-transition strictly between 0 and 1 over
-      ~200ms (a `transition: opacity 1ms` on an always-opacity-1 label must FAIL).
-- [ ] `prefers-reduced-motion: reduce`: the same 0↔1 change is instantaneous (no
-      intermediate). Playwright emulates both media states.
+## Per-phase acceptance (executable — pass on the MERGED tree)
+
+### Phase 0 — Contract invariants
+- [ ] `bun run check` → exit 0; `bun run build` → exit 0; `bun run lint` → exit 0
+- [ ] `bunx vitest run` → all pass, INCLUDING new contract tests:
+  - **Partition:** decision omitting a library entry from both lists → throws;
+    exact partition → passes. Id in BOTH lists → throws; in exactly one →
+    passes. Id in `items`/`cut` ABSENT from library → throws. Same id twice
+    within `items` (or within `cut`) → throws.
+  - **Rank:** two items in the SAME section with equal `rank` → throws; two
+    items in DIFFERENT sections sharing a `rank` → passes; non-integer or `<1`
+    → throws; unique integer ranks → passes. (Section resolved by entryId
+    lookup in the library — raw decision has no section field.)
+  - **Lede rationale:** a `rephrase:"full"`-section group whose lowest-rank
+    item has empty/whitespace/missing `leadRationale` → throws; full-section
+    lede with non-blank rationale → passes. A lede in a `light`/`none` section
+    (education/skill) with NO rationale → passes (proves scoping). *Final scope
+    is whatever survives fixture reconciliation — see below; a loosening is
+    documented in this file + ledger, not silent.*
+- [ ] **Integration (not isolation):** a genuinely contract-violating fixture
+  decision fed through the real `tailor()` pipeline throws
+  `DecisionContractError` — proving the validator is CALLED by `tailor()`, not
+  merely importable.
+- [ ] **Fixture reconciliation:** the validator, run over ALL recorded fixtures
+  (`test/fixtures/decisions/*.json`) via the real `assemble()`, passes every
+  one, AND a NON-ZERO count of full-rephrase-section ledes was actually checked
+  across the set (a loosening to near-vacuous fails this count — keeps any
+  loosening minimal + visible). A failure means loosen the invariant (record
+  the final scope here); the wired keyless `bunx vitest run` staying green is
+  the proof. **Lede = lowest-RANK item of its group, not `items[0]` in decision
+  order** (a contract test with out-of-order raw items proves this).
+- [ ] **Route persistence:** `mapTailorError` maps `DecisionContractError` to
+  its OWN HTTP code, **pinned to a specific value distinct from EVERY code the
+  map already returns** (422/502/401/429); sets `genState:"failed"` (transition
+  from `"tailored"`, not checked in isolation); and with a non-null prior
+  `current` of known content leaves that `current` **byte-identical** after the
+  failure (mirrors & extends RED-TEAM #11 at
+  `test/api.applications-tailor.test.ts:233`). The check runs pre-assemble
+  (a violation assemble doesn't itself guard proves it) and `decide()` is
+  called exactly once (no retry).
+
+### Phase 1 — JD-signal coverage readout
+- [ ] `bun run check` → exit 0; `bun run build` → exit 0; `bun run lint` → exit 0
+- [ ] `bunx vitest run` → all pass, INCLUDING keyless contrast tests on the pure
+  coverage function (uncovered = signals named by NO lede rationale):
+  - `weights=["platform SDK productization","API versioning"]`, one lede
+    rationale naming platform/SDK → uncovered `["API versioning"]`; a second
+    lede naming "API versioning" → uncovered `[]`.
+  - `hardRequirements` fold into the SAME uncovered set as `weights`.
+  - `roleLevel` excluded from covered AND uncovered.
+  - a signal named only by a NON-lede item's `leadRationale` → still uncovered
+    (lede-only, not any-rationale).
+  - a signal token present only in a lede item's `text` (not its rationale) →
+    still uncovered (rationale-referenced, not text-match).
+  - **documented-limit case:** two signals sharing a ≥4-char token, one named by
+    a lede rationale → the test asserts BOTH read covered (pins ANY-token
+    behavior as intended).
+- [ ] `bunx playwright test --project=applications` → all pass, INCLUDING a new
+  spec (added to the applications testMatch, matched by NO other project)
+  driving the ReasoningPanel from REAL decision data (fixture → assembled
+  resume → derived uncovered, NOT an injected `uncovered` prop), fixture pinned
+  so ≥1 signal covered AND ≥1 uncovered, asserting EXACT signal identities (not
+  cardinality): the uncovered one renders under non-evaluative copy matching
+  `/no lede addresses/i` verbatim; the covered one is ABSENT from that list.
+- [ ] Component guard (`test/reasoning-coverage.test.tsx`): `<ReasoningPanel>`
+  takes ONLY `resume` (no coverage-shaped prop — `bun run check` enforces);
+  TWO distinct hide cases — (a) ≥1 lede all-covered → hidden, (b) zero ledes +
+  non-empty signals → hidden.
+- [ ] **Reuse enforced:** the coverage matcher is the SAME token logic as the
+  flip-eval's `rationaleReferencesSignal`/`tokenize` (single source, extracted
+  to a client-safe shared module) — not a fresh matcher. No `node:*` import
+  reaches the client bundle (`bun run build` proves it).
 
 ## Coverage map (spec → delivery)
 
-| Spec finding | One line | Delivered by |
+| Spec § | Requirement (one line) | Delivered by |
 |---|---|---|
-| P1 | expanded cluster mismatched | T002 |
-| P2 | collapse toggle stranded/full-width | T003 |
-| P3 | wordmark not collapse-aware | T001 |
-| P4 | bottom cluster not collapse-aware | T001 |
-| P5 | hover fill = active-nav fill | T002 |
-| P6/OQ5 | wordmark quiet logo (no hover) | T002 (asserted) |
-| P7 | focus-ring geometry inconsistent | T003 |
-| P8 | doubled footer divider + padding | T003 |
-| P9 | collapsed nav overflows 48px | T001 |
-| P10 | collapsed controls need Radix tooltips | T001 (theme/logout), T003 (toggle) |
-| P11 | toggle aria-pressed glyph distinction | T003 |
-| P12/OQ6 | collapse label motion | T004 |
-| Icon size 16px | consistency fix | T002 |
+| D1 Partition | entry-id partition: exact ∪, disjoint, no foreign, no dup | T001 |
+| D1 Rank | integer ≥1, unique within section (section via library lookup) | T001 |
+| D1 Lede rationale | every full-rephrase-section lede has non-blank rationale (scope survives reconciliation) | T001 |
+| D1 failure mode | `DecisionContractError` thrown; no self-repair/retry | T001, T002 |
+| D1 placement | flat checks pre-assemble, lede check post-assemble, inside `tailor()` outside provider retry | T002 |
+| D1 tolerate extra rationale | extra `leadRationale` on non-lede tolerated & discarded | T001 (asserted) |
+| Fixture reconciliation | validator passes all recorded fixtures (loosen, don't edit fixtures) | T001 |
+| D1 route | `mapTailorError` → distinct code; `genState:"failed"`; `current` byte-identical | T002 |
+| D2 signal source | `weights ∪ hardRequirements`, `roleLevel` excluded | T003 |
+| D2 lede-only | covered iff a LEDE's rationale references the signal | T003 |
+| D2 documented limit | ANY shared ≥4-char token (reuse `rationaleReferencesSignal`) | T003 |
+| D2 reuse/single-source | shared client-safe matcher; `evalcore` re-imports it | T003 |
+| D2 honest framing | "no lede addresses X" copy; hide when uncovered empty OR zero ledes | T004 |
+| D2 surface | extend ReasoningPanel; keyless, always-on, per-render | T004 |
+| D2 e2e | applications-project spec from real decision data | T004 |
+| Out-of-scope list | none crossed | per-ticket scope check + tripwire |
 
 ## Caps
 
-`backlog.json`: maxAttempts 3 · thrash 2 · chunk 20 dispatches/invocation.
+`backlog.json` `caps`: maxAttempts 3 · thrash 2. No dispatch cap — run to
+completion. Builders: `model: sonnet`. Gates/verify/coordinator: session model.

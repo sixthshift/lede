@@ -276,8 +276,21 @@ function makeResumeDecision(overrides: Partial<TailorDecision> = {}): TailorDeci
   return {
     signals: { roleLevel: "senior", weights: ["platform"], hardRequirements: [] },
     summary: "Built platform tooling.",
-    items: [{ entryId: LEAD_ENTRY.id, text: "built a platform SDK", rank: 1 }],
-    cut: [],
+    items: [
+      {
+        entryId: LEAD_ENTRY.id,
+        text: "built a platform SDK",
+        rank: 1,
+        leadRationale: "leads on platform work",
+      },
+    ],
+    // The other two SEED_ENTRIES must land in items OR cut for the partition
+    // to be exact (validateDecisionContract now runs in tailor()); cutting
+    // them is behavior-neutral for the voice-grounding this suite probes.
+    cut: [
+      { entryId: "cloudcase-rules-engine", reason: "not this role's lead" },
+      { entryId: "cloudcase-frontend-rewrite", reason: "not this role's lead" },
+    ],
     ...overrides,
   };
 }

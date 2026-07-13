@@ -5,6 +5,7 @@
 
 import { createHash } from "node:crypto";
 import type { CoverLetter, Entry, LetterDecision, TailoredResume } from "@shared/types";
+import { rationaleReferencesPhrase } from "@shared/signal-coverage";
 import { assembleLetter, validateLetterNoFabrication } from "./letter";
 import { FabricationError } from "./validate";
 
@@ -89,21 +90,15 @@ export function flipPredicate(
   return { leads, rationaleNamesSignal };
 }
 
+// Reuses the shared client-safe matcher (@shared/signal-coverage) — the flip
+// eval and the coverage readout must never drift on what "references a
+// signal" means. Unlike uncoveredSignals(), this candidate set still
+// includes roleLevel: a flip is "the rationale names ANY signal", while
+// coverage's per-signal readout deliberately excludes the resume-wide
+// roleLevel framing.
 function rationaleReferencesSignal(rationale: string, signals: TailoredResume["signals"]): boolean {
-  const rationaleLower = rationale.toLowerCase();
   const candidateTokens = [signals.roleLevel, ...signals.weights, ...signals.hardRequirements];
-
-  return candidateTokens.some((phrase) => {
-    const tokens = tokenize(phrase);
-    return tokens.some((tok) => tok.length >= 4 && rationaleLower.includes(tok));
-  });
-}
-
-function tokenize(phrase: string): string[] {
-  return phrase
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter(Boolean);
+  return candidateTokens.some((phrase) => rationaleReferencesPhrase(rationale, phrase));
 }
 
 // ── 4. tag-shuffle control (Finding B) ──

@@ -1,0 +1,36 @@
+T001 — independent re-verify (coordinator, on main, baseSha e0d17a4)
+
+SCOPE (git status delta vs baseline dirty set) — PASS
+  builder-touched in territory: src/server/tailor/validate.ts (M) + test/decision-contract.test.ts (new)
+  = exactly the declared files. Baseline WIP (src/client/App.tsx, test/e2e/route-transitions.spec.ts) unchanged (App 9/1, route +34).
+
+GAMING READ — CLEAN
+  validate.ts: DecisionContractError + validateDecisionContract (partition+rank, pre-assemble) + validateLedeRationale (post-assemble).
+  - partition: multiset (assertNoInternalDuplicates before cross-list) — dup-within-list distinct from in-both; foreign in items & cut; omitted-from-both. Complete.
+  - rank: Number.isInteger && >=1 (catches 1.5/NaN/Infinity/"1"/0/neg); per-section Map-of-Maps uniqueness; error names section+rank+ids. Correct.
+  - lede: reads only group.leadRationale for rephrase:"full" sections; scoped to ledes (items[0] = assemble's rank-lowest); non-lede never read. Correct.
+  No hardcoding, no weakened/deleted tests, no special-casing.
+
+FAST TIER (authoritative, coordinator re-run)
+  bun run check  -> CHECK_EXIT=0
+  bun run lint   -> LINT_EXIT=0 (biome, 267 files, no errors)
+  bun run build  -> BUILD_EXIT=0 (only pre-existing chunk-size advisory)
+  bunx vitest run -> EXIT=1: Test Files 3 failed | 81 passed (84); Tests 4 failed | 1099 passed (1103)
+     new test/decision-contract.test.ts: 24/24 PASS (not among the failures).
+
+FLAKE DISCRIMINATION — 4 failures confirmed FLAKY (not a T001 regression)
+  Failing (all client jsdom UI tests, 30-46s durations = timeouts under full-suite load):
+    test/library-filter.test.tsx (progressive disclosure)
+    test/fit-ui.test.tsx (fit wiring)
+    test/application-detail-design.test.tsx (debounce PUT; locked controls)
+  Isolated re-run (the 3 files together), 3x: 12/12 PASS every time (ISO_1/2/3 EXIT=0).
+  Analysis: T001 touches ONLY server-side validate.ts (client bundle never imports it) — cannot cause client UI failures. Timing-fragile jsdom tests (debounce/async waits) time out under the loaded 84-file run; adding 24 contract tests raised suite load past a timing margin. Root cause = test-infra timing, OUT of this spec's scope. QUARANTINED in oracle.md; carried as a residual.
+
+ACCEPTANCE — PASS
+  All partition/rank/lede contrast cases present & green (incl. out-of-order-follows-rank, 3-section same-rank, NaN/Infinity/string, non-lede-missing-ok, light/none-lede-ok).
+  Fixture reconciliation: every recorded fixture passes partition+rank+lede via real assemble+SEED_ENTRIES; non-zero checked-lede count asserted.
+
+RECONCILIATION VERDICT (independently confirmed) — NO LOOSENING
+  All 3 cloudcase-* experience seed entries share company="Cloudcase" · role="Senior → Principal SWE" · period="2021–present" -> experience groupBy (`${company} · ${role} · ${period}`) collapses each fixture to ONE experience group whose rank-1 lede carries the recorded leadRationale. checkedLedeCount=3 (1 lede/fixture). Strict "every full-rephrase-section lede has a non-blank leadRationale" holds as originally scoped.
+
+VERDICT: ACCEPT. wiring left for T002.

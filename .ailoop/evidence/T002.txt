@@ -1,0 +1,22 @@
+T002 — independent re-verify (coordinator, on main, baseSha e0d17a4). Attempt 1 blocked (footprint gap), resumed same builder, then:
+
+SCOPE (git status delta, subtracting T001's 2 files + baseline WIP) — PASS
+  T002 delta = src/server/tailor/engine.ts, src/server/routes/applications.ts, test/api.applications-tailor.test.ts, test/engine.test.ts, test/voice-conditioning.test.ts, test/api.applications-inflight.test.ts
+  = exactly the 6 declared files (3 original + 3 coordinator-authorized footprint expansion). No fixture/validate.ts(further)/assemble/schema/prompt touch. WIP (App.tsx, route-transitions) pristine.
+
+GAMING READ — CLEAN
+  engine.ts: validateDecisionContract(decision, entries) BEFORE assemble() (:267); validateLedeRationale(resume) AFTER assemble, alongside validateNoFabrication (:273). Comment documents no-retry. Placement exactly as specced.
+  applications.ts: mapTailorError branch `if (err instanceof DecisionContractError) return {status:424, body:{error:"decision_contract"}}` — distinct from 502(fabrication)/422(no_fixture)/401/429. Import added.
+  acceptance tests (api.applications-tailor.test.ts): (1) counting engine, duplicate-rank-in-section (assemble-unguarded) -> DecisionContractError instanceof + engine.calls===1 (no retry, proves pre-assemble placement); (2) RED-TEAM #12: first tailor 200 + genState 'tailored' + capture successCurrent (not null, positive control); contract-violating re-tailor -> 424, asserted !=502 && !=422, body {error:'decision_contract'}, error !='fabrication'; fetched current deep-equals successCurrent, genState 'failed'. Pinned literals, before/after/before.
+  stub fixes (engine.test/voice-conditioning/inflight): DATA-ONLY augmentation — git diff shows ZERO removed/weakened assertions. engine.test+voice keep platform-sdk as sole experience item + added leadRationale (now-required by validateLedeRationale) + cut the other 2 seed ids; inflight OK_DECISION cuts all 3 (items=[] -> no lede). Behavior-preserving for what each test probes (fabrication grounding / in-flight guard / voice).
+
+FAST TIER (authoritative, coordinator re-run)
+  bun run check -> CHECK_EXIT=0
+  bun run lint  -> LINT_EXIT=0
+  bun run build -> BUILD_EXIT=0
+  bunx vitest run -> VITEST_EXIT=0: Test Files 84 passed (84); Tests 1105 passed (1105). Fully clean — no flakes triggered this run. (= 1079 base + 24 T001 contract + 2 T002 acceptance; the 6 previously-red sibling tests from attempt-1 now green.)
+
+P0 PHASE GATE (merged/working tree)
+  P0 oracle is entirely fast-tier (no P0-specific playwright) -> the green full tier + check/build/lint IS the P0 gate. All P0 acceptance items satisfied: partition/rank/lede contract tests (T001, 24), integration proving tailor() calls the validator pre-assemble with decide()-once, fixture reconciliation (no loosening), route persistence with distinct 424 + current byte-identical. P0 CLOSED.
+
+VERDICT: ACCEPT T002. P0 (T001+T002) complete.

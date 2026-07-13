@@ -38,7 +38,7 @@ import {
   tailor,
   type TailorEngine,
 } from "../tailor/engine";
-import { FabricationError } from "../tailor/validate";
+import { DecisionContractError, FabricationError } from "../tailor/validate";
 import { deriveContentBudget } from "../tailor/budget";
 import { tailorLetter } from "../tailor/letter";
 
@@ -92,6 +92,13 @@ function voicePrompt(sources: VoiceSource[]): string | undefined {
 function mapTailorError(err: unknown): { status: number; body: { error: string } } {
   if (err instanceof NoFixtureError) return { status: 422, body: { error: "no_fixture" } };
   if (err instanceof FabricationError) return { status: 502, body: { error: "fabrication" } };
+  // The model returned a structurally well-formed but contract-violating
+  // decision (bad partition/rank, or a missing lede rationale) — distinct
+  // from fabrication (502) and no_fixture (422): 424 signals the failure is
+  // downstream of a dependency (the model's decision) that didn't hold up,
+  // not a malformed client request or a transport-level provider failure.
+  if (err instanceof DecisionContractError)
+    return { status: 424, body: { error: "decision_contract" } };
 
   if (APICallError.isInstance(err)) {
     if (err.statusCode === 401 || err.statusCode === 403)

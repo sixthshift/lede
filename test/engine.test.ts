@@ -34,9 +34,16 @@ function makeDecision(overrides: Partial<TailorDecision> = {}): TailorDecision {
         entryId: "cloudcase-platform-sdk",
         text: "built a platform SDK exposing the platform programmatically for the first time",
         rank: 1,
+        leadRationale: "leads on platform work",
       },
     ],
-    cut: [],
+    // The other two SEED_ENTRIES must land somewhere for the partition to be
+    // exact (validateDecisionContract now runs in tailor()); cutting them is
+    // behavior-neutral for what these tests probe (grounding / assembly).
+    cut: [
+      { entryId: "cloudcase-rules-engine", reason: "not this role's lead" },
+      { entryId: "cloudcase-frontend-rewrite", reason: "not this role's lead" },
+    ],
     ...overrides,
   };
 }
