@@ -171,3 +171,91 @@ test.describe("NewApplication inline panel (T032/F304)", () => {
     await expect(page.locator("[data-application-id]").filter({ hasText: company })).toBeVisible();
   });
 });
+
+// T006 — creation flow: navigate on success, no toast, honest failure.
+test.describe("NewApplication creation flow (T006)", () => {
+  test("success: navigates to the new application's own page, Job details expanded with the submitted JD, preview shows the explainer beats, no toast", async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/");
+    await login(page, PASSWORD);
+    await expect(page).toHaveURL(/\/applications$/);
+
+    // Seed a pre-existing application so the new id can be proven distinct.
+    const preExistingId = await createApplication(page, {
+      company: `E2E T006 Preexisting ${runId}-${testInfo.retry}`,
+      jd: JD,
+    });
+
+    const toastRegion = page.locator("[data-sonner-toast]");
+    await expect(toastRegion).toHaveCount(0);
+
+    const newJd = `T006 success-path job description ${runId}-${testInfo.retry}. React, TypeScript.`;
+    await trigger(page).click();
+    const dialog = panel(page);
+    await expect(dialog).toBeVisible();
+    await dialog.getByLabel(/^Company/).fill(`E2E T006 New ${runId}-${testInfo.retry}`);
+    await dialog.getByLabel("Job description", { exact: true }).fill(newJd);
+    await dialog.getByRole("button", { name: "Create application" }).click();
+
+    await page.waitForURL(/\/applications\/[^/]+$/);
+    const newId = page.url().split("/applications/")[1];
+    expect(newId).toBeTruthy();
+    expect(newId, "the new application's id must differ from the pre-existing one").not.toBe(
+      preExistingId,
+    );
+
+    // Job details section is expanded (setup stage) and carries the JD just
+    // submitted through the dialog.
+    await expect(page.getByTestId("section-collapse-job")).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByLabel("Job description", { exact: true })).toHaveValue(newJd);
+
+    // Preview pane lands on the setup-stage explainer beats, not a document.
+    await expect(page.getByTestId("preview-empty-beats")).toBeVisible();
+
+    // No toast rendered anywhere during the flow.
+    await expect(toastRegion).toHaveCount(0);
+  });
+
+  test("failure: a real server error leaves the URL/dialog/typed JD untouched and shows an inline error, never navigates", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/");
+    await login(page, PASSWORD);
+    await expect(page).toHaveURL(/\/applications$/);
+
+    await page.route("**/api/applications", (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      return route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Internal error" }),
+      });
+    });
+
+    const typedJd = "This JD must survive a failed create untouched.";
+    await trigger(page).click();
+    const dialog = panel(page);
+    await expect(dialog).toBeVisible();
+    await dialog.getByLabel("Job description", { exact: true }).fill(typedJd);
+
+    const [response] = await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().endsWith("/api/applications") && r.request().method() === "POST",
+      ),
+      dialog.getByRole("button", { name: "Create application" }).click(),
+    ]);
+    expect(response.status()).toBe(500);
+
+    // Never navigates away from the dashboard.
+    await expect(page).toHaveURL(/\/applications$/);
+    // Dialog stays open, un-torn-down.
+    await expect(dialog).toBeVisible();
+    // Typed input survives — never cleared on failure.
+    await expect(dialog.getByLabel("Job description", { exact: true })).toHaveValue(typedJd);
+    // Inline error is shown.
+    await expect(dialog.getByRole("alert")).toBeVisible();
+  });
+});

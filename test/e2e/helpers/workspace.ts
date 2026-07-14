@@ -64,6 +64,12 @@ export interface CreateApplicationParams {
   jd: string;
 }
 
+// T006: a successful create now navigates straight to the new application's
+// detail page (/applications/:id) instead of closing back onto the
+// dashboard — the id is read off that URL, then this helper navigates back
+// to the dashboard itself, so the ~72 existing call sites keep their
+// original post-condition (on the dashboard, new card present) without
+// editing any of them.
 export async function createApplication(
   page: Page,
   { company, role, jd }: CreateApplicationParams,
@@ -75,13 +81,15 @@ export async function createApplication(
   if (role) await dialog.getByLabel(/^Role/).fill(role);
   await dialog.getByLabel("Job description", { exact: true }).fill(jd);
   await dialog.getByRole("button", { name: "Create application" }).click();
-  await expect(dialog).toBeHidden();
+  await page.waitForURL(/\/applications\/[^/]+$/);
 
-  const card = page.locator("[data-application-id]").filter({ hasText: company });
+  const applicationId = page.url().split("/applications/")[1];
+  expect(applicationId, "navigation must land on the created application's id").toBeTruthy();
+
+  await page.goto("/");
+  const card = page.locator(`[data-application-id="${applicationId}"]`);
   await expect(card).toBeVisible();
-  const applicationId = await card.getAttribute("data-application-id");
-  expect(applicationId, "created card must carry a data-application-id").toBeTruthy();
-  return applicationId!;
+  return applicationId;
 }
 
 // ── Tailor / Lock ── click + wait-for-the-matching-response pattern, repeated

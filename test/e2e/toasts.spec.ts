@@ -54,13 +54,26 @@ test.beforeEach(async ({ page }) => {
 
 // ── 8 named success mutations, each its own test (red-team #15) ──
 
-test("create application → one 'Application created' toast", async ({ page }, testInfo) => {
+// T006: create no longer toasts at all — a successful create navigates
+// straight to the new application's page, and landing there IS the
+// confirmation. Driven directly (not via the createApplication helper, which
+// navigates back to the dashboard afterward) so the URL can be asserted
+// while still on the freshly created application's detail page.
+test("create application → no toast at all; URL lands on the new application's page", async ({
+  page,
+}, testInfo) => {
   await expect(toasts(page)).toHaveCount(0);
-  await createApplication(page, {
-    company: `E2E Toast Create ${runId}-${testInfo.retry}`,
-    jd: "A job description for the create-toast case.",
-  });
-  await expectSingleToast(page, "Application created");
+  await page.getByRole("button", { name: "New application" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel(/^Company/).fill(`E2E Toast Create ${runId}-${testInfo.retry}`);
+  await dialog
+    .getByLabel("Job description", { exact: true })
+    .fill("A job description for the create-toast case.");
+  await dialog.getByRole("button", { name: "Create application" }).click();
+
+  await page.waitForURL(/\/applications\/[^/]+$/);
+  await expect(toasts(page)).toHaveCount(0);
 });
 
 test("duplicate application → one 'Application duplicated' toast", async ({ page }, testInfo) => {

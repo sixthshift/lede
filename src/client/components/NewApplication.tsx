@@ -23,6 +23,7 @@
 
 import { useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { useNavigate } from "react-router-dom";
 import { X } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useCreateApplication } from "../queries/useApplications";
@@ -49,6 +50,7 @@ export function NewApplication() {
   const [state, setState] = useState(emptyState());
   const [error, setError] = useState<string | null>(null);
   const createApplication = useCreateApplication();
+  const navigate = useNavigate();
   // T045 (F406): required-field (JD) failure moves focus onto the field the
   // error is actually about, so the inline message never renders detached
   // from what it's describing.
@@ -72,13 +74,17 @@ export function NewApplication() {
     }
 
     try {
-      await createApplication.mutateAsync({
+      const created = await createApplication.mutateAsync({
         company: state.company.trim() || undefined,
         role: state.role.trim() || undefined,
         jobDescription,
         context: state.context.trim() || undefined,
       });
+      // T006: navigation IS the success confirmation (no toast) — landing on
+      // the new application's page is only reachable from here, never on
+      // failure, so the dialog closes exclusively on the success path.
       setOpen(false);
+      navigate(`/applications/${created.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't create application.");
     }

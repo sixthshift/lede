@@ -47,11 +47,10 @@ export function useCreateApplication() {
     mutationFn: (input: ApplicationCreateInput) => createApplication(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["applications"] });
-      // T040/F401: one success toast per named mutation, fired in the hook
-      // whose onSuccess is 1:1 with the action (create fires exactly once per
-      // created application). A failed create surfaces at its own call-site,
-      // never here.
-      toast.success("Application created");
+      // T006: no success toast here — a successful create now navigates
+      // straight to the new application's page (NewApplication.tsx), and
+      // landing there IS the confirmation. Transport-only hook; navigation
+      // stays at the component with router access.
     },
   });
 }
