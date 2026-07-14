@@ -650,6 +650,14 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   const journeyStage = deriveJourneyStage(application);
   const letterCurrent = Boolean(application.letterCurrent);
 
+  // T003: Tailor is the strip's sole primary action until a `current`
+  // snapshot exists (setup/tailoring); once one survives (review/final) the
+  // strip goes flat — driven by the already-derived stage, not `genState`
+  // directly, so a re-tailor-in-flight over a surviving current (still
+  // "review") stays flat rather than flashing primary again.
+  const tailorButtonVariant =
+    journeyStage === "setup" || journeyStage === "tailoring" ? "default" : "outline";
+
   function disclosureFor(key: WorkspaceSectionKey): DisclosureState {
     return resolveDisclosure(journeyStage, key, {
       userOverride: collapsedSections[key],
@@ -836,6 +844,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
         >
           <div className="flex flex-wrap items-center gap-2">
             <Button
+              variant={tailorButtonVariant}
               data-testid="tailor-button"
               onClick={() => tailorApplication.mutate(application.id)}
               disabled={isTailoring}

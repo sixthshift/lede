@@ -158,3 +158,58 @@ test("existing collapse persistence: a manual toggle survives a full reload", as
   await expect(page.getByRole("button", { name: "Tailor", exact: true })).toBeVisible();
   expect(await isExpanded(page, "design")).toBe(true);
 });
+
+// T003 — Tailor's variant is stage-driven (journeyStage, not raw genState):
+// the sole primary-weighted action pre-current (setup/tailoring), flat with
+// every other strip button once a `current` snapshot exists (review/final).
+// Component coverage (all four stages, incl. the re-tailor-in-flight edge)
+// lives in test/journey-emphasis.test.tsx; this proves it against the real
+// compiled Tailwind cascade rather than an injected jsdom rule.
+//
+// The resolved `--accent`/`--primary` token (tokens.css §12: `#2643bd`) —
+// the Button primitive's real "default" variant background.
+const PRIMARY_BG = "rgb(38, 67, 189)";
+
+async function primaryStyledStripButtonCount(page: import("@playwright/test").Page) {
+  const backgrounds = await page
+    .getByTestId("detail-action-strip")
+    .locator("button")
+    .evaluateAll((buttons) => buttons.map((button) => getComputedStyle(button).backgroundColor));
+  return backgrounds.filter((bg) => bg === PRIMARY_BG).length;
+}
+
+test("action strip: Tailor is the sole primary-styled button pre-current, and the strip goes flat after tailoring", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `Journey Weighting ${Date.now()}`;
+  const applicationId = await createApplication(page, { company, jd: JD });
+  await page.goto(`/applications/${applicationId}`);
+
+  const tailorButton = page.getByTestId("tailor-button");
+  await expect(tailorButton).toHaveText("Tailor");
+  await expect(tailorButton).toHaveCSS("background-color", PRIMARY_BG);
+  expect(
+    await primaryStyledStripButtonCount(page),
+    "exactly one primary-styled button before a current exists",
+  ).toBe(1);
+
+  await tailor(page, applicationId);
+  await expect(tailorButton).toHaveText("Re-tailor");
+
+  await expect(tailorButton, "Tailor's own background must flip once current exists").not.toHaveCSS(
+    "background-color",
+    PRIMARY_BG,
+  );
+  expect(
+    await primaryStyledStripButtonCount(page),
+    "zero primary-styled buttons once a current exists",
+  ).toBe(0);
+
+  await expect(page.getByRole("button", { name: "Lock final" })).toBeEnabled();
+  await expect(page.getByTestId("download-pdf-button")).toBeEnabled();
+  await expect(page.getByTestId("download-text-button")).toBeEnabled();
+});

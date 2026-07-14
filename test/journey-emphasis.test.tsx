@@ -9,7 +9,7 @@
 // same pattern as test/applications-ui.test.tsx / application-detail-design.test.tsx.
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach, beforeAll, vi } from "vitest";
-import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import type { Application, Profile, TailoredResume } from "@shared/types";
@@ -34,7 +34,17 @@ vi.mock("@react-pdf/renderer", async (importOriginal) => {
 // test/ui-foundation.test.tsx's F109 suite.
 beforeAll(() => {
   const style = document.createElement("style");
-  style.textContent = ".opacity-50 { opacity: 0.5; }";
+  // T003: `.bg-primary`/`.bg-surface` are the Button primitive's own
+  // default/outline background utilities (button.tsx) — real values ripped
+  // from tokens.css's `--accent`/`--surface` (§12), same "inject the ONE
+  // rule under test" convention as the opacity rule above, so
+  // getComputedStyle discriminates primary-vs-flat for real rather than
+  // reading back a className string.
+  style.textContent = [
+    ".opacity-50 { opacity: 0.5; }",
+    ".bg-primary { background-color: rgb(38, 67, 189); }",
+    ".bg-surface { background-color: rgb(255, 255, 255); }",
+  ].join("\n");
   document.head.appendChild(style);
 });
 
@@ -244,5 +254,76 @@ describe("journey-driven section emphasis (T002)", () => {
     // An overridden section is never muted — the click both expands AND
     // unmutes in the same render.
     expect(opacityOf(screen.getByTestId("workspace-section-header-letter"))).toBe(1);
+  });
+});
+
+// The resolved `--accent`/`--primary` token (tokens.css §12: `#2643bd`),
+// matching the `.bg-primary` rule injected in beforeAll above — the same
+// value the "default" Button variant resolves to for real.
+const PRIMARY_BG = "rgb(38, 67, 189)";
+
+function primaryButtonsIn(strip: HTMLElement): HTMLElement[] {
+  return within(strip)
+    .getAllByRole("button")
+    .filter((button) => getComputedStyle(button).backgroundColor === PRIMARY_BG);
+}
+
+describe("action-strip: Tailor sole-primary weighting driven by journey stage (T003)", () => {
+  it("setup: exactly one primary-styled strip button, and it's Tailor; gated buttons present+disabled", async () => {
+    const app = applicationFixture({ id: "setup-t003", genState: "untailored", current: null });
+    renderDetail(app);
+
+    const strip = await screen.findByTestId("detail-action-strip");
+    const primaryButtons = primaryButtonsIn(strip);
+    expect(primaryButtons).toHaveLength(1);
+    expect(primaryButtons[0]).toBe(screen.getByTestId("tailor-button"));
+
+    expect(screen.getByTestId("tailor-button")).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Lock final" })).toBeDisabled();
+    expect(screen.getByTestId("flag-voice-resume")).toBeDisabled();
+    expect(screen.getByTestId("download-pdf-button")).toBeDisabled();
+    expect(screen.getByTestId("download-text-button")).toBeDisabled();
+  });
+
+  it("tailoring, no current yet (stage=tailoring): Tailor stays primary-styled, disabled", async () => {
+    const app = applicationFixture({ id: "tailoring-t003", genState: "tailoring", current: null });
+    renderDetail(app);
+
+    const strip = await screen.findByTestId("detail-action-strip");
+    const primaryButtons = primaryButtonsIn(strip);
+    expect(primaryButtons).toHaveLength(1);
+    expect(primaryButtons[0]).toBe(screen.getByTestId("tailor-button"));
+    expect(screen.getByTestId("tailor-button")).toBeDisabled();
+  });
+
+  it("re-tailor in flight over a surviving current (stage=review): ZERO primary strip buttons", async () => {
+    const app = applicationFixture({
+      id: "retailoring-t003",
+      genState: "tailoring",
+      current: resumeFixture(),
+    });
+    renderDetail(app);
+
+    const strip = await screen.findByTestId("detail-action-strip");
+    expect(primaryButtonsIn(strip)).toHaveLength(0);
+    expect(screen.getByTestId("tailor-button")).toBeDisabled();
+  });
+
+  it("review: zero primary strip buttons; gated buttons enabled per existing rules", async () => {
+    const app = applicationFixture({
+      id: "review-t003",
+      genState: "tailored",
+      current: resumeFixture(),
+    });
+    renderDetail(app);
+
+    const strip = await screen.findByTestId("detail-action-strip");
+    expect(primaryButtonsIn(strip)).toHaveLength(0);
+
+    expect(screen.getByTestId("tailor-button")).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Lock final" })).not.toBeDisabled();
+    expect(screen.getByTestId("flag-voice-resume")).not.toBeDisabled();
+    expect(screen.getByTestId("download-pdf-button")).not.toBeDisabled();
+    expect(screen.getByTestId("download-text-button")).not.toBeDisabled();
   });
 });
