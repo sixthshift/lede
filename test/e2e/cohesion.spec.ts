@@ -35,6 +35,7 @@ import {
   openEditFor,
   railWordmark,
   tailor,
+  ensureSectionExpanded,
   expectResumeCanvasPainted,
   countOversizedOverlays,
   assertOutsideElementReachable,
@@ -747,6 +748,20 @@ test.describe("Re-verified on the final tree (v4-T060)", () => {
     await setupTailoredApplication(page, company);
 
     const editorPane = page.getByTestId("editor-pane");
+
+    // T002 re-baseline (same as scroll-spy.spec.ts): review folds Job by
+    // default — expand it back to the full-height geometry the sampled
+    // fractions were designed around, then nudge a real scroll round-trip so
+    // the spy's marker reflects the settled layout before the fraction-0
+    // sample (a 0 -> 0 scrollTop assignment fires no event).
+    await ensureSectionExpanded(page, "job");
+    await editorPane.evaluate((el) => {
+      el.scrollTop = 1;
+    });
+    await editorPane.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+
     const railNav = page.getByTestId("rail-nav");
     const SECTION_KEYS = ["job", "letter", "design"] as const;
 

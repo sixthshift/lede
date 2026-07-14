@@ -4,8 +4,11 @@
 // Footer, and Sections' five per-section subgroups) each fold behind their
 // own header, DEFAULT COLLAPSED — retiring the ~5,400px always-open scroll
 // this panel used to force. The three top-level editor sections (Job
-// details/Cover letter/Design) are UNCHANGED by this ticket and stay default
-// EXPANDED (red-team #8: outer sections are never collapsed-by-default).
+// details/Cover letter/Design) default per the JOURNEY STAGE since T002
+// (journey-stage.ts): post-tailor (review) folds Job and opens Letter+Design
+// — the first test below pins that matrix row (superseding v4-T041a's
+// original "outer sections always expanded" red-team #8 pin) and proves the
+// fold is a working accordion, not a gate.
 //
 // Locked decisions under test: group collapse is VIEW-STATE ONLY (a
 // namespaced localStorage key per group, NEVER a settings/application
@@ -25,6 +28,7 @@ import {
   login,
   createApplication,
   tailor,
+  ensureSectionExpanded,
   expectResumeCanvasPainted,
   resumePreviewCanvas,
   canvasSnapshot,
@@ -90,18 +94,37 @@ async function setupTailoredApplication(page: Page, testInfo: TestInfo): Promise
 }
 
 test.describe("design accordion (v4-T041a, F505)", () => {
-  test("the 3 top-level sections (Job details/Cover letter/Design) are ALL default expanded on load", async ({
+  test("the 3 top-level sections default per the journey matrix post-tailor (review): Job collapsed, Letter+Design expanded — and the collapsed Job still expands on demand", async ({
     page,
   }, testInfo) => {
     await setupTailoredApplication(page, testInfo);
 
+    // T002 journey matrix, review row: job closed, letter+design open.
+    const expected: Record<(typeof OUTER_SECTIONS)[number], boolean> = {
+      job: false,
+      letter: true,
+      design: true,
+    };
     for (const key of OUTER_SECTIONS) {
       await expect(
         page.getByTestId(`section-collapse-${key}`),
-        `${key} section must default expanded`,
-      ).toHaveAttribute("aria-expanded", "true");
-      await expect(page.getByTestId(`workspace-section-body-${key}`)).toBeVisible();
+        `${key} section must default ${expected[key] ? "expanded" : "collapsed"} at review`,
+      ).toHaveAttribute("aria-expanded", String(expected[key]));
+      const body = page.getByTestId(`workspace-section-body-${key}`);
+      if (expected[key]) {
+        await expect(body).toBeVisible();
+      } else {
+        await expect(
+          body,
+          `${key} section body must be folded, not merely faded`,
+        ).not.toBeVisible();
+      }
     }
+
+    // Muted-is-never-a-gate / the accordion affordance itself: the folded Job
+    // section expands normally from its own header.
+    await ensureSectionExpanded(page, "job");
+    await expect(page.getByTestId("workspace-section-body-job")).toBeVisible();
   });
 
   test("Design's internal groups default COLLAPSED on load; clicking a group header reveals its controls", async ({

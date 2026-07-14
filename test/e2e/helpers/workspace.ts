@@ -376,6 +376,36 @@ export async function expandDesignGroup(page: Page, groupKey: string): Promise<v
   }
 }
 
+// ── Journey-stage disclosure (T002) ── the three top-level editor sections
+// (job/letter/design) default open/closed per the journey stage
+// (deriveJourneyStage/resolveDisclosure): setup/tailoring folds Letter+Design,
+// review folds Job, final folds all three. A spec that drives a control
+// inside a stage-folded section body (a click can't land inside the 0-height
+// grid-rows-[0fr] fold) expands the section first via its own header toggle —
+// the redesigned UX's real interaction. Idempotent — a no-op when already
+// expanded. NOTE: a manual expand writes a user override to localStorage BY
+// DESIGN (override precedence, journey-stage.ts) — don't follow it with
+// assertions about stage-default disclosure or store purity on the same
+// application.
+export async function ensureSectionExpanded(
+  page: Page,
+  key: "job" | "letter" | "design",
+): Promise<void> {
+  const toggle = page.getByTestId(`section-collapse-${key}`);
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute("aria-expanded")) === "false") {
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    // Settle the 200ms grid-rows transition (F403/T043) before returning, so
+    // callers that measure editor-pane geometry right after (scroll-spy's
+    // overflow precondition, viewport checks) read the expanded layout, not
+    // a mid-transition height.
+    await page
+      .getByTestId(`section-collapse-track-${key}`)
+      .evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
+  }
+}
+
 // ── Modality ban ── the shared "non-modal" oracle: no aria-modal, and no
 // fixed/absolute-positioned element covers more than half the viewport.
 // Ported from applications.spec.ts's own local assertNoModalOverlay (the

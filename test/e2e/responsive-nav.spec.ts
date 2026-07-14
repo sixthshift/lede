@@ -9,7 +9,7 @@
 // first-run set-password -> login, gate ON) — PASSWORD MUST match that
 // file's exactly (single server-wide secret, playwright.config.ts).
 import { test, expect, type Page, type Locator } from "@playwright/test";
-import { login, createApplication } from "./helpers/workspace";
+import { login, createApplication, ensureSectionExpanded } from "./helpers/workspace";
 
 const PASSWORD = "correct horse battery staple e2e applications";
 const JD = "Backend platform engineer role. Distributed systems, Go, Kubernetes.";
@@ -182,6 +182,13 @@ for (const viewport of COMPACT_VIEWPORTS) {
       for (const key of ["job", "letter", "design"]) {
         await expect(page.getByTestId(`editor-section-nav-${key}`)).toBeVisible();
       }
+
+      // T002: an untailored app is at the setup stage, which folds Letter +
+      // Design — expand them back so the editor pane carries the full
+      // three-section height the "Design heading starts off-viewport" nav
+      // precondition below was designed around.
+      await ensureSectionExpanded(page, "letter");
+      await ensureSectionExpanded(page, "design");
 
       // The nav is genuinely operable: clicking a row scrolls its section
       // into view (the same navigateToSection behavior the rail's own copy

@@ -24,6 +24,7 @@ import { ApiError } from "../api";
 import { downloadLetterPdf, downloadResumePdf, downloadResumeText } from "../document/download";
 import { fitToPages, type FitResult } from "../document/fit";
 import { useEntries, useProfile, useSettings, useUpdateSettings } from "../hooks/queries";
+import { deriveJourneyStage, resolveDisclosure, type DisclosureState } from "../lib/journey-stage";
 import { cn } from "../lib/utils";
 import {
   useApplication,
@@ -216,6 +217,7 @@ function EditorSection({
   sectionKey,
   label,
   collapsed,
+  muted,
   onToggleCollapse,
   headingRef,
   children,
@@ -223,13 +225,21 @@ function EditorSection({
   sectionKey: WorkspaceSectionKey;
   label: string;
   collapsed: boolean;
+  // Journey-stage-driven de-emphasis (T002) — a reduced-opacity header
+  // treatment for sections the current stage hasn't reached yet. Computed
+  // per render from resolveDisclosure, never persisted; an overridden
+  // section is never muted (the resolver already guarantees that).
+  muted: boolean;
   onToggleCollapse: () => void;
   headingRef: (el: HTMLHeadingElement | null) => void;
   children: ReactNode;
 }) {
   return (
     <section data-testid={`workspace-section-${sectionKey}`} className="flex flex-col gap-3">
-      <div className="flex items-center gap-1.5">
+      <div
+        data-testid={`workspace-section-header-${sectionKey}`}
+        className={cn("flex items-center gap-1.5", muted && "opacity-50")}
+      >
         <h2
           ref={headingRef}
           tabIndex={-1}
@@ -601,16 +611,6 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
     headingRefs.current[key] = el;
   }
 
-  // Collapse never reaches the server — the toggle only flips local state
-  // and re-serializes it to localStorage; nothing here calls a mutation.
-  function toggleSection(key: WorkspaceSectionKey) {
-    setCollapsedSections((prev) => {
-      const next = { ...prev, [key]: !prev[key] };
-      window.localStorage.setItem(collapseStorageKey(applicationId), JSON.stringify(next));
-      return next;
-    });
-  }
-
   // Scrolls the section's heading to the top of the editor pane's scroll
   // container and focuses it — never touches the URL or the preview pane.
   function navigateToSection(key: WorkspaceSectionKey) {
@@ -642,6 +642,35 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   const isLetterGenerating = generateLetter.isPending || application.letterGenState === "tailoring";
   const letterLabel =
     application.letterGenState === "untailored" ? "Generate letter" : "Regenerate letter";
+
+  // T002: journey-stage-driven disclosure. `collapsedSections` is the
+  // OVERRIDE layer, not the source of truth — an unset key means "follow the
+  // stage default", so this is recomputed from resolveDisclosure every
+  // render rather than read directly off local state.
+  const journeyStage = deriveJourneyStage(application);
+  const letterCurrent = Boolean(application.letterCurrent);
+
+  function disclosureFor(key: WorkspaceSectionKey): DisclosureState {
+    return resolveDisclosure(journeyStage, key, {
+      userOverride: collapsedSections[key],
+      letterCurrent,
+    });
+  }
+
+  // Collapse never reaches the server, and a stage-driven default is never
+  // persisted — only this direct-user-toggle path writes localStorage, and
+  // it writes the PRE-toggle effective open state (not `!prev[key]`): the
+  // key may be unset while the section is stage-open, so the override must
+  // be computed from what's actually showing, not from whatever the raw
+  // store happened to hold.
+  function toggleSection(key: WorkspaceSectionKey) {
+    const effectiveOpen = disclosureFor(key).open;
+    setCollapsedSections((prev) => {
+      const next = { ...prev, [key]: effectiveOpen };
+      window.localStorage.setItem(collapseStorageKey(applicationId), JSON.stringify(next));
+      return next;
+    });
+  }
 
   // T042/F402: guarded on the pending flag itself, not just the button's
   // `disabled` (belt-and-suspenders against a second activation landing
@@ -756,6 +785,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
           <nav aria-label="Sections" data-testid="rail-nav" className="flex flex-col gap-1">
             {WORKSPACE_SECTIONS.map((section) => {
               const isActive = activeSection === section.key;
+              const muted = disclosureFor(section.key).muted;
               return (
                 <button
                   key={section.key}
@@ -768,6 +798,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
                     isActive
                       ? "bg-accent font-medium text-primary"
                       : "text-muted-foreground hover:bg-[var(--ring-weak)] hover:text-foreground",
+                    muted && "opacity-50",
                   )}
                 >
                   {section.label}
@@ -900,6 +931,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
         >
           {WORKSPACE_SECTIONS.map((section) => {
             const isActive = activeSection === section.key;
+            const muted = disclosureFor(section.key).muted;
             return (
               <button
                 key={section.key}
@@ -912,6 +944,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
                   isActive
                     ? "bg-accent font-medium text-primary"
                     : "text-muted-foreground hover:bg-[var(--ring-weak)] hover:text-foreground",
+                  muted && "opacity-50",
                 )}
               >
                 {section.label}
@@ -924,7 +957,8 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
       <EditorSection
         sectionKey="job"
         label="Job details"
-        collapsed={Boolean(collapsedSections.job)}
+        collapsed={!disclosureFor("job").open}
+        muted={disclosureFor("job").muted}
         onToggleCollapse={() => toggleSection("job")}
         headingRef={(el) => setHeadingRef("job", el)}
       >
@@ -934,7 +968,8 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
       <EditorSection
         sectionKey="letter"
         label="Cover letter"
-        collapsed={Boolean(collapsedSections.letter)}
+        collapsed={!disclosureFor("letter").open}
+        muted={disclosureFor("letter").muted}
         onToggleCollapse={() => toggleSection("letter")}
         headingRef={(el) => setHeadingRef("letter", el)}
       >
@@ -1050,7 +1085,8 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
       <EditorSection
         sectionKey="design"
         label="Design"
-        collapsed={Boolean(collapsedSections.design)}
+        collapsed={!disclosureFor("design").open}
+        muted={disclosureFor("design").muted}
         onToggleCollapse={() => toggleSection("design")}
         headingRef={(el) => setHeadingRef("design", el)}
       >

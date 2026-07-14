@@ -138,6 +138,13 @@
 // the "platform-sdk" CONTRAST_JDS scenario), same shared
 // login/PASSWORD/tailor-fixture rationale as ats-view.spec.ts, no fourth
 // server warranted.
+//
+// T002 adds journey.spec.ts (and reserves journey-cards.spec.ts for a later
+// ticket — a regex alternative matching a not-yet-existing file is harmless)
+// to the same "applications" project — it drives the same tailor/lock
+// lifecycle across the journey-stage disclosure defaults, same shared
+// login/PASSWORD/tailor-fixture rationale as applications.spec.ts itself, no
+// fourth server warranted.
 import { defineConfig, devices } from "@playwright/test";
 import { randomBytes } from "node:crypto";
 import { createTmpDataDir } from "./test/e2e/helpers/tmpdata";
@@ -193,7 +200,7 @@ export default defineConfig({
     {
       name: "applications",
       testMatch:
-        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration|tap-targets|toasts|export-busy|motion|letter-empty|card-detail|design-accordion|accordion|letter-editing|detail-craft|preview-zoom|panel-craft|panel-sheet|signal-coverage|coverage)\.spec\.ts/,
+        /(applications|design|mutation-probe|cohesion|ats-view|gallery-bounds|docked-panel-bounds|tailor-failure|card-bounds|chrome-merge|rail-design|rail-collapse|scroll-spy|route-transitions|responsive-nav|phone-overflow|new-application|pane-arbitration|tap-targets|toasts|export-busy|motion|letter-empty|card-detail|design-accordion|accordion|letter-editing|detail-craft|preview-zoom|panel-craft|panel-sheet|signal-coverage|coverage|journey|journey-cards)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: APPLICATIONS_BASE_URL },
     },
     ...(dockerProject

@@ -18,7 +18,13 @@
 // byte from CONTRAST_JDS) so tailoring replays keylessly.
 import { test, expect, type Page, type Locator } from "@playwright/test";
 import { CONTRAST_JDS } from "../../src/server/tailor/evalcore";
-import { login, createApplication, tailor, expectResumeCanvasPainted } from "./helpers/workspace";
+import {
+  login,
+  createApplication,
+  tailor,
+  ensureSectionExpanded,
+  expectResumeCanvasPainted,
+} from "./helpers/workspace";
 
 const PASSWORD = "correct horse battery staple e2e applications";
 const JD = CONTRAST_JDS[0]!.jd; // "platform-sdk" scenario — byte-for-byte, see applications.spec.ts
@@ -83,6 +89,23 @@ test("scroll-spy (v4-T023/F202): active section tracks the 30%-line rule across 
   await expectResumeCanvasPainted(page);
 
   const editorPane = page.getByTestId("editor-pane");
+
+  // T002 re-baseline: post-tailor (review stage) folds the Job section by
+  // default, which collapses the geometry these sampled fractions were
+  // designed around — expand it back so all three sections contribute real
+  // height. The 30%-line rule itself (this test's subject) is untouched: the
+  // expected section is still derived independently from live geometry below.
+  await ensureSectionExpanded(page, "job");
+  // Neither the stage flip nor the expand fires a scroll event, and the
+  // app's spy recomputes on scroll — nudge a real scroll round-trip so the
+  // marker reflects the settled expanded layout before the fraction-0 sample
+  // (whose scrollTop assignment is a 0 -> 0 no-op that fires no event).
+  await editorPane.evaluate((el) => {
+    el.scrollTop = 1;
+  });
+  await editorPane.evaluate((el) => {
+    el.scrollTop = 0;
+  });
 
   // Precondition: genuine overflow, not a fixture that happens to barely
   // scroll — otherwise every sampled position could trivially land on the

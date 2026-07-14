@@ -57,6 +57,7 @@ import {
   pixelDiffFraction,
   interactiveDescendants,
   expandDesignGroup,
+  ensureSectionExpanded,
   letterGreetingField,
   letterClosingField,
   letterParagraphField,
@@ -627,6 +628,11 @@ test("cover letter: a failed generation surfaces a distinct failed badge, never 
   const unmatchedJd = `An entirely unrecorded job description, never fixture-matched ${runId}-${testInfo.retry}`;
   const applicationId = await createApplication(page, { company, jd: unmatchedJd });
   await page.goto(`/applications/${applicationId}`);
+  // T002: an untailored app is at the setup stage, which folds the Cover
+  // letter section by default — expand it before driving its controls (the
+  // override persists through the reload below, keeping the failed badge
+  // genuinely on-screen).
+  await ensureSectionExpanded(page, "letter");
   await expect(page.getByText("No letter", { exact: true })).toBeVisible();
 
   const generateResponse = await generateLetter(page, applicationId!);
@@ -978,6 +984,12 @@ test("retroactive import: blank letter -> hand-authored via in-place editing -> 
     jd: "Retroactive-import test JD — no tailoring happens in this test.",
   });
   await page.goto(`/applications/${applicationId}`);
+
+  // T002: setup stage (never tailored) folds the Cover letter section —
+  // expand it before driving create-blank-letter and the editing fields
+  // below (once the blank letter exists, the letter-content exemption would
+  // keep it open anyway; the click that CREATES it needs the fold opened).
+  await ensureSectionExpanded(page, "letter");
 
   // (1) blank letter — via the actual UI affordance (data-testid
   // "create-blank-letter"), never a DB/API backdoor.
@@ -1758,7 +1770,11 @@ test("locked sweep (protocol D): every edit affordance individually disabled/409
   // (4) motivation — not a document-editing affordance (it only guides a
   // FUTURE letter generation, itself locked-blocked via Generate/Regenerate);
   // stays editable on a locked application, its PUT still 200s, and it
-  // persists across reload.
+  // persists across reload. T002: the final stage folds every section — the
+  // (1)-(3) attribute assertions above read folded DOM fine, but driving the
+  // Motivation field + Save click needs the Job section's fold opened (the
+  // override persists through the reload below).
+  await ensureSectionExpanded(page, "job");
   const motivationText = `Locked-sweep motivation ${runId}-${testInfo.retry}`;
   await page.getByLabel("Motivation", { exact: true }).fill(motivationText);
   const [motivationPut] = await Promise.all([
