@@ -25,13 +25,27 @@ interface WorkspaceShellSlotTargets {
   hoisted: boolean;
   railTarget: HTMLElement | null;
   previewTarget: HTMLElement | null;
+  // v6-T005 (Active reveal): the imperative one-shot request a route's own
+  // content (ApplicationDetail) uses to ask the hoisted shell to reveal its
+  // preview pane after a first tailor — see useRevealPreview below. Defaults
+  // to a no-op so the non-hoisted fallback (a component test rendering
+  // WorkspaceShellSurface standalone, no Provider above it) never throws;
+  // that fallback's behavior is e2e-verified against the real hoisted shell,
+  // not this default.
+  revealPreview: () => void;
 }
 
 export const WorkspaceShellSlotsContext = createContext<WorkspaceShellSlotTargets>({
   hoisted: false,
   railTarget: null,
   previewTarget: null,
+  revealPreview: () => {},
 });
+
+/** The one-shot "reveal the preview pane" request — see WorkspaceShellSlotTargets. */
+export function useRevealPreview(): () => void {
+  return useContext(WorkspaceShellSlotsContext).revealPreview;
+}
 
 /**
  * A leaf route's single entry point: portals `rail`/`preview` into the

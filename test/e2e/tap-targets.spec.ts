@@ -164,13 +164,17 @@ test.describe("Coarse-pointer 44px tap targets (T034/F305)", () => {
     await page.goto(`/applications/${applicationId}`);
     await tailor(page, applicationId);
 
-    const trigger = page.getByTestId("preview-sheet-trigger");
-    await assertTapTarget44(trigger, "preview-sheet-trigger");
-
-    await trigger.click();
+    // v6-T005 (active reveal): a FIRST tailor below `lg` auto-opens the
+    // preview sheet — so the Close control is what's on screen first, and
+    // the trigger (which unmounts while the sheet is open) is measured
+    // after dismissing it. Both 44px floors still asserted.
     const sheet = page.getByTestId("preview-sheet");
     await expect(sheet).toBeVisible();
     await assertTapTarget44(page.getByTestId("preview-sheet-close"), "preview-sheet-close");
+
+    await page.getByTestId("preview-sheet-close").click();
+    await expect(sheet).toHaveCount(0);
+    await assertTapTarget44(page.getByTestId("preview-sheet-trigger"), "preview-sheet-trigger");
   });
 
   test("4b. lg..xl swap toggle (preview-swap-toggle) is >=44px (already h-11 w-11 — verified, not just asserted from source)", async ({

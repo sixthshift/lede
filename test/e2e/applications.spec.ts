@@ -1375,7 +1375,7 @@ test("WorkspaceShell (protocol B): the surface stays non-modal — no aria-modal
   expect(download.suggestedFilename()).toBeTruthy();
 });
 
-test("WorkspaceShell drawer: below 1280px the preview pane starts non-co-visible (closed), and the toggle reveals a real painted canvas", async ({
+test("WorkspaceShell drawer: below 1280px the FIRST tailor auto-reveals the preview (v6-T005); the toggle closes it back to the non-co-visible default and re-reveals a real painted canvas", async ({
   page,
 }, testInfo) => {
   await page.setViewportSize({ width: 1024, height: 720 });
@@ -1388,9 +1388,19 @@ test("WorkspaceShell drawer: below 1280px the preview pane starts non-co-visible
   await page.goto(`/applications/${applicationId}`);
   await tailor(page, applicationId!);
 
-  // Drawer closed by default below 1280 — the preview pane (and whatever
-  // canvas it hosts) is not visible/co-visible at all.
+  // v6-T005 (active reveal): a FIRST tailor at the swap regime auto-switches
+  // to the preview with no click — and the toggle's own state agrees.
   const previewPane = page.getByTestId("preview-pane");
+  await expect(previewPane).toBeVisible();
+  await expect(page.getByRole("button", { name: "Hide preview" })).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+
+  // One toggle click returns to the closed-by-default drawer state below
+  // 1280 — the preview pane (and whatever canvas it hosts) is not
+  // visible/co-visible at all.
+  await page.getByRole("button", { name: "Hide preview" }).click();
   await expect(previewPane).toBeHidden();
   await expect(page.getByRole("button", { name: "Show preview" })).toHaveAttribute(
     "aria-expanded",

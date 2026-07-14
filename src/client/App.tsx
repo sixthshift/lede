@@ -295,6 +295,14 @@ export function App() {
   }, []);
   useRouteScrollAndFocus(editorPaneRef);
 
+  // v6-T005 (Active reveal): WorkspaceShell populates this ref with its own
+  // `revealPreview` action (see WorkspaceShell.tsx's `revealPreviewRef`
+  // prop); `revealPreview` below is the STABLE wrapper handed into the slots
+  // context so a route's content (ApplicationDetail) can call it without
+  // caring whether the shell has attached yet.
+  const revealPreviewRef = useRef<(() => void) | null>(null);
+  const revealPreview = useCallback(() => revealPreviewRef.current?.(), []);
+
   const rail = (
     <div className="flex h-full flex-col">
       <RailWordmark />
@@ -308,13 +316,19 @@ export function App() {
     <LoginGate>
       <div className="h-screen overflow-hidden bg-background text-foreground">
         <WorkspaceShellSlotsContext.Provider
-          value={{ hoisted: true, railTarget, previewTarget: hasPreview ? previewTarget : null }}
+          value={{
+            hoisted: true,
+            railTarget,
+            previewTarget: hasPreview ? previewTarget : null,
+            revealPreview,
+          }}
         >
           <WorkspaceShell
             rail={rail}
             editor={<Outlet />}
             preview={hasPreview ? <div ref={setPreviewTarget} className="h-full" /> : undefined}
             editorPaneRef={setEditorPaneRef}
+            revealPreviewRef={revealPreviewRef}
           />
         </WorkspaceShellSlotsContext.Provider>
         {/* T040/F401: the single app-wide feedback surface. Non-modal chrome

@@ -194,6 +194,17 @@ export interface WorkspaceShellProps {
   // route changes (F203/F208) — still no routing awareness enters this file
   // itself, it just hands the node out.
   editorPaneRef?: (el: HTMLElement | null) => void;
+  // v6-T005 (Active reveal): the mirror of `editorPaneRef` for an IMPERATIVE
+  // action instead of a DOM node — App.tsx hands in a ref, WorkspaceShell
+  // populates it with a one-shot `revealPreview()` the hoisted caller's
+  // portaled route content (ApplicationDetail, via WorkspaceShellSlots'
+  // useRevealPreview) can call after its first tailor. In the swap/sheet
+  // regimes it's `setPreviewOpen(true)` — the SAME state the user-facing
+  // swap toggle/sheet trigger already drive, so it inherits their focus-
+  // management/aria-expanded wiring for free rather than adding a second
+  // path into either regime. At co-visible the ref holds null (see the
+  // populating effect for why a "harmless" state write there isn't).
+  revealPreviewRef?: { current: (() => void) | null };
 }
 
 const RAIL_COLLAPSE_STORAGE_KEY = "lede.workspace.railCollapsed";
@@ -293,7 +304,13 @@ export function useRailLabelFade(collapsed: boolean): { faded: boolean; hidden: 
   return { faded, hidden };
 }
 
-export function WorkspaceShell({ rail, editor, preview, editorPaneRef }: WorkspaceShellProps) {
+export function WorkspaceShell({
+  rail,
+  editor,
+  preview,
+  editorPaneRef,
+  revealPreviewRef,
+}: WorkspaceShellProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [railCollapsed, setRailCollapsed] = useState(readRailCollapsed);
   const isBelowLg = useIsBelowLg();
@@ -333,6 +350,23 @@ export function WorkspaceShell({ rail, editor, preview, editorPaneRef }: Workspa
       editorContainerElRef.current.inert = !showEditor;
     }
   }, [showEditor]);
+
+  // v6-T005: populate the caller's ref with the one-shot reveal action, kept
+  // in an effect (not assigned inline during render — render purity), re-run
+  // whenever the regime flips so the stored function always reflects it.
+  // Co-visible gets a genuine null (no-op at the App.tsx wrapper), NOT a
+  // setPreviewOpen(true) that "changes nothing visible": a stale
+  // previewOpen=true set at >=xl would leak — resize below xl later and the
+  // swap/sheet starts open; navigate to a preview-less route and
+  // `showEditor = coVisible || !previewOpen` collapses the editor to
+  // 0-width/inert. Reveal must only ever set state in the regimes where the
+  // spec says it acts (swap/sheet).
+  const canRevealPreview = swapRegime || sheetRegime;
+  useEffect(() => {
+    if (revealPreviewRef) {
+      revealPreviewRef.current = canRevealPreview ? () => setPreviewOpen(true) : null;
+    }
+  }, [revealPreviewRef, canRevealPreview]);
 
   function toggleRailCollapsed() {
     setRailCollapsed((collapsed) => {

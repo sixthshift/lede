@@ -5,15 +5,19 @@
 // test/journey-emphasis.test.tsx; this file proves the parts a jsdom render
 // can't: real localStorage store purity across the actual tailor/lock
 // lifecycle, and override precedence surviving those same real mutations.
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { CONTRAST_JDS } from "../../src/server/tailor/evalcore";
 import {
   firstRunLogin,
   login,
   createApplication,
   tailor,
+  retailor,
   lockFinal,
   expectResumeCanvasPainted,
+  generateLetter,
+  ensureSectionExpanded,
+  countOversizedOverlays,
 } from "./helpers/workspace";
 
 const PASSWORD = "correct horse battery staple e2e applications";
@@ -264,4 +268,177 @@ test("explainer empty state: three beats + Library link pre-tailor, gone post-ta
     boxAfterTailor!.width,
     "preview pane width must stay stable across the pre/post-tailor swap",
   ).toBeCloseTo(boxBeforeTailor!.width, 0);
+});
+
+// T005 — Active reveal on the FIRST resume tailor only, across all three
+// responsive regimes (WorkspaceShell.tsx's coVisible/swapRegime/sheetRegime).
+// The discriminator is "no `current` existed before THIS tailor's mutation
+// started" — never a session flag — so a re-tailor over a surviving current
+// (including one freshly loaded from a hard reload) must never auto-reveal.
+// Letter generation and failed tailors are untouched (out of scope for the
+// reveal at all).
+async function gotoDetail(page: Page, applicationId: string): Promise<void> {
+  await page.goto(`/applications/${applicationId}`);
+  await expect(page.getByRole("button", { name: "Tailor", exact: true })).toBeVisible();
+}
+
+test("active reveal — lg..xl swap regime: first tailor auto-switches to preview (toggle tracks it), one click restores the editor, and a re-tailor never re-switches", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `Journey Reveal Swap ${Date.now()}`;
+  const applicationId = await createApplication(page, { company, jd: JD });
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await gotoDetail(page, applicationId);
+
+  const editorPane = page.getByTestId("editor-pane");
+  const toggle = page.getByTestId("preview-swap-toggle");
+  await expect(editorPane).toBeVisible();
+  await expect(page.getByTestId("preview-pane")).toHaveCount(0);
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+  await tailor(page, applicationId);
+
+  // Auto-switched with NO click: the preview pane is up and the toggle's own
+  // state agrees with what's visible.
+  await expect(page.getByTestId("preview-pane")).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(
+    await editorPane.evaluate((el) => el.getBoundingClientRect().width),
+    "editor must be genuinely swapped away (zero-width), not merely covered",
+  ).toBe(0);
+  await expectResumeCanvasPainted(page);
+
+  // One click returns to the editor AND flips aria-expanded back.
+  await toggle.click();
+  await expect(editorPane).toBeVisible();
+  await expect(page.getByTestId("preview-pane")).toHaveCount(0);
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+  // From preview-hidden: a re-tailor must NOT auto-switch again.
+  await retailor(page, applicationId);
+  await expect(editorPane).toBeVisible();
+  await expect(page.getByTestId("preview-pane")).toHaveCount(0);
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+});
+
+test("active reveal — fresh-load discriminator: reloading an already-tailored app then re-tailoring never auto-reveals (fails under a session one-shot flag)", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `Journey Reveal FreshLoad ${Date.now()}`;
+  const applicationId = await createApplication(page, { company, jd: JD });
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await gotoDetail(page, applicationId);
+  await tailor(page, applicationId);
+  await expect(page.getByRole("button", { name: "Re-tailor", exact: true })).toBeVisible();
+
+  // A genuinely fresh page load — zero session/render history — of an app
+  // that already carries a `current`.
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Re-tailor", exact: true })).toBeVisible();
+
+  const editorPane = page.getByTestId("editor-pane");
+  const toggle = page.getByTestId("preview-swap-toggle");
+  await expect(editorPane).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+  await retailor(page, applicationId);
+
+  await expect(editorPane).toBeVisible();
+  await expect(page.getByTestId("preview-pane")).toHaveCount(0);
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+});
+
+test("active reveal — below-lg sheet regime: first tailor opens the preview sheet, Escape dismisses with no aria-modal/scrim, and a re-tailor from sheet-closed never reopens it", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `Journey Reveal Sheet ${Date.now()}`;
+  const applicationId = await createApplication(page, { company, jd: JD });
+  await page.setViewportSize({ width: 800, height: 900 });
+  await gotoDetail(page, applicationId);
+
+  await expect(page.getByTestId("preview-sheet")).toHaveCount(0);
+  await expect(page.getByTestId("preview-sheet-trigger")).toBeVisible();
+
+  await tailor(page, applicationId);
+
+  const sheet = page.getByTestId("preview-sheet");
+  await expect(sheet).toBeVisible();
+  await expectResumeCanvasPainted(page);
+  expect(await page.locator('[aria-modal="true"]').count(), "no aria-modal anywhere").toBe(0);
+  expect(
+    await countOversizedOverlays(page, sheet),
+    "no oversized overlay besides the sheet itself (no scrim)",
+  ).toBe(0);
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("preview-sheet")).toHaveCount(0);
+  await expect(page.getByTestId("preview-sheet-trigger")).toBeVisible();
+
+  // From sheet-closed: a re-tailor must not reopen it.
+  await retailor(page, applicationId);
+  await expect(page.getByTestId("preview-sheet")).toHaveCount(0);
+  await expect(page.getByTestId("preview-sheet-trigger")).toBeVisible();
+});
+
+test("active reveal — co-visible (>=xl) regime: first tailor is a no-op layout-wise, both panes already visible before and after", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `Journey Reveal CoVisible ${Date.now()}`;
+  const applicationId = await createApplication(page, { company, jd: JD });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await gotoDetail(page, applicationId);
+
+  const editorPane = page.getByTestId("editor-pane");
+  const previewPane = page.getByTestId("preview-pane");
+  await expect(editorPane).toBeVisible();
+  await expect(previewPane).toBeVisible();
+  await expect(page.getByTestId("preview-swap-toggle")).toHaveCount(0);
+  await expect(page.getByTestId("preview-sheet")).toHaveCount(0);
+
+  await tailor(page, applicationId);
+
+  await expect(editorPane).toBeVisible();
+  await expect(previewPane).toBeVisible();
+  await expect(page.getByTestId("preview-swap-toggle")).toHaveCount(0);
+  await expect(page.getByTestId("preview-sheet")).toHaveCount(0);
+  await expectResumeCanvasPainted(page);
+});
+
+test("active reveal — letter generation never triggers a pane switch", async ({ page }) => {
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `Journey Reveal Letter ${Date.now()}`;
+  const applicationId = await createApplication(page, { company, jd: JD });
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await gotoDetail(page, applicationId);
+
+  const editorPane = page.getByTestId("editor-pane");
+  const toggle = page.getByTestId("preview-swap-toggle");
+  await expect(editorPane).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+  await ensureSectionExpanded(page, "letter");
+  await generateLetter(page, applicationId);
+
+  await expect(editorPane).toBeVisible();
+  await expect(page.getByTestId("preview-pane")).toHaveCount(0);
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
 });

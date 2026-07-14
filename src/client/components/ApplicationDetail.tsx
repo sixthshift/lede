@@ -54,7 +54,7 @@ import { Card, CardContent, CardHeader, CardDescription } from "./ui/card";
 import { Label } from "./ui/label";
 import { Skeleton } from "./ui/skeleton";
 import { Textarea } from "./ui/textarea";
-import { WorkspaceShellSurface } from "./WorkspaceShellSlots";
+import { useRevealPreview, WorkspaceShellSurface } from "./WorkspaceShellSlots";
 
 // Same 300ms coalescing window the former dedicated design view used for its
 // format PUTs (v3-T012 carries that behavior into this card).
@@ -475,6 +475,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   const { data: entries } = useEntries();
   const tailorApplication = useTailorApplication();
   const generateLetter = useGenerateLetter();
+  const revealPreview = useRevealPreview();
   const undoLetter = useUndoLetter();
   const lockApplication = useLockApplication();
   const unlockApplication = useUnlockApplication();
@@ -701,6 +702,23 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
     }
   };
 
+  // v6-T005 (Active reveal): whether THIS tailor is the first one is captured
+  // from `application.current` right here, before `.mutate` fires — a stale
+  // closure is exactly what's wanted, since the mutation's own success
+  // handler runs after the server round-trip, by which point a refetch may
+  // already have populated `current`. The discriminator is "no current
+  // existed when the tailor STARTED", never a session flag, so a re-tailor
+  // (current already present) and a failed tailor (onSuccess never fires)
+  // both correctly never reveal.
+  const handleTailor = () => {
+    const hadNoCurrentBeforeTailor = application.current == null;
+    tailorApplication.mutate(application.id, {
+      onSuccess: () => {
+        if (hadNoCurrentBeforeTailor) revealPreview();
+      },
+    });
+  };
+
   const handleDownloadText = async () => {
     if (isExportingText || !application.current || !profile) return;
     setIsExportingText(true);
@@ -846,7 +864,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
             <Button
               variant={tailorButtonVariant}
               data-testid="tailor-button"
-              onClick={() => tailorApplication.mutate(application.id)}
+              onClick={handleTailor}
               disabled={isTailoring}
               className={TAP_TARGET_COARSE}
             >
