@@ -442,3 +442,147 @@ test("active reveal — letter generation never triggers a pane switch", async (
   await expect(page.getByTestId("preview-pane")).toHaveCount(0);
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
 });
+
+// T008 — mobile regime pass: the same journey (stage-driven disclosure,
+// active reveal) proven at a genuine phone viewport (390x844, BottomTabBar +
+// sheet regime), with the ONE new hazard those two other regimes can't
+// exercise: whether the Tailor CTA is reachable BEFORE any scroll. A button
+// that merely exists above the sections in DOM order but renders below the
+// fold at this height would pass every other regime's assertions and still
+// be unusable here.
+test.describe("mobile regime (390x844): journey reads correctly under BottomTabBar + sheet", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  async function headerOpacity(page: Page, key: "job" | "letter" | "design"): Promise<number> {
+    const raw = await page
+      .getByTestId(`workspace-section-header-${key}`)
+      .evaluate((el) => getComputedStyle(el).opacity);
+    return Number(raw);
+  }
+
+  test("setup: Job expanded and Letter+Design muted; Tailor reachable pre-scroll; first tailor opens the sheet; close restores review defaults; re-tailor from sheet-closed never reopens", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await login(page, PASSWORD);
+    await expect(page).toHaveURL(/\/applications$/);
+
+    const company = `Journey Mobile Setup ${Date.now()}`;
+    const applicationId = await createApplication(page, { company, jd: JD });
+    await gotoDetail(page, applicationId);
+
+    // 1. Setup default: Job open, Letter+Design headers muted vs Job's own
+    // header in the same render (same real-computed-style oracle
+    // journey-emphasis.test.tsx uses in jsdom, proven here against the actual
+    // compiled Tailwind cascade).
+    expect(await isExpanded(page, "job")).toBe(true);
+    expect(await isExpanded(page, "letter")).toBe(false);
+    expect(await isExpanded(page, "design")).toBe(false);
+    expect(await headerOpacity(page, "job")).toBe(1);
+    expect(await headerOpacity(page, "letter")).toBeLessThan(1);
+    expect(await headerOpacity(page, "design")).toBeLessThan(1);
+
+    // 2. The Tailor button is REALLY reachable pre-scroll: measured before
+    // any scroll has occurred (right after navigation), not merely "exists
+    // in the DOM above the sections".
+    const tailorButton = page.getByTestId("tailor-button");
+    await expect(tailorButton).toBeVisible();
+    const box = await tailorButton.boundingBox();
+    expect(box, "Tailor button must have a rendered bounding box").toBeTruthy();
+    expect(
+      box!.y,
+      "Tailor button top must be within the initial viewport (no scroll)",
+    ).toBeGreaterThanOrEqual(0);
+    expect(
+      box!.y + box!.height,
+      "Tailor button bottom must be within the initial viewport (no scroll)",
+    ).toBeLessThanOrEqual(844);
+    expect(box!.height, "Tailor button must clear a real tap-target floor").toBeGreaterThanOrEqual(
+      32,
+    );
+
+    // 3. First tailor -> the preview sheet opens with the document painted
+    // (tailor()'s own .click() below is itself the "actually clickable"
+    // proof — Playwright's actionability check runs before any click fires).
+    await expect(page.getByTestId("preview-sheet")).toHaveCount(0);
+    await tailor(page, applicationId);
+    const sheet = page.getByTestId("preview-sheet");
+    await expect(sheet).toBeVisible();
+    await expectResumeCanvasPainted(page);
+
+    // 4. Close the sheet -> editor intact with review's stage defaults (Job
+    // collapsed, Letter+Design open, all three headers unmuted).
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("preview-sheet")).toHaveCount(0);
+    await expect.poll(() => isExpanded(page, "job")).toBe(false);
+    expect(await isExpanded(page, "letter")).toBe(true);
+    expect(await isExpanded(page, "design")).toBe(true);
+    expect(await headerOpacity(page, "job")).toBe(1);
+    expect(await headerOpacity(page, "letter")).toBe(1);
+    expect(await headerOpacity(page, "design")).toBe(1);
+
+    // 5. Re-tailor from sheet-closed must never auto-reopen it.
+    await retailor(page, applicationId);
+    await expect(page.getByTestId("preview-sheet")).toHaveCount(0);
+    await expect(page.getByTestId("preview-sheet-trigger")).toBeVisible();
+  });
+
+  test("a setup override on Design survives the sheet mount/unmount and the transition into final's closed default", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await login(page, PASSWORD);
+    await expect(page).toHaveURL(/\/applications$/);
+
+    const company = `Journey Mobile Override ${Date.now()}`;
+    const applicationId = await createApplication(page, { company, jd: JD });
+    await gotoDetail(page, applicationId);
+
+    // Setup default: Design closed. Manually expand it — a genuine override
+    // (review's own open default would mask this; final's closed default is
+    // the discriminator checked below).
+    expect(await isExpanded(page, "design")).toBe(false);
+    await ensureSectionExpanded(page, "design");
+
+    await tailor(page, applicationId);
+    const sheet = page.getByTestId("preview-sheet");
+    await expect(sheet).toBeVisible();
+    await expectResumeCanvasPainted(page);
+
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+
+    await lockFinal(page, applicationId);
+    await expect(page.getByRole("button", { name: "Unlock", exact: true })).toBeVisible();
+
+    // Final's stage default is all-closed — the override must beat it while
+    // Job and Letter (never overridden) fall to that default.
+    await expect.poll(() => isExpanded(page, "job")).toBe(false);
+    expect(await isExpanded(page, "letter")).toBe(false);
+    expect(await isExpanded(page, "design")).toBe(true);
+  });
+
+  test("fresh-load re-tailor: reloading an already-tailored app then re-tailoring never reopens the sheet", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await login(page, PASSWORD);
+    await expect(page).toHaveURL(/\/applications$/);
+
+    const company = `Journey Mobile FreshLoad ${Date.now()}`;
+    const applicationId = await createApplication(page, { company, jd: JD });
+    await gotoDetail(page, applicationId);
+    await tailor(page, applicationId);
+    await expect(page.getByRole("button", { name: "Re-tailor", exact: true })).toBeVisible();
+
+    // A genuinely fresh page load of an app that already carries a `current`.
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Re-tailor", exact: true })).toBeVisible();
+    await expect(page.getByTestId("preview-sheet")).toHaveCount(0);
+    await expect(page.getByTestId("preview-sheet-trigger")).toBeVisible();
+
+    await retailor(page, applicationId);
+    await expect(page.getByTestId("preview-sheet")).toHaveCount(0);
+    await expect(page.getByTestId("preview-sheet-trigger")).toBeVisible();
+  });
+});
