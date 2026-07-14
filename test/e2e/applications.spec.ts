@@ -1886,15 +1886,17 @@ test("NewApplication (v3-T020): the create panel is non-modal, the underlying li
   await expect(trigger).toBeFocused();
 });
 
-// ── T030 (Phase 3, OQ4a): card dashboard content — the list's GEN_STATE
-// LABEL text this pill-contrast check reads against, mirrored here (not
-// imported) so this spec exercises the same accessible text a real user
-// sees rather than reaching into GenStateBadge.tsx's internals.
-const RESUME_STATE_LABEL: Record<string, string> = {
-  untailored: "Untailored",
+// ── T030 (Phase 3, OQ4a; labels migrated by T007): card dashboard content —
+// the card's resume state is the journey-stage pill (Not tailored/Tailoring…/
+// Tailored, from deriveJourneyStage; a locked card renders the Locked badge
+// as its stage display and no pill element at all; a failure is a distinct
+// destructive badge alongside). Labels mirrored here (not imported) so this
+// spec exercises the same accessible text a real user sees rather than
+// reaching into GenStateBadge.tsx's internals.
+const STAGE_PILL_LABEL: Record<string, string> = {
+  setup: "Not tailored",
   tailoring: "Tailoring…",
-  tailored: "Tailored",
-  failed: "Failed",
+  review: "Tailored",
 };
 const LETTER_STATE_LABEL: Record<string, string> = {
   untailored: "No letter",
@@ -1903,7 +1905,7 @@ const LETTER_STATE_LABEL: Record<string, string> = {
   failed: "Letter failed",
 };
 
-test("dashboard card content (T030, OQ4a): resume pills differ and match server genState; the locked badge appears only on a locked app; the letter pill appears iff a letter exists", async ({
+test("dashboard card content (T030, OQ4a): stage pills differ and match server state; the locked badge appears only on a locked app; the letter pill appears iff a letter exists", async ({
   page,
 }, testInfo) => {
   await page.goto("/");
@@ -1938,8 +1940,11 @@ test("dashboard card content (T030, OQ4a): resume pills differ and match server 
   expect(tailoredRow.letterGenState).toBe("tailored");
   expect(tailoredRow.locked).toBe(true);
 
-  // (3) back on the list — each card's resume pill DIFFERS and matches its
-  // own row's server genState (never hardcoded/swapped).
+  // (3) back on the list — each card's stage display DIFFERS and matches its
+  // own row's server state (never hardcoded/swapped). The untailored row
+  // (genState untailored, no currentMeta, unlocked) is the setup stage; the
+  // tailored row is LOCKED, so its stage display is the Locked badge — no
+  // stage-pill element renders on it at all (T007's final-stage handling).
   await page.goto("/applications");
   const untailoredCard = page
     .locator("[data-application-id]")
@@ -1948,16 +1953,13 @@ test("dashboard card content (T030, OQ4a): resume pills differ and match server 
   await expect(untailoredCard).toBeVisible();
   await expect(tailoredCard).toBeVisible();
 
-  const untailoredLabel = RESUME_STATE_LABEL[untailoredRow.genState]!;
-  const tailoredLabel = RESUME_STATE_LABEL[tailoredRow.genState]!;
-  expect(untailoredLabel).not.toBe(tailoredLabel);
-  expect(Object.values(RESUME_STATE_LABEL)).toContain(untailoredLabel);
-  expect(Object.values(RESUME_STATE_LABEL)).toContain(tailoredLabel);
-
-  await expect(untailoredCard.getByText(untailoredLabel, { exact: true })).toBeVisible();
-  await expect(untailoredCard.getByText(tailoredLabel, { exact: true })).toHaveCount(0);
-  await expect(tailoredCard.getByText(tailoredLabel, { exact: true })).toBeVisible();
-  await expect(tailoredCard.getByText(untailoredLabel, { exact: true })).toHaveCount(0);
+  await expect(untailoredCard.getByTestId("application-card-stage-pill")).toHaveText(
+    STAGE_PILL_LABEL.setup!,
+  );
+  await expect(tailoredCard.getByTestId("application-card-stage-pill")).toHaveCount(0);
+  // Cross-contrast both directions: neither card may show the other's text.
+  await expect(untailoredCard.getByText(STAGE_PILL_LABEL.review!, { exact: true })).toHaveCount(0);
+  await expect(tailoredCard.getByText(STAGE_PILL_LABEL.setup!, { exact: true })).toHaveCount(0);
 
   // (4) locked badge: present on the locked app's card, absent on the
   // unlocked one.
@@ -2034,7 +2036,7 @@ test("dashboard quick actions (T031, OQ4b): open routes to the workspace; duplic
   // anchor + Duplicate + Download + Delete controls — no more. This is a
   // CONTRAST check (nothing beyond the allowlist is interactive), not an
   // existence check, so it's asserted on BOTH cards even though they carry
-  // different pill/badge counts: the untailored card shows only a resume
+  // different pill/badge counts: the untailored card shows only a stage
   // pill, the ready card additionally shows a letter pill and a Locked
   // badge — none of which may add to the interactive count, since Badge
   // (ui/badge.tsx) renders a plain non-interactive <div>.

@@ -1,7 +1,8 @@
 // One tailoring record's list-row summary — spec.md §27. Applications are
 // tailoring records, not a hiring tracker: the only status surfaced here is
-// genState (untailored/tailoring/tailored/failed) — never applied/interviewing/
-// rejected or any kanban-style hiring status.
+// journey position (Not tailored/Tailoring…/Tailored/Locked, T007) plus a
+// distinct failure treatment — never applied/interviewing/rejected or any
+// kanban-style hiring status.
 //
 // T031 (Phase 3, OQ4b): four quick actions — open/duplicate/delete/download —
 // live in their own row BELOW the card's Link (never nested inside it: an
@@ -18,10 +19,11 @@ import { downloadLetterPdf, downloadResumePdf } from "../document/download";
 import { useProfile, useSettings } from "../hooks/queries";
 import { useDeleteApplication, useDuplicateApplication } from "../queries/useApplications";
 import { cn } from "../lib/utils";
+import { deriveJourneyStage, type JourneyStage } from "../lib/journey-stage";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { GenStateBadge } from "./GenStateBadge";
+import { GenStateBadge, JourneyStagePill } from "./GenStateBadge";
 
 const JD_PREVIEW_LENGTH = 160;
 
@@ -56,6 +58,23 @@ function hasDownloadableDocument(application: ApplicationSummary): boolean {
   return Boolean(application.currentMeta) || application.letterGenState !== "untailored";
 }
 
+// deriveJourneyStage (journey-stage.ts, frozen) reads `locked`/`current` only
+// for truthiness, but ApplicationSummary — the list row's shape (§9 "no heavy
+// snapshots") — never carries the heavy `current` payload and flattens
+// `locked` to a plain boolean. `currentMeta` is the same "a current snapshot
+// exists" proxy `hasDownloadableDocument` above already relies on, so it
+// stands in for `current` here; the sentinel value is never read, only its
+// null-ness.
+const PRESENT = {} as unknown as Parameters<typeof deriveJourneyStage>[0]["current"];
+
+function cardStage(application: ApplicationSummary): JourneyStage {
+  return deriveJourneyStage({
+    locked: application.locked ? PRESENT : null,
+    current: application.currentMeta ? PRESENT : null,
+    genState: application.genState,
+  });
+}
+
 export function ApplicationCard({
   application,
   highlighted = false,
@@ -80,6 +99,7 @@ export function ApplicationCard({
   const [downloading, setDownloading] = useState(false);
 
   const canDownload = hasDownloadableDocument(application) && Boolean(profile) && !downloading;
+  const stage = cardStage(application);
 
   // Fetches the ONE full record this card's summary doesn't carry (current/
   // locked/letterCurrent/format), renders whichever document(s) exist via
@@ -165,11 +185,29 @@ export function ApplicationCard({
 
       <CardFooter className="justify-between border-t border-border/60 py-3">
         <div className="flex flex-wrap items-center gap-1.5">
-          <GenStateBadge state={application.genState} />
+          {/* T007: the journey-stage pill REPLACES the old resume genState
+              pill on the card (both would read "Tailored"/"Tailoring…" at
+              once — a duplicate, not a contrast). `application.locked` and
+              `stage === "final"` are the same condition (deriveJourneyStage
+              checks `locked` first) — the pre-existing Locked badge already
+              IS the design-system pill with the final stage's text, so it
+              stands in for the pill there. */}
+          {application.locked ? (
+            <Badge variant="secondary">Locked</Badge>
+          ) : (
+            <JourneyStagePill stage={stage} />
+          )}
+          {/* A failed tailor is NOT a stage — it renders ALONGSIDE the stage
+              pill as the existing distinct destructive treatment, never
+              erased by it (locked spec carve-out): failed + no surviving
+              current reads "Not tailored" + "Failed"; failed + surviving
+              current reads "Tailored" + "Failed". */}
+          {application.genState === "failed" ? (
+            <GenStateBadge state={application.genState} />
+          ) : null}
           {application.letterGenState !== "untailored" ? (
             <GenStateBadge state={application.letterGenState} kind="letter" />
           ) : null}
-          {application.locked ? <Badge variant="secondary">Locked</Badge> : null}
         </div>
         <span
           data-testid="application-card-stamp"
@@ -178,6 +216,21 @@ export function ApplicationCard({
           Updated {formatUpdatedAt(application.updatedAt)}
         </span>
       </CardFooter>
+
+      {/* T007 (application-page-flow spec): the existing stale-tailor hint —
+          `currentMeta` present means the last successful tailor may now be
+          stale against newer Library entries. Kept ABSENT for apps that
+          never tailored (currentMeta null), never gated on genState/stage,
+          so a failed re-tailor over a surviving `current` still shows it. */}
+      {application.currentMeta ? (
+        <p
+          data-testid="application-card-stale-hint"
+          className="border-t border-border/60 bg-warn-soft px-6 py-2 text-xs text-warn"
+        >
+          Tailored {formatUpdatedAt(application.currentMeta.at)} — re-tailor to fold in newer
+          Library entries.
+        </p>
+      ) : null}
 
       {/* Quick actions (T031, OQ4b) — a sibling row of the Link above, never
           nested inside it. Exactly four controls: Duplicate/Download stay

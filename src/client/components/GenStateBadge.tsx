@@ -5,6 +5,7 @@
 // so a letter badge can never be read as a resume-tailor status, or vice versa.
 
 import type { Application } from "@shared/types";
+import type { JourneyStage } from "../lib/journey-stage";
 import { Badge, type BadgeProps } from "./ui/badge";
 
 type GenState = Application["genState"];
@@ -39,4 +40,34 @@ export function GenStateBadge({
 }) {
   const label = kind === "letter" ? LETTER_GEN_STATE_LABEL[state] : GEN_STATE_LABEL[state];
   return <Badge variant={GEN_STATE_VARIANT[state]}>{label}</Badge>;
+}
+
+// T007 (application-page-flow spec, "Dashboard cards show journey position"):
+// the dashboard card's stage pill — it REPLACES the resume GenStateBadge on
+// the card (the detail page keeps GenStateBadge untouched). Journey-stage
+// wording (setup/tailoring/review/final) is a different taxonomy than
+// genState (a failed re-tailor is still "review" if a prior `current`
+// survives), so this is kept apart from GenStateBadge rather than folded
+// into its `kind` union; the card's failed treatment still comes from
+// GenStateBadge, rendered alongside this pill.
+const JOURNEY_STAGE_LABEL: Record<JourneyStage, string> = {
+  setup: "Not tailored",
+  tailoring: "Tailoring…",
+  review: "Tailored",
+  final: "Locked",
+};
+
+const JOURNEY_STAGE_VARIANT: Record<JourneyStage, NonNullable<BadgeProps["variant"]>> = {
+  setup: "outline",
+  tailoring: "default",
+  review: "success",
+  final: "secondary",
+};
+
+export function JourneyStagePill({ stage }: { stage: JourneyStage }) {
+  return (
+    <Badge data-testid="application-card-stage-pill" variant={JOURNEY_STAGE_VARIANT[stage]}>
+      {JOURNEY_STAGE_LABEL[stage]}
+    </Badge>
+  );
 }

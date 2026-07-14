@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
 // ApplicationsView + ApplicationDetail — ticket E6-B1, spec.md §27.
 // Applications are tailoring records, NOT a hiring tracker: RED-TEAM #10
-// checks that genState/company render from real data (not hardcoded) and
-// that no hiring-status vocabulary (applied/interviewing/rejected/kanban)
-// leaks into the DOM.
+// checks that per-application state/company render from real data (not
+// hardcoded) and that no hiring-status vocabulary (applied/interviewing/
+// rejected/kanban) leaks into the DOM. T007 migrated the card's resume
+// pill from raw genState labels to the journey-stage pill ("Tailored" is
+// now the review-stage label, driven by currentMeta presence; a failure is
+// its own distinct badge alongside) — the detail page's GenStateBadge keeps
+// the old labels untouched.
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, within, fireEvent, waitFor, cleanup } from "@testing-library/react";
@@ -199,10 +203,18 @@ describe("ApplicationsView", () => {
     expect(await screen.findByText("Acme Corp", { exact: false })).toBeInTheDocument();
   });
 
-  it("RED-TEAM #10: distinct company + genState per application render distinctly, not hardcoded", async () => {
+  it("RED-TEAM #10: distinct company + state per application render distinctly, not hardcoded", async () => {
     mockFetch({
       list: () => [
-        applicationFixture({ id: "a1", company: "Acme Corp", genState: "tailored" }),
+        // currentMeta drives the review stage on the card (the list payload
+        // never carries `current` itself) — a successfully tailored app
+        // always has it set (routes/applications.ts writes both together).
+        applicationFixture({
+          id: "a1",
+          company: "Acme Corp",
+          genState: "tailored",
+          currentMeta: { at: 1, provider: "anthropic", model: "claude-opus-4-8" },
+        }),
         applicationFixture({ id: "a2", company: "Widgetron", genState: "failed" }),
       ],
     });
@@ -222,6 +234,7 @@ describe("ApplicationsView", () => {
     expect(within(cardB).getByText("Widgetron", { exact: false })).toBeInTheDocument();
     expect(within(cardB).getByText("Failed")).toBeInTheDocument();
     expect(within(cardB).queryByText("Tailored")).not.toBeInTheDocument();
+    expect(within(cardB).getByText("Not tailored")).toBeInTheDocument();
 
     // no hiring-status vocabulary anywhere in the list
     const html = document.body.textContent ?? "";
