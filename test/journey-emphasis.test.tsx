@@ -268,6 +268,56 @@ function primaryButtonsIn(strip: HTMLElement): HTMLElement[] {
     .filter((button) => getComputedStyle(button).backgroundColor === PRIMARY_BG);
 }
 
+describe("explainer empty state in the pre-tailor preview pane (T004)", () => {
+  it("setup: three structurally distinct beats plus a Library link, pane stays mounted", async () => {
+    const app = applicationFixture({ id: "setup-t004", genState: "untailored", current: null });
+    renderDetail(app);
+
+    const beats = await screen.findAllByTestId(/^preview-empty-beat-/);
+    expect(beats).toHaveLength(3);
+    expect(screen.getByTestId("preview-empty-beat-lands")).toHaveTextContent(
+      "The tailored resume lands here.",
+    );
+    expect(screen.getByTestId("preview-empty-beat-library")).toHaveTextContent(
+      "Lede picks what leads from your Library",
+    );
+    expect(screen.getByTestId("preview-empty-beat-facts")).toHaveTextContent(
+      "Every claim is grounded in your entries' facts.",
+    );
+
+    const libraryLink = screen.getByRole("link", { name: /Library/ });
+    expect(libraryLink).toHaveAttribute("href", "/library");
+  });
+
+  it("banned-claims: the empty state never overpromises", async () => {
+    const app = applicationFixture({
+      id: "setup-t004-claims",
+      genState: "untailored",
+      current: null,
+    });
+    renderDetail(app);
+
+    const beats = await screen.findAllByTestId(/^preview-empty-beat-/);
+    const text = beats.map((beat) => beat.textContent ?? "").join(" ");
+    expect(text).not.toMatch(
+      /guarantee|beat the ats|ats-proof|100%|bulletproof|flawless|perfect|always pass|never rejected|outrank/i,
+    );
+  });
+
+  it("post-tailor: explainer beats are gone and the document preview renders instead", async () => {
+    const app = applicationFixture({
+      id: "review-t004",
+      genState: "tailored",
+      current: resumeFixture(),
+    });
+    renderDetail(app);
+
+    await screen.findByTestId("workspace-section-header-job");
+    expect(screen.queryByTestId("preview-empty-beats")).not.toBeInTheDocument();
+    expect(document.querySelector(".document-preview")).toBeTruthy();
+  });
+});
+
 describe("action-strip: Tailor sole-primary weighting driven by journey stage (T003)", () => {
   it("setup: exactly one primary-styled strip button, and it's Tailor; gated buttons present+disabled", async () => {
     const app = applicationFixture({ id: "setup-t003", genState: "untailored", current: null });

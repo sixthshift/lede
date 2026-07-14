@@ -1272,17 +1272,23 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
             )}
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border-strong py-16 text-center">
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border-strong px-6 py-16 text-center">
             <BookOpen aria-hidden className="h-8 w-8 text-muted-foreground/60" strokeWidth={1.5} />
-            <div>
-              <p className="text-sm font-medium">No tailored resume yet</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Tailor pulls from your Library —{" "}
+            <ul
+              data-testid="preview-empty-beats"
+              className="flex max-w-sm flex-col gap-2 text-left text-sm text-muted-foreground"
+            >
+              <li data-testid="preview-empty-beat-lands">The tailored resume lands here.</li>
+              <li data-testid="preview-empty-beat-library">
+                Lede picks what leads from your Library —{" "}
                 <Link to="/library" className="text-primary underline underline-offset-4">
                   add missing facts in Library →
                 </Link>
-              </p>
-            </div>
+              </li>
+              <li data-testid="preview-empty-beat-facts">
+                Every claim is grounded in your entries' facts.
+              </li>
+            </ul>
           </div>
         )
       ) : application.letterCurrent ? (

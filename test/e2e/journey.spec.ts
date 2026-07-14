@@ -7,7 +7,14 @@
 // lifecycle, and override precedence surviving those same real mutations.
 import { test, expect } from "@playwright/test";
 import { CONTRAST_JDS } from "../../src/server/tailor/evalcore";
-import { firstRunLogin, login, createApplication, tailor, lockFinal } from "./helpers/workspace";
+import {
+  firstRunLogin,
+  login,
+  createApplication,
+  tailor,
+  lockFinal,
+  expectResumeCanvasPainted,
+} from "./helpers/workspace";
 
 const PASSWORD = "correct horse battery staple e2e applications";
 const JD = CONTRAST_JDS[0]!.jd; // "platform-sdk" scenario — keyless fixture replay
@@ -212,4 +219,49 @@ test("action strip: Tailor is the sole primary-styled button pre-current, and th
   await expect(page.getByRole("button", { name: "Lock final" })).toBeEnabled();
   await expect(page.getByTestId("download-pdf-button")).toBeEnabled();
   await expect(page.getByTestId("download-text-button")).toBeEnabled();
+});
+
+// T004 — explainer empty state in the pre-tailor preview pane. Component
+// coverage (three-beat structure, banned-claims sweep, post-tailor removal)
+// lives in test/journey-emphasis.test.tsx; this proves it against the real
+// preview pane (WorkspaceShell's `[data-testid="preview-pane"]`) and pins the
+// locked "the pane itself stays, layout-stable" rationale with a real
+// bounding-box measurement across the actual tailor round-trip.
+test("explainer empty state: three beats + Library link pre-tailor, gone post-tailor, preview pane never resizes", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await login(page, PASSWORD);
+  await expect(page).toHaveURL(/\/applications$/);
+
+  const company = `Journey Explainer ${Date.now()}`;
+  const applicationId = await createApplication(page, { company, jd: JD });
+  await page.goto(`/applications/${applicationId}`);
+  await expect(page.getByRole("button", { name: "Tailor", exact: true })).toBeVisible();
+
+  const previewPane = page.getByTestId("preview-pane");
+  await expect(previewPane.getByText("The tailored resume lands here.")).toBeVisible();
+  await expect(previewPane.getByText(/Lede picks what leads from your Library/)).toBeVisible();
+  await expect(
+    previewPane.getByText("Every claim is grounded in your entries' facts."),
+  ).toBeVisible();
+  const libraryLink = previewPane.getByRole("link", { name: /Library/ });
+  await expect(libraryLink).toHaveAttribute("href", "/library");
+
+  const boxBeforeTailor = await previewPane.boundingBox();
+  expect(boxBeforeTailor, "preview pane must have a rendered bounding box pre-tailor").toBeTruthy();
+
+  await tailor(page, applicationId);
+  await expect(page.getByRole("button", { name: "Re-tailor", exact: true })).toBeVisible();
+
+  await expect(previewPane.getByText("The tailored resume lands here.")).not.toBeVisible();
+  await expect(previewPane.getByText(/Lede picks what leads from your Library/)).not.toBeVisible();
+  await expectResumeCanvasPainted(page);
+
+  const boxAfterTailor = await previewPane.boundingBox();
+  expect(boxAfterTailor, "preview pane must have a rendered bounding box post-tailor").toBeTruthy();
+  expect(
+    boxAfterTailor!.width,
+    "preview pane width must stay stable across the pre/post-tailor swap",
+  ).toBeCloseTo(boxBeforeTailor!.width, 0);
 });
