@@ -407,45 +407,47 @@ export function WorkspaceShell({
   }, [sheetRegime, previewOpen]);
 
   return (
-    <div data-testid="workspace-shell" className="flex h-full bg-background text-foreground">
-      {isBelowLg ? null : (
-        <aside
-          data-testid="rail-pane"
-          data-collapsed={railCollapsed}
-          className={cn(
-            "flex shrink-0 flex-col border-r border-border bg-surface",
-            "transition-[width] duration-200 ease-in-out motion-reduce:transition-none",
-            railCollapsed ? "w-12" : "w-56",
-          )}
-        >
-          {/* The per-surface section zone is portaled-in content this
+    // The collapse provider spans the WHOLE shell, not just the rail aside:
+    // a route's portaled-in rail content (WorkspaceShellSurface) lives
+    // React-tree-wise under `editor`, and context flows through the React
+    // tree — not the portal's DOM target — so an aside-scoped provider would
+    // leave portaled rail content reading the default (never-collapsed) value.
+    <RailCollapseContext.Provider value={{ collapsed: railCollapsed, toggle: toggleRailCollapsed }}>
+      <div data-testid="workspace-shell" className="flex h-full bg-background text-foreground">
+        {isBelowLg ? null : (
+          <aside
+            data-testid="rail-pane"
+            data-collapsed={railCollapsed}
+            className={cn(
+              "flex shrink-0 flex-col border-r border-border bg-surface",
+              "transition-[width] duration-200 ease-in-out motion-reduce:transition-none",
+              railCollapsed ? "w-12" : "w-56",
+            )}
+          >
+            {/* The per-surface section zone is portaled-in content this
               ticket's declared files don't own; it publishes a stable
               `aria-label="Sections"` a11y contract we hide by, rather than
               reaching into that file to add a collapse-aware prop. */}
-          <style>
-            {'[data-testid="rail-pane"][data-collapsed="true"] div:has(> nav[aria-label="Sections"]) { display: none; }' +
-              // v5-T003 (P7): every Button-based rail control (theme, logout,
-              // the collapse toggle — now relocated to the wordmark row)
-              // inherits ui/button.tsx's shared `ring-offset-2`, while the
-              // wordmark/nav links (plain <a> tags) never opted into an
-              // offset at all (Tailwind's preflight default is 0px) — the
-              // two families' focus rings therefore had different
-              // footprints. Neutralizing the OFFSET WIDTH here, rail-locally
-              // (never touching button.tsx's shared variant, per the
-              // tripwire), is what makes every rail control share one ring
-              // footprint; the ring itself (width, color) is untouched and
-              // stays fully visible.
-              '[data-testid="rail-pane"] button:focus-visible { --tw-ring-offset-width: 0px; }'}
-          </style>
-          <RailCollapseContext.Provider
-            value={{ collapsed: railCollapsed, toggle: toggleRailCollapsed }}
-          >
+            <style>
+              {'[data-testid="rail-pane"][data-collapsed="true"] div:has(> nav[aria-label="Sections"]) { display: none; }' +
+                // v5-T003 (P7): every Button-based rail control (theme, logout,
+                // the collapse toggle — now relocated to the wordmark row)
+                // inherits ui/button.tsx's shared `ring-offset-2`, while the
+                // wordmark/nav links (plain <a> tags) never opted into an
+                // offset at all (Tailwind's preflight default is 0px) — the
+                // two families' focus rings therefore had different
+                // footprints. Neutralizing the OFFSET WIDTH here, rail-locally
+                // (never touching button.tsx's shared variant, per the
+                // tripwire), is what makes every rail control share one ring
+                // footprint; the ring itself (width, color) is untouched and
+                // stays fully visible.
+                '[data-testid="rail-pane"] button:focus-visible { --tw-ring-offset-width: 0px; }'}
+            </style>
             <div className="min-h-0 flex-1 overflow-y-auto">{rail}</div>
-          </RailCollapseContext.Provider>
-        </aside>
-      )}
+          </aside>
+        )}
 
-      {/* v4-T033: the editor pane itself STAYS MOUNTED across the swap — the
+        {/* v4-T033: the editor pane itself STAYS MOUNTED across the swap — the
           route content living in `editor` (ApplicationDetail) is also the
           component that portals the preview's own content into the preview
           pane's target node (WorkspaceShellSurface, see WorkspaceShellSlots
@@ -457,119 +459,120 @@ export function WorkspaceShell({
           hidden from assistive tech, applied imperatively since this
           project's React/@types/react version predates `inert` as a JSX
           prop) — rather than DOM removal. */}
-      <main
-        ref={setEditorContainerEl}
-        data-testid="editor-pane"
-        className={cn(
-          "overflow-y-auto",
-          isBelowLg && CONTENT_CLEARANCE_CLASS,
-          showEditor ? "min-w-0 flex-1" : "w-0 min-w-0 shrink-0 overflow-hidden",
-        )}
-      >
-        {editor}
-      </main>
+        <main
+          ref={setEditorContainerEl}
+          data-testid="editor-pane"
+          className={cn(
+            "overflow-y-auto",
+            isBelowLg && CONTENT_CLEARANCE_CLASS,
+            showEditor ? "min-w-0 flex-1" : "w-0 min-w-0 shrink-0 overflow-hidden",
+          )}
+        >
+          {editor}
+        </main>
 
-      {/* lg..xl SWAP, open: the preview takes the full main-area width the
+        {/* lg..xl SWAP, open: the preview takes the full main-area width the
           editor just vacated — flex-1, not a fixed drawer width. */}
-      {swapRegime && previewOpen ? (
-        <aside data-testid="preview-pane" className="min-w-0 flex-1 overflow-y-auto bg-surface">
-          {preview}
-        </aside>
-      ) : null}
+        {swapRegime && previewOpen ? (
+          <aside data-testid="preview-pane" className="min-w-0 flex-1 overflow-y-auto bg-surface">
+            {preview}
+          </aside>
+        ) : null}
 
-      {/* >=xl: always co-visible, proportional width, plus the zoom control
+        {/* >=xl: always co-visible, proportional width, plus the zoom control
           (v4-T054/F507) — the only viewport regime that gets one; below xl
           the pane-swap (T033) already hands the preview the full width. */}
-      {coVisible ? <CoVisiblePreviewPane>{preview}</CoVisiblePreviewPane> : null}
+        {coVisible ? <CoVisiblePreviewPane>{preview}</CoVisiblePreviewPane> : null}
 
-      {/* lg..xl SWAP toggle strip: survives both directions of the swap (it
+        {/* lg..xl SWAP toggle strip: survives both directions of the swap (it
           never depends on which pane is currently showing), so it's the
           stable affordance that replaces the old dead full-height gutter
           (that gutter co-existed with a flex-1 editor and crushed it to a
           sliver at this width — this strip instead REPLACES the editor
           outright when opened). */}
-      {swapRegime ? (
-        <div className="flex shrink-0 items-center border-l border-border bg-surface p-1.5">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            aria-expanded={previewOpen}
-            aria-label={previewOpen ? "Hide preview" : "Show preview"}
-            title={previewOpen ? "Hide preview" : "Show preview"}
-            data-testid="preview-swap-toggle"
-            className="h-11 w-11 justify-center p-0"
-            onClick={() => setPreviewOpen((open) => !open)}
-          >
-            {previewOpen ? (
-              <PanelRightClose aria-hidden className="h-4 w-4" />
-            ) : (
-              <PanelRightOpen aria-hidden className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-      ) : null}
+        {swapRegime ? (
+          <div className="flex shrink-0 items-center border-l border-border bg-surface p-1.5">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-expanded={previewOpen}
+              aria-label={previewOpen ? "Hide preview" : "Show preview"}
+              title={previewOpen ? "Hide preview" : "Show preview"}
+              data-testid="preview-swap-toggle"
+              className="h-11 w-11 justify-center p-0"
+              onClick={() => setPreviewOpen((open) => !open)}
+            >
+              {previewOpen ? (
+                <PanelRightClose aria-hidden className="h-4 w-4" />
+              ) : (
+                <PanelRightOpen aria-hidden className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        ) : null}
 
-      {/* <lg: the operable trigger that opens the sheet (T031 had withheld
+        {/* <lg: the operable trigger that opens the sheet (T031 had withheld
           this entirely — the sheet mechanics below are what unblocks it).
           Only rendered while the sheet is closed; unmounts the instant it
           opens, and a fresh instance mounts when it closes again — the
           focus-return effect above targets whatever's currently attached to
           `triggerRef`, not a specific node captured at click-time. */}
-      {sheetRegime && !previewOpen ? (
-        <button
-          ref={triggerRef}
-          type="button"
-          aria-label="Show preview"
-          title="Show preview"
-          data-testid="preview-sheet-trigger"
-          className="fixed bottom-[4.75rem] right-4 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-border bg-surface shadow-md"
-          onClick={() => setPreviewOpen(true)}
-        >
-          <PanelRightOpen aria-hidden className="h-5 w-5" />
-        </button>
-      ) : null}
+        {sheetRegime && !previewOpen ? (
+          <button
+            ref={triggerRef}
+            type="button"
+            aria-label="Show preview"
+            title="Show preview"
+            data-testid="preview-sheet-trigger"
+            className="fixed bottom-[4.75rem] right-4 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-border bg-surface shadow-md"
+            onClick={() => setPreviewOpen(true)}
+          >
+            <PanelRightOpen aria-hidden className="h-5 w-5" />
+          </button>
+        ) : null}
 
-      {/* <lg: the full-width sheet itself — OQ2's sanctioned below-`lg`
+        {/* <lg: the full-width sheet itself — OQ2's sanctioned below-`lg`
           exception to the de-modal ban. No `aria-modal`, no scrim (nothing
           underneath to scrim — the editor is swapped out, not covered);
           dismissible via Escape (effect above) AND this visible Close
           control; focus-managed both directions (effect above). Still
           clears the bottom tab bar's height since that persistent chrome
           stays visible below `lg` regardless of sheet state. */}
-      {sheetRegime && previewOpen ? (
-        <div
-          data-testid="preview-sheet"
-          role="dialog"
-          aria-label="Preview"
-          className={cn("fixed inset-0 z-30 flex flex-col bg-surface", CONTENT_CLEARANCE_CLASS)}
-        >
-          <div className="flex shrink-0 items-center justify-between border-b border-border p-2">
-            <span className="text-sm font-medium text-foreground">Preview</span>
-            <Button
-              ref={sheetCloseRef}
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-label="Close preview"
-              data-testid="preview-sheet-close"
-              onClick={() => setPreviewOpen(false)}
-              className={TAP_TARGET_COARSE}
-            >
-              <X aria-hidden className="mr-1 h-4 w-4" />
-              Close
-            </Button>
+        {sheetRegime && previewOpen ? (
+          <div
+            data-testid="preview-sheet"
+            role="dialog"
+            aria-label="Preview"
+            className={cn("fixed inset-0 z-30 flex flex-col bg-surface", CONTENT_CLEARANCE_CLASS)}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-border p-2">
+              <span className="text-sm font-medium text-foreground">Preview</span>
+              <Button
+                ref={sheetCloseRef}
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-label="Close preview"
+                data-testid="preview-sheet-close"
+                onClick={() => setPreviewOpen(false)}
+                className={TAP_TARGET_COARSE}
+              >
+                <X aria-hidden className="mr-1 h-4 w-4" />
+                Close
+              </Button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">{preview}</div>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">{preview}</div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {/* F301: the rail's replacement below `lg` — persistent chrome (always
+        {/* F301: the rail's replacement below `lg` — persistent chrome (always
           present, blocks nothing, no scrim/aria-modal), not a drawer. Fixed
           to the viewport so it survives the editor pane's own scrolling;
           `BOTTOM_BAR_HEIGHT_CLASS` is the exact height the content panes'
           `CONTENT_CLEARANCE_CLASS` padding clears above. */}
-      {isBelowLg ? <BottomTabBar heightClassName={BOTTOM_BAR_HEIGHT_CLASS} /> : null}
-    </div>
+        {isBelowLg ? <BottomTabBar heightClassName={BOTTOM_BAR_HEIGHT_CLASS} /> : null}
+      </div>
+    </RailCollapseContext.Provider>
   );
 }

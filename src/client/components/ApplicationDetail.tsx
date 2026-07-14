@@ -44,7 +44,7 @@ import { AtsView } from "./AtsView";
 import { CoveragePanel } from "./CoveragePanel";
 import { DesignPanel } from "./DesignPanel";
 import { FitChip } from "./FitChip";
-import { GenStateBadge } from "./GenStateBadge";
+import { GenStateBadge, GenStateIcon, genStateLabel } from "./GenStateBadge";
 import { JobPanel } from "./JobPanel";
 import { LetterPreview } from "./LetterPreview";
 import { ResultView } from "./ResultView";
@@ -54,6 +54,8 @@ import { Card, CardContent, CardHeader, CardDescription } from "./ui/card";
 import { Label } from "./ui/label";
 import { Skeleton } from "./ui/skeleton";
 import { Textarea } from "./ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
+import { useRailCollapsed } from "./WorkspaceShell";
 import { useRevealPreview, WorkspaceShellSurface } from "./WorkspaceShellSlots";
 
 // Same 300ms coalescing window the former dedicated design view used for its
@@ -476,6 +478,7 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   const tailorApplication = useTailorApplication();
   const generateLetter = useGenerateLetter();
   const revealPreview = useRevealPreview();
+  const railCollapsed = useRailCollapsed();
   const undoLetter = useUndoLetter();
   const lockApplication = useLockApplication();
   const unlockApplication = useUnlockApplication();
@@ -765,28 +768,54 @@ export function ApplicationDetail({ applicationId }: { applicationId: string }) 
   // surface-context zone contributes instead is standing STATUS that has no
   // home in the global nav: which application this is (company) and its
   // gen-state.
+  const railStatusLabel = application.company
+    ? `${application.company} — ${genStateLabel(application.genState)}`
+    : genStateLabel(application.genState);
   const rail = (
-    <div className="flex flex-col gap-5 p-4">
-      <div className="min-w-0">
-        {application.company ? (
-          <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-            {application.company}
-          </p>
-        ) : null}
-        <div className="mt-2 flex flex-col items-start gap-1.5">
-          {/* F509/T052: gen-state metadata — explicit `font-sans`, matching
-              the letter card's own gen-state badge below, rather than
-              inheriting body-default and leaving the two free to drift apart
-              (the mono treatment above is the KICKER's, exempt by design —
-              this is the non-kicker metadata set the two badges belong to). */}
-          <div data-testid="genstate-resume-metadata" className="font-sans">
-            <GenStateBadge state={application.genState} />
-          </div>
-          {isTailoring ? (
-            <span className="font-sans text-xs text-muted-foreground">Tailoring…</span>
+    <div className={cn("flex flex-col gap-5", railCollapsed ? "items-center p-1.5" : "p-4")}>
+      {railCollapsed ? (
+        /* Collapsed band: the gen-state pill can't shrink below its wording
+           (48px band, ~70px pill — it overflowed rather than truncated), so
+           the SAME taxonomy renders as its icon glyph, with company + wording
+           moved into the tooltip/aria-label — the collapsed nav's own
+           icon-plus-tooltip convention (F207). */
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                data-testid="genstate-resume-metadata"
+                role="img"
+                aria-label={railStatusLabel}
+                className="flex h-9 w-9 items-center justify-center"
+              >
+                <GenStateIcon state={application.genState} />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right">{railStatusLabel}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : (
+        <div className="min-w-0">
+          {application.company ? (
+            <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+              {application.company}
+            </p>
           ) : null}
+          <div className="mt-2 flex flex-col items-start gap-1.5">
+            {/* F509/T052: gen-state metadata — explicit `font-sans`, matching
+                the letter card's own gen-state badge below, rather than
+                inheriting body-default and leaving the two free to drift apart
+                (the mono treatment above is the KICKER's, exempt by design —
+                this is the non-kicker metadata set the two badges belong to). */}
+            <div data-testid="genstate-resume-metadata" className="font-sans">
+              <GenStateBadge state={application.genState} />
+            </div>
+            {isTailoring ? (
+              <span className="font-sans text-xs text-muted-foreground">Tailoring…</span>
+            ) : null}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Section zone: a mono-caps micro-label — same kicker treatment as
           the editor pane's own section headings (EditorSection below) —

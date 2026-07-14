@@ -4,8 +4,16 @@
 // tailored/failed) but is a DISTINCT generation — its own labels via `kind`
 // so a letter badge can never be read as a resume-tailor status, or vice versa.
 
+import {
+  CircleAlert,
+  CircleCheck,
+  CircleDashed,
+  LoaderCircle,
+  type LucideIcon,
+} from "lucide-react";
 import type { Application } from "@shared/types";
 import type { JourneyStage } from "../lib/journey-stage";
+import { cn } from "../lib/utils";
 import { Badge, type BadgeProps } from "./ui/badge";
 
 type GenState = Application["genState"];
@@ -31,6 +39,12 @@ const GEN_STATE_VARIANT: Record<GenState, NonNullable<BadgeProps["variant"]>> = 
   failed: "destructive",
 };
 
+/** The pill's visible wording for a state — exported so the collapsed rail's
+ *  icon variant can carry the SAME words into its tooltip/aria-label. */
+export function genStateLabel(state: GenState, kind: "resume" | "letter" = "resume"): string {
+  return kind === "letter" ? LETTER_GEN_STATE_LABEL[state] : GEN_STATE_LABEL[state];
+}
+
 export function GenStateBadge({
   state,
   kind = "resume",
@@ -38,8 +52,37 @@ export function GenStateBadge({
   state: GenState;
   kind?: "resume" | "letter";
 }) {
-  const label = kind === "letter" ? LETTER_GEN_STATE_LABEL[state] : GEN_STATE_LABEL[state];
-  return <Badge variant={GEN_STATE_VARIANT[state]}>{label}</Badge>;
+  return <Badge variant={GEN_STATE_VARIANT[state]}>{genStateLabel(state, kind)}</Badge>;
+}
+
+// Icon-only variant for the rail's collapsed (48px) band, where a text pill
+// can't shrink below its wording and overflows. Same four-state taxonomy;
+// tones reuse the pill variants' own text tokens so the two representations
+// can't drift apart. Carries no accessible name itself — the caller owns the
+// label (tooltip + aria), since only it knows what context the collapse hid.
+const GEN_STATE_ICON: Record<GenState, LucideIcon> = {
+  untailored: CircleDashed,
+  tailoring: LoaderCircle,
+  tailored: CircleCheck,
+  failed: CircleAlert,
+};
+
+const GEN_STATE_ICON_TONE: Record<GenState, string> = {
+  untailored: "text-muted-foreground",
+  tailoring: "text-primary",
+  tailored: "text-success",
+  failed: "text-danger",
+};
+
+export function GenStateIcon({ state }: { state: GenState }) {
+  const Icon = GEN_STATE_ICON[state];
+  return (
+    <Icon
+      aria-hidden
+      strokeWidth={2}
+      className={cn("h-4 w-4", GEN_STATE_ICON_TONE[state], state === "tailoring" && "animate-spin")}
+    />
+  );
 }
 
 // T007 (application-page-flow spec, "Dashboard cards show journey position"):
