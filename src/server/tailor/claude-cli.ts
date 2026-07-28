@@ -29,6 +29,12 @@ export const DISALLOWED_TOOLS = "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 
+// How much of a failing child's own words an error carries, and how much of the
+// stream is retained to produce it. The window is wider than the tail so
+// `failureTail` can still distinguish a truncated stream from a short message.
+const FAILURE_TAIL_CHARS = 500;
+const STDERR_WINDOW_CHARS = 4_000;
+
 // The CLI's output contract, appended to the SHARED system text — the AI SDK
 // path gets structured output from `generateObject`, the CLI path has to ask
 // for it in prose. Leading "\n\n" so the written file is exactly
@@ -49,6 +55,18 @@ ${JSON.stringify(z.toJSONSchema(schema), null, 2)}`;
 // `exit` (non-zero exit, or a wrapper that reports its own failure),
 // `timeout` (we killed it), `bad_output` (it answered, unusably).
 export type ClaudeCliErrorCode = "binary_missing" | "exit" | "timeout" | "bad_output";
+
+// The retry class of a failure, as a pure function of its code — exported so
+// callers and tests can read the policy without provoking it.
+//
+// `exit` and `bad_output` are the two classes a fresh spawn can plausibly
+// change: a transient CLI/API failure, and a model that answered off-format
+// once. `binary_missing` is deterministic (PATH will not change mid-call) and
+// `timeout` has already spent the caller's whole budget — retrying either only
+// buys latency.
+export function isRetryableCode(code: ClaudeCliErrorCode): boolean {
+  return code === "exit" || code === "bad_output";
+}
 
 export class ClaudeCliError extends Error {
   readonly code: ClaudeCliErrorCode;
@@ -79,11 +97,11 @@ export class ClaudeCliEngine implements TailorEngine {
     budget?: string | null,
     voice?: string | null,
   ): Promise<TailorDecision> {
-    const stdout = await this.run(
+    return this.judge(
       `${SYSTEM_PROMPT}\n\n${renderLibrary(entries)}${buildJsonOutputSuffix(TailorDecisionZ)}`,
       buildUserPrompt(jd, context, budget, voice),
+      TailorDecisionZ,
     );
-    return parseWrappedJson(stdout, TailorDecisionZ);
   }
 
   async decideLetter(
@@ -93,22 +111,37 @@ export class ClaudeCliEngine implements TailorEngine {
     context?: string | null,
     voice?: string | null,
   ): Promise<LetterDecision> {
-    const stdout = await this.run(
+    return this.judge(
       `${LETTER_SYSTEM_PROMPT}\n\n${renderLibrary(entries)}${buildJsonOutputSuffix(LetterDecisionZ)}`,
       buildLetterUserPrompt(jd, motivation, context, voice),
+      LetterDecisionZ,
     );
-    return parseWrappedJson(stdout, LetterDecisionZ);
   }
 
-  // One attempt per call. Class-scoped retry is a separate concern and a
-  // separate ticket; a blind retry here would re-run a `bad_output` the same
-  // way it re-runs a transient `exit`.
-  private async run(systemText: string, prompt: string): Promise<string> {
+  // Both judgment calls share one retry policy: at most one extra attempt, and
+  // only for a class a fresh spawn could change. No backoff — the retry absorbs
+  // a one-off, it does not wait out an outage, and a request is holding the
+  // connection open while it runs.
+  private async judge<T>(systemText: string, prompt: string, schema: z.ZodType<T>): Promise<T> {
+    try {
+      return await this.attempt(systemText, prompt, schema);
+    } catch (err) {
+      if (!(err instanceof ClaudeCliError) || !isRetryableCode(err.code)) throw err;
+      // Fresh child, fresh scratch dir — and the second failure is final, so it
+      // propagates from here untouched.
+      return await this.attempt(systemText, prompt, schema);
+    }
+  }
+
+  // The retryable unit is spawn AND parse: a `bad_output` is only knowable once
+  // the child's answer has been read, so a retry that re-spawned without
+  // re-parsing would not cover the class it is for.
+  private async attempt<T>(systemText: string, prompt: string, schema: z.ZodType<T>): Promise<T> {
     const scratchDir = mkdtempSync(path.join(os.tmpdir(), "lede-claude-cli-"));
     try {
       const systemPath = path.join(scratchDir, "system.md");
       writeFileSync(systemPath, systemText, "utf-8");
-      return await this.spawnClaude(scratchDir, systemPath, prompt);
+      return parseWrappedJson(await this.spawnClaude(scratchDir, systemPath, prompt), schema);
     } finally {
       rmSync(scratchDir, { recursive: true, force: true });
     }
@@ -140,6 +173,8 @@ export class ClaudeCliEngine implements TailorEngine {
       );
 
       let stdout = "";
+      let stderrTail = "";
+      let killedByTimeout = false;
       let settled = false;
       const settle = (fn: () => void) => {
         if (settled) return;
@@ -150,23 +185,32 @@ export class ClaudeCliEngine implements TailorEngine {
 
       // This is the only layer that can enforce the bound — nothing above
       // cancels a subprocess — so the kill is unconditional (SIGKILL, not
-      // SIGTERM: a wedged child must not get to decline).
+      // SIGTERM: a wedged child must not get to decline). The rejection is
+      // deferred to `exit`, which libuv emits only after reaping the child:
+      // callers learn "timeout" once the process is genuinely gone, not once a
+      // signal was posted to it.
       const timer = setTimeout(() => {
-        settle(() => {
-          child.kill("SIGKILL");
-          reject(new ClaudeCliError("timeout", `claude did not answer within ${timeoutMs}ms`));
-        });
+        killedByTimeout = true;
+        child.kill("SIGKILL");
       }, timeoutMs);
+
+      const rejectTimeout = () =>
+        settle(() =>
+          reject(new ClaudeCliError("timeout", `claude did not answer within ${timeoutMs}ms`)),
+        );
 
       child.stdout.setEncoding("utf-8");
       child.stdout.on("data", (chunk: string) => {
         stdout += chunk;
       });
-      // stderr is drained but deliberately never surfaced: the CLI echoes its
-      // environment on some failures, and this engine's env carries the OAuth
-      // token. An exit code plus the model's own output is the whole
-      // diagnostic budget.
-      child.stderr.resume();
+      // stderr is kept as a rolling window and only ever surfaced through
+      // `failureTail`, which redacts: the CLI echoes its whole environment on
+      // some failures and this engine's env carries the OAuth token. The window
+      // is what keeps a runaway child from being held in memory whole.
+      child.stderr.setEncoding("utf-8");
+      child.stderr.on("data", (chunk: string) => {
+        stderrTail = (stderrTail + chunk).slice(-STDERR_WINDOW_CHARS);
+      });
 
       child.on("error", (err) => {
         settle(() => {
@@ -179,10 +223,24 @@ export class ClaudeCliEngine implements TailorEngine {
         });
       });
 
+      child.on("exit", () => {
+        if (killedByTimeout) rejectTimeout();
+      });
+
       child.on("close", (exitCode) => {
+        if (killedByTimeout) {
+          rejectTimeout();
+          return;
+        }
         settle(() => {
           if (exitCode !== 0) {
-            reject(new ClaudeCliError("exit", `claude exited with code ${exitCode}`));
+            reject(
+              new ClaudeCliError(
+                "exit",
+                `claude exited with code ${exitCode}`,
+                failureTail(stderrTail),
+              ),
+            );
             return;
           }
           resolve(stdout);
@@ -225,7 +283,7 @@ function parseWrappedJson<T>(stdout: string, schema: z.ZodType<T>): T {
     throw new ClaudeCliError(
       "exit",
       "claude reported an error result",
-      snippet(wrapper.data.result),
+      failureTail(wrapper.data.result),
     );
   }
 
@@ -251,9 +309,29 @@ function stripCodeFence(text: string): string {
   return fenced ? fenced[1] : text;
 }
 
-// Model output only — never stderr, never env. Bounded so a runaway response
-// can't become a runaway error message.
+// The head of an unusable answer — a malformed response is diagnosed from where
+// it starts going wrong. Bounded so a runaway response can't become a runaway
+// error message; redacted because the child's words are never trusted to be
+// secret-free.
 function snippet(text: string): string {
-  const trimmed = text.trim();
+  const trimmed = redactSecrets(text).trim();
   return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
+}
+
+// The tail of a failure — a CLI that dies says why in its last lines, not its
+// first. Leading ellipsis marks a stream we truncated, so a short message is
+// never mistaken for a complete one.
+function failureTail(text: string): string {
+  const trimmed = redactSecrets(text).trim();
+  return trimmed.length > FAILURE_TAIL_CHARS ? `…${trimmed.slice(-FAILURE_TAIL_CHARS)}` : trimmed;
+}
+
+// The child inherits the whole server env, so anything it echoes can carry the
+// OAuth token back to us. Redaction happens here — before an error message
+// exists — rather than at a logging seam: there is no seam that could catch a
+// thrown message, and a token that reaches the string has already escaped.
+function redactSecrets(text: string): string {
+  const token = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+  if (!token) return text;
+  return text.split(token).join("[redacted]");
 }

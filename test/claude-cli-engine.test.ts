@@ -299,17 +299,6 @@ describe("ClaudeCliEngine — boundary parsing", () => {
     const err = await captureError(() => engine(undefined, 400).decide(JD, SEED_ENTRIES));
     expect(err.code).toBe("timeout");
   });
-
-  it("performs exactly one attempt per call — no internal retry", async () => {
-    process.env.LEDE_STUB_MODE = "is-error-once";
-    setPayload(CANNED_DECISION);
-
-    await captureError(() => engine().decide(JD, SEED_ENTRIES));
-    expect(stub.readRecords()).toHaveLength(1);
-
-    await expect(engine().decide(JD, SEED_ENTRIES)).resolves.toEqual(CANNED_DECISION);
-    expect(stub.readRecords()).toHaveLength(2);
-  });
 });
 
 describe("claude stub — library-derived answers survive the real validators", () => {
