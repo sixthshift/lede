@@ -15,6 +15,7 @@ import type { ProviderId } from "@shared/types";
 
 import { useSettings, useUpdateSettings } from "../hooks/queries";
 import { ApiKeyForm } from "./ApiKeyForm";
+import { ClaudeCliAuth } from "./ClaudeCliAuth";
 import { DesignPanel } from "./DesignPanel";
 import { ModelPicker } from "./ModelPicker";
 import { ProviderPicker } from "./ProviderPicker";
@@ -74,6 +75,7 @@ export function SettingsView() {
     editorContent = <p className="text-sm text-destructive">Could not load settings.</p>;
   } else {
     const { provider, model, keySet, defaultFormat } = settingsQuery.data;
+    const keyless = provider === "claude-cli";
 
     function handleProviderChange(nextProvider: ProviderId) {
       updateSettings.mutate({ provider: nextProvider, model: PROVIDERS[nextProvider].default });
@@ -117,12 +119,17 @@ export function SettingsView() {
                 API key
               </CardTitle>
               <CardDescription>
-                Stored encrypted on the server and never shown again — you bring your own key for
-                the provider above.
+                {keyless
+                  ? "The provider above authenticates on the server itself, so this instance stores no key for it."
+                  : "Stored encrypted on the server and never shown again — you bring your own key for the provider above."}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ApiKeyForm keySet={keySet} />
+              {/* T008: the keyless provider takes this card over rather than
+                  adding one — the Settings surface is bound to three cards
+                  (test/e2e/settings.spec.ts). Swapped, not disabled: a key
+                  input that can't be used is an affordance that lies. */}
+              {keyless ? <ClaudeCliAuth /> : <ApiKeyForm keySet={keySet} />}
             </CardContent>
           </Card>
         </div>

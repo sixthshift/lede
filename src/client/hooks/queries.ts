@@ -20,6 +20,7 @@ import {
   authLogout,
   setApiKey,
   deleteApiKey,
+  testConnection,
 } from "../api";
 import type { EntryInput, ProfileInput, SettingsInput, SettingsResponse } from "../api";
 
@@ -164,4 +165,11 @@ export function useDeleteApiKey() {
       queryClient.invalidateQueries({ queryKey: ["settings"] });
     },
   });
+}
+
+// Readiness for provider claude-cli. Invalidates nothing on purpose: the probe
+// observes the server's environment, it doesn't change any state ['settings']
+// caches — a refetch here would only re-read what the operator just saw.
+export function useTestConnection() {
+  return useMutation({ mutationFn: () => testConnection() });
 }

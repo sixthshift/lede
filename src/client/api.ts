@@ -311,6 +311,35 @@ export async function deleteApiKey(): Promise<{ keySet: false }> {
   return request<{ keySet: false }>("/api/settings/key", { method: "DELETE" });
 }
 
+// ── claude-cli readiness — the keyless counterpart to a stored key. Nothing
+// is sent and nothing comes back but the verdict: the server spends one real
+// round trip through its own `claude` (src/server/routes/settings.ts), which
+// is the only observation that separates "installed" from "logged in".
+export async function testConnection(): Promise<{ ok: true }> {
+  return request<{ ok: true }>("/api/settings/test-connection", jsonInit("POST", {}));
+}
+
+// The four ways the CLI can fail, each kept as its own sentence because each
+// has its own remedy (install it / read its login state / raise the budget /
+// re-run an off-format answer) — the server refuses to collapse them into one
+// code for that reason (CLAUDE_CLI_ERRORS, src/server/tailor/claude-cli.ts),
+// so this client must not collapse them into one sentence either. An
+// unrecognised code says only what it knows, never `err.message` raw.
+const CLAUDE_CLI_ERROR_COPY: Record<string, string> = {
+  claude_cli_binary_missing:
+    "No claude binary on the server's PATH — install the Claude Code CLI where Lede runs.",
+  claude_cli_exit:
+    "The claude CLI exited with an error — check that it is signed in on the server.",
+  claude_cli_timeout: "The claude CLI did not answer in time.",
+  claude_cli_bad_output: "The claude CLI answered in a format Lede could not read.",
+  provider_not_testable: "Only Claude Code (CLI) has a connection to test.",
+};
+
+export function claudeCliErrorMessage(code: string | undefined): string {
+  const fallback = "Could not reach the claude CLI.";
+  return code ? (CLAUDE_CLI_ERROR_COPY[code] ?? fallback) : fallback;
+}
+
 // ── backup (spec.md §27) — full-instance export/import: library + profile + applications ──
 export type BackupPayload = {
   entries: Entry[];
