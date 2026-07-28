@@ -2,7 +2,7 @@
 
 Self-hosted resume-tailoring tool: an AI decides which of your experience **leads** for a specific role. Repositioning judgment, not keyword-matching — that judgment is the product; everything else is CRUD around it.
 
-v1 campaign (spec + ailoop drive, E1–E9) is complete and archived at `specs/v1/`. v2 (cover letters + authored capture: letters, editable drafts, voice sources) is complete and archived at `specs/v2/`. v3 (workspace redesign: persistent three-pane shell, de-modaled flows, card dashboard) is complete and archived at `specs/v3/`. Archives are records, not sources. New feature work gets a fresh spec via `/aispec`; don't amend an archive.
+v1 campaign (spec + ailoop drive, E1–E9) is complete and archived at `specs/v1/`. v2 (cover letters + authored capture: letters, editable drafts, voice sources) is complete and archived at `specs/v2/`. v3 (workspace redesign: persistent three-pane shell, de-modaled flows, card dashboard) is complete and archived at `specs/v3/`. Later drives archive likewise (`specs/v4/`–`specs/v7/`, latest: content-ATS coverage). Archives are records, not sources — and local-only: `specs/` is untracked (gitignored), so archives live on the host, not in the repo. New feature work gets a fresh spec via `/aispec`; don't amend an archive.
 
 ## Commands
 
@@ -44,6 +44,7 @@ The tailor pipeline (`src/server/tailor/`) is engine-split: `ProviderEngine` (li
 - Snapshots (`current`/`locked`) are self-contained copies — Library edits never mutate them.
 - **De-modal, forever** (v3; bounded exception v4). The ban is on *modality*, not the ARIA role: no user action produces `aria-modal="true"`, a backdrop/overlay covering >50% of the viewport, or removal of the underlying surface from tab order/interactivity. Non-modal `role="dialog"` panels are correct ARIA. Destructive confirms are inline two-step, never `window.confirm`. **Below `lg` (1024px), full-width sheets are sanctioned** where co-visibility is physically impossible — dismissible + focus-managed; at ≥`lg` the ban stays absolute (no scrims, no lightboxes). Persistent chrome (bottom tab bar) and non-blocking transient toasts are not modality. (Cohesion e2e enforces both regimes.)
 - **Rail collapse is view-state only** (v3) — client-side persistence at most; it never writes `settings.layout` or `sectionDisplay`.
+- **Coverage reports, never fills** (v7). The content-ATS coverage layer (`src/shared/content-coverage.ts` → `CoveragePanel`) is read-only display: never feeds the tailor (decision/ranking/prompt), never inserts a keyword into document or entry. Matching stays keyless deterministic token-matching — no LLM/semantic/synonym pass (synonym blind spot is a disclosed limit). Raw-JD terms are display candidates only; they never score, reorder, or select entries.
 
 ## Design system
 
