@@ -12,3 +12,10 @@ playwright-report/
 
 # playwright MCP session artifacts
 .playwright-mcp/
+
+# specs are campaign contracts, not repo records (tracked v1–v6 archives predate this)
+specs/
+
+# ailoop campaign state (ephemeral by design; learnings/ stays tracked)
+.ailoop/campaign/
+.ailoop/worktrees/

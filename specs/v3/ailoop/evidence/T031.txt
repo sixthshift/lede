@@ -1,8 +1,0 @@
-T031 — INDEPENDENT RE-VERIFY (branch v3-t031 @ 7bc09d2, baseSha 4730329)
-SCOPE: server/routes/applications.ts + client/api.ts + client/queries/useApplications.ts (UNDECLARED cascade — duplicate mutation hook) + ApplicationCard.tsx + api.applications.test.ts + applications.spec.ts. Declared files updated.
-CO-2 applied correctly: POST /api/applications/:id/duplicate — structuredClone the full row → fresh id/timestamps, 201 {id}, 404 unknown. Confined to this one new endpoint; no other route/table/column. api test proves duplicate of tailored+locked+lettered source → n+1 with genState/locked/letterGenState/letterCurrent/current matching.
-DELETE inline (protocol): 0 window.confirm / ui-dialog-modal / aria-modal in ApplicationCard; two-step via deleteArmed useState (Delete→Confirm delete, single button, onBlur resets). Resting interactive count = 4 (Open/Duplicate/Delete/Download) for T032 allowlist.
-PROTOCOL A: applications.spec +1 test (T031 quick actions); 0 skip/only; 409 x15, flag-voice x9 intact.
-E2E: open→/applications/:id + workspace-shell; duplicate→GET n+1 with matching gen/locked/letter; delete inline two-step (assertNoModalOverlay holds while armed)→GET id gone; download→real event, %PDF non-empty, disabled on untailored/enabled on tailored+lettered.
-BASELINE (authoritative, exit codes): check 0 · lint 0 · build 0 · vitest 1056 · chromium EXIT 0 (14) · auth EXIT 0 (1) · applications EXIT 0 (21). (No flake this run.)
-VERDICT: DONE.

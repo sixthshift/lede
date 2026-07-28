@@ -1,7 +1,0 @@
-T021 — RE-VERIFY (branch v3-t021, baseSha 9421a97)
-SCOPE: EntryEditor.tsx + LibraryView.tsx + workspace.ts + library-crud.spec.ts (declared; no server/shared).
-Approach: DialogPrimitive modal={false}, focus-restore via ref (two external triggers Add entry/Edit selected). ui/dialog.tsx untouched.
-PROTOCOL A: library-crud 8 preserved + 2 added; 0 skip/only. entry-editor.test.tsx (9 vitest) unchanged+green.
-PROTOCOL B (2 new tests): assertNoModalOverlay (0 aria-modal, no >50% overlay); focus opens on Section combobox; REAL un-forced Import click opens native filechooser (underlying interactive); Escape returns focus to Add-entry/Edit-selected trigger. Create+edit CRUD round-trip preserved (8 existing tests green incl. reload persistence).
-BASELINE (authoritative, ports clear): check 0 · lint 0 · build 0 · vitest 1053 · chromium 10 · auth 1 · applications 18.
-VERDICT: DONE.

@@ -1,8 +1,0 @@
-T02R2 — Repair: letter prompt reproduces numbers verbatim — INDEPENDENT RE-VERIFY, branch ailoop/T02R2, baseSha 27701da
-ACCEPTED. Merged --ff-only into main.
-SCOPE: CLEAN — letter-prompt.ts + test/letter-engine.test.ts. buildLetterUserPrompt UNTOUCHED (byte-identity).
-BASELINE: check 0 / lint 0 / build 0 / vitest 67 files 916 pass (+1 verbatim test).
-GAMING READ: added a "Numbers are verbatim" block to §1 fact-lock (reproduce numbers exactly incl. shorthand;
-  '~30k' stays '~30k', never '30,000'/'30000'; rationale: grounding matches tokens verbatim). Fact-lock + focus
-  sections intact. validate.ts NOT touched (fact-lock kept strict, per human decision).
-NOTE: keyless-necessary; sufficient gate = T05 live re-record (rules-engine must ground '~30k').

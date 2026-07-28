@@ -1,7 +1,0 @@
-T024 — INDEPENDENT RE-VERIFY (branch v3-t024 @ 3cbfc9d, baseSha 03a8ceb)
-SCOPE: TemplateGallery.tsx + design.spec.ts (declared; no server/shared/format-engine).
-FIX: mirrors NewApplication (owned DialogPrimitive.Trigger 'Browse templates') — modal={false}, no overlay/portal, right-anchored dropdown; onOpenAutoFocus focuses first data-template-id card (static PRESET_MANIFESTS, no data-load gating); default onCloseAutoFocus restores focus. Selectors preserved (data-template-id, data-user-preset-id, ATS Badge, role=dialog, h2 heading).
-PROTOCOL A: design.spec +1 de-modal test; mega-test preserved; 0 skip/only. template-gallery.test.tsx (11 vitest) unmodified+green.
-NEW test: card visible FIRST → assertNoModalOverlay → firstCard toBeFocused → real un-forced 'Letter' tab click flips aria-pressed while gallery open (underlying interactive) → select 'compact' → PUT format.presetId==='compact' (round-trip) → Escape returns focus to trigger.
-BASELINE (authoritative, exit codes): check 0 · lint 0 · build 0 · vitest 1053 · chromium EXIT 0 (14) · auth EXIT 0 (1) · applications EXIT 0 (19).
-VERDICT: DONE.

@@ -1,4 +1,0 @@
-T042 — Export busy state (F402). Re-verify branch t042-export-busy tip 66ea32d, baseSha a15fa93.
-SCOPE (excl .ailoop): playwright.config(reg), ApplicationCard, ApplicationDetail, export-busy.spec(new). All declared. CLEAN.
-BASELINE: check 0 · build 0 · lint 0 (256) · vitest 1077.
-GAMING CLEAN: real early-return guard `if (isExportingPdf) return` (not just disabled attr) + disabled + label swap "Preparing…" on both PDF & plain-text (ApplicationDetail) and card Download (ApplicationCard). Spec counts page.on("download") events → exactly 1 on double-click; slows font (.woff) responses for a deterministic busy window; builder anti-gaming self-check (strip guard → test fails). Full playwright at P3 gate.

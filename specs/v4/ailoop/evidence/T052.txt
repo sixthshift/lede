@@ -1,6 +1,0 @@
-T052 — Kicker dedup F503 + action-strip regroup F504 + metadata typography F509. Re-verify branch t052-detail-craft, baseSha 8c397c8.
-SCOPE (excl .ailoop): ApplicationDetail, detail-craft.spec(new), playwright.config(reg). All declared. CLEAN.
-BASELINE: check 0 · build 0 · lint 0 (263) · vitest 1077/1077.
-E2E (coordinator-run, ports-clean): detail-craft + route-transitions 14/14 PASS — F503 heading removal did NOT break F208 heading order.
-GAMING CLEAN: F503 — duplicate "Cover letter"/"Design" CardTitles removed (CardTitle import dropped); mono-caps kickers (<p> landmarks) STAY; spec asserts named-heading count===1 (reworded-not-removed caught via count + kicker-text present). F504 — primary Tailor/Re-tailor first in SOURCE order (comment explicitly rejects flex-row-reverse; spec asserts DOM/tab order via getByRole list AND visual boundingBox.x); "Use resume as a voice source" + "Use letter as a voice source" distinct; Lock-final gets warn treatment (border-warn/bg-warn-soft/text-warn). F509 — gen-state metadata unified to explicit font-sans (genstate-resume/letter-metadata, Tailoring…/Generating…). Full playwright at P4 gate.
-Note: builder built correctly but got stuck in a report wait-loop; coordinator committed staged work (branch had no commit) + verified independently.

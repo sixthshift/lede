@@ -1,8 +1,0 @@
-T023 — INDEPENDENT RE-VERIFY (attempt 2; branch v3-t023 @ 03a8ceb, baseSha 5b27768)
-SCOPE: ProfileEditor.tsx + LibraryView.tsx + library-crud.spec.ts (declared; no server/shared).
-FIX (mirrors merged WORKING LayoutEditor exactly): DialogPrimitive modal={false}; onOpenAutoFocus preventDefault; onCloseAutoFocus restores to LibraryView profileTriggerRef; first-field (Name) focus via useEffect keyed on [open, profileLoaded=Boolean(useProfile())] — not onOpenAutoFocus. Voice testids untouched.
-PROTOCOL A: library-crud +2 tests (Edit profile panel, round-trip); 0 skip/only. Existing profile-layout.test.tsx vitest unchanged+green.
-NEW tests (structurally identical to LayoutEditor's): assert Name field visible BEFORE modality; assertNoModalOverlay; Name toBeFocused; Import filechooser proof; Escape returns focus to trigger; Headline edit + Save (PUT /api/profile 200) → reload → GET reflects → restore.
-BASELINE (authoritative, exit codes captured, ports clear): check 0 · lint 0 · build 0 · vitest 1053 (fit-ui.test.tsx GREEN — earlier failure confirmed a flake) · chromium EXIT 0 (14 passed) · auth EXIT 0 (1) · applications EXIT 0 (18, voice intact).
-ATTEMPT 1 (failed): builder stalled on background playwright + focus/round-trip bug from deviating from the working pattern; see T023-a1.txt.
-VERDICT: DONE (attempt 2).

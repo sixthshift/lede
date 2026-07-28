@@ -1,4 +1,0 @@
-T044 — Letter empty-state parity (F405). Re-verify branch t044-letter-empty tip 7018a3a, baseSha a6c5c54.
-SCOPE (excl .ailoop): playwright.config(reg), ApplicationDetail, letter-empty.spec(new). All declared (scope corrected [0104]: real home was ApplicationDetail letter-tab ternary, not LetterPreview). CLEAN.
-BASELINE: check 0 · build 0 · lint 0 (258) · vitest 1077.
-GAMING CLEAN: replaced bare <p>Nothing to preview yet.</p> with a dashed card mirroring the resume empty state (same rounded-xl border-dashed border-border-strong tokens, Mail icon, "No cover letter yet" heading, "Cover letter panel →" CTA). Arrow in a whitespace-nowrap parent (same line-box). letter-empty.spec asserts computed border-style dashed, CTA present, arrow count===1 (delete-arrow→0 fails, red-team), arrow/text boundingBox.y within 2px. CTA points to the real letter affordance (editor Cover-letter card; no separate route). Full playwright at P3 gate.

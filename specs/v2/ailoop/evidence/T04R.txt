@@ -1,8 +1,0 @@
-T04R — Repair: record retry loop (sampling robustness) — INDEPENDENT RE-VERIFY, branch ailoop/T04R, baseSha c9128a1
-ACCEPTED. Merged --ff-only into main.
-SCOPE: CLEAN — only scripts/record-letter-fixtures.ts. No temp tsconfig committed.
-BASELINE: check 0 / lint 0 / build 0 / vitest 67 files 915 pass. Script typechecks out-of-band (exit 0).
-GAMING READ: clean — MAX_ATTEMPTS=5 loop calls UNCHANGED recordOneLetter (letterFlipPredicate + validateLetterNoFabrication
-  still gate every attempt), keeps first ok, no fixture on all-fail (exit non-zero), records real per-JD attempts count;
-  usage summing unchanged. Checks NOT weakened.
-NOTE: keyless-necessary; sufficient gate is T05's live re-record.

@@ -1,8 +1,0 @@
-T041 — INDEPENDENT RE-VERIFY (branch v3-t041 @ 40d1b34, baseSha b07e474)
-SCOPE: SettingsView.tsx + App.tsx (isWorkspaceRoute+/settings, cascade) + playwright.config.ts (chromium testMatch widen only) + settings.spec.ts (new) + settings-auth.test.tsx (re-homed vitest). No server/shared.
-SECTIONS enumerated from live SettingsView (all 3): Provider&model, API key, Default document format — SettingsView now WorkspaceShell(rail=section nav, no preview → degrade); rail-nav-provider/apiKey/format scrollIntoView.
-settings.spec.ts (5 tests, chromium project): workspace-shell present + preview-pane count 0 (degrade); rail 1 item/section, nav doesn't change URL; Provider&model round-trip (PUT /api/settings 200 + reload persists); API key round-trip via LOCAL 127.0.0.1 OpenAI-shaped stub → real ApiKeyForm Save exercises the real validate-before-store route KEYLESS, 'A key is set.' survives reload; Default format round-trip (Heading weight axis + PUT + reload). No skip/only.
-playwright.config: chromium testMatch /library-crud/ → /(library-crud|settings)/ (additive for new spec; no server/other-project change).
-PROTOCOL A: no test deleted/renamed/skipped; settings-auth.test.tsx re-homed to getByRole heading (rail button vs card heading dup) + added shell/no-preview asserts.
-BASELINE (authoritative, exit codes): check 0 · lint 0 · build 0 · vitest 1055 passed + 1 fit-ui FLAKE (passes 4/4 isolated) · chromium --retries=0 EXIT 0 (20) · auth EXIT 0 (1) · applications EXIT 0 (21).
-VERDICT: DONE.

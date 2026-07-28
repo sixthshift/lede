@@ -1,8 +1,0 @@
-T020 — INDEPENDENT RE-VERIFY (branch v3-t020 @ 9421a97, baseSha dbb2716)
-SCOPE: NewApplication.tsx + applications.spec.ts + workspace.ts (declared; no server/shared).
-Approach: Radix modal={false} non-modal dropdown under trigger, ~28rem/70vh (<50% viewport), no overlay/focus-trap; shared ui/dialog.tsx untouched (stays modal for gallery/voice consumers).
-PROTOCOL A: +1 test; 0 skip/fixme/only; 409 x15, flag-voice x9 intact; existing NewApplication unit test unmodified+green.
-PROTOCOL B (new test line 1767): assertNoModalOverlay (0 aria-modal, no >50% overlay); focus opens on Company field; REAL un-forced click on underlying [data-application-id] card navigates (underlying interactive); reopen + Escape returns focus to trigger.
-CREATE round-trip: fill+submit visible after reload via [data-application-id].
-BASELINE (authoritative, ports clear): check 0 · lint 0 · build 0 · vitest 1053 · chromium 8 · auth 1 · applications 18.
-VERDICT: DONE.

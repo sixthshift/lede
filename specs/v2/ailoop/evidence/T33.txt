@@ -1,8 +1,0 @@
-T33 — independent re-verify (coordinator) — ACCEPT (test-only)
-baseSha 7a82be4 ancestor; commit 3380718; scope CLEAN (1 declared file test/api.applications-overwrite.test.ts, no prod code).
-Gaming read CLEAN + NON-VACUOUS (full test read): every overwrite case asserts edit PRESENT pre then GONE post
-(deep toEqual(original), deterministic FixtureEngine replay keyed on jd+entries); one-level undo via two DISTINCT
-fixtures (CONTRAST_JDS[0]/[1] JD-swap) asserts swap byte-exact BOTH directions + re-undo restores; unrecoverable
-case asserts edited draft in NEITHER letterCurrent NOR letterPrevious after fresh gen (deep-equal AND exact text).
-Verified at INTEGRATION on merged tree e0270cd (see T34 evidence for the shared gate output): 4 T33 tests green
-within vitest 78 files / 1021 pass.
