@@ -38,6 +38,7 @@ import {
   tailor,
   type TailorEngine,
 } from "../tailor/engine";
+import { ClaudeCliEngine, ClaudeCliError, type ClaudeCliErrorCode } from "../tailor/claude-cli";
 import { DecisionContractError, FabricationError } from "../tailor/validate";
 import { deriveContentBudget } from "../tailor/budget";
 import { tailorLetter } from "../tailor/letter";
@@ -87,6 +88,18 @@ function voicePrompt(sources: VoiceSource[]): string | undefined {
   return sources.map((s) => s.text).join("\n\n---\n\n");
 }
 
+// The CLI engine's four failure codes, each with its own client-visible error
+// string. One string per code, never a shared `claude_cli_error`: the operator
+// remedies differ completely (install the binary / read the CLI's own failure /
+// raise the budget / re-run an off-format answer), so a client that collapsed
+// them would be telling the user something it doesn't know.
+const CLAUDE_CLI_ERRORS: Record<ClaudeCliErrorCode, string> = {
+  binary_missing: "claude_cli_binary_missing",
+  exit: "claude_cli_exit",
+  timeout: "claude_cli_timeout",
+  bad_output: "claude_cli_bad_output",
+};
+
 // Maps a tailor() failure to its distinct HTTP status — identical to
 // index.ts's mapTailorError for the stateless route (spec.md §9).
 function mapTailorError(err: unknown): { status: number; body: { error: string } } {
@@ -99,6 +112,13 @@ function mapTailorError(err: unknown): { status: number; body: { error: string }
   // not a malformed client request or a transport-level provider failure.
   if (err instanceof DecisionContractError)
     return { status: 424, body: { error: "decision_contract" } };
+
+  // 502 across all four: the local `claude` is this engine's upstream, so every
+  // way it can fail is a bad gateway. The body carries only the code's fixed
+  // string — never the error's own message, which ends in the child's
+  // (redacted, bounded) output tail and has no business in an HTTP response.
+  if (err instanceof ClaudeCliError)
+    return { status: 502, body: { error: CLAUDE_CLI_ERRORS[err.code] } };
 
   if (APICallError.isInstance(err)) {
     if (err.statusCode === 401 || err.statusCode === 403)
@@ -251,9 +271,10 @@ export type ApplicationsRoutesDeps = {
 };
 
 // Selects the engine for one tailor request exactly like the stateless
-// /api/tailor route does: fixture mode is keyless; live mode decrypts the
-// stored BYOK key per request (never a boot-time constant) or short-circuits
-// to 'no_api_key' before any provider call.
+// /api/tailor route does: fixture mode is keyless; the claude-cli provider is
+// keyless too (it authenticates through the local CLI's own login); every other
+// live provider decrypts the stored BYOK key per request (never a boot-time
+// constant) or short-circuits to 'no_api_key' before any provider call.
 function resolveEngine(
   db: Db,
   config: Config,
@@ -262,10 +283,17 @@ function resolveEngine(
   if (deps?.engine) return deps.engine;
   if (config.tailorEngine === "fixture") return new FixtureEngine();
 
+  const settingsRow = db.select().from(settings).where(eq(settings.id, 1)).get()!;
+  // Ordered BEFORE the secrets read on purpose: the CLI engine has no use for a
+  // BYOK key, so this path must never touch the secrets table at all — not read
+  // it and find the column empty, and never decrypt.
+  if (settingsRow.provider === "claude-cli") {
+    return new ClaudeCliEngine({ model: settingsRow.model });
+  }
+
   const secretsRow = db.select().from(secrets).where(eq(secrets.id, 1)).get();
   if (!secretsRow?.apiKeyEnc) return { error: "no_api_key" };
 
-  const settingsRow = db.select().from(settings).where(eq(settings.id, 1)).get()!;
   // Decrypted in memory for this request only — never persisted, logged, or returned.
   const apiKey = decrypt(secretsRow.apiKeyEnc, config.masterKey);
   return new ProviderEngine({
