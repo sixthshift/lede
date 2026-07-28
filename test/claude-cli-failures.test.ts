@@ -9,7 +9,10 @@
 //
 // Attempt counts come from the stub's recording (one JSON line per invocation),
 // which the stub writes BEFORE it acts, so even the mode that never answers is
-// counted.
+// counted — for every class except `binary_missing`, where nothing runs and so
+// nothing records. That one is counted at the spawn seam instead (see the spy
+// below), because a recording written BY the child can never distinguish one
+// absent child from two.
 
 import { existsSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -24,6 +27,33 @@ import {
   pathWithStub,
   pathWithoutClaude,
 } from "./helpers/claude-stub";
+
+// The spawn seam, as a PASS-THROUGH: the spy delegates to the real
+// `child_process.spawn`, so every other case in this file keeps driving a real
+// subprocess against the stub on PATH. The only thing added is a count of
+// attempts, which is the one fact the stub's recording cannot carry on the
+// binary-missing path.
+//
+// The implementation is passed to `vi.fn(impl)` rather than attached afterwards
+// with `mockImplementation`: `restoreAllMocks()` in afterEach resets a mock to
+// the implementation it was CONSTRUCTED with, so a spy configured after the
+// fact would go dead from the second test onward and spawn nothing at all. The
+// real function is only reachable inside the factory, hence the holder.
+const { spawnSpy, realSpawn } = vi.hoisted(() => {
+  const realSpawn: { fn?: typeof import("node:child_process").spawn } = {};
+  return {
+    realSpawn,
+    spawnSpy: vi.fn((...args: Parameters<typeof import("node:child_process").spawn>) =>
+      realSpawn.fn!(...args),
+    ),
+  };
+});
+
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  realSpawn.fn = actual.spawn;
+  return { ...actual, spawn: spawnSpy };
+});
 
 const JD = "Senior platform engineer; owns the SDK and the developer experience.";
 
@@ -86,6 +116,8 @@ beforeEach(() => {
   process.env.LEDE_STUB_RECORD = stub.recordPath;
   process.env.LEDE_STUB_MODE = "ok";
   process.env.LEDE_STUB_PAYLOAD = payloadPath;
+
+  spawnSpy.mockClear();
 });
 
 afterEach(() => {
@@ -119,6 +151,13 @@ async function captureError(run: () => Promise<unknown>): Promise<ClaudeCliError
 
 function messageAndDetail(err: ClaudeCliError): string {
   return `${err.message}\n${err.detail ?? ""}`;
+}
+
+// Every command the engine tried to launch, in order. The command itself is part
+// of the evidence rather than just the count: an assertion on length alone would
+// also pass if the engine had spawned something else entirely.
+function spawnedCommands(): string[] {
+  return spawnSpy.mock.calls.map((call) => String(call[0]));
 }
 
 describe("ClaudeCliEngine — four distinct codes, each from its own stub variant", () => {
@@ -225,17 +264,45 @@ describe("ClaudeCliEngine — a non-retryable class is attempted once", () => {
   });
 
   it("records nothing at all for a missing binary", async () => {
-    // LIMIT, stated rather than implied: a binary that does not exist records
-    // nothing, so attempt count is NOT observable on this path. What is proved
-    // here is that no invocation happened and that the exported policy excludes
-    // the class — the retry-count claim rests on the predicate, not on evidence
-    // from this run.
+    // A binary that does not exist records nothing, so what this case proves is
+    // that no invocation happened and that the exported policy excludes the
+    // class. The attempt COUNT on this path is not observable from the
+    // recording either way — it is observed at the spawn seam instead, in the
+    // describe below.
     process.env.PATH = pathWithoutClaude();
     const err = await captureError(() => engine().decide(JD, SEED_ENTRIES));
 
     expect(err.code).toBe("binary_missing");
     expect(stub.readRecords()).toHaveLength(0);
     expect(isRetryableCode(err.code)).toBe(false);
+  });
+});
+
+describe("ClaudeCliEngine — the single attempt on the binary-missing path, measured at the spawn seam", () => {
+  it("spawns `claude` exactly once when there is no claude to spawn", async () => {
+    process.env.PATH = pathWithoutClaude();
+    const err = await captureError(() => engine().decide(JD, SEED_ENTRIES));
+
+    expect(err.code).toBe("binary_missing");
+    // The claim the code's own words make — one attempt, no retry — as an
+    // observation rather than a reading of isRetryableCode: an engine that
+    // ignored the predicate and retried every class would fail HERE, where it
+    // passes every recording-based assertion (a second absent binary records
+    // nothing either).
+    expect(spawnedCommands()).toEqual(["claude"]);
+  });
+
+  it("CONTROL: the same counter sees two spawns for a retryable class", async () => {
+    // Non-vacuity. Without this, the case above would pass just as happily
+    // against a spy that never counted anything.
+    process.env.LEDE_STUB_MODE = "exit1";
+    const err = await captureError(() => engine().decide(JD, SEED_ENTRIES));
+
+    expect(err.code).toBe("exit");
+    expect(spawnedCommands()).toEqual(["claude", "claude"]);
+    // Both spawns really reached the stub, so the seam is counting the same
+    // attempts the recording sees.
+    expect(stub.readRecords()).toHaveLength(2);
   });
 });
 
