@@ -77,6 +77,14 @@ export function settingsRoutes(
       .from(settings)
       .where(eq(settings.id, 1))
       .get()!;
+    // claude-cli authenticates ambiently through the host's own CLI login, so
+    // there is no key this route could validate or usefully store. Rejected
+    // rather than accepted-and-ignored: storing a key the tailor path never
+    // reads would report a readiness the instance doesn't have.
+    if (provider === "claude-cli") {
+      return reply.code(400).send({ error: "provider_keyless" });
+    }
+
     try {
       await validate({
         provider: provider as ProviderId,
