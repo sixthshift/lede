@@ -104,7 +104,9 @@ export type Profile = {
 export type Layout = { section: Section | "summary"; enabled: boolean }[];
 
 // ── providers (§6.1) ──
-export type ProviderId = "anthropic" | "openai" | "google" | "openai-compatible";
+// "claude-cli" shells out to the `claude` binary instead of calling an HTTP API — it is a
+// provider to the UI and the engine selector, but never to the AI SDK (see resolveModel).
+export type ProviderId = "anthropic" | "openai" | "google" | "openai-compatible" | "claude-cli";
 
 // ── page model (§28.1): paper is a global setting, targetPages is per-application ──
 export type Paper = "letter" | "a4";

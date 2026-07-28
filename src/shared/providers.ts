@@ -31,6 +31,12 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
     models: [],
     default: "",
   },
+  // CLI aliases passed straight to `claude -p --model <alias>` — deliberately not API model ids.
+  "claude-cli": {
+    label: "Claude Code (CLI)",
+    models: ["opus", "sonnet", "haiku"],
+    default: "sonnet",
+  },
 };
 
 // apiKey is optional so callers may rely on each provider SDK's own env-var fallback
@@ -57,6 +63,13 @@ export function resolveModel({
       return createGoogleGenerativeAI({ apiKey })(model);
     case "openai-compatible":
       return createOpenAI({ apiKey, baseURL, name: "openai-compatible" })(model);
+    // Reaching here is a routing bug, not a config error: the claude-cli provider is served by
+    // the CLI engine and has no AI-SDK model to build. Throwing keeps the switch exhaustive so a
+    // future ProviderId member is a compile error rather than a silent undefined.
+    case "claude-cli":
+      throw new Error(
+        'resolveModel: provider "claude-cli" has no AI SDK model — it is served by the claude CLI engine; this call is misrouted',
+      );
   }
 }
 
