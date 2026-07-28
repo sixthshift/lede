@@ -76,6 +76,36 @@ whose staged files have lint or format issues. Run `bun run lint:fix` to clear t
 Copy `.env.example` to `.env` and adjust as needed. `.env` is git-ignored and
 optionally loaded by the dev container.
 
+## Claude Code (CLI)
+
+Selecting **Claude Code (CLI)** as the provider in **Settings** swaps the BYOK
+HTTP call for a local `claude -p` subprocess. It is the one provider that needs
+no API key.
+
+**Auth is your Claude subscription, not a key.** The engine inherits the
+server's environment, so it authenticates however the machine running the
+server already does: the `claude login` state on that machine, or a
+`CLAUDE_CODE_OAUTH_TOKEN` environment variable exported for the server process.
+Nothing is stored — no API key is kept for this provider, and none is needed.
+There is no token field in the UI; `CLAUDE_CODE_OAUTH_TOKEN` is a host
+environment variable only.
+
+**Host-run only — deliberately not in the Docker image.** The shipped image
+(root `Dockerfile` / `docker-compose.yml`) does not install the `claude` binary
+and never will; this provider is for running lede directly on a machine that
+already has Claude Code. A container that selects it fails loud — the tailor
+request returns `claude_cli_binary_missing` (502) — rather than silently
+degrading to another provider. (The dev container under `.devcontainer/` does
+preinstall the CLI, but that is the development environment, not the shipped
+image.)
+
+**Live smoke is manual.** CI has no Claude subscription, so the keyless suite
+covers the plumbing (prompt shape, failure taxonomy, route mapping) but can
+never exercise a real CLI call. The live path's only end-to-end check is
+therefore manual: on a logged-in machine, run one real tailor through the
+**Claude Code (CLI)** provider and confirm the decision comes back. Same stance
+as the key-gated live model-quality evals — opt-in, operator-run, never in CI.
+
 ## Production / self-hosting
 
 ### Quickstart — prebuilt image (no clone needed)
