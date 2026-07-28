@@ -56,6 +56,23 @@ ${JSON.stringify(z.toJSONSchema(schema), null, 2)}`;
 // `timeout` (we killed it), `bad_output` (it answered, unusably).
 export type ClaudeCliErrorCode = "binary_missing" | "exit" | "timeout" | "bad_output";
 
+// Each code's client-visible error string. One string per code, never a shared
+// `claude_cli_error`: the operator remedies differ completely (install the
+// binary / read the CLI's own failure / raise the budget / re-run an off-format
+// answer), so a client that collapsed them would be telling the user something
+// it doesn't know.
+//
+// It lives beside the taxonomy rather than in either route because two routes
+// now speak it — tailoring and the readiness probe — and an operator who sees
+// `claude_cli_exit` from one must be able to trust it means the same thing as
+// from the other. Two private copies would let them drift silently.
+export const CLAUDE_CLI_ERRORS: Record<ClaudeCliErrorCode, string> = {
+  binary_missing: "claude_cli_binary_missing",
+  exit: "claude_cli_exit",
+  timeout: "claude_cli_timeout",
+  bad_output: "claude_cli_bad_output",
+};
+
 // The retry class of a failure, as a pure function of its code — exported so
 // callers and tests can read the policy without provoking it.
 //
@@ -87,8 +104,38 @@ export type ClaudeCliEngineConfig = {
   timeoutMs?: number;
 };
 
+// The readiness probe's own trivial exchange. It is this engine's constant, not
+// a shared prompt: readiness asks nothing about a library or a job description,
+// and the shared prompts belong to judgment. The expected reply is a
+// schema-checked literal rather than free text, because the only failure worth
+// catching here is a `claude` that runs but cannot answer — installed but not
+// logged in, or wedged behind a login prompt. Those exit 0 and say something;
+// a probe that accepted any exit 0 would call them healthy.
+const probeReplyZ = z.object({ ready: z.literal(true) });
+const PROBE_SYSTEM_TEXT =
+  "You are answering a connectivity check from a resume-tailoring tool. Confirm you are reachable.";
+const PROBE_PROMPT = "Confirm you are reachable.";
+
 export class ClaudeCliEngine implements TailorEngine {
   constructor(private cfg: ClaudeCliEngineConfig) {}
+
+  // Readiness, not tailoring: ONE round trip over the same pinned spawn
+  // contract, so whatever breaks here breaks a real decision identically —
+  // which is why this is a round trip and not a `--version` probe (a binary
+  // that exists proves nothing about a subscription that isn't logged in).
+  //
+  // Single attempt, deliberately: `judge`'s retry absorbs a one-off wobble on
+  // work the caller wants completed, but a probe that retried would report a
+  // health the operator's next tailor may not get. Resolves on success and
+  // throws the usual `ClaudeCliError` otherwise — the parsed reply carries no
+  // information beyond "it answered", so there is nothing to return.
+  async probe(): Promise<void> {
+    await this.attempt(
+      `${PROBE_SYSTEM_TEXT}${buildJsonOutputSuffix(probeReplyZ)}`,
+      PROBE_PROMPT,
+      probeReplyZ,
+    );
+  }
 
   async decide(
     jd: string,
@@ -251,6 +298,14 @@ export class ClaudeCliEngine implements TailorEngine {
     });
   }
 }
+
+// The probe as a bare dependency: hand it the configured model, learn only
+// whether the round trip worked. Callers get this instead of the engine because
+// readiness is a property of the installation, not of a tailoring run — a route
+// asking "is the CLI usable?" has no business assembling an engine config.
+export type ClaudeCliProbe = (model: string) => Promise<void>;
+
+export const probeClaudeCli: ClaudeCliProbe = (model) => new ClaudeCliEngine({ model }).probe();
 
 // ── boundary parse: stdout is a claim, not a decision ──
 

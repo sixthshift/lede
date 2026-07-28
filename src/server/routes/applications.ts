@@ -38,7 +38,7 @@ import {
   tailor,
   type TailorEngine,
 } from "../tailor/engine";
-import { ClaudeCliEngine, ClaudeCliError, type ClaudeCliErrorCode } from "../tailor/claude-cli";
+import { CLAUDE_CLI_ERRORS, ClaudeCliEngine, ClaudeCliError } from "../tailor/claude-cli";
 import { DecisionContractError, FabricationError } from "../tailor/validate";
 import { deriveContentBudget } from "../tailor/budget";
 import { tailorLetter } from "../tailor/letter";
@@ -87,18 +87,6 @@ function voicePrompt(sources: VoiceSource[]): string | undefined {
   if (sources.length === 0) return undefined;
   return sources.map((s) => s.text).join("\n\n---\n\n");
 }
-
-// The CLI engine's four failure codes, each with its own client-visible error
-// string. One string per code, never a shared `claude_cli_error`: the operator
-// remedies differ completely (install the binary / read the CLI's own failure /
-// raise the budget / re-run an off-format answer), so a client that collapsed
-// them would be telling the user something it doesn't know.
-const CLAUDE_CLI_ERRORS: Record<ClaudeCliErrorCode, string> = {
-  binary_missing: "claude_cli_binary_missing",
-  exit: "claude_cli_exit",
-  timeout: "claude_cli_timeout",
-  bad_output: "claude_cli_bad_output",
-};
 
 // Maps a tailor() failure to its distinct HTTP status — identical to
 // index.ts's mapTailorError for the stateless route (spec.md §9).
