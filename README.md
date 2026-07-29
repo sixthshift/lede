@@ -111,8 +111,11 @@ as the key-gated live model-quality evals — opt-in, operator-run, never in CI.
 ### Quickstart — prebuilt image (no clone needed)
 
 CI publishes a multi-arch (amd64/arm64) image to GHCR on every green main
-build: `ghcr.io/sixthshift/lede:latest` (immutable `:sha-*` and semver tags
-also available).
+build: `ghcr.io/sixthshift/lede:latest`. Each build is also auto-versioned —
+CI derives the next semver from the conventional commits since the last
+release (fix → patch, feat → minor, breaking → major), pushes the `vX.Y.Z`
+git tag, and publishes the matching `:X.Y.Z` image tag (plus an immutable
+`:sha-*`) for pinning and rollback.
 
 With compose (recommended for anything long-lived — the `.env` keeps the
 secrets stable across container recreates, and `restart: unless-stopped`

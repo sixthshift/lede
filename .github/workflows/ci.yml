@@ -1,19 +1,21 @@
 # CI/CD — every push and PR runs the full keyless oracle (check, lint, build,
-# unit, browser e2e); pushes to main and v* tags additionally run the docker
-# e2e (the repo's own packaging gate) and, only if everything is green,
-# publish a multi-arch image to GHCR. Publishing needs no secrets beyond the
-# workflow's own GITHUB_TOKEN (packages: write).
+# unit, browser e2e); pushes to main additionally run the docker e2e (the
+# repo's own packaging gate) and, only if everything is green, auto-bump the
+# semver (from conventional commits), push the v* git tag, and publish a
+# multi-arch image to GHCR. Publishing needs no secrets beyond the workflow's
+# own GITHUB_TOKEN (contents: write for the tag, packages: write for the
+# image). Versions come from this pipeline, not from manually pushed tags —
+# tag pushes trigger nothing.
 name: ci
 
 on:
   push:
     branches: [main]
-    tags: ['v*']
   pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -70,9 +72,33 @@ jobs:
             test-results/
           retention-days: 7
 
-  publish:
+  # Auto-version: each green main push gets the next semver, derived from the
+  # conventional commits since the last tag (fix → patch, feat → minor,
+  # BREAKING CHANGE / ! → major, anything else → patch). The tag is created
+  # with GITHUB_TOKEN, which GitHub deliberately prevents from triggering
+  # workflows — so publish consumes the version as a job output, never as a
+  # tag event.
+  version:
     runs-on: ubuntu-latest
     needs: [test, docker-e2e]
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.bump.outputs.new_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history — the bump is computed from commits since the last tag
+      - id: bump
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: patch
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: [test, docker-e2e, version]
     if: github.event_name == 'push'
     permissions:
       contents: read
@@ -90,13 +116,12 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
-          # main -> :latest + :main; v1.2.3 tag -> :1.2.3 + :1.2 + :latest;
-          # every push also gets an immutable :sha-<short> tag.
+          # every green main push -> :latest + :main + the auto-bumped
+          # :X.Y.Z + an immutable :sha-<short>.
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest
             type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=${{ needs.version.outputs.version }}
             type=sha
       - uses: docker/build-push-action@v6
         with:
