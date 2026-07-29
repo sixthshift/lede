@@ -114,6 +114,20 @@ CI publishes a multi-arch (amd64/arm64) image to GHCR on every green main
 build: `ghcr.io/sixthshift/lede:latest` (immutable `:sha-*` and semver tags
 also available).
 
+With compose (recommended for anything long-lived — the `.env` keeps the
+secrets stable across container recreates, and `restart: unless-stopped`
+survives reboots):
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/sixthshift/lede/main/deploy/docker-compose.yml
+printf 'LEDE_MASTER_KEY=%s\nLEDE_SESSION_SECRET=%s\n' \
+  "$(openssl rand -base64 32)" "$(openssl rand -base64 48)" > .env
+docker compose up -d
+```
+
+Update later with `docker compose pull && docker compose up -d`. Or as a
+one-off `docker run`:
+
 ```bash
 docker run -d --name lede \
   -p 8787:8787 \
@@ -125,9 +139,10 @@ docker run -d --name lede \
 
 Open **http://localhost:8787**, set your login password, then add your
 provider API key in **Settings** (BYOK — stored encrypted at rest). Note:
-generating `LEDE_MASTER_KEY` inline like this works until you recreate the
-container — for anything long-lived, generate once, store it safely, and pass
-the same value every time (see the warning below).
+generating the secrets inline like the `docker run` example works until you
+recreate the container — for anything long-lived, generate once, store safely
+(the compose `.env` does this), and pass the same value every time (see the
+warning below).
 
 ### Building it yourself
 

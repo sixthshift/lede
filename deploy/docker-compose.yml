@@ -1,0 +1,29 @@
+# Device install — pulls the prebuilt GHCR image; no repo clone, no build.
+# (The root docker-compose.yml builds from source and is the docker-e2e's
+# packaging gate — this file is the consumer-side counterpart, kept separate
+# so `docker compose up` on a device can never accidentally build.)
+#
+#   curl -fsSLO https://raw.githubusercontent.com/sixthshift/lede/main/deploy/docker-compose.yml
+#   printf 'LEDE_MASTER_KEY=%s\nLEDE_SESSION_SECRET=%s\n' \
+#     "$(openssl rand -base64 32)" "$(openssl rand -base64 48)" > .env
+#   docker compose up -d
+#
+# Update to the newest image: docker compose pull && docker compose up -d
+services:
+  lede:
+    image: ghcr.io/sixthshift/lede:latest
+    ports:
+      - '${PORT:-8787}:8787'
+    environment:
+      - 'LEDE_MASTER_KEY=${LEDE_MASTER_KEY:?required — generate with "openssl rand -base64 32"}'
+      - 'LEDE_SESSION_SECRET=${LEDE_SESSION_SECRET:?required — generate with "openssl rand -base64 48"}'
+      - PORT=8787
+      - DATA_DIR=/app/data
+      - LEDE_AUTH_DISABLED=${LEDE_AUTH_DISABLED:-false}
+    volumes:
+      - lede-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  lede-data:
+    driver: local
